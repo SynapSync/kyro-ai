@@ -106,6 +106,9 @@ This skill works for **any** project type, language, or framework.
 | Read vault/sprints | Yes | Yes | Yes |
 | Update accumulated debt | No | Yes | No |
 | Report progress | No | No | Yes |
+| Delegate to specialized agents | No | Yes (reviewer, debugger) | No |
+| Propose learned rules | No | Yes (via retro) | No |
+| Validate tasks with checklist | No | Yes (BLOCKER/WARNING/SUGGESTION) | No |
 
 ---
 
@@ -204,6 +207,44 @@ This will: read all sprints, calculate metrics, display progress and accumulated
 | Skill | Integration |
 |-------|------------|
 | `code-analyzer` | INIT: Can be used as a preliminary step. The code-analyzer reports feed into Sprint Forge findings, providing structured technical input for the roadmap. |
+
+---
+
+## Workflow Components
+
+Sprint Forge v2.0 operates as a workflow with specialized agents and commands. The SKILL.md remains the core orchestration logic, but execution is now distributed:
+
+### Agents
+
+| Agent | Role | When Used |
+|-------|------|-----------|
+| `explorer` | Read-only codebase analysis | INIT mode — delegates deep analysis |
+| `reviewer` | Task quality validation | SPRINT mode — validates each task before closure |
+| `debugger` | Root cause investigation | SPRINT mode — invoked on task failure |
+| `orchestrator` | Full cycle coordination | /forge command — coordinates all phases with gates |
+
+### Commands
+
+| Command | Maps To |
+|---------|---------|
+| `/forge` | Full cycle: INIT → SPRINT → Review → Close with validation gates |
+| `/sprint` | SPRINT mode (generate and/or execute) |
+| `/status` | STATUS mode with velocity metrics and debt heatmap |
+| `/debt` | Debt management (list, add, resolve, escalate) |
+| `/retro` | Sprint retrospective ritual with rule proposals |
+
+### Lifecycle Hooks
+
+The workflow fires hooks at key moments during sprint execution. See `hooks/hooks.json` for the full list. Key hooks:
+- **SessionStart** — loads learned rules from `~/.sprint-forge/rules.md`
+- **PostToolUse** — checks for debug artifacts after code edits
+- **TaskCompleted** — runs reviewer checklist
+- **PostToolUseFailure** — suggests debugger invocation
+- **PreCompact** — saves re-entry state before context compaction
+
+### Cross-Project Learning
+
+Corrections during sprint execution are captured as persistent rules in `~/.sprint-forge/rules.md`. These rules are loaded at session start and applied automatically in all future projects. See the `sprint-learner` skill for details.
 
 ---
 
