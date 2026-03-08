@@ -1,0 +1,149 @@
+{
+  "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
+  "name": "sprint-forge",
+  "type": "skill",
+  "version": "1.10.0",
+  "description": "Adaptive sprint workflow — analysis, roadmap, iterative sprints, debt tracking, and context persistence",
+  "author": {
+    "name": "SynapSync",
+    "url": "https://github.com/SynapSync",
+    "email": "hello@synapsync.dev"
+  },
+  "license": "Apache-2.0",
+  "category": "workflow",
+  "tags": [
+    "workflow",
+    "sprint",
+    "planning",
+    "execution",
+    "debt-tracking",
+    "roadmap",
+    "iterative",
+    "adaptive",
+    "context-persistence",
+    "reentry"
+  ],
+  "providers": [
+    "claude",
+    "openai",
+    "cursor",
+    "windsurf",
+    "copilot",
+    "gemini",
+    "codex"
+  ],
+  "file": "SKILL.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SynapSync/skills-registry"
+  },
+  "homepage": "https://synapsync.dev/cognitives/sprint-forge",
+  "assets": {
+    "modes": 3,
+    "helpers": 4,
+    "templates": 4
+  },
+  "changelog": [
+    {
+      "version": "1.10.0",
+      "date": "2026-03-07",
+      "changes": [
+        "Add checkpoint-per-phase persistence rule to SPRINT EXECUTE workflow — sprint file is written to disk after each phase completes, balancing crash safety with execution fluidity"
+      ]
+    },
+    {
+      "version": "1.9.0",
+      "date": "2026-03-06",
+      "changes": [
+        "Add YAML frontmatter properties to all templates (SPRINT, ROADMAP, PROJECT-README, REENTRY-PROMPTS) and finding file format",
+        "Add `agents` field to frontmatter — tracks AI model names (e.g., claude-opus-4-6, gpt-4o, codex) that created or modified the document",
+        "Update INIT and SPRINT modes with frontmatter generation instructions and close-time frontmatter updates"
+      ]
+    },
+    {
+      "version": "1.8.0",
+      "date": "2026-03-03",
+      "changes": [
+        "Remove obsidian integration from sprint-forge — syncing to vault is now a separate, explicit user step"
+      ]
+    },
+    {
+      "version": "1.7.0",
+      "date": "2026-03-03",
+      "changes": [
+        "Remove AGENTS.md branded block dependency for output_sprint_forge_dir resolution",
+        "INIT now asks user once and stores output_sprint_forge_dir in README.md and RE-ENTRY-PROMPTS.md",
+        "SPRINT Step 0 now extracts output_sprint_forge_dir from re-entry prompt paths as primary source",
+        "REENTRY-PROMPTS template now includes explicit output_sprint_forge_dir section at the top",
+        "Simplified Configuration Resolution in SKILL.md to 3 clear rules"
+      ]
+    },
+    {
+      "version": "1.6.0",
+      "date": "2026-02-21",
+      "changes": [
+        "Updated Integration table with explicit obsidian skill invocation and MCP guardrail"
+      ]
+    },
+    {
+      "version": "1.5.0",
+      "date": "2026-02-21",
+      "changes": [
+        "Remove changelog from frontmatter, remove Version History section, add Asset Loading (Mode-Gated) table"
+      ]
+    },
+    {
+      "version": "1.4.0",
+      "date": "2026-02-19",
+      "changes": [
+        "Branded AGENTS.md block support — output_sprint_forge_dir config persisted in synapsync-skills Configuration table",
+        "New output_sprint_forge_dir config key remembered across sessions via AGENTS.md (supplements auto-discovery and re-entry prompts)"
+      ]
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-02-18",
+      "changes": [
+        "Replaced staging pattern with interactive path resolution — ask once before first write",
+        "Option 1: {cwd}/.agents/sprint-forge/{project-name}/ (default)",
+        "Option 2: {user-root}/sprint-forge/{project-name}/ (custom)",
+        "Removed post-production delivery steps from INIT and SPRINT modes",
+        "Added Step 0 to SPRINT and STATUS for locating {output_sprint_forge_dir} in future sessions"
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-02-17",
+      "changes": [
+        "Migrated to deterministic staging pattern (.agents/staging/sprint-forge/)",
+        "Renamed {output_base} to {output_sprint_forge_dir} for consistency across all skills",
+        "Added post-production delivery step to INIT and SPRINT modes"
+      ]
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-02-16",
+      "changes": [
+        "Add [>] carry-over task state for tasks that pass to the next sprint",
+        "Add execution metadata (date, executor) to sprint header",
+        "Add 'Converted to Phase' as disposition action for recommendations",
+        "Add Findings Consolidation phase as recommended sprint closing pattern",
+        "Add Evidence field to task format for inline documentation",
+        "Add 'New Technical Debt Detected' as fourth retro subsection"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-02-16",
+      "changes": [
+        "Initial release — 3 modes (INIT, SPRINT, STATUS)",
+        "Adaptive roadmap with sprint-by-sprint generation",
+        "Formal debt tracking with inheritance",
+        "Re-entry prompts for context persistence across sessions",
+        "Language-agnostic: works for any project type, language, or framework"
+      ]
+    }
+  ],
+  "createdAt": "2026-02-16T00:00:00Z",
+  "updatedAt": "2026-03-07T00:00:00Z"
+}

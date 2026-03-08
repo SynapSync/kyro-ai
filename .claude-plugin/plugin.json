@@ -1,0 +1,29 @@
+{
+  "name": "sprint-forge",
+  "version": "2.0.0",
+  "description": "Complete sprint workflow system. 4 agents, 8 lifecycle hooks, 5 commands, adaptive learning, and formal debt tracking.",
+  "author": {
+    "name": "SynapSync",
+    "url": "https://github.com/SynapSync"
+  },
+  "homepage": "https://github.com/SynapSync/sprint-forge",
+  "repository": "https://github.com/SynapSync/sprint-forge",
+  "license": "Apache-2.0",
+  "keywords": [
+    "claude-code",
+    "workflow",
+    "sprint",
+    "planning",
+    "agents",
+    "hooks",
+    "debt-tracking",
+    "adaptive"
+  ],
+  "skills": ["./skills/"],
+  "agents": [
+    "./agents/explorer.md",
+    "./agents/reviewer.md",
+    "./agents/debugger.md",
+    "./agents/orchestrator.md"
+  ]
+}
