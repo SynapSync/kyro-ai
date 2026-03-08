@@ -1,0 +1,59 @@
+name: sprint-forge
+type: workflow
+version: "2.0.0"
+description: >
+  Complete sprint workflow system with specialized agents, lifecycle hooks,
+  adaptive learning across projects, and formal validation gates.
+
+author:
+  name: SynapSync
+  url: https://github.com/SynapSync
+
+license: Apache-2.0
+
+commands:
+  - forge       # Full cycle: Analyze → Plan → Implement → Review → Commit
+  - sprint      # Generate and/or execute the next sprint
+  - status      # Project metrics, velocity, debt heatmap
+  - debt        # Technical debt management
+  - retro       # Sprint retrospective ritual
+
+agents:
+  - explorer      # Read-only codebase analysis (INIT)
+  - reviewer      # Task quality validation (SPRINT)
+  - debugger      # Root cause investigation (on failure)
+  - orchestrator  # Full cycle coordination (/forge)
+
+skills:
+  - sprint-forge     # Core orchestration (base skill)
+  - sprint-analyzer  # Analysis strategies per work type
+  - sprint-reviewer  # Quality checklist (BLOCKER/WARNING/SUGGESTION)
+  - sprint-learner   # Cross-project rule accumulation
+  - sprint-metrics   # Velocity trends and debt heatmap
+  - sprint-handoff   # Enriched context transfer with mental model
+
+hooks:
+  - SessionStart         # Load rules, show active sprint
+  - PreToolUse           # Track edits, remind quality gates
+  - PostToolUse          # Check for debug artifacts, detect test failures
+  - Stop                 # Session check, capture learnings
+  - SessionEnd           # Save stats, prompt for learnings
+  - UserPromptSubmit     # Drift detection, rule violation check
+  - PreCompact           # Save re-entry state before compaction
+  - SubagentStart        # Log agent lifecycle
+  - SubagentStop         # Log agent completion
+  - TaskCompleted        # Post-task quality checklist
+  - PostToolUseFailure   # Detect failures, suggest debugger
+
+storage:
+  global: ~/.sprint-forge/          # Rules, database, handoffs
+  project: .agents/sprint-forge/    # Per-project sprint documents
+
+philosophy:
+  - "Learn from every project, apply in the next"
+  - "Investigate before planning, plan before implementing"
+  - "Every task passes a quality gate before closure"
+  - "Mental context is as important as code"
+  - "Zero dead time — parallel tasks when possible"
+  - "Debt never disappears — only its status changes"
+  - "The plan serves execution, not the reverse"

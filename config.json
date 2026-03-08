@@ -1,0 +1,49 @@
+{
+  "database": {
+    "path": "~/.sprint-forge/data.db",
+    "auto_init": true
+  },
+  "rules": {
+    "path": "~/.sprint-forge/rules.md",
+    "auto_load": true,
+    "require_approval": true
+  },
+  "search": {
+    "default_limit": 10,
+    "highlight_matches": true
+  },
+  "self_correction": {
+    "enabled": true,
+    "require_approval": true,
+    "learned_file": "~/.sprint-forge/rules.md"
+  },
+  "quality_gates": {
+    "run_lint": true,
+    "run_typecheck": true,
+    "run_tests": true,
+    "lint_command": "npm run lint",
+    "typecheck_command": "npm run typecheck",
+    "test_command": "npm test -- --related"
+  },
+  "sprint": {
+    "max_tasks_per_sprint": 10,
+    "checkpoint_per_phase": true,
+    "require_retro": true,
+    "debt_aged_threshold_sprints": 3
+  },
+  "parallel_sessions": {
+    "suggest_worktrees": true,
+    "native_worktree": true
+  },
+  "model_preferences": {
+    "exploration": "haiku",
+    "planning": "sonnet",
+    "implementation": "opus",
+    "debugging": "opus",
+    "review": "sonnet"
+  },
+  "context": {
+    "warning_threshold_percent": 70,
+    "auto_save_reentry": true
+  }
+}

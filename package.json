@@ -1,0 +1,66 @@
+{
+  "name": "sprint-forge",
+  "version": "2.0.0",
+  "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive learning across projects",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build",
+    "db:init": "node dist/db/index.js"
+  },
+  "keywords": [
+    "claude-code",
+    "workflow",
+    "sprint",
+    "planning",
+    "execution",
+    "debt-tracking",
+    "roadmap",
+    "iterative",
+    "adaptive",
+    "hooks",
+    "agents",
+    "subagents",
+    "self-correction",
+    "worktrees",
+    "context-persistence"
+  ],
+  "author": {
+    "name": "SynapSync",
+    "url": "https://github.com/SynapSync"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SynapSync/sprint-forge"
+  },
+  "homepage": "https://synapsync.dev/cognitives/sprint-forge",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^25.2.2",
+    "typescript": "^5.7.3"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "hooks",
+    "commands",
+    "agents",
+    "skills",
+    "docs",
+    "rules",
+    "contexts",
+    "templates",
+    "config.json",
+    "settings.example.json",
+    "README.md"
+  ]
+}
