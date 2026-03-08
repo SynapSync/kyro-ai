@@ -1,9 +1,9 @@
 {
   "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
   "name": "sprint-forge",
-  "type": "skill",
-  "version": "1.10.0",
-  "description": "Adaptive sprint workflow — analysis, roadmap, iterative sprints, debt tracking, and context persistence",
+  "type": "workflow",
+  "version": "2.0.0",
+  "description": "Adaptive sprint workflow with specialized agents, lifecycle hooks, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and cross-project learning",
   "author": {
     "name": "SynapSync",
     "url": "https://github.com/SynapSync",
@@ -35,15 +35,22 @@
   "file": "SKILL.md",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SynapSync/skills-registry"
+    "url": "https://github.com/SynapSync/sprint-forge"
   },
-  "homepage": "https://synapsync.dev/cognitives/sprint-forge",
+  "homepage": "https://github.com/SynapSync/sprint-forge",
   "assets": {
     "modes": 3,
     "helpers": 4,
     "templates": 4
   },
   "changelog": [
+    {
+      "version": "2.0.0",
+      "date": "2026-03-08",
+      "changes": [
+        "Evolve from standalone skill to full workflow with specialized agents (explorer, reviewer, debugger, orchestrator), lifecycle hooks, slash commands (/forge, /sprint, /status, /debt, /retro), and cross-project learning via persistent rules"
+      ]
+    },
     {
       "version": "1.10.0",
       "date": "2026-03-07",
@@ -145,5 +152,5 @@
     }
   ],
   "createdAt": "2026-02-16T00:00:00Z",
-  "updatedAt": "2026-03-07T00:00:00Z"
+  "updatedAt": "2026-03-08T00:00:00Z"
 }
