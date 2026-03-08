@@ -1,0 +1,7 @@
+{
+  "name": "sprint-forge",
+  "version": "2.0.0",
+  "description": "Sprint workflow system with agents, hooks, and adaptive learning",
+  "skills": ["./skills/"],
+  "rules": ["./rules/"]
+}
