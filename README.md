@@ -6,11 +6,12 @@
   <a href="https://github.com/SynapSync/sprint-forge/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/sprint-forge?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
   <a href="https://www.npmjs.com/package/sprint-forge"><img src="https://img.shields.io/npm/v/sprint-forge?style=for-the-badge&logo=npm&color=E8926F&labelColor=1e1e2e" alt="npm"/></a>
   <a href="https://github.com/SynapSync/sprint-forge/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-22c55e?style=for-the-badge&labelColor=1e1e2e" alt="License"/></a>
+  <a href="https://github.com/SynapSync/sprint-forge/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SynapSync/sprint-forge/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=1e1e2e" alt="CI"/></a>
 </p>
 
 <p align="center">
   <b>Complete sprint workflow system for AI-assisted development.</b><br/>
-  4 agents &bull; 12 hooks &bull; 5 commands &bull; 6 skills &bull; Adaptive learning across projects<br/>
+  4 agents &bull; 12 hooks &bull; 9 commands &bull; 7 skills &bull; Adaptive learning across projects<br/>
   Built for <b>Claude Code</b>. Compatible with any AI coding agent via SkillKit.
 </p>
 
@@ -35,7 +36,7 @@ Unlike rigid project planners, Sprint Forge:
 
 <table>
 <tr><td><b>4 Agents</b></td><td>Explorer (read-only analysis), Reviewer (task validation), Debugger (root cause), Orchestrator (full cycle)</td></tr>
-<tr><td><b>5 Commands</b></td><td><code>/forge</code>, <code>/sprint</code>, <code>/status</code>, <code>/debt</code>, <code>/retro</code></td></tr>
+<tr><td><b>9 Commands</b></td><td><code>/forge</code>, <code>/sprint</code>, <code>/status</code>, <code>/debt</code>, <code>/retro</code>, <code>/wrap-up</code>, <code>/insights</code>, <code>/deslop</code>, <code>/parallel</code></td></tr>
 <tr><td><b>12 Hooks</b></td><td>SessionStart, PreToolUse, PostToolUse, Stop, SessionEnd, UserPromptSubmit, PreCompact, SubagentStart/Stop, TaskCompleted, PostToolUseFailure</td></tr>
 <tr><td><b>Cross-Project Learning</b></td><td>Corrections become rules in <code>~/.sprint-forge/rules.md</code> — applied automatically in future projects</td></tr>
 <tr><td><b>Validation Gates</b></td><td>BLOCKER/WARNING/SUGGESTION checklist per task, phase gates with user approval</td></tr>
@@ -106,14 +107,18 @@ sprint-forge/
 │   ├── debugger.md             # Root cause investigation (on failure)
 │   └── orchestrator.md         # Full cycle coordinator (/forge)
 │
-├── commands/                   # 5 slash commands
+├── commands/                   # 9 slash commands
 │   ├── forge.md                # /forge — full cycle with gates
 │   ├── sprint.md               # /sprint — generate/execute next sprint
 │   ├── status.md               # /status — metrics + debt heatmap
 │   ├── debt.md                 # /debt — manage technical debt
-│   └── retro.md                # /retro — sprint retrospective ritual
+│   ├── retro.md                # /retro — sprint retrospective ritual
+│   ├── wrap-up.md              # /wrap-up — session closure ritual
+│   ├── insights.md             # /insights — DB-backed analytics
+│   ├── deslop.md               # /deslop — AI slop removal
+│   └── parallel.md             # /parallel — worktree parallel execution
 │
-├── skills/                     # 6 skills (domain knowledge)
+├── skills/                     # 7 skills (domain knowledge)
 │   ├── sprint-forge/           # Core orchestration (base skill from v1.x)
 │   │   ├── SKILL.md
 │   │   └── assets/             # Modes, helpers, templates
@@ -121,18 +126,35 @@ sprint-forge/
 │   ├── sprint-reviewer/        # Quality checklist (BLOCKER/WARNING/SUGGESTION)
 │   ├── sprint-learner/         # Cross-project rule accumulation
 │   ├── sprint-metrics/         # Velocity trends + debt heatmap
-│   └── sprint-handoff/         # Enriched context transfer
+│   ├── sprint-handoff/         # Enriched context transfer
+│   └── deslop/                 # AI slop detection and removal
+│
+├── docs/                       # 8 documentation guides
+│   ├── getting-started.md      # Quick start walkthrough
+│   ├── commands-reference.md   # Full command documentation
+│   ├── agents-reference.md     # Agent capabilities and tools
+│   ├── hooks-reference.md      # Hook event documentation
+│   ├── rules-guide.md          # Self-correction rules system
+│   ├── architecture.md         # System architecture deep dive
+│   ├── model-selection.md      # Model tier selection guide
+│   └── context-management.md   # Token limits and compaction strategies
 │
 ├── hooks/                      # Lifecycle event handlers
 │   └── hooks.json              # 12 hook definitions
-├── scripts/                    # 10 Node.js hook handler scripts
+├── scripts/                    # 11 Node.js hook handler + test scripts
 │
 ├── src/                        # TypeScript source (SQLite + FTS5)
 │   ├── db/                     # Database init, schema, store
 │   └── search/                 # Full-text search with BM25 ranking
 │
+├── .github/workflows/          # CI/CD pipelines
+│   ├── ci.yml                  # Build + test on push/PR
+│   └── release.yml             # GitHub release on tag push
+│
 ├── .claude-plugin/             # Claude Code plugin metadata
+├── .cursor-plugin/             # Cursor plugin metadata
 ├── config.json                 # Workflow configuration
+├── marketplace.json            # Plugin marketplace listing
 ├── settings.example.json       # Production settings template
 ├── WORKFLOW.yaml               # Workflow definition
 └── CLAUDE.md                   # Development instructions
@@ -179,6 +201,10 @@ npx skillkit install sprint-forge
 | `/status` | Project metrics, velocity trends, debt heatmap |
 | `/debt` | List, add, resolve, or escalate technical debt |
 | `/retro` | Sprint retrospective ritual with rule proposals |
+| `/wrap-up` | End-of-session closure ritual with quality check and context handoff |
+| `/insights` | Database-backed analytics — correction trends, learning heatmap, velocity |
+| `/deslop` | Detect and remove AI-generated slop — unnecessary comments, over-engineering |
+| `/parallel` | Analyze sprint tasks for parallel execution via git worktrees |
 
 ---
 
@@ -203,6 +229,7 @@ npx skillkit install sprint-forge
 | `sprint-learner` | Cross-project rule accumulation via `~/.sprint-forge/rules.md` |
 | `sprint-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
 | `sprint-handoff` | Enriched session handoff with mental context (hypotheses, decisions, blockers) |
+| `deslop` | AI slop detection and removal — 7 categories, confidence ratings, safety rules |
 
 ---
 
@@ -282,11 +309,29 @@ See [`settings.example.json`](settings.example.json) for production permission a
 | Learning | Per-project retro | Persistent rules across projects |
 | Agents | 1 (the skill itself) | 4 specialized (explorer, reviewer, debugger, orchestrator) |
 | Hooks | 0 | 12 lifecycle events |
-| Commands | 0 (text triggers) | 5 commands (/forge, /sprint, /status, /debt, /retro) |
+| Commands | 0 (text triggers) | 9 commands (/forge, /sprint, /status, /debt, /retro, /wrap-up, /insights, /deslop, /parallel) |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase |
 | Metrics | Basic STATUS | Velocity trends + debt heatmap + estimation patterns |
 | Context transfer | Re-entry prompts (files) | Enriched handoff (mental context) |
 | Database | None | SQLite + FTS5 (learnings, sessions, debt) |
+| CI/CD | None | 2 GitHub Actions workflows (CI + Release) |
+| Documentation | README only | 8 guides + SOUL.md template |
+| Distribution | Manual clone | marketplace.json + npm pack ready |
+
+---
+
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](docs/getting-started.md) | Quick start walkthrough |
+| [Commands Reference](docs/commands-reference.md) | Full command documentation |
+| [Agents Reference](docs/agents-reference.md) | Agent capabilities and tools |
+| [Hooks Reference](docs/hooks-reference.md) | Hook event documentation |
+| [Rules Guide](docs/rules-guide.md) | Self-correction rules system |
+| [Architecture](docs/architecture.md) | System architecture deep dive |
+| [Model Selection](docs/model-selection.md) | Model tier selection and cost tradeoffs |
+| [Context Management](docs/context-management.md) | Token limits, compaction strategies |
 
 ---
 

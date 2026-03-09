@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// Track edit count for quality gate reminders
+// Track edit count for quality gate reminders (temp file)
 const stateFile = path.join(os.tmpdir(), 'sprint-forge-edits.json');
 
 let state = { editCount: 0, lastReminder: 0 };
@@ -25,6 +25,16 @@ if (state.editCount - state.lastReminder >= 5) {
 }
 
 fs.writeFileSync(stateFile, JSON.stringify(state));
+
+// Also track edit_count in .active-session for DB persistence
+const sessionFile = path.join(os.homedir(), '.sprint-forge', '.active-session');
+try {
+  if (fs.existsSync(sessionFile)) {
+    const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
+    sessionData.edit_count = (sessionData.edit_count || 0) + 1;
+    fs.writeFileSync(sessionFile, JSON.stringify(sessionData));
+  }
+} catch (_) {}
 
 // Pass through stdin
 let data = '';

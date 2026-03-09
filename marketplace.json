@@ -1,0 +1,41 @@
+{
+  "name": "sprint-forge",
+  "version": "2.3.0",
+  "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive learning across projects",
+  "author": {
+    "name": "SynapSync",
+    "url": "https://github.com/SynapSync"
+  },
+  "homepage": "https://synapsync.dev/cognitives/sprint-forge",
+  "repository": "https://github.com/SynapSync/sprint-forge",
+  "license": "Apache-2.0",
+  "keywords": [
+    "workflow",
+    "sprint",
+    "planning",
+    "agents",
+    "hooks",
+    "adaptive",
+    "debt-tracking",
+    "self-correction"
+  ],
+  "categories": [
+    "workflow",
+    "sprint",
+    "planning"
+  ],
+  "engines": {
+    "claude-code": ">=1.0.0"
+  },
+  "entrypoints": {
+    "skills": "./skills/",
+    "agents": [
+      "./agents/explorer.md",
+      "./agents/reviewer.md",
+      "./agents/debugger.md",
+      "./agents/orchestrator.md"
+    ],
+    "commands": "./commands/",
+    "hooks": "./hooks/hooks.json"
+  }
+}
