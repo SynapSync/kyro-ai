@@ -11,13 +11,13 @@ Report project progress, sprint velocity, technical debt heatmap, and next sprin
 
 ### Standard Report
 
-1. **Locate output directory** — resolve `{output_sprint_forge_dir}`
+1. **Locate output directory** — resolve `{output_kyro_dir}`
 2. **Read project state** — README, ROADMAP, all sprint files
 3. **Calculate metrics** and generate report:
 
 ```text
 ══════════════════════════════════════
-SPRINT FORGE — Project Status
+KYRO — Project Status
 ══════════════════════════════════════
 
 ## Sprint Progress

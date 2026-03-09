@@ -1,12 +1,12 @@
 ---
-description: Governs the capture, formatting, and lifecycle of learned rules in ~/.sprint-forge/rules.md. Ensures rules are specific, actionable, and do not accumulate without bound.
+description: Governs the capture, formatting, and lifecycle of learned rules in ~/.kyro/rules.md. Ensures rules are specific, actionable, and do not accumulate without bound.
 globs: ["**/*.md"]
 alwaysApply: true
 ---
 
 # Learning Rules
 
-Rules governing how Sprint Forge captures and manages cross-project learnings.
+Rules governing how Kyro captures and manages cross-project learnings.
 
 ## R-LR-01: Capture Corrections as Rules
 
@@ -41,11 +41,11 @@ Every rule must include the date it was learned and the project where the lesson
 
 ## R-LR-04: Check Before Adding
 
-Before proposing a new rule, check `~/.sprint-forge/rules.md` for existing rules that cover the same concern.
+Before proposing a new rule, check `~/.kyro/rules.md` for existing rules that cover the same concern.
 
 - If a match exists, update or refine the existing rule instead of adding a duplicate.
 - If the new rule contradicts an existing one, present both to the user for resolution.
-- Use the `sprint-learner` skill's search capability to find semantic matches.
+- Use the `kyro-learner` skill's search capability to find semantic matches.
 
 ## R-LR-05: Maximum 50 Active Rules
 
@@ -54,7 +54,7 @@ The active rule set must not exceed 50 rules.
 - When the limit is reached, trigger a consolidation review:
   1. Merge rules that cover the same domain into a single, broader rule.
   2. Deprecate rules that have not been triggered in the last 5 sprints.
-  3. Archive deprecated rules to `~/.sprint-forge/rules-archive.md`.
+  3. Archive deprecated rules to `~/.kyro/rules-archive.md`.
 - Present the consolidation plan to the user for approval before modifying.
 
 ## R-LR-06: Rule Application Tracking

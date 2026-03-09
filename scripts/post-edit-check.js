@@ -29,7 +29,7 @@ process.stdin.on('end', () => {
     }
 
     if (issues.length > 0) {
-      console.error(`[SprintForge] Issues in ${filePath}:`);
+      console.error(`[Kyro] Issues in ${filePath}:`);
       issues.forEach(issue => console.error(`  ⚠ ${issue}`));
     }
   } catch (e) {

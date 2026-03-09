@@ -11,7 +11,7 @@ agents:
 tags:
   - "{project_name}"
   - "progress"
-  - "sprint-forge"
+  - "kyro"
 changelog:
   - version: "1.0"
     date: "{date}"
@@ -31,7 +31,7 @@ related:
 
 ## What Is This
 
-This directory contains the working artifacts for {description_of_work}. It is managed by the `sprint-forge` skill and follows an adaptive sprint workflow.
+This directory contains the working artifacts for {description_of_work}. It is managed by the `kyro` skill and follows an adaptive sprint workflow.
 
 ---
 
@@ -49,7 +49,7 @@ If you are an AI agent resuming work on this project, read these files in order:
 ## Directory Structure
 
 ```
-{output_sprint_forge_dir}/
+{output_kyro_dir}/
 ├── README.md              ← This file
 ├── ROADMAP.md             ← Adaptive roadmap (living document)
 ├── RE-ENTRY-PROMPTS.md    ← Context recovery prompts
@@ -70,11 +70,11 @@ If you are an AI agent resuming work on this project, read these files in order:
 | Resource | Path |
 |----------|------|
 | Codebase | `{codebase_path}` |
-| Working Directory | `{output_sprint_forge_dir}` |
-| Findings | `{output_sprint_forge_dir}/findings/` |
-| Sprints | `{output_sprint_forge_dir}/sprints/` |
-| Roadmap | `{output_sprint_forge_dir}/ROADMAP.md` |
-| Re-entry Prompts | `{output_sprint_forge_dir}/RE-ENTRY-PROMPTS.md` |
+| Working Directory | `{output_kyro_dir}` |
+| Findings | `{output_kyro_dir}/findings/` |
+| Sprints | `{output_kyro_dir}/sprints/` |
+| Roadmap | `{output_kyro_dir}/ROADMAP.md` |
+| Re-entry Prompts | `{output_kyro_dir}/RE-ENTRY-PROMPTS.md` |
 
 ---
 

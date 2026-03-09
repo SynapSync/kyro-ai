@@ -1,5 +1,5 @@
 {
-  "name": "sprint-forge",
+  "name": "kyro-workflow",
   "version": "2.3.0",
   "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive learning across projects",
   "main": "dist/index.js",
@@ -34,9 +34,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/SynapSync/sprint-forge"
+    "url": "https://github.com/SynapSync/kyro-workflow"
   },
-  "homepage": "https://synapsync.dev/cognitives/sprint-forge",
+  "homepage": "https://synapsync.dev/cognitives/kyro-workflow",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=18.0.0"

@@ -1,10 +1,10 @@
 {
   "database": {
-    "path": "~/.sprint-forge/data.db",
+    "path": "~/.kyro/data.db",
     "auto_init": true
   },
   "rules": {
-    "path": "~/.sprint-forge/rules.md",
+    "path": "~/.kyro/rules.md",
     "auto_load": true,
     "require_approval": true
   },
@@ -15,7 +15,7 @@
   "self_correction": {
     "enabled": true,
     "require_approval": true,
-    "learned_file": "~/.sprint-forge/rules.md"
+    "learned_file": "~/.kyro/rules.md"
   },
   "quality_gates": {
     "run_lint": true,

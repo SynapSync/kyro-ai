@@ -3,11 +3,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-const DEFAULT_DB_DIR = path.join(os.homedir(), '.sprint-forge');
+const DEFAULT_DB_DIR = path.join(os.homedir(), '.kyro');
 const DEFAULT_DB_PATH = path.join(DEFAULT_DB_DIR, 'data.db');
 
 export function getDbPath(): string {
-  return process.env.SPRINT_FORGE_DB_PATH || DEFAULT_DB_PATH;
+  return process.env.KYRO_DB_PATH || DEFAULT_DB_PATH;
 }
 
 export function initDatabase(dbPath?: string): Database.Database {

@@ -10,9 +10,9 @@ process.stdin.on('end', () => {
     const userMessage = input.user_message || '';
 
     // Check for active sprint
-    const sprintForgeDir = path.join(process.cwd(), '.agents', 'sprint-forge');
-    if (fs.existsSync(sprintForgeDir)) {
-      const sprintsDir = path.join(sprintForgeDir, 'sprints');
+    const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
+    if (fs.existsSync(kyroDir)) {
+      const sprintsDir = path.join(kyroDir, 'sprints');
       if (fs.existsSync(sprintsDir)) {
         const sprints = fs.readdirSync(sprintsDir).filter(f => f.endsWith('.md')).sort();
         if (sprints.length > 0) {
@@ -27,8 +27,8 @@ process.stdin.on('end', () => {
             if (!sprintKeywords.test(userMessage) && !codeKeywords.test(userMessage)) {
               // Could be drift — gentle reminder
               if (userMessage.length > 50) {
-                console.error('[SprintForge] Reminder: Sprint in progress (' + latest + ')');
-                console.error('[SprintForge] Is this related to the current sprint task?');
+                console.error('[Kyro] Reminder: Sprint in progress (' + latest + ')');
+                console.error('[Kyro] Is this related to the current sprint task?');
               }
             }
           }

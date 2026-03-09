@@ -1,4 +1,4 @@
-# COMMANDS.md — Sprint Forge Command Reference
+# COMMANDS.md — Kyro Command Reference
 
 ## /forge
 
@@ -62,7 +62,7 @@ Sprint retrospective ritual. Required after every completed sprint.
 
 Captures: what worked, what did not, estimation accuracy, and concrete
 improvements. Writes learnings to `LEARNED.md` and to the global rules
-file at `~/.sprint-forge/rules.md`.
+file at `~/.kyro/rules.md`.
 
 ---
 

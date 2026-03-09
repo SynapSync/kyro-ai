@@ -15,7 +15,7 @@ This mode performs deep analysis of a project, generates findings, creates an ad
 ## Prerequisites
 
 - Access to the codebase (local path or repository)
-- No previous sprint-forge work for this project (if resuming, use SPRINT or STATUS mode)
+- No previous kyro work for this project (if resuming, use SPRINT or STATUS mode)
 
 ---
 
@@ -47,22 +47,22 @@ Gather or detect the following configuration:
 |--------|---------------|
 | **Project Name** | Ask the user or derive from the codebase directory name. Use a slug format: `my-project-audit`. |
 | **Codebase Path** | The absolute path to the codebase. Usually the current working directory. |
-| **Sprint Output Dir** | `{output_sprint_forge_dir}/sprints/` (automatic, resolved below) |
+| **Sprint Output Dir** | `{output_kyro_dir}/sprints/` (automatic, resolved below) |
 
-**Resolve `{output_sprint_forge_dir}`** — ask the user:
+**Resolve `{output_kyro_dir}`** — ask the user:
 
-> "Where should I save sprint-forge documents for **{project_name}**?
+> "Where should I save kyro documents for **{project_name}**?
 >
-> 1. **Default** (Recommended) — `.agents/sprint-forge/{project-name}/`
+> 1. **Default** (Recommended) — `.agents/kyro/{project-name}/`
 > 2. **Custom path** — provide your preferred directory"
 
-Set `{output_sprint_forge_dir}` based on the choice. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.
+Set `{output_kyro_dir}` based on the choice. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.
 
 Confirm with the user:
 
 > **Project**: {project_name}
 > **Codebase**: `{codebase_path}`
-> **Output**: `{output_sprint_forge_dir}`
+> **Output**: `{output_kyro_dir}`
 >
 > Proceed with this configuration?
 
@@ -91,7 +91,7 @@ Perform thorough analysis based on the work type. This is the most critical step
 
 Write each distinct finding as a separate file:
 
-**Location**: `{output_sprint_forge_dir}/findings/`
+**Location**: `{output_kyro_dir}/findings/`
 
 **Naming**: `NN-descriptive-slug.md` (e.g., `01-architecture-issues.md`)
 
@@ -123,14 +123,14 @@ Using the [ROADMAP.md template](../templates/ROADMAP.md), create the adaptive ro
 5. Fill in the Sprint Summary table
 6. Write the dependency map
 
-**Location**: `{output_sprint_forge_dir}/ROADMAP.md`
+**Location**: `{output_kyro_dir}/ROADMAP.md`
 
 ### Step 6 — Scaffold Working Directory
 
 Create the full directory structure:
 
 ```
-{output_sprint_forge_dir}/
+{output_kyro_dir}/
 ├── README.md              ← From PROJECT-README.md template
 ├── ROADMAP.md             ← Created in Step 5
 ├── RE-ENTRY-PROMPTS.md    ← Created in Step 7
@@ -154,11 +154,11 @@ Using the [reentry-generator.md](../helpers/reentry-generator.md) helper:
 
 1. Use the [REENTRY-PROMPTS.md template](../templates/REENTRY-PROMPTS.md)
 2. Fill in all template variables with actual values:
-   - `{project_name}`, `{codebase_path}`, `{output_sprint_forge_dir}`
+   - `{project_name}`, `{codebase_path}`, `{output_kyro_dir}`
    - `{current_sprint}` = 1 (no sprints yet)
    - Sprint 1 finding file path
 3. Generate all 4 scenario prompts with real paths
-4. Write to `{output_sprint_forge_dir}/RE-ENTRY-PROMPTS.md`
+4. Write to `{output_kyro_dir}/RE-ENTRY-PROMPTS.md`
 
 ## Output Summary
 
@@ -172,14 +172,14 @@ At the end of INIT, present a summary:
 **Findings**: {N} files in findings/
 **Sprints Planned**: {M} sprints in roadmap
 **Files Created**:
-  - {output_sprint_forge_dir}/README.md
-  - {output_sprint_forge_dir}/ROADMAP.md
-  - {output_sprint_forge_dir}/RE-ENTRY-PROMPTS.md
-  - {output_sprint_forge_dir}/findings/01-{slug}.md
-  - {output_sprint_forge_dir}/findings/02-{slug}.md
+  - {output_kyro_dir}/README.md
+  - {output_kyro_dir}/ROADMAP.md
+  - {output_kyro_dir}/RE-ENTRY-PROMPTS.md
+  - {output_kyro_dir}/findings/01-{slug}.md
+  - {output_kyro_dir}/findings/02-{slug}.md
   - ...
 
-**Next Step**: Generate Sprint 1 using `/sprint-forge` or copy the re-entry prompt from RE-ENTRY-PROMPTS.md → Scenario 1.
+**Next Step**: Generate Sprint 1 using `/kyro` or copy the re-entry prompt from RE-ENTRY-PROMPTS.md → Scenario 1.
 ```
 
 ---

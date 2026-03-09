@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const forgeDir = path.join(os.homedir(), '.sprint-forge');
+const forgeDir = path.join(os.homedir(), '.kyro');
 const distDir = path.join(__dirname, '..', 'dist');
 const sessionFile = path.join(forgeDir, '.active-session');
 
@@ -29,18 +29,18 @@ try {
       tasks_total: sessionData.tasks_total || 0
     });
 
-    console.error(`[SprintForge] Session ${sessionData.sessionId} closed with stats: ${sessionData.tasks_completed || 0} tasks completed.`);
+    console.error(`[Kyro] Session ${sessionData.sessionId} closed with stats: ${sessionData.tasks_completed || 0} tasks completed.`);
 
     db.close();
     fs.unlinkSync(sessionFile);
   }
 } catch (e) {
-  console.error(`[SprintForge] DB session close skipped: ${e.message}`);
+  console.error(`[Kyro] DB session close skipped: ${e.message}`);
 }
 
-console.error('[SprintForge] Session ending.');
-console.error('[SprintForge] Did you capture any learnings this session?');
-console.error('[SprintForge] Use /retro to run a retrospective before closing.');
+console.error('[Kyro] Session ending.');
+console.error('[Kyro] Did you capture any learnings this session?');
+console.error('[Kyro] Use /retro to run a retrospective before closing.');
 
 // Pass through stdin
 let data = '';

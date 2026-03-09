@@ -11,7 +11,7 @@ Generate the next sprint from the roadmap, previous sprint retro, and accumulate
 
 ### Generate Workflow
 
-1. **Locate output directory** — resolve `{output_sprint_forge_dir}` from re-entry prompts, explicit path, or auto-discovery
+1. **Locate output directory** — resolve `{output_kyro_dir}` from re-entry prompts, explicit path, or auto-discovery
 2. **Determine sprint number** — scan existing sprint files
 3. **Gather inputs** — roadmap section, previous sprint retro/recommendations, finding files
 4. **Build disposition table** — every recommendation from Sprint N-1 must be addressed

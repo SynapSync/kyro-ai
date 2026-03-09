@@ -3,16 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const rulesPath = path.join(os.homedir(), '.sprint-forge', 'rules.md');
+const rulesPath = path.join(os.homedir(), '.kyro', 'rules.md');
 const distDir = path.join(__dirname, '..', 'dist');
 
 // Load learned rules (flat file — always available)
 if (fs.existsSync(rulesPath)) {
   const rules = fs.readFileSync(rulesPath, 'utf8');
   const ruleCount = (rules.match(/\[RULE-\d+\]/g) || []).length;
-  console.error(`[SprintForge] Loaded ${ruleCount} learned rules from ${rulesPath}`);
+  console.error(`[Kyro] Loaded ${ruleCount} learned rules from ${rulesPath}`);
 } else {
-  console.error('[SprintForge] No learned rules found. Rules will be captured during sprints.');
+  console.error('[Kyro] No learned rules found. Rules will be captured during sprints.');
 }
 
 // Initialize database and start session
@@ -29,19 +29,19 @@ try {
 
   // Detect active sprint
   let sprint = null;
-  const sprintForgeDir = path.join(process.cwd(), '.agents', 'sprint-forge');
-  if (fs.existsSync(sprintForgeDir)) {
-    const dirs = fs.readdirSync(sprintForgeDir).filter(f =>
-      fs.statSync(path.join(sprintForgeDir, f)).isDirectory() && f !== 'sprints'
+  const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
+  if (fs.existsSync(kyroDir)) {
+    const dirs = fs.readdirSync(kyroDir).filter(f =>
+      fs.statSync(path.join(kyroDir, f)).isDirectory() && f !== 'sprints'
     );
     if (dirs.length > 0) {
-      const projectDir = path.join(sprintForgeDir, dirs[0], 'sprints');
+      const projectDir = path.join(kyroDir, dirs[0], 'sprints');
       if (fs.existsSync(projectDir)) {
         const sprints = fs.readdirSync(projectDir).filter(f => f.endsWith('.md')).sort();
         if (sprints.length > 0) {
           const latest = sprints[sprints.length - 1];
           sprint = latest.replace(/\.md$/, '');
-          console.error(`[SprintForge] Active project detected. Latest sprint: ${latest}`);
+          console.error(`[Kyro] Active project detected. Latest sprint: ${latest}`);
         }
       }
     }
@@ -49,16 +49,16 @@ try {
 
   // Start session in DB
   sessionId = store.startSession(project, sprint);
-  console.error(`[SprintForge] Session ${sessionId} started (project: ${project})`);
+  console.error(`[Kyro] Session ${sessionId} started (project: ${project})`);
 
   // Load recent learnings from DB
   const learnings = store.getLearnings(project, 10);
   if (learnings.length > 0) {
-    console.error(`[SprintForge] ${learnings.length} learnings found in DB for project "${project}"`);
+    console.error(`[Kyro] ${learnings.length} learnings found in DB for project "${project}"`);
   }
 
   // Store session ID in temp file for other hooks to use
-  const sessionFile = path.join(os.homedir(), '.sprint-forge', '.active-session');
+  const sessionFile = path.join(os.homedir(), '.kyro', '.active-session');
   fs.writeFileSync(sessionFile, JSON.stringify({
     sessionId, project, sprint,
     tasks_completed: 0,
@@ -68,7 +68,7 @@ try {
 
   db.close();
 } catch (e) {
-  console.error(`[SprintForge] DB init skipped: ${e.message}`);
+  console.error(`[Kyro] DB init skipped: ${e.message}`);
 }
 
 // Pass through stdin

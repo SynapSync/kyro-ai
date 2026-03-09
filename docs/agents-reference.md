@@ -1,6 +1,6 @@
 # Agents Reference
 
-Sprint Forge uses 4 specialized agents, each with a distinct role, toolset, and set of constraints. Agents are defined as markdown files in the `agents/` directory and are invoked by commands or by other agents during the sprint lifecycle.
+Kyro uses 4 specialized agents, each with a distinct role, toolset, and set of constraints. Agents are defined as markdown files in the `agents/` directory and are invoked by commands or by other agents during the sprint lifecycle.
 
 ---
 
@@ -40,8 +40,8 @@ The explorer agent performs read-only codebase analysis during the INIT phase. I
 - **NEVER edits files.** Read-only exploration only.
 - **NEVER writes files.** The orchestrator handles all file creation.
 - Operates in worktree isolation when available.
-- Loads rules from `~/.sprint-forge/rules.md` and applies relevant ones during analysis.
-- Uses the `sprint-analyzer` skill for analysis strategies per work type.
+- Loads rules from `~/.kyro/rules.md` and applies relevant ones during analysis.
+- Uses the `kyro-analyzer` skill for analysis strategies per work type.
 
 ### Workflow
 
@@ -293,7 +293,7 @@ Recommended next step: [suggestion for the human]
 - Check `git blame` -- recent changes are more likely to be the cause.
 - Use project memory to recall previous bugs in the same area.
 - If stuck after 3 rounds, escalate with findings so far.
-- Capture debugging insights as rule proposals for `~/.sprint-forge/rules.md`.
+- Capture debugging insights as rule proposals for `~/.kyro/rules.md`.
 
 ---
 
@@ -349,7 +349,7 @@ The orchestrator never proceeds past a gate without explicit user approval.
 
 At the start of every orchestration:
 
-1. Read `~/.sprint-forge/rules.md` if it exists
+1. Read `~/.kyro/rules.md` if it exists
 2. Apply relevant rules throughout all phases
 3. If a rule is about to be violated, pause and show the rule to the user
 4. At the end, propose new rules based on corrections made during the session
@@ -376,7 +376,7 @@ After all tasks are complete:
 4. Update frontmatter (status, dates, agents)
 5. Generate/update re-entry prompts
 6. Update roadmap if needed
-7. Propose new rules for `~/.sprint-forge/rules.md`
+7. Propose new rules for `~/.kyro/rules.md`
 
 ### Constraints
 

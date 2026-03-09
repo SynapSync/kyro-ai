@@ -2,11 +2,11 @@
 
 ## Workflow
 
-This project uses **Sprint Forge** for structured sprint execution.
+This project uses **Kyro** for structured sprint execution.
 
-- Workflow: `sprint-forge` (installed via Claude Code plugin or local path)
-- Sprint output: `.agents/sprint-forge/{project}/`
-- Global rules: `~/.sprint-forge/rules.md`
+- Workflow: `kyro-workflow` (installed via Claude Code plugin or local path)
+- Sprint output: `.agents/kyro/{project}/`
+- Global rules: `~/.kyro/rules.md`
 
 ## Agent Rules
 
