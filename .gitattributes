@@ -1,0 +1,18 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Explicit text files
+*.ts text
+*.js text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.sql text
+
+# Binary files
+*.db binary
+*.sqlite binary
+
+# Generated — exclude from GitHub language stats
+dist/** linguist-generated
