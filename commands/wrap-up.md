@@ -39,7 +39,7 @@ Prompt for learnings from this session:
    ```
    [LEARN] Category: One-line rule
    ```
-4. Learnings are automatically persisted to both `~/.sprint-forge/rules.md` and the database
+4. Learnings are automatically persisted to both `~/.kyro/rules.md` and the database
 
 ### Step 4: Next Session Context
 

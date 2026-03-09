@@ -1,12 +1,12 @@
 # Architecture
 
-This document describes the internal architecture of Sprint Forge v2.0, including the Command > Agent > Skill pattern, data flow, storage layout, database schema, hook lifecycle, and differences from the v1.x skill.
+This document describes the internal architecture of Kyro v2.0, including the Command > Agent > Skill pattern, data flow, storage layout, database schema, hook lifecycle, and differences from the v1.x skill.
 
 ---
 
 ## Command > Agent > Skill Pattern
 
-Sprint Forge is organized in three layers:
+Kyro is organized in three layers:
 
 ```
 User Command (/forge, /sprint, /status, /debt, /retro)
@@ -15,7 +15,7 @@ User Command (/forge, /sprint, /status, /debt, /retro)
 Agent (explorer, reviewer, debugger, orchestrator)
   |
   v
-Skill (sprint-forge, sprint-analyzer, sprint-reviewer, sprint-learner, sprint-metrics, sprint-handoff)
+Skill (kyro-workflow, kyro-analyzer, kyro-reviewer, kyro-learner, kyro-metrics, kyro-handoff)
   |
   v
 Hook (lifecycle events that fire automatically)
@@ -52,12 +52,12 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
 
 | Skill | Knowledge Domain |
 |-------|-----------------|
-| `sprint-forge` | Core orchestration: modes (INIT/SPRINT/STATUS), helpers, templates |
-| `sprint-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
-| `sprint-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
-| `sprint-learner` | Cross-project rule accumulation and management |
-| `sprint-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
-| `sprint-handoff` | Enriched context transfer with mental model (hypotheses, decisions, blockers) |
+| `kyro-workflow` | Core orchestration: modes (INIT/SPRINT/STATUS), helpers, templates |
+| `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
+| `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
+| `kyro-learner` | Cross-project rule accumulation and management |
+| `kyro-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
+| `kyro-handoff` | Enriched context transfer with mental model (hypotheses, decisions, blockers) |
 
 ---
 
@@ -73,7 +73,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
                      |
                      v
             +------------------+
-            |   ORCHESTRATOR   |---------> ~/.sprint-forge/rules.md [LOAD]
+            |   ORCHESTRATOR   |---------> ~/.kyro/rules.md [LOAD]
             +------------------+
                  |    |    |
       +----------+    |    +----------+
@@ -90,7 +90,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
       +-------+-------+-------+-------+
               |               |
               v               v
-    .agents/sprint-forge/   ~/.sprint-forge/
+    .agents/kyro/   ~/.kyro/
     {project}/              ├── data.db
     ├── findings/           └── rules.md
     ├── sprints/
@@ -107,7 +107,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
 
 ### Flow for /forge
 
-1. **Rules Loading** -- Orchestrator reads `~/.sprint-forge/rules.md`
+1. **Rules Loading** -- Orchestrator reads `~/.kyro/rules.md`
 2. **Analysis** -- Orchestrator delegates to Explorer agent. Explorer reads the codebase and produces an analysis report. Findings are written to `findings/`.
 3. **Gate 1** -- User approves analysis.
 4. **Planning** -- Orchestrator generates a sprint document with phases and tasks. Writes to `sprints/`.
@@ -128,26 +128,26 @@ Direct read of all project files. No agents involved. Computes metrics and outpu
 
 ## Storage Locations
 
-Sprint Forge uses two storage locations:
+Kyro uses two storage locations:
 
-### Global: `~/.sprint-forge/`
+### Global: `~/.kyro/`
 
 Stores data that persists across all projects and sessions.
 
 ```
-~/.sprint-forge/
+~/.kyro/
 ├── data.db       # SQLite database
 └── rules.md      # Learned rules (accumulated across all projects)
 ```
 
-The database path is configurable via `config.json` (`database.path`) or the `SPRINT_FORGE_DB_PATH` environment variable.
+The database path is configurable via `config.json` (`database.path`) or the `KYRO_DB_PATH` environment variable.
 
-### Per-Project: `.agents/sprint-forge/{project}/`
+### Per-Project: `.agents/kyro/{project}/`
 
 Stores all sprint documents for a specific project. Created during INIT and used by all subsequent commands.
 
 ```
-.agents/sprint-forge/{project-name}/
+.agents/kyro/{project-name}/
 ├── README.md              # Project overview with paths and baseline
 ├── ROADMAP.md             # Adaptive roadmap with sprint definitions
 ├── RE-ENTRY-PROMPTS.md    # Context recovery prompts
@@ -161,13 +161,13 @@ Stores all sprint documents for a specific project. Created during INIT and used
     └── YYYY-MM-DD-sprint-N.md
 ```
 
-The output directory path (`{output_sprint_forge_dir}`) is resolved once at the start of any mode and embedded in `README.md` and `RE-ENTRY-PROMPTS.md`. These two files are the source of truth for the path.
+The output directory path (`{output_kyro_dir}`) is resolved once at the start of any mode and embedded in `README.md` and `RE-ENTRY-PROMPTS.md`. These two files are the source of truth for the path.
 
 ---
 
 ## Database Schema
 
-Sprint Forge uses SQLite with WAL mode and FTS5 full-text search. The schema is defined in `src/db/schema.sql`.
+Kyro uses SQLite with WAL mode and FTS5 full-text search. The schema is defined in `src/db/schema.sql`.
 
 ### Tables
 
@@ -274,14 +274,14 @@ See [hooks-reference.md](hooks-reference.md) for detailed documentation of each 
 
 ## How the Workflow Differs from v1.x
 
-Sprint Forge v2.0 is a full workflow that replaces the v1.x single-skill approach.
+Kyro v2.0 is a full workflow that replaces the v1.x single-skill approach.
 
 ### v1.x: Single Skill
 
-In v1.x, `sprint-forge` was a single skill with mode detection (INIT/SPRINT/STATUS). The skill contained all logic inline and had no hooks, no specialized agents, and no persistent learning.
+In v1.x, `kyro-workflow` was a single skill with mode detection (INIT/SPRINT/STATUS). The skill contained all logic inline and had no hooks, no specialized agents, and no persistent learning.
 
 ```
-v1.x:  User message --> sprint-forge skill --> output files
+v1.x:  User message --> kyro-workflow skill --> output files
 ```
 
 ### v2.0: Workflow Architecture
@@ -301,7 +301,7 @@ v2.0:  User command --> Agent (orchestrator/explorer/reviewer/debugger)
 |-----------|-------------|-----------------|
 | Type | Single skill | Full workflow (commands + agents + skills + hooks) |
 | Entry point | Text triggers detected by skill | Slash commands (`/forge`, `/sprint`, etc.) |
-| Learning | Per-project retro only | Persistent rules across all projects via `~/.sprint-forge/rules.md` |
+| Learning | Per-project retro only | Persistent rules across all projects via `~/.kyro/rules.md` |
 | Agents | 1 (the skill itself) | 4 specialized (explorer, reviewer, debugger, orchestrator) |
 | Hooks | 0 | 12 lifecycle events |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase gates with approval |
@@ -315,14 +315,14 @@ v2.0:  User command --> Agent (orchestrator/explorer/reviewer/debugger)
 
 | v1.x Component | v2.0 Location |
 |----------------|---------------|
-| INIT mode logic | `skills/sprint-forge/assets/modes/INIT.md` + `agents/explorer.md` |
-| SPRINT mode logic | `skills/sprint-forge/assets/modes/SPRINT.md` + `agents/orchestrator.md` |
-| STATUS mode logic | `skills/sprint-forge/assets/modes/STATUS.md` + `skills/sprint-metrics/` |
-| Analysis helpers | `skills/sprint-analyzer/` |
-| Quality validation | `skills/sprint-reviewer/` + `agents/reviewer.md` |
+| INIT mode logic | `skills/kyro-workflow/assets/modes/INIT.md` + `agents/explorer.md` |
+| SPRINT mode logic | `skills/kyro-workflow/assets/modes/SPRINT.md` + `agents/orchestrator.md` |
+| STATUS mode logic | `skills/kyro-workflow/assets/modes/STATUS.md` + `skills/kyro-metrics/` |
+| Analysis helpers | `skills/kyro-analyzer/` |
+| Quality validation | `skills/kyro-reviewer/` + `agents/reviewer.md` |
 | Debugging | `agents/debugger.md` (new in v2.0) |
-| Learning/rules | `skills/sprint-learner/` + hooks (new in v2.0) |
-| Context handoff | `skills/sprint-handoff/` (enriched in v2.0) |
-| Templates | `skills/sprint-forge/assets/templates/` (unchanged) |
+| Learning/rules | `skills/kyro-learner/` + hooks (new in v2.0) |
+| Context handoff | `skills/kyro-handoff/` (enriched in v2.0) |
+| Templates | `skills/kyro-workflow/assets/templates/` (unchanged) |
 
-The v1.x skill still exists as `skills/sprint-forge/` and provides the core orchestration knowledge (modes, helpers, templates). The new agents, commands, and hooks layer on top of it.
+The v1.x skill still exists as `skills/kyro-workflow/` and provides the core orchestration knowledge (modes, helpers, templates). The new agents, commands, and hooks layer on top of it.

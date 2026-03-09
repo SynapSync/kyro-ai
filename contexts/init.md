@@ -8,7 +8,7 @@ model: sonnet
 
 # Context: INIT — Analysis Mode
 
-Activated during project initialization and analysis phases. This context puts Sprint Forge in **read-only exploration mode** where the goal is understanding, not action.
+Activated during project initialization and analysis phases. This context puts Kyro in **read-only exploration mode** where the goal is understanding, not action.
 
 ## When Active
 

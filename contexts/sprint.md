@@ -8,7 +8,7 @@ model: opus
 
 # Context: SPRINT — Execution Mode
 
-Activated during sprint implementation. This context puts Sprint Forge in **active execution mode** where tasks are implemented one by one with quality validation at each step.
+Activated during sprint implementation. This context puts Kyro in **active execution mode** where tasks are implemented one by one with quality validation at each step.
 
 ## When Active
 

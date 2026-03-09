@@ -1,6 +1,6 @@
-# Sprint Forge — Assets
+# Kyro — Assets
 
-This directory contains the modular components of the `sprint-forge` skill.
+This directory contains the modular components of the `kyro` skill.
 
 ## Directory Structure
 

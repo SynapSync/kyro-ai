@@ -64,7 +64,7 @@ run_test() {
   PASS=$((PASS + 1))
 }
 
-echo "=== Sprint Forge Hook Script Tests ==="
+echo "=== Kyro Hook Script Tests ==="
 echo ""
 
 # --- session-start.js ---

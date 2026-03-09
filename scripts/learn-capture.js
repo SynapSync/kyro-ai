@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 
 const distDir = path.join(__dirname, '..', 'dist');
-const sessionFile = path.join(os.homedir(), '.sprint-forge', '.active-session');
+const sessionFile = path.join(os.homedir(), '.kyro', '.active-session');
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
@@ -26,7 +26,7 @@ process.stdin.on('end', () => {
     }
 
     if (learnings.length > 0) {
-      const rulesDir = path.join(os.homedir(), '.sprint-forge');
+      const rulesDir = path.join(os.homedir(), '.kyro');
       const rulesPath = path.join(rulesDir, 'rules.md');
 
       if (!fs.existsSync(rulesDir)) {
@@ -37,7 +37,7 @@ process.stdin.on('end', () => {
       if (fs.existsSync(rulesPath)) {
         rules = fs.readFileSync(rulesPath, 'utf8');
       } else {
-        rules = '# Sprint Forge — Learned Rules\n\n';
+        rules = '# Kyro — Learned Rules\n\n';
       }
 
       // Find next rule number
@@ -92,7 +92,7 @@ process.stdin.on('end', () => {
           } catch (_) {}
         }
 
-        console.error(`[SprintForge] Captured: [RULE-${String(nextNum).padStart(3, '0')}] ${l.category}: ${l.rule}`);
+        console.error(`[Kyro] Captured: [RULE-${String(nextNum).padStart(3, '0')}] ${l.category}: ${l.rule}`);
         nextNum++;
       });
 

@@ -1,22 +1,22 @@
-# Sprint Forge — Workflow
+# Kyro — Workflow
 
 ## Overview
 
-Sprint Forge is a **workflow** (not a standalone skill) that orchestrates sprint-based project execution through specialized agents, lifecycle hooks, and persistent learning.
+Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based project execution through specialized agents, lifecycle hooks, and persistent learning.
 
 ## Architecture: Command → Agent → Skill
 
 ```
 User Command (/forge, /sprint, /status, /debt, /retro, /wrap-up, /insights, /deslop, /parallel)
   └── Agent (explorer, reviewer, debugger, orchestrator)
-        └── Skill (sprint-forge, sprint-learner, sprint-reviewer, sprint-metrics, sprint-handoff, sprint-analyzer, deslop)
+        └── Skill (kyro-workflow, kyro-learner, kyro-reviewer, kyro-metrics, kyro-handoff, kyro-analyzer, deslop)
               └── Hook (lifecycle events that fire automatically)
 ```
 
 ## Directory Structure
 
 ```
-sprint-forge/
+kyro-workflow/
 ├── agents/           # 4 specialized agents
 │   ├── explorer.md   # Read-only codebase analysis (INIT)
 │   ├── reviewer.md   # Task quality validation (SPRINT)
@@ -36,12 +36,12 @@ sprint-forge/
 │   └── hooks.json    # 12 hook definitions
 ├── scripts/          # Hook implementation scripts
 ├── skills/           # 7 skills (domain knowledge)
-│   ├── sprint-forge/     # Core orchestration (from v1.x)
-│   ├── sprint-analyzer/  # Analysis strategies per work type
-│   ├── sprint-reviewer/  # Quality checklist (BLOCKER/WARNING/SUGGESTION)
-│   ├── sprint-learner/   # Cross-project rule accumulation
-│   ├── sprint-metrics/   # Velocity trends and debt heatmap
-│   ├── sprint-handoff/   # Enriched context transfer
+│   ├── kyro-workflow/     # Core orchestration (from v1.x)
+│   ├── kyro-analyzer/  # Analysis strategies per work type
+│   ├── kyro-reviewer/  # Quality checklist (BLOCKER/WARNING/SUGGESTION)
+│   ├── kyro-learner/   # Cross-project rule accumulation
+│   ├── kyro-metrics/   # Velocity trends and debt heatmap
+│   ├── kyro-handoff/   # Enriched context transfer
 │   └── deslop/           # AI slop detection and removal
 ├── docs/             # 8 documentation guides
 ├── config.json       # Workflow configuration
@@ -53,9 +53,9 @@ sprint-forge/
 
 ## Key Conventions
 
-- **Rules file**: `~/.sprint-forge/rules.md` — persistent learned rules across all projects
-- **Database**: `~/.sprint-forge/data.db` — session stats and searchable learnings
-- **Sprint output**: `{cwd}/.agents/sprint-forge/{project}/` — per-project sprint documents
+- **Rules file**: `~/.kyro/rules.md` — persistent learned rules across all projects
+- **Database**: `~/.kyro/data.db` — session stats and searchable learnings
+- **Sprint output**: `{cwd}/.agents/kyro/{project}/` — per-project sprint documents
 - **Checkpoint-per-phase**: Sprint file saved after each phase completes
 - **Debt never disappears**: Items are only closed when explicitly resolved
 - **Gates require approval**: Never proceed past a validation gate without user confirmation

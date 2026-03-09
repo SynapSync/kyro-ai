@@ -1,6 +1,6 @@
 # Rules Guide -- Cross-Project Learning System
 
-Sprint Forge accumulates knowledge across projects through a persistent rules file at `~/.sprint-forge/rules.md`. Rules capture corrections, patterns, and estimation insights so that mistakes made once are never repeated.
+Kyro accumulates knowledge across projects through a persistent rules file at `~/.kyro/rules.md`. Rules capture corrections, patterns, and estimation insights so that mistakes made once are never repeated.
 
 ---
 
@@ -18,7 +18,7 @@ The learning flow moves from correction to persistent rule in four steps:
 3. User approves (or edits) the proposed rule
        |
        v
-4. Rule is appended to ~/.sprint-forge/rules.md
+4. Rule is appended to ~/.kyro/rules.md
 ```
 
 ### Detection
@@ -49,7 +49,7 @@ The user can:
 
 ### Storage
 
-Approved rules are appended to `~/.sprint-forge/rules.md` and logged in the sprint's `LEARNED` section.
+Approved rules are appended to `~/.kyro/rules.md` and logged in the sprint's `LEARNED` section.
 
 ---
 
@@ -76,7 +76,7 @@ Components:
 Rules are organized into categories that correspond to different phases of sprint execution:
 
 ```markdown
-# Sprint Forge -- Learned Rules
+# Kyro -- Learned Rules
 
 ## Estimation
 - [RULE-001] DB migration tasks: add 20% buffer to estimates (2026-02-20, project: nebux-api)
@@ -111,7 +111,7 @@ Rules are organized into categories that correspond to different phases of sprin
 
 At the start of every session, the `SessionStart` hook:
 
-1. Reads `~/.sprint-forge/rules.md` (path configurable in `config.json`)
+1. Reads `~/.kyro/rules.md` (path configurable in `config.json`)
 2. Parses all active rules
 3. Makes them available to all agents for the session
 
@@ -131,7 +131,7 @@ Rules are applied contextually based on their category:
 When the agent is about to violate a learned rule, the `UserPromptSubmit` hook triggers a warning:
 
 ```
-[SprintForge] Rule violation detected:
+[Kyro] Rule violation detected:
   [RULE-003] Always validate version compatibility before adding dependencies
   Source: 2026-02-25, project: synap-sync
 
@@ -182,7 +182,7 @@ After accumulating many rules, related rules can be consolidated:
 
 ### Rule Limits
 
-The sprint-learner skill enforces a maximum of **50 active rules**. When approaching this limit:
+The kyro-learner skill enforces a maximum of **50 active rules**. When approaching this limit:
 - Review rules by `times_applied` -- rarely-applied rules may be candidates for deprecation
 - Consolidate related rules into broader, more useful ones
 - Deprecate rules tied to completed or abandoned projects
@@ -192,7 +192,7 @@ The sprint-learner skill enforces a maximum of **50 active rules**. When approac
 ## Example rules.md File
 
 ```markdown
-# Sprint Forge -- Learned Rules
+# Kyro -- Learned Rules
 
 > Accumulated rules from sprint execution across all projects.
 > Loaded automatically at session start. Applied contextually by category.
@@ -225,7 +225,7 @@ The sprint-learner skill enforces a maximum of **50 active rules**. When approac
 
 ## Rules in the Database
 
-In addition to the `rules.md` file, learnings are stored in the SQLite database (`~/.sprint-forge/data.db`) in the `learnings` table:
+In addition to the `rules.md` file, learnings are stored in the SQLite database (`~/.kyro/data.db`) in the `learnings` table:
 
 | Column | Type | Description |
 |--------|------|-------------|

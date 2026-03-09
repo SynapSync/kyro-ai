@@ -8,7 +8,7 @@ model: sonnet
 
 # Context: REVIEW — Assessment Mode
 
-Activated during status checks and retrospectives. This context puts Sprint Forge in **analysis-only mode** focused on measuring, reflecting, and planning improvements.
+Activated during status checks and retrospectives. This context puts Kyro in **analysis-only mode** focused on measuring, reflecting, and planning improvements.
 
 ## When Active
 
@@ -44,12 +44,12 @@ Activated during status checks and retrospectives. This context puts Sprint Forg
    - **What went wrong** — blockers, underestimates, regressions
    - **Recommendations** — numbered list of improvements for Sprint N+1
    - **Estimation corrections** — adjusted buffers for task types
-   - **New learned rules** — proposed additions to `~/.sprint-forge/rules.md`
+   - **New learned rules** — proposed additions to `~/.kyro/rules.md`
 4. Update the debt table with any new items or status changes.
 
 ### Metrics Analysis
 
-The `sprint-metrics` skill provides:
+The `kyro-metrics` skill provides:
 
 - Velocity trend (SP/sprint over last 5 sprints)
 - Estimation accuracy trend (mean absolute error over time)
@@ -63,7 +63,7 @@ Review outputs feed directly into next sprint planning:
 
 - Recommendations become the disposition table in Sprint N+1.
 - Estimation corrections update buffer percentages.
-- New rules are proposed for `~/.sprint-forge/rules.md`.
+- New rules are proposed for `~/.kyro/rules.md`.
 - Unresolved debt items carry forward with updated age.
 
 ## Constraints
@@ -76,7 +76,7 @@ Review outputs feed directly into next sprint planning:
 
 - **Primary agent**: reviewer (quality assessment and metrics)
 - Tools: `Read`, `Glob`, `Grep`, `Bash` (read-only commands only)
-- Skills: `sprint-metrics`, `sprint-reviewer`
+- Skills: `kyro-metrics`, `kyro-reviewer`
 
 ## Output
 

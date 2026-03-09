@@ -1,13 +1,13 @@
 {
-  "name": "sprint-forge",
+  "name": "kyro-workflow",
   "version": "2.3.0",
-  "description": "Complete sprint workflow system. 4 agents, 12 lifecycle hooks, 9 commands, 7 skills, adaptive learning, and formal debt tracking.",
+  "description": "Agentic execution kernel for structured work. 4 agents, 12 hooks, 9 commands, 7 skills, adaptive learning, and formal debt tracking.",
   "author": {
     "name": "SynapSync",
     "url": "https://github.com/SynapSync"
   },
-  "homepage": "https://github.com/SynapSync/sprint-forge",
-  "repository": "https://github.com/SynapSync/sprint-forge",
+  "homepage": "https://github.com/SynapSync/kyro-workflow",
+  "repository": "https://github.com/SynapSync/kyro-workflow",
   "license": "Apache-2.0",
   "keywords": [
     "claude-code",

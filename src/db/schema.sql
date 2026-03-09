@@ -1,4 +1,4 @@
--- Sprint Forge Database Schema
+-- Kyro Database Schema
 
 CREATE TABLE IF NOT EXISTS learnings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,12 +1,12 @@
 # Model Selection Guide
 
-How to choose the right model tier for each Sprint Forge activity, and how to override defaults.
+How to choose the right model tier for each Kyro activity, and how to override defaults.
 
 ---
 
 ## Default Model Assignments
 
-Sprint Forge maps activities to model tiers in `config.json`:
+Kyro maps activities to model tiers in `config.json`:
 
 ```json
 "model_preferences": {
@@ -48,7 +48,7 @@ These values map to the `model` field in each agent definition (`agents/*.md`).
 
 ### Per-project override
 
-Edit `config.json` in your project's sprint-forge installation:
+Edit `config.json` in your project's kyro-workflow installation:
 
 ```json
 "model_preferences": {
@@ -95,4 +95,4 @@ Rough cost comparison for a typical sprint (5 phases, 10 tasks):
 
 For complex implementation and debugging tasks, models with extended thinking capabilities produce better results. Extended thinking allows the model to reason through complex problems before responding.
 
-Sprint Forge does not explicitly control extended thinking — it's a model-level capability that activates automatically when the model determines it's beneficial. Using Opus for implementation and debugging tasks gives you the best extended thinking performance.
+Kyro does not explicitly control extended thinking — it's a model-level capability that activates automatically when the model determines it's beneficial. Using Opus for implementation and debugging tasks gives you the best extended thinking performance.
