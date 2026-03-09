@@ -1,6 +1,6 @@
 {
   "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
-  "name": "sprint-forge",
+  "name": "kyro",
   "type": "workflow",
   "version": "2.0.0",
   "description": "Adaptive sprint workflow with specialized agents, lifecycle hooks, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and cross-project learning",
@@ -35,9 +35,9 @@
   "file": "SKILL.md",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SynapSync/sprint-forge"
+    "url": "https://github.com/SynapSync/kyro-workflow"
   },
-  "homepage": "https://github.com/SynapSync/sprint-forge",
+  "homepage": "https://github.com/SynapSync/kyro-workflow",
   "assets": {
     "modes": 3,
     "helpers": 4,
@@ -71,17 +71,17 @@
       "version": "1.8.0",
       "date": "2026-03-03",
       "changes": [
-        "Remove obsidian integration from sprint-forge — syncing to vault is now a separate, explicit user step"
+        "Remove obsidian integration from kyro — syncing to vault is now a separate, explicit user step"
       ]
     },
     {
       "version": "1.7.0",
       "date": "2026-03-03",
       "changes": [
-        "Remove AGENTS.md branded block dependency for output_sprint_forge_dir resolution",
-        "INIT now asks user once and stores output_sprint_forge_dir in README.md and RE-ENTRY-PROMPTS.md",
-        "SPRINT Step 0 now extracts output_sprint_forge_dir from re-entry prompt paths as primary source",
-        "REENTRY-PROMPTS template now includes explicit output_sprint_forge_dir section at the top",
+        "Remove AGENTS.md branded block dependency for output_kyro_dir resolution",
+        "INIT now asks user once and stores output_kyro_dir in README.md and RE-ENTRY-PROMPTS.md",
+        "SPRINT Step 0 now extracts output_kyro_dir from re-entry prompt paths as primary source",
+        "REENTRY-PROMPTS template now includes explicit output_kyro_dir section at the top",
         "Simplified Configuration Resolution in SKILL.md to 3 clear rules"
       ]
     },
@@ -103,8 +103,8 @@
       "version": "1.4.0",
       "date": "2026-02-19",
       "changes": [
-        "Branded AGENTS.md block support — output_sprint_forge_dir config persisted in synapsync-skills Configuration table",
-        "New output_sprint_forge_dir config key remembered across sessions via AGENTS.md (supplements auto-discovery and re-entry prompts)"
+        "Branded AGENTS.md block support — output_kyro_dir config persisted in synapsync-skills Configuration table",
+        "New output_kyro_dir config key remembered across sessions via AGENTS.md (supplements auto-discovery and re-entry prompts)"
       ]
     },
     {
@@ -112,18 +112,18 @@
       "date": "2026-02-18",
       "changes": [
         "Replaced staging pattern with interactive path resolution — ask once before first write",
-        "Option 1: {cwd}/.agents/sprint-forge/{project-name}/ (default)",
-        "Option 2: {user-root}/sprint-forge/{project-name}/ (custom)",
+        "Option 1: {cwd}/.agents/kyro/{project-name}/ (default)",
+        "Option 2: {user-root}/kyro/{project-name}/ (custom)",
         "Removed post-production delivery steps from INIT and SPRINT modes",
-        "Added Step 0 to SPRINT and STATUS for locating {output_sprint_forge_dir} in future sessions"
+        "Added Step 0 to SPRINT and STATUS for locating {output_kyro_dir} in future sessions"
       ]
     },
     {
       "version": "1.2.0",
       "date": "2026-02-17",
       "changes": [
-        "Migrated to deterministic staging pattern (.agents/staging/sprint-forge/)",
-        "Renamed {output_base} to {output_sprint_forge_dir} for consistency across all skills",
+        "Migrated to deterministic staging pattern (.agents/staging/kyro/)",
+        "Renamed {output_base} to {output_kyro_dir} for consistency across all skills",
         "Added post-production delivery step to INIT and SPRINT modes"
       ]
     },

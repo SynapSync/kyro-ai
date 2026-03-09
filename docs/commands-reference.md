@@ -1,6 +1,6 @@
 # Commands Reference
 
-Sprint Forge provides 5 slash commands. Each command maps to one or more agents and skills that handle the actual work.
+Kyro provides 5 slash commands. Each command maps to one or more agents and skills that handle the actual work.
 
 ---
 
@@ -33,7 +33,7 @@ The argument describes what to analyze or work on. It can be a path, a module na
 The `/forge` command runs the complete lifecycle:
 
 ```
-[GATE 0: RULES]     Load learned rules from ~/.sprint-forge/rules.md
+[GATE 0: RULES]     Load learned rules from ~/.kyro/rules.md
         |
 [PHASE 1: ANALYZE]  Explorer agent investigates codebase (read-only)
         |
@@ -104,7 +104,7 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 
 ### Generate Workflow
 
-1. Locate the output directory (`{output_sprint_forge_dir}`)
+1. Locate the output directory (`{output_kyro_dir}`)
 2. Determine the sprint number (highest existing + 1)
 3. Gather inputs: roadmap section, previous sprint retro, finding files
 4. Build the disposition table (Sprint 2+): every recommendation from Sprint N-1 must be addressed
@@ -171,7 +171,7 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 The full report includes:
 
 ```
-SPRINT FORGE -- Project Status
+KYRO -- Project Status
 
 ## Sprint Progress
 Sprint 1: xxxxxxxxxx 10/10 (100%)  Complete
@@ -368,7 +368,7 @@ Numbered recommendations that MUST be addressed in the next sprint's disposition
 Based on corrections and learnings during the sprint:
 
 ```
-Proposed rules for ~/.sprint-forge/rules.md:
+Proposed rules for ~/.kyro/rules.md:
 
 [RULE-XXX] Category: One-line rule
   Context: Why this rule exists (from this sprint's experience)
@@ -392,4 +392,4 @@ Formal capture of confirmed learnings:
 The retro is written directly into the sprint file's Retro section. After completion:
 1. Re-entry prompts are updated
 2. Roadmap is updated if recommendations affect future sprints
-3. Confirmed rules are saved to `~/.sprint-forge/rules.md`
+3. Confirmed rules are saved to `~/.kyro/rules.md`

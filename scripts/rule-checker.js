@@ -10,7 +10,7 @@ process.stdin.on('end', () => {
   // This hook provides a lightweight pre-check for common violations.
 
   try {
-    const rulesPath = path.join(os.homedir(), '.sprint-forge', 'rules.md');
+    const rulesPath = path.join(os.homedir(), '.kyro', 'rules.md');
     if (fs.existsSync(rulesPath)) {
       const rules = fs.readFileSync(rulesPath, 'utf8');
       const input = JSON.parse(data);
@@ -22,7 +22,7 @@ process.stdin.on('end', () => {
         if (estimationRules) {
           const ruleLines = estimationRules[0].match(/\[RULE-\d+\].*/g) || [];
           if (ruleLines.length > 0) {
-            console.error('[SprintForge] Estimation rules to consider:');
+            console.error('[Kyro] Estimation rules to consider:');
             ruleLines.slice(0, 3).forEach(r => console.error('  ' + r.trim()));
           }
         }

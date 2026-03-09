@@ -1,4 +1,4 @@
-# AGENTS.md — Sprint Forge Workflow Rules
+# AGENTS.md — Kyro Workflow Rules
 
 ## Sprint Discipline
 
@@ -12,7 +12,7 @@
 
 - Every completed sprint MUST end with a retrospective (`/retro`).
 - The retro captures: what worked, what did not, estimation accuracy, and concrete improvements.
-- Learnings from the retro are written to `LEARNED.md` and to `~/.sprint-forge/rules.md` for cross-project reuse.
+- Learnings from the retro are written to `LEARNED.md` and to `~/.kyro/rules.md` for cross-project reuse.
 - Skipping the retro is a workflow violation.
 
 ### Debt is Inherited
@@ -44,7 +44,7 @@ Rules:
 When a session ends or context is compacted:
 
 1. Save the current sprint state as a checkpoint.
-2. Write a re-entry prompt to `.agents/sprint-forge/{project}/reentry.md` that contains:
+2. Write a re-entry prompt to `.agents/kyro/{project}/reentry.md` that contains:
    - Current sprint ID and phase.
    - Last completed task.
    - Next task and its context.

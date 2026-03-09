@@ -1,11 +1,11 @@
 ---
-name: sprint-metrics
+name: kyro-metrics
 description: >
   Sprint velocity tracking, technical debt heatmap, and estimation pattern analysis.
   Enriches STATUS mode with historical data and trend visualization.
 ---
 
-# Sprint Metrics — Velocity & Debt Analytics
+# Kyro Metrics — Velocity & Debt Analytics
 
 ## Purpose
 
@@ -80,7 +80,7 @@ Score: 72/100 (Good)
 
 ## Calculation
 
-Read all sprint files in `{output_sprint_forge_dir}/sprints/` and compute:
+Read all sprint files in `{output_kyro_dir}/sprints/` and compute:
 
 1. Count tasks per sprint (total, completed, blocked, skipped, carry-over)
 2. Map debt items to source directories

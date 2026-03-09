@@ -3,7 +3,7 @@ name: reviewer
 description: Task validation agent that runs a quality checklist before marking any sprint task as complete. Use after completing each task in a sprint.
 tools: ["Read", "Glob", "Grep", "Bash"]
 model: sonnet
-skills: ["sprint-reviewer"]
+skills: ["kyro-reviewer"]
 ---
 
 # Reviewer — Sprint Task Validation

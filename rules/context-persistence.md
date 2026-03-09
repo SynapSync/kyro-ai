@@ -34,7 +34,7 @@ Generate a handoff document when ending a session mid-sprint.
   - Any in-flight decisions or blockers
   - Modified files not yet committed
   - Active debt items relevant to current work
-- Use the `sprint-handoff` skill to generate enriched handoffs with mental model context.
+- Use the `kyro-handoff` skill to generate enriched handoffs with mental model context.
 
 ## R-CP-04: Re-Entry Prompts Are Source of Truth
 
@@ -42,7 +42,7 @@ Re-entry prompts are the authoritative source for output directory paths.
 
 - Never hardcode or guess output paths — always read from the re-entry prompt.
 - If the re-entry prompt is missing or corrupted, ask the user to confirm the output directory before proceeding.
-- Output directory format: `{cwd}/.agents/sprint-forge/{project}/`
+- Output directory format: `{cwd}/.agents/kyro/{project}/`
 
 ## R-CP-05: Session Continuity Verification
 

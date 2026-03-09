@@ -1,5 +1,5 @@
 ---
-name: sprint-forge
+name: kyro
 description: >
   Adaptive sprint workflow: deep analysis, evolving roadmap, one-at-a-time sprints,
   formal debt tracking, and re-entry prompts for context persistence.
@@ -32,7 +32,7 @@ metadata:
 allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task
 ---
 
-# Sprint Forge
+# Kyro
 
 ## Assets
 
@@ -48,7 +48,7 @@ See [assets/README.md](assets/README.md) for full directory documentation.
 
 ## Purpose
 
-Sprint Forge is an **adaptive sprint workflow** skill designed for iterative project execution. Unlike rigid planners that pre-generate all sprints upfront, Sprint Forge:
+Kyro is an **adaptive sprint workflow** skill designed for iterative project execution. Unlike rigid planners that pre-generate all sprints upfront, Kyro:
 
 - **Analyzes first** — deep exploration of the project/issue before committing to a plan
 - **Generates sprints one at a time** — each sprint feeds from the previous one's retro, recommendations, and accumulated debt
@@ -114,11 +114,11 @@ This skill works for **any** project type, language, or framework.
 
 ## Configuration Resolution
 
-`{output_sprint_forge_dir}` is the directory where sprint-forge stores all project documents. Resolve it once at the start of any mode:
+`{output_kyro_dir}` is the directory where kyro stores all project documents. Resolve it once at the start of any mode:
 
-1. **Re-entry prompt** — If the user's message contains file paths (e.g. `/Users/.../ROADMAP.md`), extract `{output_sprint_forge_dir}` from those paths. It's already there.
+1. **Re-entry prompt** — If the user's message contains file paths (e.g. `/Users/.../ROADMAP.md`), extract `{output_kyro_dir}` from those paths. It's already there.
 2. **INIT (first time)** — Ask the user where to save documents. Store the chosen path in `README.md` and `RE-ENTRY-PROMPTS.md`. These are the only sources of truth.
-3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/sprint-forge/` in `{cwd}`, or ask the user directly.
+3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/kyro/` in `{cwd}`, or ask the user directly.
 
 No AGENTS.md. No branded blocks. The re-entry prompts and README carry the path across sessions.
 
@@ -206,13 +206,13 @@ This will: read all sprints, calculate metrics, display progress and accumulated
 
 | Skill | Integration |
 |-------|------------|
-| `code-analyzer` | INIT: Can be used as a preliminary step. The code-analyzer reports feed into Sprint Forge findings, providing structured technical input for the roadmap. |
+| `code-analyzer` | INIT: Can be used as a preliminary step. The code-analyzer reports feed into Kyro findings, providing structured technical input for the roadmap. |
 
 ---
 
 ## Workflow Components
 
-Sprint Forge v2.0 operates as a workflow with specialized agents and commands. The SKILL.md remains the core orchestration logic, but execution is now distributed:
+Kyro v2.0 operates as a workflow with specialized agents and commands. The SKILL.md remains the core orchestration logic, but execution is now distributed:
 
 ### Agents
 
@@ -236,7 +236,7 @@ Sprint Forge v2.0 operates as a workflow with specialized agents and commands. T
 ### Lifecycle Hooks
 
 The workflow fires hooks at key moments during sprint execution. See `hooks/hooks.json` for the full list. Key hooks:
-- **SessionStart** — loads learned rules from `~/.sprint-forge/rules.md`
+- **SessionStart** — loads learned rules from `~/.kyro/rules.md`
 - **PostToolUse** — checks for debug artifacts after code edits
 - **TaskCompleted** — runs reviewer checklist
 - **PostToolUseFailure** — suggests debugger invocation
@@ -244,7 +244,7 @@ The workflow fires hooks at key moments during sprint execution. See `hooks/hook
 
 ### Cross-Project Learning
 
-Corrections during sprint execution are captured as persistent rules in `~/.sprint-forge/rules.md`. These rules are loaded at session start and applied automatically in all future projects. See the `sprint-learner` skill for details.
+Corrections during sprint execution are captured as persistent rules in `~/.kyro/rules.md`. These rules are loaded at session start and applied automatically in all future projects. See the `kyro-learner` skill for details.
 
 ---
 

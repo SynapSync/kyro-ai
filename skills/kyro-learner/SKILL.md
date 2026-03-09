@@ -1,20 +1,20 @@
 ---
-name: sprint-learner
+name: kyro-learner
 description: >
   Captures corrections and patterns as persistent rules that apply across projects.
-  Manages ~/.sprint-forge/rules.md — the accumulated wisdom from all sprint executions.
+  Manages ~/.kyro/rules.md — the accumulated wisdom from all sprint executions.
 ---
 
-# Sprint Learner — Cross-Project Rule Accumulation
+# Kyro Learner — Cross-Project Rule Accumulation
 
 ## Purpose
 
-Captures corrections, patterns, and estimation insights as persistent rules stored in `~/.sprint-forge/rules.md`. Unlike per-project retros, these rules apply across ALL projects.
+Captures corrections, patterns, and estimation insights as persistent rules stored in `~/.kyro/rules.md`. Unlike per-project retros, these rules apply across ALL projects.
 
 ## Rule Format
 
 ```markdown
-# Sprint Forge — Learned Rules
+# Kyro — Learned Rules
 
 ## Estimation
 - [RULE-001] DB migration tasks: add 20% buffer to estimates (2026-02-20, project: nebux-api)
@@ -50,13 +50,13 @@ Detected a pattern worth remembering:
 Save this rule? (yes/no/edit)
 ```
 
-3. On approval, append to `~/.sprint-forge/rules.md`
+3. On approval, append to `~/.kyro/rules.md`
 4. Log in the sprint's LEARNED section
 
 ## Rule Application
 
 At the start of every session:
-1. Load `~/.sprint-forge/rules.md`
+1. Load `~/.kyro/rules.md`
 2. Before generating sprint estimates, check estimation rules
 3. Before architecture decisions, check architecture rules
 4. If about to violate a rule, pause and show it (RuleViolation event)

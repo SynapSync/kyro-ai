@@ -1,12 +1,12 @@
 <p align="center">
-  <h1 align="center">Sprint Forge</h1>
+  <h1 align="center">Kyro</h1>
 </p>
 
 <p align="center">
-  <a href="https://github.com/SynapSync/sprint-forge/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/sprint-forge?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
-  <a href="https://www.npmjs.com/package/sprint-forge"><img src="https://img.shields.io/npm/v/sprint-forge?style=for-the-badge&logo=npm&color=E8926F&labelColor=1e1e2e" alt="npm"/></a>
-  <a href="https://github.com/SynapSync/sprint-forge/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-22c55e?style=for-the-badge&labelColor=1e1e2e" alt="License"/></a>
-  <a href="https://github.com/SynapSync/sprint-forge/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SynapSync/sprint-forge/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=1e1e2e" alt="CI"/></a>
+  <a href="https://github.com/SynapSync/kyro-workflow/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/kyro-workflow?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
+  <a href="https://www.npmjs.com/package/kyro-workflow"><img src="https://img.shields.io/npm/v/kyro-workflow?style=for-the-badge&logo=npm&color=E8926F&labelColor=1e1e2e" alt="npm"/></a>
+  <a href="https://github.com/SynapSync/kyro-workflow/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-22c55e?style=for-the-badge&labelColor=1e1e2e" alt="License"/></a>
+  <a href="https://github.com/SynapSync/kyro-workflow/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SynapSync/kyro-workflow/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=1e1e2e" alt="CI"/></a>
 </p>
 
 <p align="center">
@@ -17,15 +17,15 @@
 
 ---
 
-## What Is Sprint Forge?
+## What Is Kyro?
 
-Sprint Forge is a **workflow** that orchestrates iterative project execution through specialized agents, lifecycle hooks, and persistent learning. It evolves from the [sprint-forge skill](https://github.com/SynapSync/skills-registry) into a full Command > Agent > Skill architecture.
+Kyro is a **workflow** that orchestrates iterative project execution through specialized agents, lifecycle hooks, and persistent learning. It evolves from the [kyro-workflow skill](https://github.com/SynapSync/skills-registry) into a full Command > Agent > Skill architecture.
 
-Unlike rigid project planners, Sprint Forge:
+Unlike rigid project planners, Kyro:
 
 - **Analyzes first** — deep codebase exploration before committing to a plan
 - **Generates sprints one at a time** — each sprint feeds from the previous one's retro
-- **Learns across projects** — corrections become persistent rules in `~/.sprint-forge/rules.md`
+- **Learns across projects** — corrections become persistent rules in `~/.kyro/rules.md`
 - **Validates at every step** — BLOCKER/WARNING/SUGGESTION checklist per task
 - **Adapts the roadmap** — the plan evolves based on what execution reveals
 - **Persists context** — re-entry prompts + enriched handoffs with mental model
@@ -38,7 +38,7 @@ Unlike rigid project planners, Sprint Forge:
 <tr><td><b>4 Agents</b></td><td>Explorer (read-only analysis), Reviewer (task validation), Debugger (root cause), Orchestrator (full cycle)</td></tr>
 <tr><td><b>9 Commands</b></td><td><code>/forge</code>, <code>/sprint</code>, <code>/status</code>, <code>/debt</code>, <code>/retro</code>, <code>/wrap-up</code>, <code>/insights</code>, <code>/deslop</code>, <code>/parallel</code></td></tr>
 <tr><td><b>12 Hooks</b></td><td>SessionStart, PreToolUse, PostToolUse, Stop, SessionEnd, UserPromptSubmit, PreCompact, SubagentStart/Stop, TaskCompleted, PostToolUseFailure</td></tr>
-<tr><td><b>Cross-Project Learning</b></td><td>Corrections become rules in <code>~/.sprint-forge/rules.md</code> — applied automatically in future projects</td></tr>
+<tr><td><b>Cross-Project Learning</b></td><td>Corrections become rules in <code>~/.kyro/rules.md</code> — applied automatically in future projects</td></tr>
 <tr><td><b>Validation Gates</b></td><td>BLOCKER/WARNING/SUGGESTION checklist per task, phase gates with user approval</td></tr>
 <tr><td><b>Velocity Metrics</b></td><td>Sprint velocity trends, debt heatmap, underestimation pattern detection</td></tr>
 <tr><td><b>Enriched Handoffs</b></td><td>Mental context: active hypotheses, pending decisions, blockers, next action</td></tr>
@@ -79,7 +79,7 @@ Every gate requires explicit user approval. The plan serves execution, not the r
 ```
 User corrects agent → Agent proposes rule → User approves
         ↓
-Rule saved to ~/.sprint-forge/rules.md
+Rule saved to ~/.kyro/rules.md
         ↓
 Future sessions load rules automatically
         ↓
@@ -100,7 +100,7 @@ Command (user entry point)
 ```
 
 ```
-sprint-forge/
+kyro-workflow/
 ├── agents/                     # 4 specialized agents
 │   ├── explorer.md             # Read-only codebase analysis (INIT)
 │   ├── reviewer.md             # Task quality validation (SPRINT)
@@ -119,14 +119,14 @@ sprint-forge/
 │   └── parallel.md             # /parallel — worktree parallel execution
 │
 ├── skills/                     # 7 skills (domain knowledge)
-│   ├── sprint-forge/           # Core orchestration (base skill from v1.x)
+│   ├── kyro-workflow/           # Core orchestration (base skill from v1.x)
 │   │   ├── SKILL.md
 │   │   └── assets/             # Modes, helpers, templates
-│   ├── sprint-analyzer/        # Analysis strategies per work type
-│   ├── sprint-reviewer/        # Quality checklist (BLOCKER/WARNING/SUGGESTION)
-│   ├── sprint-learner/         # Cross-project rule accumulation
-│   ├── sprint-metrics/         # Velocity trends + debt heatmap
-│   ├── sprint-handoff/         # Enriched context transfer
+│   ├── kyro-analyzer/        # Analysis strategies per work type
+│   ├── kyro-reviewer/        # Quality checklist (BLOCKER/WARNING/SUGGESTION)
+│   ├── kyro-learner/         # Cross-project rule accumulation
+│   ├── kyro-metrics/         # Velocity trends + debt heatmap
+│   ├── kyro-handoff/         # Enriched context transfer
 │   └── deslop/                 # AI slop detection and removal
 │
 ├── docs/                       # 8 documentation guides
@@ -167,27 +167,27 @@ sprint-forge/
 ### Claude Code — Plugin Install
 
 ```bash
-/plugin install SynapSync/sprint-forge
+/plugin install SynapSync/kyro-workflow
 ```
 
 ### Claude Code — Manual
 
 ```bash
-git clone https://github.com/SynapSync/sprint-forge.git ~/.claude/plugins/sprint-forge
-cd ~/.claude/plugins/sprint-forge
+git clone https://github.com/SynapSync/kyro-workflow.git ~/.claude/plugins/kyro-workflow
+cd ~/.claude/plugins/kyro-workflow
 npm install && npm run build
 ```
 
 Then load it:
 
 ```bash
-claude --plugin-dir ~/.claude/plugins/sprint-forge
+claude --plugin-dir ~/.claude/plugins/kyro-workflow
 ```
 
 ### SkillKit (Any Agent)
 
 ```bash
-npx skillkit install sprint-forge
+npx skillkit install kyro-workflow
 ```
 
 ---
@@ -223,12 +223,12 @@ npx skillkit install sprint-forge
 
 | Skill | Description |
 |-------|-------------|
-| `sprint-forge` | Core orchestration — modes (INIT/SPRINT/STATUS), helpers, templates |
-| `sprint-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
-| `sprint-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
-| `sprint-learner` | Cross-project rule accumulation via `~/.sprint-forge/rules.md` |
-| `sprint-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
-| `sprint-handoff` | Enriched session handoff with mental context (hypotheses, decisions, blockers) |
+| `kyro-workflow` | Core orchestration — modes (INIT/SPRINT/STATUS), helpers, templates |
+| `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
+| `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
+| `kyro-learner` | Cross-project rule accumulation via `~/.kyro/rules.md` |
+| `kyro-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
+| `kyro-handoff` | Enriched session handoff with mental context (hypotheses, decisions, blockers) |
 | `deslop` | AI slop detection and removal — 7 categories, confidence ratings, safety rules |
 
 ---
@@ -257,7 +257,7 @@ npx skillkit install sprint-forge
 Learnings, sessions, and debt items stored in SQLite with FTS5 full-text search:
 
 ```
-~/.sprint-forge/
+~/.kyro/
 ├── data.db       # SQLite database (learnings, sessions, debt)
 └── rules.md      # Persistent learned rules (accumulated across projects)
 ```
@@ -277,8 +277,8 @@ Learnings, sessions, and debt items stored in SQLite with FTS5 full-text search:
 
 ```json
 {
-  "database": { "path": "~/.sprint-forge/data.db" },
-  "rules": { "path": "~/.sprint-forge/rules.md", "auto_load": true },
+  "database": { "path": "~/.kyro/data.db" },
+  "rules": { "path": "~/.kyro/rules.md", "auto_load": true },
   "quality_gates": { "run_lint": true, "run_typecheck": true, "run_tests": true },
   "sprint": { "checkpoint_per_phase": true, "require_retro": true, "debt_aged_threshold_sprints": 3 },
   "model_preferences": { "exploration": "haiku", "planning": "sonnet", "implementation": "opus" }
@@ -339,8 +339,8 @@ See [`settings.example.json`](settings.example.json) for production permission a
 
 ```bash
 # 1. Install
-git clone https://github.com/SynapSync/sprint-forge.git ~/.claude/plugins/sprint-forge
-cd ~/.claude/plugins/sprint-forge && npm install && npm run build
+git clone https://github.com/SynapSync/kyro-workflow.git ~/.claude/plugins/kyro-workflow
+cd ~/.claude/plugins/kyro-workflow && npm install && npm run build
 
 # 2. Start a project
 /forge analyze the authentication module    # Full cycle with gates
@@ -359,9 +359,9 @@ cd ~/.claude/plugins/sprint-forge && npm install && npm run build
   <br/>
   <b>If you find this useful, star the repo to help others discover it.</b>
   <br/><br/>
-  <a href="https://github.com/SynapSync/sprint-forge/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/sprint-forge?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
+  <a href="https://github.com/SynapSync/kyro-workflow/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/kyro-workflow?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
   <br/><br/>
-  <a href="https://github.com/SynapSync/sprint-forge/issues">Report Issues</a> &bull;
+  <a href="https://github.com/SynapSync/kyro-workflow/issues">Report Issues</a> &bull;
   <a href="https://synapsync.dev">SynapSync</a> &bull;
   <a href="https://github.com/SynapSync/skills-registry">Skills Registry</a>
   <br/><br/>

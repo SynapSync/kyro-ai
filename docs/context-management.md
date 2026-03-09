@@ -1,6 +1,6 @@
 # Context Management Guide
 
-How to manage token limits, prevent context overflow, and use compaction strategies effectively with Sprint Forge.
+How to manage token limits, prevent context overflow, and use compaction strategies effectively with Kyro.
 
 ---
 
@@ -18,7 +18,7 @@ AI models have finite context windows. When your conversation approaches the lim
 
 ---
 
-## Sprint Forge Context Config
+## Kyro Context Config
 
 `config.json` has a context section:
 
@@ -42,7 +42,7 @@ When the conversation approaches the context limit, the system compresses older 
 
 ### Good compact points
 
-Sprint Forge is designed with natural compact points:
+Kyro is designed with natural compact points:
 
 | Point | Why it's safe |
 |-------|---------------|
@@ -73,7 +73,7 @@ This triggers compaction at 50% context usage instead of the default. Useful for
 
 ## Re-entry Prompts
 
-Re-entry prompts are Sprint Forge's primary defense against context loss. After each sprint execution, re-entry prompts are updated with:
+Re-entry prompts are Kyro's primary defense against context loss. After each sprint execution, re-entry prompts are updated with:
 
 - Current sprint number and status
 - File paths for all project artifacts
@@ -91,7 +91,7 @@ If compaction happens mid-session, a new agent can use the re-entry prompt to re
 
 3. **Use Haiku for exploration** — The explorer agent reads many files. Using Haiku keeps context cost low and leaves more room for implementation.
 
-4. **Checkpoint aggressively** — Sprint Forge checkpoints after each phase. This means progress survives compaction.
+4. **Checkpoint aggressively** — Kyro checkpoints after each phase. This means progress survives compaction.
 
 5. **Avoid loading unnecessary skills** — Each loaded skill adds to the context. Only invoke skills when needed.
 
@@ -99,7 +99,7 @@ If compaction happens mid-session, a new agent can use the re-entry prompt to re
 
 ## PreCompact Hook
 
-Sprint Forge's `context-warning.js` hook fires on the `PreCompact` event:
+Kyro's `context-warning.js` hook fires on the `PreCompact` event:
 
 - Logs a warning that compaction is about to happen
 - Checks for active sprint and reminds about re-entry prompts

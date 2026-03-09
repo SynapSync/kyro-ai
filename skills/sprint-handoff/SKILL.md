@@ -1,11 +1,11 @@
 ---
-name: sprint-handoff
+name: kyro-handoff
 description: >
   Enriched session handoff with mental context — active hypotheses, pending decisions,
   identified blockers, and recommended next action. Goes beyond file-based re-entry prompts.
 ---
 
-# Sprint Handoff — Enriched Context Transfer
+# Kyro Handoff — Enriched Context Transfer
 
 ## Purpose
 
@@ -97,7 +97,7 @@ When generating a handoff:
 2. Review conversation for hypotheses and decisions
 3. Check git status for uncommitted work
 4. Check rules applied/proposed this session
-5. Write to `{output_sprint_forge_dir}/handoffs/[date]-sprint-[N].md`
+5. Write to `{output_kyro_dir}/handoffs/[date]-sprint-[N].md`
 6. Update re-entry prompts with handoff reference
 
 ## Difference from Re-entry Prompts

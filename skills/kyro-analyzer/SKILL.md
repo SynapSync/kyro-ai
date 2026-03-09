@@ -1,11 +1,11 @@
 ---
-name: sprint-analyzer
+name: kyro-analyzer
 description: >
   Isolated codebase analysis skill for the explorer agent. Provides analysis strategies
   per work type and structured finding output format.
 ---
 
-# Sprint Analyzer — Codebase Analysis Strategies
+# Kyro Analyzer — Codebase Analysis Strategies
 
 ## Purpose
 
@@ -61,7 +61,7 @@ Provides the explorer agent with structured analysis strategies based on work ty
 
 ## Finding Output Format
 
-Each finding becomes a numbered file in `{output_sprint_forge_dir}/findings/`:
+Each finding becomes a numbered file in `{output_kyro_dir}/findings/`:
 
 ```markdown
 ---

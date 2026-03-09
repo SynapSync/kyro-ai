@@ -3,9 +3,9 @@ description: Database-backed analytics — correction trends, learning heatmap, 
 argument-hint: [project name or "all"]
 ---
 
-# /insights — Sprint Forge Analytics
+# /insights — Kyro Analytics
 
-Query the Sprint Forge database to surface patterns in learnings, corrections, sessions, and sprint velocity. All data comes from `~/.sprint-forge/data.db`.
+Query the Kyro database to surface patterns in learnings, corrections, sessions, and sprint velocity. All data comes from `~/.kyro/data.db`.
 
 ## Scope: $ARGUMENTS
 
@@ -108,7 +108,7 @@ Cross-reference with correction trends:
 ### Output Format
 
 ```
-Sprint Forge Insights — {project or "All Projects"}
+Kyro Insights — {project or "All Projects"}
 ═══════════════════════════════════════════════════
 
 📊 Correction Trends
@@ -126,6 +126,6 @@ Sprint Forge Insights — {project or "All Projects"}
 💡 Estimation Patterns
 {analysis + recommendations}
 
-Data source: ~/.sprint-forge/data.db
+Data source: ~/.kyro/data.db
 Total learnings: {count} | Total sessions: {count}
 ```

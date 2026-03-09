@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 
 // Track edit count for quality gate reminders (temp file)
-const stateFile = path.join(os.tmpdir(), 'sprint-forge-edits.json');
+const stateFile = path.join(os.tmpdir(), 'kyro-workflow-edits.json');
 
 let state = { editCount: 0, lastReminder: 0 };
 if (fs.existsSync(stateFile)) {
@@ -19,15 +19,15 @@ state.editCount++;
 
 // Remind every 5 edits
 if (state.editCount - state.lastReminder >= 5) {
-  console.error(`[SprintForge] ${state.editCount} edits since session start.`);
-  console.error('[SprintForge] Consider pausing for a quality review checkpoint.');
+  console.error(`[Kyro] ${state.editCount} edits since session start.`);
+  console.error('[Kyro] Consider pausing for a quality review checkpoint.');
   state.lastReminder = state.editCount;
 }
 
 fs.writeFileSync(stateFile, JSON.stringify(state));
 
 // Also track edit_count in .active-session for DB persistence
-const sessionFile = path.join(os.homedir(), '.sprint-forge', '.active-session');
+const sessionFile = path.join(os.homedir(), '.kyro', '.active-session');
 try {
   if (fs.existsSync(sessionFile)) {
     const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));

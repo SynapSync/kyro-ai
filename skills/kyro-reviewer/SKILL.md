@@ -1,11 +1,11 @@
 ---
-name: sprint-reviewer
+name: kyro-reviewer
 description: >
   Quality validation checklist for sprint tasks. Provides BLOCKER/WARNING/SUGGESTION
   classification for task closure decisions.
 ---
 
-# Sprint Reviewer — Task Quality Validation
+# Kyro Reviewer — Task Quality Validation
 
 ## Purpose
 
