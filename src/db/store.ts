@@ -45,7 +45,12 @@ export function createStore(db: Database.Database) {
         INSERT INTO learnings (project, category, rule, mistake, correction, sprint)
         VALUES (@project, @category, @rule, @mistake, @correction, @sprint)
       `);
-      const result = stmt.run(learning);
+      const result = stmt.run({
+        mistake: null,
+        correction: null,
+        sprint: null,
+        ...learning
+      });
       return result.lastInsertRowid as number;
     },
 
@@ -68,7 +73,7 @@ export function createStore(db: Database.Database) {
         INSERT INTO sessions (project, sprint)
         VALUES (@project, @sprint)
       `);
-      const result = stmt.run({ project, sprint });
+      const result = stmt.run({ project, sprint: sprint ?? null });
       return result.lastInsertRowid as number;
     },
 
@@ -81,7 +86,14 @@ export function createStore(db: Database.Database) {
           tasks_completed = @tasks_completed,
           tasks_total = @tasks_total
         WHERE id = @id
-      `).run({ id, ...stats });
+      `).run({
+        edit_count: 0,
+        corrections_count: 0,
+        tasks_completed: 0,
+        tasks_total: 0,
+        ...stats,
+        id
+      });
     },
 
     getRecentSessions(project?: string, limit = 10): Session[] {
@@ -100,7 +112,10 @@ export function createStore(db: Database.Database) {
         VALUES (@project, @item, @origin, @sprint_target, @status, @directory, @severity)
       `);
       const result = stmt.run({
+        sprint_target: null,
         status: 'open',
+        resolved_in: null,
+        directory: null,
         severity: 'medium',
         ...item
       });

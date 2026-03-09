@@ -1,11 +1,12 @@
 {
   "name": "sprint-forge",
-  "version": "2.0.0",
+  "version": "2.3.0",
   "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive learning across projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "postbuild": "cp src/db/schema.sql dist/db/schema.sql",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build",
     "db:init": "node dist/db/index.js"
@@ -60,6 +61,7 @@
     "contexts",
     "templates",
     "config.json",
+    "marketplace.json",
     "settings.example.json",
     "README.md"
   ]
