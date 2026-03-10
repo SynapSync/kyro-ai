@@ -1,6 +1,6 @@
 {
   "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
-  "name": "kyro",
+  "name": "sprint-forge",
   "type": "workflow",
   "version": "2.0.0",
   "description": "Adaptive sprint workflow with specialized agents, lifecycle hooks, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",

@@ -19,7 +19,7 @@
 
 ## What Is Kyro?
 
-Kyro is a **workflow** that orchestrates iterative project execution through specialized agents, lifecycle hooks, and persistent learning. It evolves from the [kyro-workflow skill](https://github.com/SynapSync/skills-registry) into a full Command > Agent > Skill architecture.
+Kyro is a **workflow** that orchestrates iterative project execution through specialized agents, lifecycle hooks, and persistent learning. It evolves from the [sprint-forge skill](https://github.com/SynapSync/skills-registry) into a full Command > Agent > Skill architecture.
 
 Unlike rigid project planners, Kyro:
 
@@ -119,7 +119,7 @@ kyro-workflow/
 │   └── parallel.md             # /kyro-workflow:parallel — worktree parallel execution
 │
 ├── skills/                     # 7 skills (domain knowledge)
-│   ├── kyro-workflow/           # Core orchestration (base skill from v1.x)
+│   ├── sprint-forge/            # Core orchestration (base skill from v1.x)
 │   │   ├── SKILL.md
 │   │   └── assets/             # Modes, helpers, templates
 │   ├── kyro-analyzer/        # Analysis strategies per work type
@@ -223,7 +223,7 @@ npx skillkit install kyro-workflow
 
 | Skill | Description |
 |-------|-------------|
-| `kyro-workflow` | Core orchestration — modes (INIT/SPRINT/STATUS), helpers, templates |
+| `sprint-forge` | Core orchestration — modes (INIT/SPRINT/STATUS), helpers, templates |
 | `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
 | `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
 | `kyro-learner` | Per-project rule accumulation via `.agents/kyro/rules.md` |
