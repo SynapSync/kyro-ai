@@ -1,5 +1,5 @@
 ---
-name: kyro
+name: sprint-forge
 description: >
   Adaptive sprint workflow: deep analysis, evolving roadmap, one-at-a-time sprints,
   formal debt tracking, and re-entry prompts for context persistence.

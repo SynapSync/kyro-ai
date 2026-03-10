@@ -15,7 +15,7 @@ User Command (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status
 Agent (explorer, reviewer, debugger, orchestrator)
   |
   v
-Skill (kyro-workflow, kyro-analyzer, kyro-reviewer, kyro-learner, kyro-metrics, kyro-handoff)
+Skill (sprint-forge, kyro-analyzer, kyro-reviewer, kyro-learner, kyro-metrics, kyro-handoff)
   |
   v
 Hook (lifecycle events that fire automatically)
@@ -52,7 +52,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
 
 | Skill | Knowledge Domain |
 |-------|-----------------|
-| `kyro-workflow` | Core orchestration: modes (INIT/SPRINT/STATUS), helpers, templates |
+| `sprint-forge` | Core orchestration: modes (INIT/SPRINT/STATUS), helpers, templates |
 | `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
 | `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
 | `kyro-learner` | Per-project rule accumulation and management |
@@ -280,10 +280,10 @@ Kyro v2.0 is a full workflow that replaces the v1.x single-skill approach.
 
 ### v1.x: Single Skill
 
-In v1.x, `kyro-workflow` was a single skill with mode detection (INIT/SPRINT/STATUS). The skill contained all logic inline and had no hooks, no specialized agents, and no persistent learning.
+In v1.x, `sprint-forge` (then called `kyro-workflow`) was a single skill with mode detection (INIT/SPRINT/STATUS). The skill contained all logic inline and had no hooks, no specialized agents, and no persistent learning.
 
 ```
-v1.x:  User message --> kyro-workflow skill --> output files
+v1.x:  User message --> sprint-forge skill --> output files
 ```
 
 ### v2.0: Workflow Architecture
@@ -317,14 +317,14 @@ v2.0:  User command --> Agent (orchestrator/explorer/reviewer/debugger)
 
 | v1.x Component | v2.0 Location |
 |----------------|---------------|
-| INIT mode logic | `skills/kyro-workflow/assets/modes/INIT.md` + `agents/explorer.md` |
-| SPRINT mode logic | `skills/kyro-workflow/assets/modes/SPRINT.md` + `agents/orchestrator.md` |
-| STATUS mode logic | `skills/kyro-workflow/assets/modes/STATUS.md` + `skills/kyro-metrics/` |
+| INIT mode logic | `skills/sprint-forge/assets/modes/INIT.md` + `agents/explorer.md` |
+| SPRINT mode logic | `skills/sprint-forge/assets/modes/SPRINT.md` + `agents/orchestrator.md` |
+| STATUS mode logic | `skills/sprint-forge/assets/modes/STATUS.md` + `skills/kyro-metrics/` |
 | Analysis helpers | `skills/kyro-analyzer/` |
 | Quality validation | `skills/kyro-reviewer/` + `agents/reviewer.md` |
 | Debugging | `agents/debugger.md` (new in v2.0) |
 | Learning/rules | `skills/kyro-learner/` + hooks (new in v2.0) |
 | Context handoff | `skills/kyro-handoff/` (enriched in v2.0) |
-| Templates | `skills/kyro-workflow/assets/templates/` (unchanged) |
+| Templates | `skills/sprint-forge/assets/templates/` (unchanged) |
 
-The v1.x skill still exists as `skills/kyro-workflow/` and provides the core orchestration knowledge (modes, helpers, templates). The new agents, commands, and hooks layer on top of it.
+The v1.x skill still exists as `skills/sprint-forge/` and provides the core orchestration knowledge (modes, helpers, templates). The new agents, commands, and hooks layer on top of it.

@@ -9,7 +9,7 @@ Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based p
 ```
 User Command (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro, /kyro-workflow:wrap-up, /kyro-workflow:insights, /kyro-workflow:deslop, /kyro-workflow:parallel)
   └── Agent (explorer, reviewer, debugger, orchestrator)
-        └── Skill (kyro-workflow, kyro-learner, kyro-reviewer, kyro-metrics, kyro-handoff, kyro-analyzer, deslop)
+        └── Skill (sprint-forge, kyro-learner, kyro-reviewer, kyro-metrics, kyro-handoff, kyro-analyzer, deslop)
               └── Hook (lifecycle events that fire automatically)
 ```
 
@@ -36,7 +36,7 @@ kyro-workflow/
 │   └── hooks.json    # 12 hook definitions
 ├── scripts/          # Hook implementation scripts
 ├── skills/           # 7 skills (domain knowledge)
-│   ├── kyro-workflow/     # Core orchestration (from v1.x)
+│   ├── sprint-forge/      # Core orchestration (from v1.x)
 │   ├── kyro-analyzer/  # Analysis strategies per work type
 │   ├── kyro-reviewer/  # Quality checklist (BLOCKER/WARNING/SUGGESTION)
 │   ├── kyro-learner/   # Per-project rule accumulation

@@ -29,7 +29,7 @@ agents:
   - orchestrator  # Full cycle coordination (/kyro-workflow:forge)
 
 skills:
-  - kyro             # Core orchestration (base skill)
+  - sprint-forge      # Core orchestration (base skill)
   - kyro-analyzer    # Analysis strategies per work type
   - kyro-reviewer    # Quality checklist (BLOCKER/WARNING/SUGGESTION)
   - kyro-learner     # Per-project rule accumulation
