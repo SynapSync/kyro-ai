@@ -8,7 +8,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: synapsync
-  version: "1.10"
+  version: "2.0"
   scope: [root]
   auto_invoke:
     # English triggers
