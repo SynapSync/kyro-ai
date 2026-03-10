@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 const fs = require('fs');
-const path = require('path');
+const { getRulesPath } = require('./lib/paths');
+
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
 process.stdin.on('end', () => {
-  // Rule checking is primarily done at the agent level via SKILL.md instructions.
-  // This hook provides a lightweight pre-check for common violations.
-
   try {
-    const rulesPath = path.join(process.cwd(), '.agents', 'kyro-workflow', 'rules.md');
+    const rulesPath = getRulesPath();
     if (fs.existsSync(rulesPath)) {
       const rules = fs.readFileSync(rulesPath, 'utf8');
       const input = JSON.parse(data);
