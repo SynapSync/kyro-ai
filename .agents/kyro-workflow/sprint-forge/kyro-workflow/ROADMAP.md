@@ -25,6 +25,9 @@ changelog:
   - version: "1.3"
     date: "2026-03-10"
     changes: ["Sprint 3 completed. 13/13 tasks. Version sync, phantom dirs removed, check-sync.js created."]
+  - version: "1.4"
+    date: "2026-03-10"
+    changes: ["Sprint 4 completed. 17/17 tasks. debugLog, writeJsonAtomic, readActiveSession added to paths.js."]
 ---
 
 # Roadmap: kyro-workflow self-audit
@@ -49,7 +52,7 @@ changelog:
 | 1 | Fix critical hook path bugs & create shared path utility | 02, 10 | bugfix + refactor | completed |
 | 2 | Implement missing debt-aging feature & fix DB query | 03, 07, 09 | feature + bugfix | completed |
 | 3 | Version & count synchronization across all manifests | 01, 04, 06 | sync-fix | completed |
-| 4 | Harden hook scripts: debug mode, atomic writes, validation | 11, 12 | quality | pending |
+| 4 | Harden hook scripts: debug mode, atomic writes, validation | 11, 12 | quality | completed |
 | 5 | Cleanup: debugger skill gap, old directory, docs alignment | 05, 08 | cleanup | pending |
 
 ---
@@ -90,16 +93,16 @@ changelog:
 - Phase 2: Removed phantom .claude-plugin/.cursor-plugin references from CLAUDE.md and README.md. Updated RULE-004. Verified marketplace.json alignment.
 - Phase 3: Created scripts/check-sync.js with 10 validation checks (version parity, hook count, allowlist, marketplace counts). All checks pass.
 
-### Sprint 4: Harden hook scripts: debug mode, atomic writes, validation
+### Sprint 4: Harden hook scripts: debug mode, atomic writes, validation -- COMPLETED
 
 **Source findings**: 11-silent-failure-pattern.md, 12-missing-validation-active-session.md
 **Priority**: Medium -- robustness improvements
-**Estimated phases**: 3
-**Dependencies**: Sprint 1 (shared path module)
+**Actual phases**: 3 (matched estimate)
+**Result**: 17/17 tasks completed. Added debugLog(), writeJsonAtomic(), readActiveSession() to paths.js (now 15 exports). Refactored all silent catch blocks across 8 scripts. All .active-session writes now atomic. Validated reader with field checks and corruption recovery.
 
-- Phase 1: Add `KYRO_DEBUG` env var support to shared module. When set, log hook errors to stderr. Refactor all silent catch blocks.
-- Phase 2: Replace .active-session JSON file read-modify-write with atomic write pattern (write to .active-session.tmp, then rename).
-- Phase 3: Add JSON schema validation for .active-session reads. Add error recovery for corrupted files.
+- Phase 1: Added debugLog() to paths.js. Replaced all silent catch blocks in 8 scripts (drift-detector, rule-checker, post-edit-check, learn-capture, task-complete, quality-gate, session-start, paths.js itself).
+- Phase 2: Added writeJsonAtomic() to paths.js. Replaced all fs.writeFileSync for .active-session in 4 scripts (session-start, quality-gate, learn-capture, task-complete).
+- Phase 3: Added readActiveSession() with JSON validation (sessionId + project required). Refactored findActiveProject() to use validated reader.
 
 ### Sprint 5: Cleanup: debugger skill gap, old directory, docs alignment
 

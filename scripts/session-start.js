@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const { getKyroDir, getRulesPath, getDistDir, getActiveSessionPath, findActiveProject } = require('./lib/paths');
+const { getKyroDir, getRulesPath, getDistDir, getActiveSessionPath, findActiveProject, debugLog, writeJsonAtomic } = require('./lib/paths');
 
 const kyroDir = getKyroDir();
 const rulesPath = getRulesPath();
@@ -60,7 +60,7 @@ try {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       debtThreshold = config.sprint?.debt_aged_threshold_sprints ?? 3;
     }
-  } catch (_) {}
+  } catch (e) { debugLog('session-start config read: ' + e.message); }
   const agedDebt = store.getAgedDebt(project, debtThreshold);
   if (agedDebt.length > 0) {
     console.error(`[Kyro] ${agedDebt.length} aged debt item(s) detected:`);
@@ -74,12 +74,12 @@ try {
   if (!fs.existsSync(kyroDir)) {
     fs.mkdirSync(kyroDir, { recursive: true });
   }
-  fs.writeFileSync(sessionFile, JSON.stringify({
+  writeJsonAtomic(sessionFile, {
     sessionId, project, sprint, projectDir,
     tasks_completed: 0,
     edit_count: 0,
     corrections_count: 0
-  }));
+  });
 
   db.close();
 } catch (e) {

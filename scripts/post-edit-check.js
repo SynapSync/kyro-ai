@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { debugLog } = require('./lib/paths');
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
@@ -33,7 +34,7 @@ process.stdin.on('end', () => {
       issues.forEach(issue => console.error(`  ⚠ ${issue}`));
     }
   } catch (e) {
-    // Silently pass through on parse error
+    debugLog('post-edit-check: ' + e.message);
   }
 
   console.log(data);

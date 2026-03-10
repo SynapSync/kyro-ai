@@ -2,6 +2,12 @@
 const fs = require('fs');
 const path = require('path');
 
+function debugLog(msg) {
+  if (process.env.KYRO_DEBUG === '1') {
+    console.error(`[Kyro:debug] ${msg}`);
+  }
+}
+
 function getKyroDir() {
   return path.join(process.cwd(), '.agents', 'kyro-workflow');
 }
@@ -37,21 +43,16 @@ function findProjectDirs() {
 }
 
 function findActiveProject() {
-  // Try .active-session first
-  const sessionPath = getActiveSessionPath();
-  try {
-    if (fs.existsSync(sessionPath)) {
-      const data = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));
-      if (data.projectDir && fs.existsSync(data.projectDir)) {
-        return {
-          name: data.project || path.basename(data.projectDir),
-          dir: data.projectDir,
-          sprintsDir: path.join(data.projectDir, 'sprints'),
-          reentryPath: path.join(data.projectDir, 'RE-ENTRY.md')
-        };
-      }
-    }
-  } catch (_) {}
+  // Try .active-session first (validated reader)
+  const data = readActiveSession();
+  if (data && data.projectDir && fs.existsSync(data.projectDir)) {
+    return {
+      name: data.project || path.basename(data.projectDir),
+      dir: data.projectDir,
+      sprintsDir: path.join(data.projectDir, 'sprints'),
+      reentryPath: path.join(data.projectDir, 'RE-ENTRY.md')
+    };
+  }
 
   // Fall back to scanning sprint-forge/
   const projects = findProjectDirs();
@@ -86,7 +87,31 @@ function findLatestSprint(sprintsDir) {
   return { file, content };
 }
 
+function writeJsonAtomic(filePath, data) {
+  const tmp = filePath + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data));
+  fs.renameSync(tmp, filePath);
+}
+
+function readActiveSession() {
+  const sessionPath = getActiveSessionPath();
+  try {
+    if (!fs.existsSync(sessionPath)) return null;
+    const raw = fs.readFileSync(sessionPath, 'utf8');
+    const data = JSON.parse(raw);
+    if (!data.sessionId || !data.project) {
+      debugLog('readActiveSession: missing required fields');
+      return null;
+    }
+    return data;
+  } catch (e) {
+    debugLog('readActiveSession: ' + e.message);
+    return null;
+  }
+}
+
 module.exports = {
+  debugLog,
   getKyroDir,
   getSprintForgeDir,
   getRulesPath,
@@ -97,5 +122,7 @@ module.exports = {
   getSprintsDir,
   getReentryPath,
   isSprintActive,
-  findLatestSprint
+  findLatestSprint,
+  writeJsonAtomic,
+  readActiveSession
 };
