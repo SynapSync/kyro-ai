@@ -6,6 +6,12 @@ const { getKyroDir, getRulesPath, getDistDir, getActiveSessionPath, findActivePr
 const kyroDir = getKyroDir();
 const rulesPath = getRulesPath();
 
+// Detect legacy storage path
+const legacyDir = path.join(path.dirname(kyroDir), 'kyro');
+if (fs.existsSync(legacyDir)) {
+  console.error('[Kyro] Legacy directory .agents/kyro/ detected. Data has moved to .agents/kyro-workflow/');
+}
+
 // Load learned rules (flat file — always available)
 if (fs.existsSync(rulesPath)) {
   const rules = fs.readFileSync(rulesPath, 'utf8');

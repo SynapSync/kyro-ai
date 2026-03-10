@@ -17,7 +17,7 @@ agents:
 | 2 | `sprints/SPRINT-02-debt-aging-and-hook-audit.md` | completed |
 | 3 | `sprints/SPRINT-03-version-sync-manifests.md` | completed |
 | 4 | `sprints/SPRINT-04-hook-hardening.md` | completed |
-| 5 | (not yet generated) | pending |
+| 5 | `sprints/SPRINT-05-cleanup-and-backlog.md` | completed |
 
 ---
 
@@ -27,21 +27,16 @@ _N/A -- Sprint 1 already completed._
 
 ---
 
-## Scenario 2: Generate Sprint 5
+## Scenario 2: Audit Complete
 
-Use to generate Sprint 5 (cleanup + docs alignment):
+All 5 sprints have been completed. The kyro-workflow self-audit is finished.
 
-> I'm continuing the **kyro-workflow self-audit** project. Sprints 1-4 are complete.
+If you need to reference the audit results:
+
+> Read the ROADMAP at:
+> `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/ROADMAP.md`
 >
-> Please read these files in order:
-> 1. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/README.md`
-> 2. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/ROADMAP.md`
-> 3. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/sprints/SPRINT-04-hook-hardening.md` (retro + recommendations + debt table)
-> 4. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/findings/05-debugger-agent-missing-skill.md`
-> 5. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/findings/08-residual-old-storage-path.md`
->
-> Then generate Sprint 5 using `/kyro-workflow:sprint generate`.
-> Sprint 5 focuses on cleanup: debugger skill gap, residual old directory, docs alignment.
+> All 12 original findings + 4 emergent debt items = 16 total items, all resolved across 5 sprints.
 
 ---
 

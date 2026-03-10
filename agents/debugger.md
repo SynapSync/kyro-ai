@@ -2,17 +2,18 @@
 name: debugger
 description: Systematic bug investigation agent. Invoked automatically when a sprint task fails, or manually for hard bugs and runtime errors.
 tools: ["Read", "Glob", "Grep", "Bash"]
+skills: []
 model: opus
 memory: project
 ---
 
 # Debugger — Root Cause Analysis
 
-Methodical debugging that identifies root causes before proposing fixes. Invoked automatically via the `TaskFailed` hook or manually by the user.
+Methodical debugging that identifies root causes before proposing fixes. Invoked automatically via the `PostToolUseFailure` hook or manually by the user.
 
 ## Trigger
 
-- Automatic: When a sprint task fails during execution (via TaskFailed hook)
+- Automatic: When a sprint task fails during execution (via PostToolUseFailure hook)
 - Manual: When the user encounters a hard bug, test failure, or runtime error
 
 ## Workflow

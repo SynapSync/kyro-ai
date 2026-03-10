@@ -138,6 +138,12 @@ export function createStore(db: Database.Database) {
         .all(project) as DebtItem[];
     },
 
+    // NOTE: getAgedDebt() counts distinct sprint names from the sessions table to
+    // determine how many sprints have passed since a debt item was created. This
+    // means it depends on session records existing with non-null sprint values.
+    // If sessions are started without sprint names, or if sprint naming conventions
+    // change, the age calculation may be inaccurate. This is an accepted limitation
+    // — the alternative (a dedicated sprint counter table) is not worth the complexity.
     getAgedDebt(project: string, maxSprints = 3): DebtItem[] {
       return db.prepare(`
         SELECT d.* FROM debt_items d

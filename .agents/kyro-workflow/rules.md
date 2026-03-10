@@ -17,6 +17,11 @@
 - [RULE-005] When adding columns to existing tables, always include an idempotent ALTER TABLE migration with try/catch in index.ts -- CREATE TABLE IF NOT EXISTS does not add new columns (2026-03-10)
 - [RULE-006] hooks.json must only contain standard Claude Code hook events: SessionStart, PreToolUse, PostToolUse, PostToolUseFailure, PreCompact, Stop, SessionEnd, UserPromptSubmit, SubagentStart, SubagentStop -- no custom/aspirational events (2026-03-10)
 
+## Agents
+
+- [RULE-012] Every agent definition must include a `skills:` field in its frontmatter -- use `skills: []` if it intentionally has no skill (2026-03-10)
+- [RULE-013] Agent descriptions must only reference real Claude Code hook events (see RULE-006 for the allowlist) -- never use aspirational or invented event names (2026-03-10)
+
 ## Version Management
 
 - [RULE-004] When bumping version, update ALL of: package.json, marketplace.json, WORKFLOW.yaml -- then run `node scripts/check-sync.js` to verify (2026-03-10, updated 2026-03-10)

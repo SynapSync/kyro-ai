@@ -4,7 +4,7 @@ date: "2026-03-10"
 updated: "2026-03-10"
 project: "kyro-workflow"
 type: "project"
-status: "active"
+status: "completed"
 version: "1.0"
 agents:
   - "claude-opus-4-6"
@@ -54,7 +54,7 @@ Self-audit of the kyro-workflow plugin codebase to identify bugs, synchronizatio
 | 2 | Implement debt-aging & fix DB query | completed |
 | 3 | Version & count synchronization | completed |
 | 4 | Harden hook scripts | completed |
-| 5 | Cleanup & docs alignment | pending |
+| 5 | Cleanup & docs alignment | completed |
 
 ## Key Paths
 
