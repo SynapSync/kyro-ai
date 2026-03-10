@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const distDir = path.join(__dirname, '..', 'dist');
-const kyroDir = path.join(process.cwd(), '.agents', 'kyro-workflow');
-const sessionFile = path.join(kyroDir, '.active-session');
+const { getKyroDir, getRulesPath, getDistDir, getActiveSessionPath } = require('./lib/paths');
+
+const kyroDir = getKyroDir();
+const sessionFile = getActiveSessionPath();
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
@@ -25,7 +26,7 @@ process.stdin.on('end', () => {
     }
 
     if (learnings.length > 0) {
-      const rulesPath = path.join(kyroDir, 'rules.md');
+      const rulesPath = getRulesPath();
 
       if (!fs.existsSync(kyroDir)) {
         fs.mkdirSync(kyroDir, { recursive: true });
@@ -58,6 +59,7 @@ process.stdin.on('end', () => {
       let store = null;
       let db = null;
       try {
+        const distDir = getDistDir();
         const { initDatabase } = require(path.join(distDir, 'db', 'index.js'));
         const { createStore } = require(path.join(distDir, 'db', 'store.js'));
         db = initDatabase();
@@ -68,7 +70,6 @@ process.stdin.on('end', () => {
         const date = new Date().toISOString().split('T')[0];
         const ruleEntry = `- [RULE-${String(nextNum).padStart(3, '0')}] ${l.rule} (${date})\n`;
 
-        // Write to rules.md (existing behavior)
         const categoryHeader = `## ${l.category}`;
         if (rules.includes(categoryHeader)) {
           rules = rules.replace(categoryHeader, `${categoryHeader}\n${ruleEntry}`);
@@ -76,7 +77,6 @@ process.stdin.on('end', () => {
           rules += `\n${categoryHeader}\n${ruleEntry}`;
         }
 
-        // Write to database
         if (store) {
           try {
             store.addLearning({

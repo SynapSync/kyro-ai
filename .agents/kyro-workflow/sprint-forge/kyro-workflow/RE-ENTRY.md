@@ -13,7 +13,7 @@ agents:
 
 | Sprint | File | Status |
 |--------|------|--------|
-| 1 | `sprints/SPRINT-01-critical-hook-fixes.md` | generated |
+| 1 | `sprints/SPRINT-01-critical-hook-fixes.md` | completed |
 | 2 | (not yet generated) | pending |
 | 3 | (not yet generated) | pending |
 | 4 | (not yet generated) | pending |
@@ -23,33 +23,26 @@ agents:
 
 ## Scenario 1: Generate First Sprint
 
-Use this prompt to start Sprint 1:
-
-> I'm working on the **kyro-workflow self-audit** project. This is a kyro-workflow sprint project.
->
-> Please read these files in order:
-> 1. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/README.md`
-> 2. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/ROADMAP.md`
-> 3. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/findings/02-hook-scripts-wrong-sprint-path.md`
-> 4. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/findings/10-no-shared-path-resolution.md`
->
-> Then generate Sprint 1 using `/kyro-workflow:sprint generate`.
-> Sprint 1 focuses on fixing critical hook path bugs and creating a shared path utility.
+_N/A -- Sprint 1 already completed._
 
 ---
 
-## Scenario 2: Continue to Next Sprint
+## Scenario 2: Generate Sprint 2
 
-Use after completing a sprint to generate the next one:
+Use to generate Sprint 2 (debt-aging feature + DB query fix):
 
-> I'm continuing the **kyro-workflow self-audit** project.
+> I'm continuing the **kyro-workflow self-audit** project. Sprint 1 is complete.
 >
 > Please read these files in order:
 > 1. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/README.md`
 > 2. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/ROADMAP.md`
-> 3. The latest sprint file in `sprints/` directory
+> 3. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/sprints/SPRINT-01-critical-hook-fixes.md` (retro + recommendations + debt table)
+> 4. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/findings/03-ghost-hook-debt-item-aged.md`
+> 5. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/findings/07-getAgedDebt-unused-parameter.md`
+> 6. `/Users/rperaza/joicodev/owned/synap-sync/kyro-workspace/.agents/kyro-workflow/sprint-forge/kyro-workflow/findings/09-no-task-hook-in-claude-code.md`
 >
-> Then generate the next sprint using `/kyro-workflow:sprint generate`.
+> Then generate Sprint 2 using `/kyro-workflow:sprint generate`.
+> Sprint 2 focuses on implementing the missing debt-aging feature and fixing the DB query.
 
 ---
 

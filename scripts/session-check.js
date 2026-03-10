@@ -1,22 +1,13 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
+const { findActiveProject, findLatestSprint } = require('./lib/paths');
 
-// Check for active sprint work
-const kyroDir = path.join(process.cwd(), '.agents', 'kyro-workflow');
-if (fs.existsSync(kyroDir)) {
-  const sprintsDir = path.join(kyroDir, 'sprints');
-  if (fs.existsSync(sprintsDir)) {
-    const sprints = fs.readdirSync(sprintsDir).filter(f => f.endsWith('.md')).sort();
-    if (sprints.length > 0) {
-      const latest = sprints[sprints.length - 1];
-      const content = fs.readFileSync(path.join(sprintsDir, latest), 'utf8');
-      if (/status:\s*in-progress/i.test(content)) {
-        console.error('[Kyro] Active sprint detected: ' + latest);
-        console.error('[Kyro] Consider running /retro before ending session');
-        console.error('[Kyro] Or update re-entry prompts for the next session');
-      }
-    }
+const activeProject = findActiveProject();
+if (activeProject) {
+  const latest = findLatestSprint(activeProject.sprintsDir);
+  if (latest && /status:\s*["']?active["']?/i.test(latest.content)) {
+    console.error('[Kyro] Active sprint detected: ' + latest.file);
+    console.error('[Kyro] Consider running /retro before ending session');
+    console.error('[Kyro] Or update re-entry prompts for the next session');
   }
 }
 
