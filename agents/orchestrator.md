@@ -13,27 +13,53 @@ Coordinates the complete sprint lifecycle with validation gates between each pha
 
 ## Lifecycle
 
+### Phase 0: Detect Project State
+
+Before starting, determine which flow to follow:
+
+1. Scan `.agents/kyro/` for existing project directories
+2. Check if a `ROADMAP.md` exists for this project
+
+- **NO ROADMAP** → New project. Follow **INIT flow** (full analysis, findings, roadmap, scaffolding, then first sprint)
+- **ROADMAP exists** → Existing project. Follow **SPRINT flow** (generate next sprint directly)
+
 ```
-[GATE 0: RULES] Load learned rules from .agents/kyro/rules.md
+[GATE 0: STARTUP] Load skill + rules
         ↓
-[PHASE 1: ANALYZE] → Explorer agent investigates codebase
+[PHASE 0: DETECT] Check if ROADMAP exists
         ↓
-[GATE 1] User approves analysis and plan direction
-        ↓
-[PHASE 2: PLAN] → Generate sprint with phases and tasks
-        ↓
-[GATE 2] User approves sprint plan
-        ↓
-[PHASE 3: IMPLEMENT] → Execute task by task
-  ├── After each task → Reviewer agent validates
-  ├── On failure → Debugger agent investigates
-  └── Checkpoint after each phase
-        ↓
-[GATE 3] User approves implementation
-        ↓
-[PHASE 4: REVIEW] → Full sprint review
-        ↓
-[PHASE 5: CLOSE] → Retro, debt update, re-entry prompts, rule proposals
+   ┌────┴────┐
+   NO        YES
+   ↓          ↓
+[INIT FLOW]  [SPRINT FLOW]
+   │          │
+   ├─ Phase 1: Analyze (explorer agent + INIT mode)
+   │  ├─ Detect work type
+   │  ├─ Deep analysis → findings files
+   │  ├─ Create ROADMAP
+   │  ├─ Scaffold directory
+   │  └─ Generate re-entry prompts
+   │  GATE 1: Approve INIT
+   │          │
+   ├─ Phase 2: First Sprint ──────┤
+   │          ├─ Phase 3: Generate Next Sprint
+   │          │  ├─ Read ROADMAP + previous retro + debt
+   │          │  ├─ Build disposition table (Sprint 2+)
+   │          │  └─ Generate sprint document
+   │          │  GATE: Approve sprint plan
+   │          │
+   └──────────┴──→ Phase 4: Implement
+                     ├── Task by task execution
+                     ├── Reviewer validates each task
+                     ├── Debugger on failure
+                     └── Checkpoint per phase
+                   GATE: Approve implementation
+                          ↓
+                   Phase 5: Review & Close
+                     ├── Quality gates
+                     ├── Retro + debt update
+                     ├── Re-entry prompts
+                     └── Rule proposals
 ```
 
 ## Gate Protocol
