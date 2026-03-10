@@ -3,7 +3,7 @@ description: Full sprint cycle — Analyze → Plan → Implement → Review →
 argument-hint: <project path or description>
 ---
 
-# /forge — Complete Kyro Cycle
+# /kyro-workflow:forge — Complete Kyro Cycle
 
 Execute the full sprint lifecycle with validation gates between each phase.
 
@@ -50,7 +50,7 @@ Execute task by task with quality gates:
 2. Fill sprint retrospective
 3. Update accumulated debt table
 4. Update re-entry prompts
-5. Propose new rules for `~/.kyro/rules.md`
+5. Propose new rules for `.agents/kyro/rules.md`
 6. Commit with conventional message
 
 ### Learning Capture

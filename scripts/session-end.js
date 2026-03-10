@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
-const forgeDir = path.join(os.homedir(), '.kyro');
+const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
 const distDir = path.join(__dirname, '..', 'dist');
-const sessionFile = path.join(forgeDir, '.active-session');
+const sessionFile = path.join(kyroDir, '.active-session');
 
 // Ensure directory exists
-if (!fs.existsSync(forgeDir)) {
-  fs.mkdirSync(forgeDir, { recursive: true });
+if (!fs.existsSync(kyroDir)) {
+  fs.mkdirSync(kyroDir, { recursive: true });
 }
 
 // End session in DB

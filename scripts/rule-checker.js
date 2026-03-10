@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
 process.stdin.on('end', () => {
@@ -10,7 +8,7 @@ process.stdin.on('end', () => {
   // This hook provides a lightweight pre-check for common violations.
 
   try {
-    const rulesPath = path.join(os.homedir(), '.kyro', 'rules.md');
+    const rulesPath = path.join(process.cwd(), '.agents', 'kyro', 'rules.md');
     if (fs.existsSync(rulesPath)) {
       const rules = fs.readFileSync(rulesPath, 'utf8');
       const input = JSON.parse(data);

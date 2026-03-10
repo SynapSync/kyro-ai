@@ -3,7 +3,7 @@ description: Detect and remove AI-generated slop — unnecessary comments, over-
 argument-hint: <file path | directory | "changed">
 ---
 
-# /deslop — AI Slop Removal
+# /kyro-workflow:deslop — AI Slop Removal
 
 Scan target files for AI-generated boilerplate and propose removals. Uses the `deslop` skill for detection and categorization.
 

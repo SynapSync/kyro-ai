@@ -11,7 +11,7 @@
 
 <p align="center">
   <b>Complete sprint workflow system for AI-assisted development.</b><br/>
-  4 agents &bull; 12 hooks &bull; 9 commands &bull; 7 skills &bull; Adaptive learning across projects<br/>
+  4 agents &bull; 12 hooks &bull; 9 commands &bull; 7 skills &bull; Adaptive per-project learning<br/>
   Built for <b>Claude Code</b>. Compatible with any AI coding agent via SkillKit.
 </p>
 
@@ -25,7 +25,7 @@ Unlike rigid project planners, Kyro:
 
 - **Analyzes first** — deep codebase exploration before committing to a plan
 - **Generates sprints one at a time** — each sprint feeds from the previous one's retro
-- **Learns across projects** — corrections become persistent rules in `~/.kyro/rules.md`
+- **Learns across sprints** — corrections become persistent rules in `.agents/kyro/rules.md`
 - **Validates at every step** — BLOCKER/WARNING/SUGGESTION checklist per task
 - **Adapts the roadmap** — the plan evolves based on what execution reveals
 - **Persists context** — re-entry prompts + enriched handoffs with mental model
@@ -36,9 +36,9 @@ Unlike rigid project planners, Kyro:
 
 <table>
 <tr><td><b>4 Agents</b></td><td>Explorer (read-only analysis), Reviewer (task validation), Debugger (root cause), Orchestrator (full cycle)</td></tr>
-<tr><td><b>9 Commands</b></td><td><code>/forge</code>, <code>/sprint</code>, <code>/status</code>, <code>/debt</code>, <code>/retro</code>, <code>/wrap-up</code>, <code>/insights</code>, <code>/deslop</code>, <code>/parallel</code></td></tr>
+<tr><td><b>9 Commands</b></td><td><code>/kyro-workflow:forge</code>, <code>/kyro-workflow:sprint</code>, <code>/kyro-workflow:status</code>, <code>/kyro-workflow:debt</code>, <code>/kyro-workflow:retro</code>, <code>/kyro-workflow:wrap-up</code>, <code>/kyro-workflow:insights</code>, <code>/kyro-workflow:deslop</code>, <code>/kyro-workflow:parallel</code></td></tr>
 <tr><td><b>12 Hooks</b></td><td>SessionStart, PreToolUse, PostToolUse, Stop, SessionEnd, UserPromptSubmit, PreCompact, SubagentStart/Stop, TaskCompleted, PostToolUseFailure</td></tr>
-<tr><td><b>Cross-Project Learning</b></td><td>Corrections become rules in <code>~/.kyro/rules.md</code> — applied automatically in future projects</td></tr>
+<tr><td><b>Per-Project Learning</b></td><td>Corrections become rules in <code>.agents/kyro/rules.md</code> — applied automatically in future sprints</td></tr>
 <tr><td><b>Validation Gates</b></td><td>BLOCKER/WARNING/SUGGESTION checklist per task, phase gates with user approval</td></tr>
 <tr><td><b>Velocity Metrics</b></td><td>Sprint velocity trends, debt heatmap, underestimation pattern detection</td></tr>
 <tr><td><b>Enriched Handoffs</b></td><td>Mental context: active hypotheses, pending decisions, blockers, next action</td></tr>
@@ -49,7 +49,7 @@ Unlike rigid project planners, Kyro:
 
 ## How It Works
 
-### The `/forge` Cycle
+### The `/kyro-workflow:forge` Cycle
 
 ```
 [PHASE 1: ANALYZE]  → Explorer agent investigates codebase (read-only)
@@ -79,7 +79,7 @@ Every gate requires explicit user approval. The plan serves execution, not the r
 ```
 User corrects agent → Agent proposes rule → User approves
         ↓
-Rule saved to ~/.kyro/rules.md
+Rule saved to .agents/kyro/rules.md
         ↓
 Future sessions load rules automatically
         ↓
@@ -105,18 +105,18 @@ kyro-workflow/
 │   ├── explorer.md             # Read-only codebase analysis (INIT)
 │   ├── reviewer.md             # Task quality validation (SPRINT)
 │   ├── debugger.md             # Root cause investigation (on failure)
-│   └── orchestrator.md         # Full cycle coordinator (/forge)
+│   └── orchestrator.md         # Full cycle coordinator (/kyro-workflow:forge)
 │
 ├── commands/                   # 9 slash commands
-│   ├── forge.md                # /forge — full cycle with gates
-│   ├── sprint.md               # /sprint — generate/execute next sprint
-│   ├── status.md               # /status — metrics + debt heatmap
-│   ├── debt.md                 # /debt — manage technical debt
-│   ├── retro.md                # /retro — sprint retrospective ritual
-│   ├── wrap-up.md              # /wrap-up — session closure ritual
-│   ├── insights.md             # /insights — DB-backed analytics
-│   ├── deslop.md               # /deslop — AI slop removal
-│   └── parallel.md             # /parallel — worktree parallel execution
+│   ├── forge.md                # /kyro-workflow:forge — full cycle with gates
+│   ├── sprint.md               # /kyro-workflow:sprint — generate/execute next sprint
+│   ├── status.md               # /kyro-workflow:status — metrics + debt heatmap
+│   ├── debt.md                 # /kyro-workflow:debt — manage technical debt
+│   ├── retro.md                # /kyro-workflow:retro — sprint retrospective ritual
+│   ├── wrap-up.md              # /kyro-workflow:wrap-up — session closure ritual
+│   ├── insights.md             # /kyro-workflow:insights — DB-backed analytics
+│   ├── deslop.md               # /kyro-workflow:deslop — AI slop removal
+│   └── parallel.md             # /kyro-workflow:parallel — worktree parallel execution
 │
 ├── skills/                     # 7 skills (domain knowledge)
 │   ├── kyro-workflow/           # Core orchestration (base skill from v1.x)
@@ -124,7 +124,7 @@ kyro-workflow/
 │   │   └── assets/             # Modes, helpers, templates
 │   ├── kyro-analyzer/        # Analysis strategies per work type
 │   ├── kyro-reviewer/        # Quality checklist (BLOCKER/WARNING/SUGGESTION)
-│   ├── kyro-learner/         # Cross-project rule accumulation
+│   ├── kyro-learner/         # Per-project rule accumulation
 │   ├── kyro-metrics/         # Velocity trends + debt heatmap
 │   ├── kyro-handoff/         # Enriched context transfer
 │   └── deslop/                 # AI slop detection and removal
@@ -196,15 +196,15 @@ npx skillkit install kyro-workflow
 
 | Command | Purpose |
 |---------|---------|
-| `/forge` | Full cycle: Analyze → Plan → Implement → Review → Commit |
-| `/sprint` | Generate and/or execute the next sprint |
-| `/status` | Project metrics, velocity trends, debt heatmap |
-| `/debt` | List, add, resolve, or escalate technical debt |
-| `/retro` | Sprint retrospective ritual with rule proposals |
-| `/wrap-up` | End-of-session closure ritual with quality check and context handoff |
-| `/insights` | Database-backed analytics — correction trends, learning heatmap, velocity |
-| `/deslop` | Detect and remove AI-generated slop — unnecessary comments, over-engineering |
-| `/parallel` | Analyze sprint tasks for parallel execution via git worktrees |
+| `/kyro-workflow:forge` | Full cycle: Analyze → Plan → Implement → Review → Commit |
+| `/kyro-workflow:sprint` | Generate and/or execute the next sprint |
+| `/kyro-workflow:status` | Project metrics, velocity trends, debt heatmap |
+| `/kyro-workflow:debt` | List, add, resolve, or escalate technical debt |
+| `/kyro-workflow:retro` | Sprint retrospective ritual with rule proposals |
+| `/kyro-workflow:wrap-up` | End-of-session closure ritual with quality check and context handoff |
+| `/kyro-workflow:insights` | Database-backed analytics — correction trends, learning heatmap, velocity |
+| `/kyro-workflow:deslop` | Detect and remove AI-generated slop — unnecessary comments, over-engineering |
+| `/kyro-workflow:parallel` | Analyze sprint tasks for parallel execution via git worktrees |
 
 ---
 
@@ -226,7 +226,7 @@ npx skillkit install kyro-workflow
 | `kyro-workflow` | Core orchestration — modes (INIT/SPRINT/STATUS), helpers, templates |
 | `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
 | `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
-| `kyro-learner` | Cross-project rule accumulation via `~/.kyro/rules.md` |
+| `kyro-learner` | Per-project rule accumulation via `.agents/kyro/rules.md` |
 | `kyro-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
 | `kyro-handoff` | Enriched session handoff with mental context (hypotheses, decisions, blockers) |
 | `deslop` | AI slop detection and removal — 7 categories, confidence ratings, safety rules |
@@ -257,9 +257,9 @@ npx skillkit install kyro-workflow
 Learnings, sessions, and debt items stored in SQLite with FTS5 full-text search:
 
 ```
-~/.kyro/
+.agents/kyro/
 ├── data.db       # SQLite database (learnings, sessions, debt)
-└── rules.md      # Persistent learned rules (accumulated across projects)
+└── rules.md      # Persistent learned rules (accumulated across sprints)
 ```
 
 ### Schema
@@ -277,8 +277,8 @@ Learnings, sessions, and debt items stored in SQLite with FTS5 full-text search:
 
 ```json
 {
-  "database": { "path": "~/.kyro/data.db" },
-  "rules": { "path": "~/.kyro/rules.md", "auto_load": true },
+  "database": { "path": ".agents/kyro/data.db" },
+  "rules": { "path": ".agents/kyro/rules.md", "auto_load": true },
   "quality_gates": { "run_lint": true, "run_typecheck": true, "run_tests": true },
   "sprint": { "checkpoint_per_phase": true, "require_retro": true, "debt_aged_threshold_sprints": 3 },
   "model_preferences": { "exploration": "haiku", "planning": "sonnet", "implementation": "opus" }
@@ -291,7 +291,7 @@ See [`settings.example.json`](settings.example.json) for production permission a
 
 ## Philosophy
 
-1. **Learn from every project, apply in the next** — corrections compound into rules
+1. **Learn from every sprint, apply in the next** — corrections compound into rules
 2. **Investigate before planning, plan before implementing** — phases are sequential, gates are mandatory
 3. **Every task passes a quality gate before closure** — BLOCKER items block, no exceptions
 4. **Mental context is as important as code** — handoffs capture hypotheses, not just file paths
@@ -306,10 +306,10 @@ See [`settings.example.json`](settings.example.json) for production permission a
 | Dimension | v1.x (Skill) | v2.0 (Workflow) |
 |-----------|--------------|-----------------|
 | Type | Single skill | Full workflow |
-| Learning | Per-project retro | Persistent rules across projects |
+| Learning | Per-project retro | Persistent rules across sprints |
 | Agents | 1 (the skill itself) | 4 specialized (explorer, reviewer, debugger, orchestrator) |
 | Hooks | 0 | 12 lifecycle events |
-| Commands | 0 (text triggers) | 9 commands (/forge, /sprint, /status, /debt, /retro, /wrap-up, /insights, /deslop, /parallel) |
+| Commands | 0 (text triggers) | 9 commands (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro, /kyro-workflow:wrap-up, /kyro-workflow:insights, /kyro-workflow:deslop, /kyro-workflow:parallel) |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase |
 | Metrics | Basic STATUS | Velocity trends + debt heatmap + estimation patterns |
 | Context transfer | Re-entry prompts (files) | Enriched handoff (mental context) |
@@ -343,14 +343,14 @@ git clone https://github.com/SynapSync/kyro-workflow.git ~/.claude/plugins/kyro-
 cd ~/.claude/plugins/kyro-workflow && npm install && npm run build
 
 # 2. Start a project
-/forge analyze the authentication module    # Full cycle with gates
+/kyro-workflow:forge analyze the authentication module    # Full cycle with gates
 
 # 3. Or step by step
-/sprint generate                            # Generate next sprint
-/sprint execute                             # Execute current sprint
-/status                                     # Check progress + metrics
-/debt escalate                              # Flag aged debt items
-/retro                                      # Run retrospective ritual
+/kyro-workflow:sprint generate                            # Generate next sprint
+/kyro-workflow:sprint execute                             # Execute current sprint
+/kyro-workflow:status                                     # Check progress + metrics
+/kyro-workflow:debt escalate                              # Flag aged debt items
+/kyro-workflow:retro                                      # Run retrospective ritual
 ```
 
 ---

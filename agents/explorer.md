@@ -74,5 +74,5 @@ Analyzed: [date]
 - **NEVER write files.** The orchestrator handles all file creation.
 - Be thorough but efficient — prioritize areas that affect sprint planning.
 - Flag uncertainties explicitly. A false "all clear" wastes more time than a noted concern.
-- Load rules from `~/.kyro/rules.md` and apply relevant ones during analysis.
+- Load rules from `.agents/kyro/rules.md` and apply relevant ones during analysis.
 - Use the skill's `analysis-guide.md` helper for detailed exploration strategies.

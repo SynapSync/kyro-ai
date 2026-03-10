@@ -3,7 +3,7 @@ description: Analyze sprint tasks for parallel execution via git worktrees
 argument-hint: [sprint number]
 ---
 
-# /parallel — Parallel Sprint Execution
+# /kyro-workflow:parallel — Parallel Sprint Execution
 
 Analyze the current sprint's tasks for dependencies, group independent tasks into parallel lanes, and set up git worktrees for concurrent execution by multiple agents or sessions.
 

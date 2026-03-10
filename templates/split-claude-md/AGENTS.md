@@ -10,9 +10,9 @@
 
 ### Retrospective Required
 
-- Every completed sprint MUST end with a retrospective (`/retro`).
+- Every completed sprint MUST end with a retrospective (`/kyro-workflow:retro`).
 - The retro captures: what worked, what did not, estimation accuracy, and concrete improvements.
-- Learnings from the retro are written to `LEARNED.md` and to `~/.kyro/rules.md` for cross-project reuse.
+- Learnings from the retro are written to `LEARNED.md` and to `.agents/kyro/rules.md` for per-project reuse.
 - Skipping the retro is a workflow violation.
 
 ### Debt is Inherited
@@ -59,7 +59,7 @@ Use for: initial codebase analysis, architecture mapping, risk identification.
 
 - Read-only. Must not modify any files.
 - Preferred model: haiku (fast, cheap).
-- Delegated automatically during the Analyze phase of `/forge`.
+- Delegated automatically during the Analyze phase of `/kyro-workflow:forge`.
 - Can be invoked manually for ad-hoc exploration.
 
 ### Reviewer Agent
@@ -82,7 +82,7 @@ Use for: root cause analysis when a task fails or tests break.
 
 ### Orchestrator Agent
 
-Use for: full-cycle coordination via `/forge`.
+Use for: full-cycle coordination via `/kyro-workflow:forge`.
 
 - Manages the Analyze -> Plan -> Implement -> Review -> Commit lifecycle.
 - Delegates to explorer, reviewer, and debugger as needed.

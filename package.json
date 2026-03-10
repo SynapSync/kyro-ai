@@ -1,7 +1,7 @@
 {
   "name": "kyro-workflow",
   "version": "2.3.0",
-  "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive learning across projects",
+  "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive per-project learning",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
