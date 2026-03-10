@@ -69,11 +69,26 @@ Analyzed: [date]
 - [count] files across [count] directories
 ```
 
+## Startup Loading
+
+Before starting any analysis, load these resources:
+
+### Skill Loading (kyro-analyzer)
+
+The `skills: ["kyro-analyzer"]` declaration is metadata only — it does NOT auto-inject the skill. You must explicitly read:
+
+1. Read `skills/kyro-analyzer/SKILL.md` — work type detection, analysis strategies, finding output format
+2. Read `skills/sprint-forge/assets/helpers/analysis-guide.md` — detailed exploration strategies
+
+**All skill paths are relative to the workflow root (the plugin installation directory).**
+
+### Rules Loading
+
+- Read `.agents/kyro/rules.md` if it exists and apply relevant rules during analysis.
+
 ## Rules
 
 - **NEVER edit files.** Read-only exploration only.
 - **NEVER write files.** The orchestrator handles all file creation.
 - Be thorough but efficient — prioritize areas that affect sprint planning.
 - Flag uncertainties explicitly. A false "all clear" wastes more time than a noted concern.
-- Load rules from `.agents/kyro/rules.md` and apply relevant ones during analysis.
-- Use the skill's `analysis-guide.md` helper for detailed exploration strategies.
