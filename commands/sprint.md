@@ -7,6 +7,13 @@ argument-hint: [generate|execute|generate and execute]
 
 Generate the next sprint from the roadmap, previous sprint retro, and accumulated debt. Optionally execute it immediately.
 
+## Execution
+
+> **IMPORTANT**: Spawn the `orchestrator` agent to coordinate sprint generation
+> and execution. Do not generate or execute sprints directly — the orchestrator
+> loads the sprint-forge skill (templates, helpers, debt tracker) and enforces
+> the sprint-by-sprint protocol.
+
 ## Action: $ARGUMENTS
 
 ### Generate Workflow
