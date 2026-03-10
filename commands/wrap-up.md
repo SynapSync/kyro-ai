@@ -3,7 +3,7 @@ description: End-of-session closure ritual with quality check and context handof
 argument-hint: [session notes]
 ---
 
-# /wrap-up — Session Closure Ritual
+# /kyro-workflow:wrap-up — Session Closure Ritual
 
 Structured 5-step checklist to close the current session cleanly. Ensures no work is lost, quality is maintained, learnings are captured, and the next session has full context.
 
@@ -39,7 +39,7 @@ Prompt for learnings from this session:
    ```
    [LEARN] Category: One-line rule
    ```
-4. Learnings are automatically persisted to both `~/.kyro/rules.md` and the database
+4. Learnings are automatically persisted to both `.agents/kyro/rules.md` and the database
 
 ### Step 4: Next Session Context
 
@@ -76,4 +76,4 @@ Display session stats:
 After completing all 5 steps:
 1. Display the summary
 2. Confirm session is ready to close
-3. Suggest using `/retro` if a sprint milestone was reached
+3. Suggest using `/kyro-workflow:retro` if a sprint milestone was reached

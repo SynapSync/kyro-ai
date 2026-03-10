@@ -3,7 +3,7 @@ description: Run the sprint retrospective ritual
 argument-hint: [sprint number]
 ---
 
-# /retro — Sprint Retrospective Ritual
+# /kyro-workflow:retro — Sprint Retrospective Ritual
 
 Formal retrospective that captures learnings, proposes rules, and feeds forward into the next sprint.
 
@@ -66,7 +66,7 @@ Numbered recommendations that MUST be addressed in the next sprint's disposition
 Based on corrections and learnings:
 
 ```text
-Proposed rules for ~/.kyro/rules.md:
+Proposed rules for .agents/kyro/rules.md:
 
 [RULE-XXX] Category: One-line rule
   Context: Why this rule exists (from this sprint's experience)
@@ -88,4 +88,4 @@ Formal capture of learnings:
 Write the retro directly into the sprint file's Retro section, then:
 1. Update re-entry prompts
 2. Update roadmap if recommendations affect future sprints
-3. Save confirmed rules to `~/.kyro/rules.md`
+3. Save confirmed rules to `.agents/kyro/rules.md`

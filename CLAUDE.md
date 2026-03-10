@@ -7,7 +7,7 @@ Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based p
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/forge, /sprint, /status, /debt, /retro, /wrap-up, /insights, /deslop, /parallel)
+User Command (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro, /kyro-workflow:wrap-up, /kyro-workflow:insights, /kyro-workflow:deslop, /kyro-workflow:parallel)
   └── Agent (explorer, reviewer, debugger, orchestrator)
         └── Skill (kyro-workflow, kyro-learner, kyro-reviewer, kyro-metrics, kyro-handoff, kyro-analyzer, deslop)
               └── Hook (lifecycle events that fire automatically)
@@ -21,17 +21,17 @@ kyro-workflow/
 │   ├── explorer.md   # Read-only codebase analysis (INIT)
 │   ├── reviewer.md   # Task quality validation (SPRINT)
 │   ├── debugger.md   # Root cause analysis (on failure)
-│   └── orchestrator.md # Full cycle coordinator (/forge)
+│   └── orchestrator.md # Full cycle coordinator (/kyro-workflow:forge)
 ├── commands/         # 9 slash commands
-│   ├── forge.md      # /forge — full cycle with gates
-│   ├── sprint.md     # /sprint — generate/execute next sprint
-│   ├── status.md     # /status — metrics and debt heatmap
-│   ├── debt.md       # /debt — manage technical debt
-│   ├── retro.md      # /retro — sprint retrospective ritual
-│   ├── wrap-up.md    # /wrap-up — session closure ritual
-│   ├── insights.md   # /insights — DB-backed analytics
-│   ├── deslop.md     # /deslop — AI slop removal
-│   └── parallel.md   # /parallel — worktree parallel execution
+│   ├── forge.md      # /kyro-workflow:forge — full cycle with gates
+│   ├── sprint.md     # /kyro-workflow:sprint — generate/execute next sprint
+│   ├── status.md     # /kyro-workflow:status — metrics and debt heatmap
+│   ├── debt.md       # /kyro-workflow:debt — manage technical debt
+│   ├── retro.md      # /kyro-workflow:retro — sprint retrospective ritual
+│   ├── wrap-up.md    # /kyro-workflow:wrap-up — session closure ritual
+│   ├── insights.md   # /kyro-workflow:insights — DB-backed analytics
+│   ├── deslop.md     # /kyro-workflow:deslop — AI slop removal
+│   └── parallel.md   # /kyro-workflow:parallel — worktree parallel execution
 ├── hooks/            # Lifecycle event handlers
 │   └── hooks.json    # 12 hook definitions
 ├── scripts/          # Hook implementation scripts
@@ -39,7 +39,7 @@ kyro-workflow/
 │   ├── kyro-workflow/     # Core orchestration (from v1.x)
 │   ├── kyro-analyzer/  # Analysis strategies per work type
 │   ├── kyro-reviewer/  # Quality checklist (BLOCKER/WARNING/SUGGESTION)
-│   ├── kyro-learner/   # Cross-project rule accumulation
+│   ├── kyro-learner/   # Per-project rule accumulation
 │   ├── kyro-metrics/   # Velocity trends and debt heatmap
 │   ├── kyro-handoff/   # Enriched context transfer
 │   └── deslop/           # AI slop detection and removal
@@ -53,8 +53,8 @@ kyro-workflow/
 
 ## Key Conventions
 
-- **Rules file**: `~/.kyro/rules.md` — persistent learned rules across all projects
-- **Database**: `~/.kyro/data.db` — session stats and searchable learnings
+- **Rules file**: `.agents/kyro/rules.md` — persistent learned rules for this project
+- **Database**: `.agents/kyro/data.db` — session stats and searchable learnings
 - **Sprint output**: `{cwd}/.agents/kyro/{project}/` — per-project sprint documents
 - **Checkpoint-per-phase**: Sprint file saved after each phase completes
 - **Debt never disappears**: Items are only closed when explicitly resolved

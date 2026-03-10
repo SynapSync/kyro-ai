@@ -6,7 +6,7 @@ This project uses **Kyro** for structured sprint execution.
 
 - Workflow: `kyro-workflow` (installed via Claude Code plugin or local path)
 - Sprint output: `.agents/kyro/{project}/`
-- Global rules: `~/.kyro/rules.md`
+- Learned rules: `.agents/kyro/rules.md`
 
 ## Agent Rules
 

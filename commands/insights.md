@@ -3,13 +3,13 @@ description: Database-backed analytics — correction trends, learning heatmap, 
 argument-hint: [project name or "all"]
 ---
 
-# /insights — Kyro Analytics
+# /kyro-workflow:insights — Kyro Analytics
 
-Query the Kyro database to surface patterns in learnings, corrections, sessions, and sprint velocity. All data comes from `~/.kyro/data.db`.
+Query the Kyro database to surface patterns in learnings, corrections, sessions, and sprint velocity. All data comes from `.agents/kyro/data.db`.
 
 ## Scope: $ARGUMENTS
 
-If a project name is provided, filter all queries to that project. If "all" or empty, show cross-project analytics.
+If a project name is provided, filter all queries to that project. If "all" or empty, show analytics across all sprints.
 
 ### 1. Correction Trends
 
@@ -108,7 +108,7 @@ Cross-reference with correction trends:
 ### Output Format
 
 ```
-Kyro Insights — {project or "All Projects"}
+Kyro Insights — {project}
 ═══════════════════════════════════════════════════
 
 📊 Correction Trends
@@ -126,6 +126,6 @@ Kyro Insights — {project or "All Projects"}
 💡 Estimation Patterns
 {analysis + recommendations}
 
-Data source: ~/.kyro/data.db
+Data source: .agents/kyro/data.db
 Total learnings: {count} | Total sessions: {count}
 ```

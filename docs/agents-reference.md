@@ -23,7 +23,7 @@ The explorer agent performs read-only codebase analysis during the INIT phase. I
 
 ### When Triggered
 
-- Phase 1 of `/forge` (delegated by the orchestrator)
+- Phase 1 of `/kyro-workflow:forge` (delegated by the orchestrator)
 - Directly when the user wants to analyze a project before planning
 
 ### Tools
@@ -40,7 +40,7 @@ The explorer agent performs read-only codebase analysis during the INIT phase. I
 - **NEVER edits files.** Read-only exploration only.
 - **NEVER writes files.** The orchestrator handles all file creation.
 - Operates in worktree isolation when available.
-- Loads rules from `~/.kyro/rules.md` and applies relevant ones during analysis.
+- Loads rules from `.agents/kyro/rules.md` and applies relevant ones during analysis.
 - Uses the `kyro-analyzer` skill for analysis strategies per work type.
 
 ### Workflow
@@ -93,7 +93,7 @@ The reviewer agent validates each task before it can be marked as completed. It 
 
 ### When Triggered
 
-- After each task completion during sprint execution (Phase 3 of `/forge` or `/sprint execute`)
+- After each task completion during sprint execution (Phase 3 of `/kyro-workflow:forge` or `/kyro-workflow:sprint execute`)
 - Manually when the user requests a quality check
 - Via the `TaskCompleted` hook
 
@@ -293,7 +293,7 @@ Recommended next step: [suggestion for the human]
 - Check `git blame` -- recent changes are more likely to be the cause.
 - Use project memory to recall previous bugs in the same area.
 - If stuck after 3 rounds, escalate with findings so far.
-- Capture debugging insights as rule proposals for `~/.kyro/rules.md`.
+- Capture debugging insights as rule proposals for `.agents/kyro/rules.md`.
 
 ---
 
@@ -301,12 +301,12 @@ Recommended next step: [suggestion for the human]
 
 **File:** `agents/orchestrator.md`
 
-The orchestrator coordinates the complete sprint lifecycle. It is the brain of the `/forge` command, managing gates, delegating to other agents, and handling sprint close.
+The orchestrator coordinates the complete sprint lifecycle. It is the brain of the `/kyro-workflow:forge` command, managing gates, delegating to other agents, and handling sprint close.
 
 ### When Triggered
 
-- `/forge` command (always)
-- Indirectly manages the flow when `/sprint` runs with execution
+- `/kyro-workflow:forge` command (always)
+- Indirectly manages the flow when `/kyro-workflow:sprint` runs with execution
 
 ### Tools
 
@@ -349,7 +349,7 @@ The orchestrator never proceeds past a gate without explicit user approval.
 
 At the start of every orchestration:
 
-1. Read `~/.kyro/rules.md` if it exists
+1. Read `.agents/kyro/rules.md` if it exists
 2. Apply relevant rules throughout all phases
 3. If a rule is about to be violated, pause and show the rule to the user
 4. At the end, propose new rules based on corrections made during the session
@@ -376,7 +376,7 @@ After all tasks are complete:
 4. Update frontmatter (status, dates, agents)
 5. Generate/update re-entry prompts
 6. Update roadmap if needed
-7. Propose new rules for `~/.kyro/rules.md`
+7. Propose new rules for `.agents/kyro/rules.md`
 
 ### Constraints
 

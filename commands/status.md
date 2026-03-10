@@ -3,7 +3,7 @@ description: Show project status, velocity metrics, and technical debt heatmap
 argument-hint: [brief|full|debt|velocity]
 ---
 
-# /status — Project Status & Metrics
+# /kyro-workflow:status — Project Status & Metrics
 
 Report project progress, sprint velocity, technical debt heatmap, and next sprint preview.
 

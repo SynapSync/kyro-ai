@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
 const distDir = path.join(__dirname, '..', 'dist');
-const sessionFile = path.join(os.homedir(), '.kyro', '.active-session');
+const sessionFile = path.join(process.cwd(), '.agents', 'kyro', '.active-session');
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);

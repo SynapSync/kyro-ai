@@ -1,15 +1,15 @@
 ---
 name: kyro-learner
 description: >
-  Captures corrections and patterns as persistent rules that apply across projects.
-  Manages ~/.kyro/rules.md — the accumulated wisdom from all sprint executions.
+  Captures corrections and patterns as persistent rules for this project.
+  Manages .agents/kyro/rules.md — the accumulated wisdom from sprint executions.
 ---
 
-# Kyro Learner — Cross-Project Rule Accumulation
+# Kyro Learner — Per-Project Rule Accumulation
 
 ## Purpose
 
-Captures corrections, patterns, and estimation insights as persistent rules stored in `~/.kyro/rules.md`. Unlike per-project retros, these rules apply across ALL projects.
+Captures corrections, patterns, and estimation insights as persistent rules stored in `.agents/kyro/rules.md`. These rules are project-scoped and accumulated across sprints.
 
 ## Rule Format
 
@@ -50,13 +50,13 @@ Detected a pattern worth remembering:
 Save this rule? (yes/no/edit)
 ```
 
-3. On approval, append to `~/.kyro/rules.md`
+3. On approval, append to `.agents/kyro/rules.md`
 4. Log in the sprint's LEARNED section
 
 ## Rule Application
 
 At the start of every session:
-1. Load `~/.kyro/rules.md`
+1. Load `.agents/kyro/rules.md`
 2. Before generating sprint estimates, check estimation rules
 3. Before architecture decisions, check architecture rules
 4. If about to violate a rule, pause and show it (RuleViolation event)

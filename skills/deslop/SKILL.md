@@ -17,7 +17,7 @@ Identifies and removes AI-generated boilerplate that adds complexity without val
 - After AI-assisted code generation sessions
 - Before code review / PR creation
 - When files feel bloated or hard to read
-- As part of `/wrap-up` session closure
+- As part of `/kyro-workflow:wrap-up` session closure
 
 ## Detection Categories
 

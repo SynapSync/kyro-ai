@@ -1,9 +1,7 @@
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
-
-const DEFAULT_DB_DIR = path.join(os.homedir(), '.kyro');
+const DEFAULT_DB_DIR = path.join(process.cwd(), '.agents', 'kyro');
 const DEFAULT_DB_PATH = path.join(DEFAULT_DB_DIR, 'data.db');
 
 export function getDbPath(): string {
