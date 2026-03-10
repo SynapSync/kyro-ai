@@ -5,7 +5,7 @@ argument-hint: [project name or "all"]
 
 # /kyro-workflow:insights — Kyro Analytics
 
-Query the Kyro database to surface patterns in learnings, corrections, sessions, and sprint velocity. All data comes from `.agents/kyro/data.db`.
+Query the Kyro database to surface patterns in learnings, corrections, sessions, and sprint velocity. All data comes from `.agents/kyro-workflow/data.db`.
 
 ## Execution
 
@@ -131,6 +131,6 @@ Kyro Insights — {project}
 💡 Estimation Patterns
 {analysis + recommendations}
 
-Data source: .agents/kyro/data.db
+Data source: .agents/kyro-workflow/data.db
 Total learnings: {count} | Total sessions: {count}
 ```

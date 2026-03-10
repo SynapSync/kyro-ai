@@ -8,7 +8,7 @@ process.stdin.on('end', () => {
   // This hook provides a lightweight pre-check for common violations.
 
   try {
-    const rulesPath = path.join(process.cwd(), '.agents', 'kyro', 'rules.md');
+    const rulesPath = path.join(process.cwd(), '.agents', 'kyro-workflow', 'rules.md');
     if (fs.existsSync(rulesPath)) {
       const rules = fs.readFileSync(rulesPath, 'utf8');
       const input = JSON.parse(data);

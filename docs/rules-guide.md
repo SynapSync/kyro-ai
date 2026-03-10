@@ -1,6 +1,6 @@
 # Rules Guide -- Per-Project Learning System
 
-Kyro accumulates knowledge across sprints through a persistent rules file at `.agents/kyro/rules.md`. Rules capture corrections, patterns, and estimation insights so that mistakes made once are never repeated.
+Kyro accumulates knowledge across sprints through a persistent rules file at `.agents/kyro-workflow/rules.md`. Rules capture corrections, patterns, and estimation insights so that mistakes made once are never repeated.
 
 ---
 
@@ -18,7 +18,7 @@ The learning flow moves from correction to persistent rule in four steps:
 3. User approves (or edits) the proposed rule
        |
        v
-4. Rule is appended to .agents/kyro/rules.md
+4. Rule is appended to .agents/kyro-workflow/rules.md
 ```
 
 ### Detection
@@ -49,7 +49,7 @@ The user can:
 
 ### Storage
 
-Approved rules are appended to `.agents/kyro/rules.md` and logged in the sprint's `LEARNED` section.
+Approved rules are appended to `.agents/kyro-workflow/rules.md` and logged in the sprint's `LEARNED` section.
 
 ---
 
@@ -111,7 +111,7 @@ Rules are organized into categories that correspond to different phases of sprin
 
 At the start of every session, the `SessionStart` hook:
 
-1. Reads `.agents/kyro/rules.md` (path configurable in `config.json`)
+1. Reads `.agents/kyro-workflow/rules.md` (path configurable in `config.json`)
 2. Parses all active rules
 3. Makes them available to all agents for the session
 
@@ -225,7 +225,7 @@ The kyro-learner skill enforces a maximum of **50 active rules**. When approachi
 
 ## Rules in the Database
 
-In addition to the `rules.md` file, learnings are stored in the SQLite database (`.agents/kyro/data.db`) in the `learnings` table:
+In addition to the `rules.md` file, learnings are stored in the SQLite database (`.agents/kyro-workflow/data.db`) in the `learnings` table:
 
 | Column | Type | Description |
 |--------|------|-------------|

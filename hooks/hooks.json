@@ -10,7 +10,7 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.js\""
           }
         ],
-        "description": "Load learned rules from .agents/kyro/rules.md and show active sprint summary"
+        "description": "Load learned rules from .agents/kyro-workflow/rules.md and show active sprint summary"
       }
     ],
     "PreToolUse": [

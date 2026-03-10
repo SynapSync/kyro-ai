@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
+const kyroDir = path.join(process.cwd(), '.agents', 'kyro-workflow');
 const rulesPath = path.join(kyroDir, 'rules.md');
 const distDir = path.join(__dirname, '..', 'dist');
 

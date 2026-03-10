@@ -10,7 +10,7 @@ process.stdin.on('end', () => {
     const userMessage = input.user_message || '';
 
     // Check for active sprint
-    const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
+    const kyroDir = path.join(process.cwd(), '.agents', 'kyro-workflow');
     if (fs.existsSync(kyroDir)) {
       const sprintsDir = path.join(kyroDir, 'sprints');
       if (fs.existsSync(sprintsDir)) {
