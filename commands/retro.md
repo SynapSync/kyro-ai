@@ -7,6 +7,12 @@ argument-hint: [sprint number]
 
 Formal retrospective that captures learnings, proposes rules, and feeds forward into the next sprint.
 
+## Execution
+
+> **IMPORTANT**: Spawn the `orchestrator` agent to run the retrospective.
+> Do not execute the ritual directly — the orchestrator loads the sprint-forge
+> skill and kyro-learner skill to ensure proper rule capture and debt tracking.
+
 ## Sprint: $ARGUMENTS
 
 ### Ritual Steps

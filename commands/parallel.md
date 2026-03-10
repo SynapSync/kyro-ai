@@ -7,6 +7,12 @@ argument-hint: [sprint number]
 
 Analyze the current sprint's tasks for dependencies, group independent tasks into parallel lanes, and set up git worktrees for concurrent execution by multiple agents or sessions.
 
+## Execution
+
+> **IMPORTANT**: Before analyzing tasks, read the current sprint file from
+> `.agents/kyro/{project}/` to understand task definitions and dependencies.
+> No agent spawn required — this command operates directly on sprint data.
+
 ## Sprint: $ARGUMENTS
 
 ### Step 1: Dependency Analysis

@@ -7,6 +7,13 @@ argument-hint: [brief|full|debt|velocity]
 
 Report project progress, sprint velocity, technical debt heatmap, and next sprint preview.
 
+## Execution
+
+> **IMPORTANT**: Before generating the report, read the sprint-forge skill's STATUS mode:
+> 1. Read `skills/sprint-forge/SKILL.md` — capabilities matrix, configuration resolution
+> 2. Read `skills/sprint-forge/assets/modes/STATUS.md` — report workflow and format
+> 3. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` — debt heatmap format
+
 ## View: $ARGUMENTS
 
 ### Standard Report

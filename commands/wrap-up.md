@@ -7,6 +7,11 @@ argument-hint: [session notes]
 
 Structured 5-step checklist to close the current session cleanly. Ensures no work is lost, quality is maintained, learnings are captured, and the next session has full context.
 
+## Execution
+
+> **IMPORTANT**: Before running the closure ritual, read the handoff skill:
+> 1. Read `skills/kyro-handoff/SKILL.md` — context transfer format and checklist
+
 ## Session Notes: $ARGUMENTS
 
 ### Step 1: Changes Audit
