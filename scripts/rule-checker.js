@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const fs = require('fs');
-const { getRulesPath } = require('./lib/paths');
+const { getRulesPath, debugLog } = require('./lib/paths');
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
@@ -25,7 +25,7 @@ process.stdin.on('end', () => {
       }
     }
   } catch (e) {
-    // Silently pass through
+    debugLog('rule-checker: ' + e.message);
   }
 
   console.log(data);

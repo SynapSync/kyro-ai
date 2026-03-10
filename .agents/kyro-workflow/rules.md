@@ -6,6 +6,12 @@
 - [RULE-002] After renaming or moving storage paths, verify ALL hook scripts were updated by running `grep -r` for the old path across `scripts/` (2026-03-10)
 - [RULE-003] The sprint file frontmatter uses `status: "active"` not `status: "in-progress"` -- any hook that checks sprint status must match the template format (2026-03-10)
 
+## Error Handling
+
+- [RULE-009] Never use empty catch blocks in hook scripts -- always call `debugLog()` from paths.js so errors are visible when KYRO_DEBUG=1 (2026-03-10)
+- [RULE-010] Always use `writeJsonAtomic()` from paths.js when writing to .active-session -- never use raw fs.writeFileSync (2026-03-10)
+- [RULE-011] Always use `readActiveSession()` from paths.js when reading .active-session -- it validates required fields and handles corruption gracefully (2026-03-10)
+
 ## Database & Schema
 
 - [RULE-005] When adding columns to existing tables, always include an idempotent ALTER TABLE migration with try/catch in index.ts -- CREATE TABLE IF NOT EXISTS does not add new columns (2026-03-10)

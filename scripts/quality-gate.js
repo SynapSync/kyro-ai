@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { getActiveSessionPath } = require('./lib/paths');
+const { getActiveSessionPath, debugLog, writeJsonAtomic } = require('./lib/paths');
 
 // Track edit count for quality gate reminders (temp file)
 const stateFile = path.join(os.tmpdir(), 'kyro-workflow-edits.json');
@@ -12,7 +12,7 @@ if (fs.existsSync(stateFile)) {
   try {
     state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
   } catch (e) {
-    // Reset on parse error
+    debugLog('quality-gate state parse: ' + e.message);
   }
 }
 
@@ -33,9 +33,9 @@ try {
   if (fs.existsSync(sessionFile)) {
     const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
     sessionData.edit_count = (sessionData.edit_count || 0) + 1;
-    fs.writeFileSync(sessionFile, JSON.stringify(sessionData));
+    writeJsonAtomic(sessionFile, sessionData);
   }
-} catch (_) {}
+} catch (e) { debugLog('quality-gate session write: ' + e.message); }
 
 // Pass through stdin
 let data = '';
