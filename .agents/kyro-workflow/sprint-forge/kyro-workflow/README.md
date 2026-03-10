@@ -50,7 +50,7 @@ Self-audit of the kyro-workflow plugin codebase to identify bugs, synchronizatio
 
 | Sprint | Focus | Status |
 |--------|-------|--------|
-| 1 | Fix critical hook path bugs & shared utility | pending |
+| 1 | Fix critical hook path bugs & shared utility | completed |
 | 2 | Implement debt-aging & fix DB query | pending |
 | 3 | Version & count synchronization | pending |
 | 4 | Harden hook scripts | pending |

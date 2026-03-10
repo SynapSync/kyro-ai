@@ -16,6 +16,9 @@ changelog:
   - version: "1.0"
     date: "2026-03-10"
     changes: ["Roadmap created from 12 findings"]
+  - version: "1.1"
+    date: "2026-03-10"
+    changes: ["Sprint 1 completed. Added Sprint 2 note about isSprintActive helper and schema migration."]
 ---
 
 # Roadmap: kyro-workflow self-audit
@@ -37,7 +40,7 @@ changelog:
 
 | Sprint | Title | Findings | Type | Status |
 |--------|-------|----------|------|--------|
-| 1 | Fix critical hook path bugs & create shared path utility | 02, 10 | bugfix + refactor | pending |
+| 1 | Fix critical hook path bugs & create shared path utility | 02, 10 | bugfix + refactor | completed |
 | 2 | Implement missing debt-aging feature & fix DB query | 03, 07, 09 | feature + bugfix | pending |
 | 3 | Version & count synchronization across all manifests | 01, 04, 06 | sync-fix | pending |
 | 4 | Harden hook scripts: debug mode, atomic writes, validation | 11, 12 | quality | pending |
@@ -47,15 +50,16 @@ changelog:
 
 ## Sprint Details
 
-### Sprint 1: Fix critical hook path bugs & create shared path utility
+### Sprint 1: Fix critical hook path bugs & create shared path utility -- COMPLETED
 
 **Source findings**: 02-hook-scripts-wrong-sprint-path.md, 10-no-shared-path-resolution.md
 **Priority**: Critical -- hooks are silently broken today
-**Estimated phases**: 3
+**Actual phases**: 3 (matched estimate)
+**Result**: 14/14 tasks completed. Created `scripts/lib/paths.js` (10 functions). Refactored 9 hook scripts. Fixed 3 critical path bugs + 1 secondary status-regex bug. New debt item D13 (inline status regex duplication).
 
-- Phase 1: Create `scripts/lib/paths.js` shared module with `getKyroDir()`, `getSprintsDir(project)`, `findActiveProject()`, `getActiveSessionPath()`
-- Phase 2: Refactor all 11 hook scripts to use the shared module, fixing sprint paths from `.agents/kyro-workflow/sprints/` to `.agents/kyro-workflow/sprint-forge/{project}/sprints/`
-- Phase 3: Fix `context-warning.js` RE-ENTRY-PROMPTS.md path resolution. Test all scripts with a mock project structure.
+- Phase 1: Created `scripts/lib/paths.js` shared module. Updated `.active-session` schema with `projectDir`.
+- Phase 2: Refactored 9 hook scripts (post-edit-check.js excluded -- no path dependencies). Fixed drift-detector.js, session-check.js, context-warning.js critical bugs.
+- Phase 3: Validated with test-hooks.js (10/10 pass) + 13 path assertion tests + npm build.
 
 ### Sprint 2: Implement missing debt-aging feature & fix DB query
 
@@ -66,8 +70,9 @@ changelog:
 
 - Phase 1: Add `sprint_created` column to `schema.sql` debt_items table. Update `addDebtItem()` in store.ts.
 - Phase 2: Fix `getAgedDebt()` to actually filter by sprint age using the new column.
-- Phase 3: Implement debt-aging check in `session-start.js` (using shared path module from Sprint 1). Log aged items to stderr.
-- Phase 4: Audit `TaskCompleted` hook -- determine if Claude Code fires it. If not, move task-completion logic to the orchestrator agent's task execution protocol.
+- Phase 3: Implement debt-aging check in `session-start.js` (using shared path module from Sprint 1). Log aged items to stderr. Note: Sprint 1 recommends adding `isSprintActive(content)` helper to paths.js during this sprint.
+- Phase 4: Audit `TaskCompleted` hook -- determine if Claude Code fires it. If not, move task-completion logic to the orchestrator agent's task execution protocol. Sprint 1 recommends also checking SubagentStop as a proxy.
+- Note: Schema migration for `sprint_created` column needs strategy -- `CREATE TABLE IF NOT EXISTS` won't add columns to existing tables.
 
 ### Sprint 3: Version & count synchronization across all manifests
 

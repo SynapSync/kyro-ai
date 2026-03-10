@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs');
-const path = require('path');
-const distDir = path.join(__dirname, '..', 'dist');
-const sessionFile = path.join(process.cwd(), '.agents', 'kyro-workflow', '.active-session');
+const { getActiveSessionPath } = require('./lib/paths');
+
+const sessionFile = getActiveSessionPath();
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);

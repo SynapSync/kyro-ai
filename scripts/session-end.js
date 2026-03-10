@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const kyroDir = path.join(process.cwd(), '.agents', 'kyro-workflow');
-const distDir = path.join(__dirname, '..', 'dist');
-const sessionFile = path.join(kyroDir, '.active-session');
+const { getKyroDir, getDistDir, getActiveSessionPath } = require('./lib/paths');
+
+const kyroDir = getKyroDir();
+const sessionFile = getActiveSessionPath();
 
 // Ensure directory exists
 if (!fs.existsSync(kyroDir)) {
@@ -14,6 +15,7 @@ if (!fs.existsSync(kyroDir)) {
 try {
   if (fs.existsSync(sessionFile)) {
     const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
+    const distDir = getDistDir();
     const { initDatabase } = require(path.join(distDir, 'db', 'index.js'));
     const { createStore } = require(path.join(distDir, 'db', 'store.js'));
 
