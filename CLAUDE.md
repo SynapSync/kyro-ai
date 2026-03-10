@@ -33,7 +33,7 @@ kyro-workflow/
 │   ├── deslop.md     # /kyro-workflow:deslop — AI slop removal
 │   └── parallel.md   # /kyro-workflow:parallel — worktree parallel execution
 ├── hooks/            # Lifecycle event handlers
-│   └── hooks.json    # 12 hook definitions
+│   └── hooks.json    # 10 hook events, 15 hook entries
 ├── scripts/          # Hook implementation scripts
 ├── skills/           # 7 skills (domain knowledge)
 │   ├── sprint-forge/      # Core orchestration (from v1.x)
@@ -47,8 +47,7 @@ kyro-workflow/
 ├── config.json       # Workflow configuration
 ├── marketplace.json  # Plugin marketplace metadata
 ├── package.json      # NPM package definition
-├── .claude-plugin/   # Claude Code plugin metadata
-└── .cursor-plugin/   # Cursor plugin metadata (must stay in sync with .claude-plugin)
+└── WORKFLOW.yaml     # Workflow definition (version must match package.json)
 ```
 
 ## Key Conventions
@@ -75,11 +74,10 @@ Hook scripts are in `scripts/` and read/write JSON via stdin/stdout following Cl
 node scripts/test-hooks.js
 ```
 
-## Plugin Manifests
+## Plugin Metadata
 
-Two plugin manifests exist and must be kept in sync:
+Plugin metadata is defined in `marketplace.json`. When updating version, description, or capabilities, keep these files in sync:
 
-- `.claude-plugin/plugin.json` — Claude Code plugin metadata
-- `.cursor-plugin/plugin.json` — Cursor plugin metadata
-
-When updating version, description, or capabilities, update both files.
+- `package.json` — canonical version and description
+- `marketplace.json` — marketplace listing (hook/agent/command/skill counts)
+- `WORKFLOW.yaml` — human-readable workflow definition (version, hooks list)

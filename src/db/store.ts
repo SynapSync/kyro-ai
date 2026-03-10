@@ -31,6 +31,7 @@ export interface DebtItem {
   item: string;
   origin: string;
   sprint_target?: string;
+  sprint_created?: string;
   status?: string;
   resolved_in?: string;
   directory?: string;
@@ -108,11 +109,12 @@ export function createStore(db: Database.Database) {
     // Debt Items
     addDebtItem(item: DebtItem): number {
       const stmt = db.prepare(`
-        INSERT INTO debt_items (project, item, origin, sprint_target, status, directory, severity)
-        VALUES (@project, @item, @origin, @sprint_target, @status, @directory, @severity)
+        INSERT INTO debt_items (project, item, origin, sprint_target, sprint_created, status, directory, severity)
+        VALUES (@project, @item, @origin, @sprint_target, @sprint_created, @status, @directory, @severity)
       `);
       const result = stmt.run({
         sprint_target: null,
+        sprint_created: null,
         status: 'open',
         resolved_in: null,
         directory: null,
@@ -137,12 +139,20 @@ export function createStore(db: Database.Database) {
     },
 
     getAgedDebt(project: string, maxSprints = 3): DebtItem[] {
-      // Returns items that have been open across multiple sprints
       return db.prepare(`
-        SELECT * FROM debt_items
-        WHERE project = ? AND status IN ('open', 'in-progress')
-        ORDER BY created_at ASC
-      `).all(project) as DebtItem[];
+        SELECT d.* FROM debt_items d
+        WHERE d.project = ? AND d.status IN ('open', 'in-progress')
+          AND (
+            d.sprint_created IS NULL
+            OR (
+              SELECT COUNT(DISTINCT s.sprint) FROM sessions s
+              WHERE s.project = d.project
+                AND s.sprint IS NOT NULL
+                AND s.sprint > d.sprint_created
+            ) >= ?
+          )
+        ORDER BY d.created_at ASC
+      `).all(project, maxSprints) as DebtItem[];
     }
   };
 }
