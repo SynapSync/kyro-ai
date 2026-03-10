@@ -26,9 +26,9 @@ This mode reads all project artifacts and generates a comprehensive progress rep
 Before reading any files, determine `{output_kyro_dir}`:
 
 1. If the user's request includes an explicit path, use it
-2. Otherwise, check `{cwd}/.agents/kyro/` — if a single project directory exists, use it
+2. Otherwise, check `{cwd}/.agents/kyro-workflow/sprint-forge/` — if a single project directory exists, use it
 3. If multiple directories exist, ask: "Which project? Found: {list}"
-4. If none found, ask: "Where are your kyro-workflow documents? (e.g. `.agents/kyro/my-project/`)"
+4. If none found, ask: "Where are your kyro-workflow documents? (e.g. `.agents/kyro-workflow/sprint-forge/my-project/`)"
 
 ### Step 1 — Read Project State
 

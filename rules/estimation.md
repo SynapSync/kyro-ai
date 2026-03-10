@@ -10,7 +10,7 @@ Rules governing how tasks are estimated and how estimation accuracy is tracked o
 
 ## R-ES-01: Load Estimation Rules Before Estimating
 
-Load estimation rules from `.agents/kyro/rules.md` before producing any estimate.
+Load estimation rules from `.agents/kyro-workflow/rules.md` before producing any estimate.
 
 - Filter for rules tagged with estimation-related keywords (estimate, duration, complexity, underestimate).
 - Apply relevant corrections to the base estimate.

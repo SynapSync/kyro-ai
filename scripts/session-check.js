@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Check for active sprint work
-const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
+const kyroDir = path.join(process.cwd(), '.agents', 'kyro-workflow');
 if (fs.existsSync(kyroDir)) {
   const sprintsDir = path.join(kyroDir, 'sprints');
   if (fs.existsSync(sprintsDir)) {

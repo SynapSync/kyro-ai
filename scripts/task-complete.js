@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const distDir = path.join(__dirname, '..', 'dist');
-const sessionFile = path.join(process.cwd(), '.agents', 'kyro', '.active-session');
+const sessionFile = path.join(process.cwd(), '.agents', 'kyro-workflow', '.active-session');
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
