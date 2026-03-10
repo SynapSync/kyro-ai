@@ -2,6 +2,7 @@
 name: explorer
 description: Read-only codebase exploration agent for INIT mode. Investigates architecture, risks, dependencies, and visible debt. Use when analyzing a project before creating a roadmap.
 tools: ["Read", "Glob", "Grep", "Bash"]
+skills: ["kyro-analyzer"]
 model: sonnet
 isolation: worktree
 memory: project
