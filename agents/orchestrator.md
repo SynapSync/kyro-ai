@@ -60,9 +60,24 @@ Waiting for your decision...
 
 **Never proceed past a gate without explicit user approval.**
 
-## Rules Loading
+## Startup Loading
 
-At the start of every orchestration:
+At the start of every orchestration, load these resources **before doing anything else**:
+
+### 1. Skill Loading (sprint-forge)
+
+The `skills: ["sprint-forge"]` declaration is metadata only — it does NOT auto-inject the skill. You must explicitly read the skill files:
+
+1. Read `skills/sprint-forge/SKILL.md` — core orchestration logic, critical rules, mode detection, capabilities matrix
+2. Load mode-gated assets based on the current phase:
+   - **INIT phase**: Read `skills/sprint-forge/assets/modes/INIT.md`, `skills/sprint-forge/assets/helpers/analysis-guide.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
+   - **SPRINT phase**: Read `skills/sprint-forge/assets/modes/SPRINT.md`, `skills/sprint-forge/assets/helpers/sprint-generator.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
+   - **STATUS phase**: Read `skills/sprint-forge/assets/modes/STATUS.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`
+3. Load templates **on-demand** as each workflow step references them (not upfront)
+
+**All skill paths are relative to the workflow root (the plugin installation directory).**
+
+### 2. Rules Loading
 
 1. Read `.agents/kyro/rules.md` if it exists
 2. Apply relevant rules throughout all phases

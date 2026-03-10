@@ -63,6 +63,18 @@ SUGGESTIONS:
 VERDICT: [BLOCKED — fix 1 issue] / [APPROVED] / [APPROVED with 1 warning]
 ```
 
+## Startup Loading
+
+Before running any validation, load this resource:
+
+### Skill Loading (kyro-reviewer)
+
+The `skills: ["kyro-reviewer"]` declaration is metadata only — it does NOT auto-inject the skill. You must explicitly read:
+
+1. Read `skills/kyro-reviewer/SKILL.md` — checklist tiers, validation commands, output format
+
+**All skill paths are relative to the workflow root (the plugin installation directory).**
+
 ## Rules
 
 - Never auto-approve without running the full checklist.
