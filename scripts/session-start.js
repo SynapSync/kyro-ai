@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const kyroDir = path.join(process.cwd(), '.agents', 'kyro-workflow');
-const rulesPath = path.join(kyroDir, 'rules.md');
-const distDir = path.join(__dirname, '..', 'dist');
+const { getKyroDir, getRulesPath, getDistDir, getActiveSessionPath, findActiveProject } = require('./lib/paths');
+
+const kyroDir = getKyroDir();
+const rulesPath = getRulesPath();
 
 // Load learned rules (flat file — always available)
 if (fs.existsSync(rulesPath)) {
@@ -17,6 +18,7 @@ if (fs.existsSync(rulesPath)) {
 // Initialize database and start session
 let sessionId = null;
 try {
+  const distDir = getDistDir();
   const { initDatabase } = require(path.join(distDir, 'db', 'index.js'));
   const { createStore } = require(path.join(distDir, 'db', 'store.js'));
 
@@ -26,22 +28,17 @@ try {
   // Detect project name from cwd
   const project = path.basename(process.cwd());
 
-  // Detect active sprint
+  // Detect active sprint via shared path module
   let sprint = null;
-  if (fs.existsSync(kyroDir)) {
-    const dirs = fs.readdirSync(kyroDir).filter(f =>
-      fs.statSync(path.join(kyroDir, f)).isDirectory() && f !== 'sprints'
-    );
-    if (dirs.length > 0) {
-      const projectDir = path.join(kyroDir, dirs[0], 'sprints');
-      if (fs.existsSync(projectDir)) {
-        const sprints = fs.readdirSync(projectDir).filter(f => f.endsWith('.md')).sort();
-        if (sprints.length > 0) {
-          const latest = sprints[sprints.length - 1];
-          sprint = latest.replace(/\.md$/, '');
-          console.error(`[Kyro] Active project detected. Latest sprint: ${latest}`);
-        }
-      }
+  let projectDir = null;
+  const activeProject = findActiveProject();
+  if (activeProject && fs.existsSync(activeProject.sprintsDir)) {
+    const { findLatestSprint } = require('./lib/paths');
+    const latest = findLatestSprint(activeProject.sprintsDir);
+    if (latest) {
+      sprint = latest.file.replace(/\.md$/, '');
+      projectDir = activeProject.dir;
+      console.error(`[Kyro] Active project detected. Latest sprint: ${latest.file}`);
     }
   }
 
@@ -56,12 +53,12 @@ try {
   }
 
   // Store session ID in temp file for other hooks to use
-  const sessionFile = path.join(kyroDir, '.active-session');
+  const sessionFile = getActiveSessionPath();
   if (!fs.existsSync(kyroDir)) {
     fs.mkdirSync(kyroDir, { recursive: true });
   }
   fs.writeFileSync(sessionFile, JSON.stringify({
-    sessionId, project, sprint,
+    sessionId, project, sprint, projectDir,
     tasks_completed: 0,
     edit_count: 0,
     corrections_count: 0
