@@ -24,5 +24,12 @@ export function initDatabase(dbPath?: string): Database.Database {
   const schema = fs.readFileSync(schemaPath, 'utf8');
   db.exec(schema);
 
+  // Migration: add sprint_created column for existing databases
+  try {
+    db.exec('ALTER TABLE debt_items ADD COLUMN sprint_created TEXT');
+  } catch (_) {
+    // Column already exists — safe to ignore
+  }
+
   return db;
 }

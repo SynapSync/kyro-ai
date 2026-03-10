@@ -52,6 +52,23 @@ try {
     console.error(`[Kyro] ${learnings.length} learnings found in DB for project "${project}"`);
   }
 
+  // Check for aged debt items
+  let debtThreshold = 3;
+  try {
+    const configPath = path.join(__dirname, '..', 'config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      debtThreshold = config.sprint?.debt_aged_threshold_sprints ?? 3;
+    }
+  } catch (_) {}
+  const agedDebt = store.getAgedDebt(project, debtThreshold);
+  if (agedDebt.length > 0) {
+    console.error(`[Kyro] ${agedDebt.length} aged debt item(s) detected:`);
+    for (const d of agedDebt) {
+      console.error(`[Kyro]   Aged debt: ${d.item} (open since ${d.sprint_created || 'unknown'})`);
+    }
+  }
+
   // Store session ID in temp file for other hooks to use
   const sessionFile = getActiveSessionPath();
   if (!fs.existsSync(kyroDir)) {

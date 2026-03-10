@@ -73,6 +73,10 @@ function getReentryPath(projectDir) {
   return path.join(projectDir, 'RE-ENTRY.md');
 }
 
+function isSprintActive(content) {
+  return /status:\s*["']?active["']?/i.test(content);
+}
+
 function findLatestSprint(sprintsDir) {
   if (!fs.existsSync(sprintsDir)) return null;
   const files = fs.readdirSync(sprintsDir).filter(f => f.endsWith('.md')).sort();
@@ -92,5 +96,6 @@ module.exports = {
   findActiveProject,
   getSprintsDir,
   getReentryPath,
+  isSprintActive,
   findLatestSprint
 };

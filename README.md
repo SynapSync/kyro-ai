@@ -11,7 +11,7 @@
 
 <p align="center">
   <b>Complete sprint workflow system for AI-assisted development.</b><br/>
-  4 agents &bull; 12 hooks &bull; 9 commands &bull; 7 skills &bull; Adaptive per-project learning<br/>
+  4 agents &bull; 10 hooks &bull; 9 commands &bull; 7 skills &bull; Adaptive per-project learning<br/>
   Built for <b>Claude Code</b>. Compatible with any AI coding agent via SkillKit.
 </p>
 
@@ -140,7 +140,7 @@ kyro-workflow/
 │   └── context-management.md   # Token limits and compaction strategies
 │
 ├── hooks/                      # Lifecycle event handlers
-│   └── hooks.json              # 12 hook definitions
+│   └── hooks.json              # 10 hook events, 15 hook entries
 ├── scripts/                    # 11 Node.js hook handler + test scripts
 │
 ├── src/                        # TypeScript source (SQLite + FTS5)
@@ -151,8 +151,7 @@ kyro-workflow/
 │   ├── ci.yml                  # Build + test on push/PR
 │   └── release.yml             # GitHub release on tag push
 │
-├── .claude-plugin/             # Claude Code plugin metadata
-├── .cursor-plugin/             # Cursor plugin metadata
+├── WORKFLOW.yaml               # Workflow definition (version must match package.json)
 ├── config.json                 # Workflow configuration
 ├── marketplace.json            # Plugin marketplace listing
 ├── settings.example.json       # Production settings template

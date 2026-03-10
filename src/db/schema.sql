@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS debt_items (
   item TEXT NOT NULL,
   origin TEXT NOT NULL,
   sprint_target TEXT,
+  sprint_created TEXT,
   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'in-progress', 'resolved', 'deferred')),
   resolved_in TEXT,
   directory TEXT,
