@@ -19,6 +19,12 @@ changelog:
   - version: "1.1"
     date: "2026-03-10"
     changes: ["Sprint 1 completed. Added Sprint 2 note about isSprintActive helper and schema migration."]
+  - version: "1.2"
+    date: "2026-03-10"
+    changes: ["Sprint 2 completed. 15/15 tasks. Debt-aging feature implemented, TaskCompleted phantom removed."]
+  - version: "1.3"
+    date: "2026-03-10"
+    changes: ["Sprint 3 completed. 13/13 tasks. Version sync, phantom dirs removed, check-sync.js created."]
 ---
 
 # Roadmap: kyro-workflow self-audit
@@ -41,8 +47,8 @@ changelog:
 | Sprint | Title | Findings | Type | Status |
 |--------|-------|----------|------|--------|
 | 1 | Fix critical hook path bugs & create shared path utility | 02, 10 | bugfix + refactor | completed |
-| 2 | Implement missing debt-aging feature & fix DB query | 03, 07, 09 | feature + bugfix | pending |
-| 3 | Version & count synchronization across all manifests | 01, 04, 06 | sync-fix | pending |
+| 2 | Implement missing debt-aging feature & fix DB query | 03, 07, 09 | feature + bugfix | completed |
+| 3 | Version & count synchronization across all manifests | 01, 04, 06 | sync-fix | completed |
 | 4 | Harden hook scripts: debug mode, atomic writes, validation | 11, 12 | quality | pending |
 | 5 | Cleanup: debugger skill gap, old directory, docs alignment | 05, 08 | cleanup | pending |
 
@@ -61,27 +67,28 @@ changelog:
 - Phase 2: Refactored 9 hook scripts (post-edit-check.js excluded -- no path dependencies). Fixed drift-detector.js, session-check.js, context-warning.js critical bugs.
 - Phase 3: Validated with test-hooks.js (10/10 pass) + 13 path assertion tests + npm build.
 
-### Sprint 2: Implement missing debt-aging feature & fix DB query
+### Sprint 2: Implement missing debt-aging feature & fix DB query -- COMPLETED
 
 **Source findings**: 03-ghost-hook-debt-item-aged.md, 07-getAgedDebt-unused-parameter.md, 09-no-task-hook-in-claude-code.md
 **Priority**: High -- promised features that do not work
-**Estimated phases**: 4
-**Dependencies**: Sprint 1 (shared path module needed)
+**Actual phases**: 4 (matched estimate)
+**Result**: 15/15 tasks completed. Added `sprint_created` column with idempotent migration. Fixed `getAgedDebt()` query. Added `isSprintActive()` helper to paths.js. Moved TaskCompleted to SubagentStop. New debt items D14 (SubagentStop noise) and D15 (age calc depends on session sprint names).
 
-- Phase 1: Add `sprint_created` column to `schema.sql` debt_items table. Update `addDebtItem()` in store.ts.
-- Phase 2: Fix `getAgedDebt()` to actually filter by sprint age using the new column.
-- Phase 3: Implement debt-aging check in `session-start.js` (using shared path module from Sprint 1). Log aged items to stderr. Note: Sprint 1 recommends adding `isSprintActive(content)` helper to paths.js during this sprint.
-- Phase 4: Audit `TaskCompleted` hook -- determine if Claude Code fires it. If not, move task-completion logic to the orchestrator agent's task execution protocol. Sprint 1 recommends also checking SubagentStop as a proxy.
-- Note: Schema migration for `sprint_created` column needs strategy -- `CREATE TABLE IF NOT EXISTS` won't add columns to existing tables.
+- Phase 1: Added `sprint_created` column to schema.sql + idempotent ALTER TABLE migration in index.ts. Updated DebtItem interface and addDebtItem().
+- Phase 2: Rewrote `getAgedDebt()` with subquery counting distinct sprints from sessions table. NULL sprint_created items conservatively included.
+- Phase 3: Added `isSprintActive()` to paths.js. Refactored drift-detector.js and session-check.js. Wired aged debt warnings into session-start.js.
+- Phase 4: Confirmed TaskCompleted is non-standard. Moved task-complete.js to SubagentStop. Removed phantom event from hooks.json.
 
-### Sprint 3: Version & count synchronization across all manifests
+### Sprint 3: Version & count synchronization across all manifests -- COMPLETED
 
 **Source findings**: 01-version-desync-workflow-yaml.md, 04-hook-count-mismatch.md, 06-plugin-manifests-partial-sync.md
 **Priority**: Medium -- integrity issues, no runtime breakage
-**Estimated phases**: 2
+**Actual phases**: 3 (exceeded estimate of 2 due to phantom plugin directory discovery)
+**Result**: 13/13 tasks completed. Synced WORKFLOW.yaml to 2.8.0. Updated all "12 hooks" to "10 hooks" across 4 files. Discovered .claude-plugin/ and .cursor-plugin/ do not exist -- removed all references, consolidated in marketplace.json. Created check-sync.js (10 automated validation checks). New debt item D16 (check-sync not wired into CI).
 
-- Phase 1: Fix WORKFLOW.yaml version to 2.8.0. Standardize hook count across all references (decide on "11 events" or "15 entries"). Fix description mismatches between plugin manifests.
-- Phase 2: Create a `scripts/check-sync.js` script that validates version, hook count, description, and manifest parity. Add to CI or pre-commit.
+- Phase 1: Fixed WORKFLOW.yaml version and removed TaskCompleted from hooks list. Updated hook counts in CLAUDE.md, README.md, marketplace.json.
+- Phase 2: Removed phantom .claude-plugin/.cursor-plugin references from CLAUDE.md and README.md. Updated RULE-004. Verified marketplace.json alignment.
+- Phase 3: Created scripts/check-sync.js with 10 validation checks (version parity, hook count, allowlist, marketplace counts). All checks pass.
 
 ### Sprint 4: Harden hook scripts: debug mode, atomic writes, validation
 

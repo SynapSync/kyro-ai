@@ -147,9 +147,7 @@
           }
         ],
         "description": "Log agent completion for sprint tracking"
-      }
-    ],
-    "TaskCompleted": [
+      },
       {
         "matcher": "*",
         "hooks": [
@@ -158,7 +156,7 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/task-complete.js\""
           }
         ],
-        "description": "PostTaskComplete: run reviewer checklist, update sprint checkpoint"
+        "description": "Post-agent quality checklist and sprint checkpoint update"
       }
     ],
     "PostToolUseFailure": [

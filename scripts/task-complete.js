@@ -9,9 +9,9 @@ process.stdin.on('data', chunk => data += chunk);
 process.stdin.on('end', () => {
   try {
     const input = JSON.parse(data);
-    const taskId = input.task_id || 'unknown';
+    const agentName = input.agent_name || input.task_id || 'unknown';
 
-    console.error(`[Kyro] Task completed: ${taskId}`);
+    console.error(`[Kyro] Agent finished: ${agentName}`);
     console.error('[Kyro] Running post-task quality checklist:');
     console.error('  □ Tests passing?');
     console.error('  □ No debug statements?');

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { findActiveProject, findLatestSprint } = require('./lib/paths');
+const { findActiveProject, findLatestSprint, isSprintActive } = require('./lib/paths');
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
@@ -11,7 +11,7 @@ process.stdin.on('end', () => {
     const activeProject = findActiveProject();
     if (activeProject) {
       const latest = findLatestSprint(activeProject.sprintsDir);
-      if (latest && /status:\s*["']?active["']?/i.test(latest.content)) {
+      if (latest && isSprintActive(latest.content)) {
         const sprintKeywords = /sprint|task|phase|forge|debt|retro|status|roadmap/i;
         const codeKeywords = /fix|implement|add|update|refactor|test|debug/i;
 

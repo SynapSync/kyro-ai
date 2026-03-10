@@ -1,6 +1,6 @@
 name: kyro-workflow
 type: workflow
-version: "2.3.0"
+version: "2.8.0"
 description: >
   Complete sprint workflow system with specialized agents, lifecycle hooks,
   adaptive per-project learning, and formal validation gates.
@@ -46,8 +46,7 @@ hooks:
   - UserPromptSubmit     # Drift detection, rule violation check
   - PreCompact           # Save re-entry state before compaction
   - SubagentStart        # Log agent lifecycle
-  - SubagentStop         # Log agent completion
-  - TaskCompleted        # Post-task quality checklist
+  - SubagentStop         # Log agent completion, post-task quality checklist
   - PostToolUseFailure   # Detect failures, suggest debugger
 
 storage:
