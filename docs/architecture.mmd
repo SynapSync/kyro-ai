@@ -1,0 +1,85 @@
+flowchart TD
+    subgraph SKILLS_ENTRY["Skills (standalone slash commands)"]
+        SK1["/sprint-forge — Core: INIT · SPRINT · STATUS"]
+        SK2["/kyro-analyzer"]
+        SK3["/kyro-learner"]
+        SK4["/kyro-metrics"]
+        SK5["/kyro-handoff"]
+        SK6["/kyro-reviewer"]
+        SK7["/deslop"]
+    end
+
+    subgraph COMMANDS_ENTRY["Commands (kyro-workflow:*)"]
+        CMD1["/kyro-workflow:forge"]
+        CMD2["/kyro-workflow:sprint"]
+        CMD3["/kyro-workflow:status"]
+        CMD4["/kyro-workflow:debt"]
+        CMD5["/kyro-workflow:retro"]
+        CMD6["/kyro-workflow:wrap-up"]
+        CMD7["/kyro-workflow:insights"]
+        CMD8["/kyro-workflow:deslop"]
+        CMD9["/kyro-workflow:parallel"]
+    end
+
+    subgraph AGENTS["AGENTS"]
+        ORCH["orchestrator — opus · read+write"]
+        EXPL["explorer — sonnet · read-only"]
+        REVW["reviewer — sonnet · read-only"]
+        DBGR["debugger — opus · read-only"]
+    end
+
+    subgraph KNOWLEDGE["SKILLS — domain knowledge"]
+        S_FORGE["sprint-forge — modes · helpers · templates"]
+        S_ANALYZER["kyro-analyzer — strategies per work type"]
+        S_REVIEWER["kyro-reviewer — BLOCKER/WARNING/SUGGESTION"]
+        S_LEARNER["kyro-learner — per-project rules"]
+        S_METRICS["kyro-metrics — velocity · debt heatmap"]
+        S_HANDOFF["kyro-handoff — mental context transfer"]
+        S_DESLOP["deslop — AI slop detection"]
+    end
+
+    subgraph HOOKS["HOOKS — 12 lifecycle events"]
+        H1["SessionStart — load rules"]
+        H2["UserPromptSubmit — drift check"]
+        H3["PreToolUse — track edits"]
+        H4["PostToolUse — check artifacts"]
+        H5["TaskCompleted — reviewer checklist"]
+        H6["Stop — capture learnings"]
+        H7["PreCompact — save re-entry"]
+        H8["SessionEnd — save stats"]
+    end
+
+    subgraph STORAGE["STORAGE — .agents/kyro/"]
+        DB["data.db — SQLite"]
+        RULES["rules.md — learned rules"]
+        SESSION[".active-session"]
+        PROJ["{project}/ — findings · sprints · ROADMAP"]
+    end
+
+    CMD1 --> ORCH
+    CMD2 --> ORCH
+    CMD5 --> ORCH
+    CMD3 -.->|direct| PROJ
+    CMD4 -.->|direct| PROJ
+
+    ORCH -->|INIT| EXPL
+    ORCH -->|validate| REVW
+    ORCH -->|failure| DBGR
+
+    ORCH -.-> S_FORGE
+    EXPL -.-> S_ANALYZER
+    REVW -.-> S_REVIEWER
+    DBGR -.-> S_FORGE
+
+    CMD5 -.-> S_LEARNER
+    CMD6 -.-> S_HANDOFF
+    CMD7 -.-> S_METRICS
+    CMD8 -.-> S_DESLOP
+
+    H1 --> RULES
+    H5 --> DB
+    H6 --> RULES
+    H8 --> DB
+    H3 --> SESSION
+    ORCH --> PROJ
+    ORCH --> DB
