@@ -10,14 +10,18 @@ process.stdin.on('end', () => {
   try {
     const input = JSON.parse(data);
     const agentName = input.agent_name || input.task_id || 'unknown';
+    const kyroAgents = ['explorer', 'reviewer', 'debugger', 'orchestrator'];
+    const isKyroAgent = kyroAgents.some(a => agentName.toLowerCase().includes(a));
 
     console.error(`[Kyro] Agent finished: ${agentName}`);
-    console.error('[Kyro] Running post-task quality checklist:');
-    console.error('  □ Tests passing?');
-    console.error('  □ No debug statements?');
-    console.error('  □ No hardcoded secrets?');
-    console.error('  □ Debt table updated?');
-    console.error('[Kyro] Use reviewer agent for full validation.');
+    if (isKyroAgent) {
+      console.error('[Kyro] Running post-task quality checklist:');
+      console.error('  □ Tests passing?');
+      console.error('  □ No debug statements?');
+      console.error('  □ No hardcoded secrets?');
+      console.error('  □ Debt table updated?');
+      console.error('[Kyro] Use reviewer agent for full validation.');
+    }
 
     // Increment tasks_completed in active session
     try {
