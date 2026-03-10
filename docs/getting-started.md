@@ -55,10 +55,10 @@ This works with any AI coding agent that supports the SkillKit protocol, not jus
 
 ## First Run
 
-Once installed, navigate to a project directory and run the `/forge` command:
+Once installed, navigate to a project directory and run the `/kyro-workflow:forge` command:
 
 ```
-/forge analyze the authentication module
+/kyro-workflow:forge analyze the authentication module
 ```
 
 This starts the full sprint cycle:
@@ -74,18 +74,18 @@ This starts the full sprint cycle:
 You can also run steps individually:
 
 ```
-/sprint generate          # Generate the next sprint without executing
-/sprint execute           # Execute an already-generated sprint
-/status                   # Check project progress and metrics
-/debt list                # View technical debt
-/retro                    # Run the retrospective ritual
+/kyro-workflow:sprint generate          # Generate the next sprint without executing
+/kyro-workflow:sprint execute           # Execute an already-generated sprint
+/kyro-workflow:status                   # Check project progress and metrics
+/kyro-workflow:debt list                # View technical debt
+/kyro-workflow:retro                    # Run the retrospective ritual
 ```
 
 ---
 
 ## Understanding the Output Structure
 
-After running `/forge` (INIT mode), Kyro creates a project workspace:
+After running `/kyro-workflow:forge` (INIT mode), Kyro creates a project workspace:
 
 ```
 .agents/kyro/{project-name}/
@@ -104,12 +104,12 @@ After running `/forge` (INIT mode), Kyro creates a project workspace:
     └── 2026-03-08-sprint-3.md
 ```
 
-Global data is stored in `~/.kyro/`:
+Project data is stored in `.agents/kyro/`:
 
 ```
-~/.kyro/
+.agents/kyro/
 ├── data.db       # SQLite database (learnings, sessions, debt items)
-└── rules.md      # Persistent learned rules (accumulated across all projects)
+└── rules.md      # Persistent learned rules (accumulated across sprints)
 ```
 
 ### Key Files
@@ -120,7 +120,7 @@ Global data is stored in `~/.kyro/`:
 | `RE-ENTRY-PROMPTS.md` | Contains copy-paste prompts for recovering context in a new session. Updated after every sprint. |
 | `findings/*.md` | Each finding from the initial analysis becomes a separate file with severity, evidence, and recommendations. |
 | `sprints/SPRINT-N-*.md` | Each sprint document includes phases, tasks, debt table, retro, and recommendations. |
-| `~/.kyro/rules.md` | Learned rules that apply across all projects. Loaded automatically at session start. |
+| `.agents/kyro/rules.md` | Learned rules for this project. Loaded automatically at session start. |
 
 ---
 
@@ -138,7 +138,7 @@ Kyro operates in three modes, determined by your intent:
 
 ### Gates
 
-Gates are mandatory approval checkpoints between phases. Kyro never proceeds past a gate without your explicit approval. There are three gates in the `/forge` cycle:
+Gates are mandatory approval checkpoints between phases. Kyro never proceeds past a gate without your explicit approval. There are three gates in the `/kyro-workflow:forge` cycle:
 
 - **Gate 1** -- after analysis, before planning
 - **Gate 2** -- after sprint plan generation, before implementation
@@ -172,7 +172,7 @@ Agent proposes rule
     |
 User approves
     |
-Rule saved to ~/.kyro/rules.md
+Rule saved to .agents/kyro/rules.md
     |
 Future sessions load rules automatically
     |
@@ -189,8 +189,8 @@ Technical debt items are tracked formally across sprints. Items are never delete
 
 ## Next Steps
 
-- [Commands Reference](commands-reference.md) -- detailed syntax and examples for all 5 commands
+- [Commands Reference](commands-reference.md) -- detailed syntax and examples for all 9 commands
 - [Agents Reference](agents-reference.md) -- how the 4 specialized agents work
 - [Hooks Reference](hooks-reference.md) -- the 12 lifecycle hooks and how to customize them
-- [Rules Guide](rules-guide.md) -- the cross-project learning system
+- [Rules Guide](rules-guide.md) -- the per-project learning system
 - [Architecture](architecture.md) -- system design and data flow

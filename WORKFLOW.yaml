@@ -3,7 +3,7 @@ type: workflow
 version: "2.3.0"
 description: >
   Complete sprint workflow system with specialized agents, lifecycle hooks,
-  adaptive learning across projects, and formal validation gates.
+  adaptive per-project learning, and formal validation gates.
 
 author:
   name: SynapSync
@@ -26,13 +26,13 @@ agents:
   - explorer      # Read-only codebase analysis (INIT)
   - reviewer      # Task quality validation (SPRINT)
   - debugger      # Root cause investigation (on failure)
-  - orchestrator  # Full cycle coordination (/forge)
+  - orchestrator  # Full cycle coordination (/kyro-workflow:forge)
 
 skills:
   - kyro             # Core orchestration (base skill)
   - kyro-analyzer    # Analysis strategies per work type
   - kyro-reviewer    # Quality checklist (BLOCKER/WARNING/SUGGESTION)
-  - kyro-learner     # Cross-project rule accumulation
+  - kyro-learner     # Per-project rule accumulation
   - kyro-metrics     # Velocity trends and debt heatmap
   - kyro-handoff     # Enriched context transfer with mental model
   - deslop           # AI slop detection and removal
@@ -51,11 +51,10 @@ hooks:
   - PostToolUseFailure   # Detect failures, suggest debugger
 
 storage:
-  global: ~/.kyro/          # Rules, database, handoffs
-  project: .agents/kyro/    # Per-project sprint documents
+  project: .agents/kyro/    # Rules, database, sprint documents (per-project)
 
 philosophy:
-  - "Learn from every project, apply in the next"
+  - "Learn from every sprint, apply in the next"
   - "Investigate before planning, plan before implementing"
   - "Every task passes a quality gate before closure"
   - "Mental context is as important as code"

@@ -221,30 +221,30 @@ Kyro v2.0 operates as a workflow with specialized agents and commands. The SKILL
 | `explorer` | Read-only codebase analysis | INIT mode — delegates deep analysis |
 | `reviewer` | Task quality validation | SPRINT mode — validates each task before closure |
 | `debugger` | Root cause investigation | SPRINT mode — invoked on task failure |
-| `orchestrator` | Full cycle coordination | /forge command — coordinates all phases with gates |
+| `orchestrator` | Full cycle coordination | /kyro-workflow:forge command — coordinates all phases with gates |
 
 ### Commands
 
 | Command | Maps To |
 |---------|---------|
-| `/forge` | Full cycle: INIT → SPRINT → Review → Close with validation gates |
-| `/sprint` | SPRINT mode (generate and/or execute) |
-| `/status` | STATUS mode with velocity metrics and debt heatmap |
-| `/debt` | Debt management (list, add, resolve, escalate) |
-| `/retro` | Sprint retrospective ritual with rule proposals |
+| `/kyro-workflow:forge` | Full cycle: INIT → SPRINT → Review → Close with validation gates |
+| `/kyro-workflow:sprint` | SPRINT mode (generate and/or execute) |
+| `/kyro-workflow:status` | STATUS mode with velocity metrics and debt heatmap |
+| `/kyro-workflow:debt` | Debt management (list, add, resolve, escalate) |
+| `/kyro-workflow:retro` | Sprint retrospective ritual with rule proposals |
 
 ### Lifecycle Hooks
 
 The workflow fires hooks at key moments during sprint execution. See `hooks/hooks.json` for the full list. Key hooks:
-- **SessionStart** — loads learned rules from `~/.kyro/rules.md`
+- **SessionStart** — loads learned rules from `.agents/kyro/rules.md`
 - **PostToolUse** — checks for debug artifacts after code edits
 - **TaskCompleted** — runs reviewer checklist
 - **PostToolUseFailure** — suggests debugger invocation
 - **PreCompact** — saves re-entry state before context compaction
 
-### Cross-Project Learning
+### Per-Project Learning
 
-Corrections during sprint execution are captured as persistent rules in `~/.kyro/rules.md`. These rules are loaded at session start and applied automatically in all future projects. See the `kyro-learner` skill for details.
+Corrections during sprint execution are captured as persistent rules in `.agents/kyro/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the `kyro-learner` skill for details.
 
 ---
 

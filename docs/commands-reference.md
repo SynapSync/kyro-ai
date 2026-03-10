@@ -1,17 +1,17 @@
 # Commands Reference
 
-Kyro provides 5 slash commands. Each command maps to one or more agents and skills that handle the actual work.
+Kyro provides 9 slash commands. Each command maps to one or more agents and skills that handle the actual work.
 
 ---
 
-## /forge
+## /kyro-workflow:forge
 
 **Full sprint cycle: Analyze, Plan, Implement, Review, Close.**
 
 ### Syntax
 
 ```
-/forge <project path or description>
+/kyro-workflow:forge <project path or description>
 ```
 
 ### Arguments
@@ -21,19 +21,19 @@ The argument describes what to analyze or work on. It can be a path, a module na
 ### Examples
 
 ```
-/forge analyze the authentication module
-/forge audit code quality in src/api/
-/forge refactor the database layer
-/forge add user profile feature
-/forge fix the login timeout bug
+/kyro-workflow:forge analyze the authentication module
+/kyro-workflow:forge audit code quality in src/api/
+/kyro-workflow:forge refactor the database layer
+/kyro-workflow:forge add user profile feature
+/kyro-workflow:forge fix the login timeout bug
 ```
 
 ### Phases and Gates
 
-The `/forge` command runs the complete lifecycle:
+The `/kyro-workflow:forge` command runs the complete lifecycle:
 
 ```
-[GATE 0: RULES]     Load learned rules from ~/.kyro/rules.md
+[GATE 0: RULES]     Load learned rules from .agents/kyro/rules.md
         |
 [PHASE 1: ANALYZE]  Explorer agent investigates codebase (read-only)
         |
@@ -74,14 +74,14 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 
 ---
 
-## /sprint
+## /kyro-workflow:sprint
 
 **Generate and/or execute the next sprint.**
 
 ### Syntax
 
 ```
-/sprint [generate|execute|generate and execute]
+/kyro-workflow:sprint [generate|execute|generate and execute]
 ```
 
 ### Arguments
@@ -96,10 +96,10 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 ### Examples
 
 ```
-/sprint generate              # Create Sprint N without executing
-/sprint execute               # Execute the current sprint
-/sprint generate and execute  # Create and run Sprint N
-/sprint                       # Same as "generate and execute"
+/kyro-workflow:sprint generate              # Create Sprint N without executing
+/kyro-workflow:sprint execute               # Execute the current sprint
+/kyro-workflow:sprint generate and execute  # Create and run Sprint N
+/kyro-workflow:sprint                       # Same as "generate and execute"
 ```
 
 ### Generate Workflow
@@ -138,14 +138,14 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 
 ---
 
-## /status
+## /kyro-workflow:status
 
 **Project metrics, velocity trends, and technical debt heatmap.**
 
 ### Syntax
 
 ```
-/status [brief|full|debt|velocity]
+/kyro-workflow:status [brief|full|debt|velocity]
 ```
 
 ### Variants
@@ -160,10 +160,10 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 ### Examples
 
 ```
-/status                # Full report
-/status brief          # Quick progress check
-/status debt           # Focus on technical debt
-/status velocity       # Focus on sprint velocity trends
+/kyro-workflow:status                # Full report
+/kyro-workflow:status brief          # Quick progress check
+/kyro-workflow:status debt           # Focus on technical debt
+/kyro-workflow:status velocity       # Focus on sprint velocity trends
 ```
 
 ### Report Sections
@@ -213,24 +213,24 @@ The status command reads all files in the output directory:
 
 ---
 
-## /debt
+## /kyro-workflow:debt
 
 **Manage and review technical debt.**
 
 ### Syntax
 
 ```
-/debt [list|add|resolve|escalate]
+/kyro-workflow:debt [list|add|resolve|escalate]
 ```
 
 ### Subcommands
 
-#### /debt list
+#### /kyro-workflow:debt list
 
 Display the full accumulated technical debt table from the latest sprint:
 
 ```
-/debt list
+/kyro-workflow:debt list
 ```
 
 Output:
@@ -246,12 +246,12 @@ Output:
 | 4 | Deprecated crypto.createCipher    | INIT finding   | Sprint 4      | open        | --          |
 ```
 
-#### /debt add
+#### /kyro-workflow:debt add
 
 Add a new debt item:
 
 ```
-/debt add "Missing error boundary in dashboard" --origin "Sprint 3 retro" --target "Sprint 4"
+/kyro-workflow:debt add "Missing error boundary in dashboard" --origin "Sprint 3 retro" --target "Sprint 4"
 ```
 
 Parameters:
@@ -259,24 +259,24 @@ Parameters:
 - `--origin`: where the debt was discovered (e.g., "INIT finding", "Sprint 2 phase", "Sprint 3 retro")
 - `--target`: which sprint should address it
 
-#### /debt resolve
+#### /kyro-workflow:debt resolve
 
 Mark a debt item as resolved:
 
 ```
-/debt resolve 3 --sprint "Sprint 3"
+/kyro-workflow:debt resolve 3 --sprint "Sprint 3"
 ```
 
 Parameters:
 - First argument: debt item number
 - `--sprint`: which sprint resolved it
 
-#### /debt escalate
+#### /kyro-workflow:debt escalate
 
 Flag aged debt items that have been open for more than 3 sprints:
 
 ```
-/debt escalate
+/kyro-workflow:debt escalate
 ```
 
 For each aged item, you are asked:
@@ -295,14 +295,14 @@ For each aged item, you are asked:
 
 ---
 
-## /retro
+## /kyro-workflow:retro
 
 **Sprint retrospective ritual.**
 
 ### Syntax
 
 ```
-/retro [sprint number]
+/kyro-workflow:retro [sprint number]
 ```
 
 ### Arguments
@@ -368,7 +368,7 @@ Numbered recommendations that MUST be addressed in the next sprint's disposition
 Based on corrections and learnings during the sprint:
 
 ```
-Proposed rules for ~/.kyro/rules.md:
+Proposed rules for .agents/kyro/rules.md:
 
 [RULE-XXX] Category: One-line rule
   Context: Why this rule exists (from this sprint's experience)
@@ -392,4 +392,4 @@ Formal capture of confirmed learnings:
 The retro is written directly into the sprint file's Retro section. After completion:
 1. Re-entry prompts are updated
 2. Roadmap is updated if recommendations affect future sprints
-3. Confirmed rules are saved to `~/.kyro/rules.md`
+3. Save confirmed rules to `.agents/kyro/rules.md`

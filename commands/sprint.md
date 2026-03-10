@@ -3,7 +3,7 @@ description: Generate and optionally execute the next sprint
 argument-hint: [generate|execute|generate and execute]
 ---
 
-# /sprint — Sprint Generation & Execution
+# /kyro-workflow:sprint — Sprint Generation & Execution
 
 Generate the next sprint from the roadmap, previous sprint retro, and accumulated debt. Optionally execute it immediately.
 
@@ -37,8 +37,8 @@ If "execute" is specified:
 ### Quick Reference
 
 ```
-/sprint generate          → Generate Sprint N without executing
-/sprint execute           → Execute the current (already generated) sprint
-/sprint generate and execute → Generate Sprint N and execute immediately
-/sprint                   → Same as "generate and execute"
+/kyro-workflow:sprint generate          → Generate Sprint N without executing
+/kyro-workflow:sprint execute           → Execute the current (already generated) sprint
+/kyro-workflow:sprint generate and execute → Generate Sprint N and execute immediately
+/kyro-workflow:sprint                   → Same as "generate and execute"
 ```

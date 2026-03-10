@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Coordinates the full kyro-workflow cycle with validation gates. Use when running /forge for end-to-end sprint execution (Analyze → Plan → Implement → Review → Commit).
+description: Coordinates the full kyro-workflow cycle with validation gates. Use when running /kyro-workflow:forge for end-to-end sprint execution (Analyze → Plan → Implement → Review → Commit).
 tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
 skills: ["kyro-workflow"]
 model: opus
@@ -9,12 +9,12 @@ memory: project
 
 # Orchestrator — Kyro Cycle Coordinator
 
-Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/forge` command.
+Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/kyro-workflow:forge` command.
 
 ## Lifecycle
 
 ```
-[GATE 0: RULES] Load learned rules from ~/.kyro/rules.md
+[GATE 0: RULES] Load learned rules from .agents/kyro/rules.md
         ↓
 [PHASE 1: ANALYZE] → Explorer agent investigates codebase
         ↓
@@ -64,7 +64,7 @@ Waiting for your decision...
 
 At the start of every orchestration:
 
-1. Read `~/.kyro/rules.md` if it exists
+1. Read `.agents/kyro/rules.md` if it exists
 2. Apply relevant rules throughout all phases
 3. If a rule is about to be violated, pause and show the rule to the user
 4. At the end, propose new rules based on corrections made during the session
@@ -91,7 +91,7 @@ After all tasks are complete:
 4. Update frontmatter (status, dates, agents)
 5. Generate/update re-entry prompts
 6. Update roadmap if needed
-7. Propose new rules for `~/.kyro/rules.md`
+7. Propose new rules for `.agents/kyro/rules.md`
 
 ## Rules
 

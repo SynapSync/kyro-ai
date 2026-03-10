@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
 const distDir = path.join(__dirname, '..', 'dist');
-const sessionFile = path.join(os.homedir(), '.kyro', '.active-session');
+const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
+const sessionFile = path.join(kyroDir, '.active-session');
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
@@ -26,11 +25,10 @@ process.stdin.on('end', () => {
     }
 
     if (learnings.length > 0) {
-      const rulesDir = path.join(os.homedir(), '.kyro');
-      const rulesPath = path.join(rulesDir, 'rules.md');
+      const rulesPath = path.join(kyroDir, 'rules.md');
 
-      if (!fs.existsSync(rulesDir)) {
-        fs.mkdirSync(rulesDir, { recursive: true });
+      if (!fs.existsSync(kyroDir)) {
+        fs.mkdirSync(kyroDir, { recursive: true });
       }
 
       let rules = '';

@@ -9,7 +9,7 @@ This document describes the internal architecture of Kyro v2.0, including the Co
 Kyro is organized in three layers:
 
 ```
-User Command (/forge, /sprint, /status, /debt, /retro)
+User Command (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro)
   |
   v
 Agent (explorer, reviewer, debugger, orchestrator)
@@ -27,11 +27,11 @@ Commands are the user-facing interface. Each command is defined as a markdown fi
 
 | Command | Primary Agent | Purpose |
 |---------|--------------|---------|
-| `/forge` | orchestrator | Full cycle: Analyze, Plan, Implement, Review, Close |
-| `/sprint` | orchestrator | Generate and/or execute the next sprint |
-| `/status` | -- (direct) | Read-only metrics report |
-| `/debt` | -- (direct) | Debt table management |
-| `/retro` | orchestrator | Sprint retrospective ritual |
+| `/kyro-workflow:forge` | orchestrator | Full cycle: Analyze, Plan, Implement, Review, Close |
+| `/kyro-workflow:sprint` | orchestrator | Generate and/or execute the next sprint |
+| `/kyro-workflow:status` | -- (direct) | Read-only metrics report |
+| `/kyro-workflow:debt` | -- (direct) | Debt table management |
+| `/kyro-workflow:retro` | orchestrator | Sprint retrospective ritual |
 
 ### Agents (Execution Engines)
 
@@ -55,7 +55,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
 | `kyro-workflow` | Core orchestration: modes (INIT/SPRINT/STATUS), helpers, templates |
 | `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
 | `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
-| `kyro-learner` | Cross-project rule accumulation and management |
+| `kyro-learner` | Per-project rule accumulation and management |
 | `kyro-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
 | `kyro-handoff` | Enriched context transfer with mental model (hypotheses, decisions, blockers) |
 
@@ -68,12 +68,12 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
                      |
                      v
               +--------------+
-              |   /forge     |  (or /sprint, /status, /debt, /retro)
+              |   /kyro-workflow:forge     |  (or /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro)
               +--------------+
                      |
                      v
             +------------------+
-            |   ORCHESTRATOR   |---------> ~/.kyro/rules.md [LOAD]
+            |   ORCHESTRATOR   |---------> .agents/kyro/rules.md [LOAD]
             +------------------+
                  |    |    |
       +----------+    |    +----------+
@@ -90,9 +90,11 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
       +-------+-------+-------+-------+
               |               |
               v               v
-    .agents/kyro/   ~/.kyro/
-    {project}/              ├── data.db
-    ├── findings/           └── rules.md
+    .agents/kyro/
+    {project}/
+    ├── findings/
+    ├── data.db
+    ├── rules.md
     ├── sprints/
     ├── handoffs/
     ├── ROADMAP.md
@@ -105,9 +107,9 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
                TaskCompleted, PostToolUseFailure)
 ```
 
-### Flow for /forge
+### Flow for /kyro-workflow:forge
 
-1. **Rules Loading** -- Orchestrator reads `~/.kyro/rules.md`
+1. **Rules Loading** -- Orchestrator reads `.agents/kyro/rules.md`
 2. **Analysis** -- Orchestrator delegates to Explorer agent. Explorer reads the codebase and produces an analysis report. Findings are written to `findings/`.
 3. **Gate 1** -- User approves analysis.
 4. **Planning** -- Orchestrator generates a sprint document with phases and tasks. Writes to `sprints/`.
@@ -116,11 +118,11 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
 7. **Gate 3** -- User approves implementation.
 8. **Review and Close** -- Orchestrator runs retro, updates debt, proposes rules, updates re-entry prompts.
 
-### Flow for /sprint
+### Flow for /kyro-workflow:sprint
 
-Same as phases 4-8 of `/forge`, but can also run phase 4 alone (generate only) or phases 5-8 alone (execute only).
+Same as phases 4-8 of `/kyro-workflow:forge`, but can also run phase 4 alone (generate only) or phases 5-8 alone (execute only).
 
-### Flow for /status
+### Flow for /kyro-workflow:status
 
 Direct read of all project files. No agents involved. Computes metrics and outputs a report.
 
@@ -130,14 +132,14 @@ Direct read of all project files. No agents involved. Computes metrics and outpu
 
 Kyro uses two storage locations:
 
-### Global: `~/.kyro/`
+### Per-Project: `.agents/kyro/`
 
-Stores data that persists across all projects and sessions.
+Stores data that persists across sprints within this project.
 
 ```
-~/.kyro/
+.agents/kyro/
 ├── data.db       # SQLite database
-└── rules.md      # Learned rules (accumulated across all projects)
+└── rules.md      # Learned rules (accumulated across sprints)
 ```
 
 The database path is configurable via `config.json` (`database.path`) or the `KYRO_DB_PATH` environment variable.
@@ -300,8 +302,8 @@ v2.0:  User command --> Agent (orchestrator/explorer/reviewer/debugger)
 | Dimension | v1.x (Skill) | v2.0 (Workflow) |
 |-----------|-------------|-----------------|
 | Type | Single skill | Full workflow (commands + agents + skills + hooks) |
-| Entry point | Text triggers detected by skill | Slash commands (`/forge`, `/sprint`, etc.) |
-| Learning | Per-project retro only | Persistent rules across all projects via `~/.kyro/rules.md` |
+| Entry point | Text triggers detected by skill | Slash commands (`/kyro-workflow:forge`, `/kyro-workflow:sprint`, etc.) |
+| Learning | Per-project retro only | Persistent rules across sprints via `.agents/kyro/rules.md` |
 | Agents | 1 (the skill itself) | 4 specialized (explorer, reviewer, debugger, orchestrator) |
 | Hooks | 0 | 12 lifecycle events |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase gates with approval |

@@ -12,8 +12,8 @@ Activated during sprint implementation. This context puts Kyro in **active execu
 
 ## When Active
 
-- `/forge` Phase 3 (Implement)
-- `/sprint execute`
+- `/kyro-workflow:forge` Phase 3 (Implement)
+- `/kyro-workflow:sprint execute`
 - Resuming a sprint from a checkpoint
 
 ## Behavior

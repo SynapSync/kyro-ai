@@ -22,7 +22,7 @@ A retrospective is mandatory before generating the next sprint.
 
 - The retro produces recommendations, estimation corrections, and debt updates.
 - These feed directly into Sprint N+1 planning.
-- If no retro exists for Sprint N, refuse to generate Sprint N+1 and prompt the user to run `/retro` first.
+- If no retro exists for Sprint N, refuse to generate Sprint N+1 and prompt the user to run `/kyro-workflow:retro` first.
 
 ## R-SD-03: Disposition Table Completeness
 

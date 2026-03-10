@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
-const rulesPath = path.join(os.homedir(), '.kyro', 'rules.md');
+const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
+const rulesPath = path.join(kyroDir, 'rules.md');
 const distDir = path.join(__dirname, '..', 'dist');
 
 // Load learned rules (flat file — always available)
@@ -29,7 +28,6 @@ try {
 
   // Detect active sprint
   let sprint = null;
-  const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
   if (fs.existsSync(kyroDir)) {
     const dirs = fs.readdirSync(kyroDir).filter(f =>
       fs.statSync(path.join(kyroDir, f)).isDirectory() && f !== 'sprints'
@@ -58,7 +56,10 @@ try {
   }
 
   // Store session ID in temp file for other hooks to use
-  const sessionFile = path.join(os.homedir(), '.kyro', '.active-session');
+  const sessionFile = path.join(kyroDir, '.active-session');
+  if (!fs.existsSync(kyroDir)) {
+    fs.mkdirSync(kyroDir, { recursive: true });
+  }
   fs.writeFileSync(sessionFile, JSON.stringify({
     sessionId, project, sprint,
     tasks_completed: 0,

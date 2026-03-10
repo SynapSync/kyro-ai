@@ -3,7 +3,7 @@ description: Manage and review technical debt
 argument-hint: [list|add|resolve|escalate]
 ---
 
-# /debt — Technical Debt Management
+# /kyro-workflow:debt — Technical Debt Management
 
 View, add, resolve, or escalate technical debt items across sprints.
 
@@ -29,7 +29,7 @@ Display the full accumulated technical debt table:
 Add a new debt item:
 
 ```
-/debt add "Missing error boundary in dashboard" --origin "Sprint 3 retro" --target "Sprint 4"
+/kyro-workflow:debt add "Missing error boundary in dashboard" --origin "Sprint 3 retro" --target "Sprint 4"
 ```
 
 ### Resolve
@@ -37,7 +37,7 @@ Add a new debt item:
 Mark a debt item as resolved:
 
 ```
-/debt resolve 3 --sprint "Sprint 3"
+/kyro-workflow:debt resolve 3 --sprint "Sprint 3"
 ```
 
 ### Escalate
@@ -45,7 +45,7 @@ Mark a debt item as resolved:
 Flag aged debt items (>3 sprints without resolution):
 
 ```
-/debt escalate
+/kyro-workflow:debt escalate
 ```
 
 Shows items that have been open for more than 3 sprints and asks:
