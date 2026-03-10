@@ -7,6 +7,11 @@ argument-hint: [list|add|resolve|escalate]
 
 View, add, resolve, or escalate technical debt items across sprints.
 
+## Execution
+
+> **IMPORTANT**: Before managing debt, read the debt tracker helper:
+> 1. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` — debt table format, status rules, escalation criteria
+
 ## Action: $ARGUMENTS
 
 ### List

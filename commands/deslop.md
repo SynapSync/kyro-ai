@@ -5,7 +5,12 @@ argument-hint: <file path | directory | "changed">
 
 # /kyro-workflow:deslop — AI Slop Removal
 
-Scan target files for AI-generated boilerplate and propose removals. Uses the `deslop` skill for detection and categorization.
+Scan target files for AI-generated boilerplate and propose removals.
+
+## Execution
+
+> **IMPORTANT**: Before scanning, read the deslop skill:
+> 1. Read `skills/deslop/SKILL.md` — detection categories, severity ratings, removal patterns
 
 ## Target: $ARGUMENTS
 

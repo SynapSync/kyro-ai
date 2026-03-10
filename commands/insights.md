@@ -7,6 +7,11 @@ argument-hint: [project name or "all"]
 
 Query the Kyro database to surface patterns in learnings, corrections, sessions, and sprint velocity. All data comes from `.agents/kyro/data.db`.
 
+## Execution
+
+> **IMPORTANT**: Before generating analytics, read the metrics skill:
+> 1. Read `skills/kyro-metrics/SKILL.md` — query patterns, heatmap format, velocity calculations
+
 ## Scope: $ARGUMENTS
 
 If a project name is provided, filter all queries to that project. If "all" or empty, show analytics across all sprints.

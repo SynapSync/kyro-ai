@@ -7,11 +7,17 @@ argument-hint: <project path or description>
 
 Execute the full sprint lifecycle with validation gates between each phase.
 
+## Execution
+
+> **IMPORTANT**: Spawn the `orchestrator` agent to coordinate this cycle.
+> Do not execute phases directly — the orchestrator handles all delegation,
+> skill loading, and validation gates.
+
 ## Target: $ARGUMENTS
 
 ### Phase 1: Analyze
 
-Delegate to the **explorer** agent:
+The orchestrator delegates to the **explorer** agent:
 
 1. Classify work type (audit, new feature, bugfix, new project, tech debt)
 2. Deep analysis of codebase — architecture, risks, dependencies, visible debt
@@ -56,6 +62,7 @@ Execute task by task with quality gates:
 ### Learning Capture
 
 After completing, check:
+
 - What corrections were made during implementation?
 - Any patterns worth adding to learned rules?
 - Any estimation errors to adjust future sprints?
