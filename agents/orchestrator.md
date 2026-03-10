@@ -2,7 +2,7 @@
 name: orchestrator
 description: Coordinates the full kyro-workflow cycle with validation gates. Use when running /kyro-workflow:forge for end-to-end sprint execution (Analyze → Plan → Implement → Review → Commit).
 tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
-skills: ["kyro-workflow"]
+skills: ["sprint-forge"]
 model: opus
 memory: project
 ---
