@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const fs = require('fs');
-const { getActiveSessionPath } = require('./lib/paths');
+const { getActiveSessionPath, debugLog, writeJsonAtomic } = require('./lib/paths');
 
 const sessionFile = getActiveSessionPath();
 
@@ -24,11 +24,11 @@ process.stdin.on('end', () => {
       if (fs.existsSync(sessionFile)) {
         const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
         sessionData.tasks_completed = (sessionData.tasks_completed || 0) + 1;
-        fs.writeFileSync(sessionFile, JSON.stringify(sessionData));
+        writeJsonAtomic(sessionFile, sessionData);
 
         console.error(`[Kyro] Session tasks completed: ${sessionData.tasks_completed}`);
       }
-    } catch (_) {}
+    } catch (e) { debugLog('task-complete session write: ' + e.message); }
   } catch (e) {
     console.error('[Kyro] Task completed. Run quality checks.');
   }

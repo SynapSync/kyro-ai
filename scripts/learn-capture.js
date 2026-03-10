@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const { getKyroDir, getRulesPath, getDistDir, getActiveSessionPath } = require('./lib/paths');
+const { getKyroDir, getRulesPath, getDistDir, getActiveSessionPath, debugLog, writeJsonAtomic } = require('./lib/paths');
 
 const kyroDir = getKyroDir();
 const sessionFile = getActiveSessionPath();
@@ -53,7 +53,7 @@ process.stdin.on('end', () => {
           project = sessionData.project || project;
           sprint = sessionData.sprint || null;
         }
-      } catch (_) {}
+      } catch (e) { debugLog('learn-capture session read: ' + e.message); }
 
       // Persist to DB (dual-write: rules.md + database)
       let store = null;
@@ -64,7 +64,7 @@ process.stdin.on('end', () => {
         const { createStore } = require(path.join(distDir, 'db', 'store.js'));
         db = initDatabase();
         store = createStore(db);
-      } catch (_) {}
+      } catch (e) { debugLog('learn-capture DB init: ' + e.message); }
 
       learnings.forEach(l => {
         const date = new Date().toISOString().split('T')[0];
@@ -87,7 +87,7 @@ process.stdin.on('end', () => {
               correction: null,
               sprint
             });
-          } catch (_) {}
+          } catch (e) { debugLog('learn-capture addLearning: ' + e.message); }
         }
 
         console.error(`[Kyro] Captured: [RULE-${String(nextNum).padStart(3, '0')}] ${l.category}: ${l.rule}`);
@@ -101,14 +101,14 @@ process.stdin.on('end', () => {
         if (fs.existsSync(sessionFile)) {
           const sd = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
           sd.corrections_count = (sd.corrections_count || 0) + learnings.length;
-          fs.writeFileSync(sessionFile, JSON.stringify(sd));
+          writeJsonAtomic(sessionFile, sd);
         }
-      } catch (_) {}
+      } catch (e) { debugLog('learn-capture session write: ' + e.message); }
 
       if (db) db.close();
     }
   } catch (e) {
-    // Silently pass through on error
+    debugLog('learn-capture: ' + e.message);
   }
 
   console.log(data);

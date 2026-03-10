@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { findActiveProject, findLatestSprint, isSprintActive } = require('./lib/paths');
+const { findActiveProject, findLatestSprint, isSprintActive, debugLog } = require('./lib/paths');
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
@@ -24,7 +24,7 @@ process.stdin.on('end', () => {
       }
     }
   } catch (e) {
-    // Silently pass through
+    debugLog('drift-detector: ' + e.message);
   }
 
   console.log(data);
