@@ -97,6 +97,6 @@ Recommended next step: [suggestion for the human]
 - Check `git blame` — recent changes are more likely to be the cause.
 - Use project memory to recall previous bugs in the same area.
 - If stuck after 3 rounds, escalate to user with findings so far.
-- Capture debugging insights: propose rules for `.agents/kyro/rules.md`.
+- Capture debugging insights: propose rules for `.agents/kyro-workflow/rules.md`.
 - Never use "shotgun debugging" — changing random things hoping something works.
 - Never fix symptoms instead of root causes.

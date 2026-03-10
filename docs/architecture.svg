@@ -43,7 +43,7 @@
 <text x="1972.3249999999998" y="210" dy="0.35em" font-size="12" font-weight="600" fill="var(--_text-sec)">&quot;HOOKS — 12 lifecycle events&quot;</text>
 <rect x="2055.8499999999995" y="369" width="2433.6425000000004" height="112" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
 <rect x="2055.8499999999995" y="369" width="2433.6425000000004" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
-<text x="2067.8499999999995" y="383" dy="0.35em" font-size="12" font-weight="600" fill="var(--_text-sec)">&quot;STORAGE — .agents/kyro/&quot;</text>
+<text x="2067.8499999999995" y="383" dy="0.35em" font-size="12" font-weight="600" fill="var(--_text-sec)">&quot;STORAGE — .agents/kyro-workflow/&quot;</text>
 <polyline points="1532.449999999999,132 1532.449999999999,270 1573.5799999999992,270" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
 <polyline points="1749.324999999999,132 1749.324999999999,270 1848.6799999999992,270" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />
 <polyline points="4534.709999999999,132 4534.709999999999,152 1850.5499999999993,152 1850.5499999999993,270 1848.6799999999992,270" fill="none" stroke="var(--_line)" stroke-width="0.75" marker-end="url(#arrowhead)" />

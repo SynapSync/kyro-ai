@@ -84,7 +84,7 @@ The `skills: ["kyro-analyzer"]` declaration is metadata only — it does NOT aut
 
 ### Rules Loading
 
-- Read `.agents/kyro/rules.md` if it exists and apply relevant rules during analysis.
+- Read `.agents/kyro-workflow/rules.md` if it exists and apply relevant rules during analysis.
 
 ## Rules
 

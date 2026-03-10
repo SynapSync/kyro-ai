@@ -7,7 +7,7 @@ console.error('[Kyro] Saving re-entry prompt state before compaction...');
 console.error('[Kyro] Run /kyro-workflow:status after compaction to verify context.');
 
 // Check for active sprint and remind about re-entry prompts
-const kyroDir = path.join(process.cwd(), '.agents', 'kyro');
+const kyroDir = path.join(process.cwd(), '.agents', 'kyro-workflow');
 if (fs.existsSync(kyroDir)) {
   const reentryPath = path.join(kyroDir, 'RE-ENTRY-PROMPTS.md');
   if (fs.existsSync(reentryPath)) {

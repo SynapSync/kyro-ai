@@ -112,7 +112,7 @@
       "date": "2026-02-18",
       "changes": [
         "Replaced staging pattern with interactive path resolution — ask once before first write",
-        "Option 1: {cwd}/.agents/kyro/{project-name}/ (default)",
+        "Option 1: {cwd}/.agents/kyro-workflow/sprint-forge/{project-name}/ (default)",
         "Option 2: {user-root}/kyro/{project-name}/ (custom)",
         "Removed post-production delivery steps from INIT and SPRINT modes",
         "Added Step 0 to SPRINT and STATUS for locating {output_kyro_dir} in future sessions"

@@ -27,7 +27,7 @@ if (state.editCount - state.lastReminder >= 5) {
 fs.writeFileSync(stateFile, JSON.stringify(state));
 
 // Also track edit_count in .active-session for DB persistence
-const sessionFile = path.join(process.cwd(), '.agents', 'kyro', '.active-session');
+const sessionFile = path.join(process.cwd(), '.agents', 'kyro-workflow', '.active-session');
 try {
   if (fs.existsSync(sessionFile)) {
     const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));

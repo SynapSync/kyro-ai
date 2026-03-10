@@ -88,7 +88,7 @@ You can also run steps individually:
 After running `/kyro-workflow:forge` (INIT mode), Kyro creates a project workspace:
 
 ```
-.agents/kyro/{project-name}/
+.agents/kyro-workflow/sprint-forge/{project-name}/
 ├── README.md              # Project overview, paths, baseline metrics
 ├── ROADMAP.md             # Adaptive roadmap with sprint definitions
 ├── RE-ENTRY-PROMPTS.md    # Context recovery prompts for new sessions
@@ -104,10 +104,10 @@ After running `/kyro-workflow:forge` (INIT mode), Kyro creates a project workspa
     └── 2026-03-08-sprint-3.md
 ```
 
-Project data is stored in `.agents/kyro/`:
+Project data is stored in `.agents/kyro-workflow/`:
 
 ```
-.agents/kyro/
+.agents/kyro-workflow/
 ├── data.db       # SQLite database (learnings, sessions, debt items)
 └── rules.md      # Persistent learned rules (accumulated across sprints)
 ```
@@ -120,7 +120,7 @@ Project data is stored in `.agents/kyro/`:
 | `RE-ENTRY-PROMPTS.md` | Contains copy-paste prompts for recovering context in a new session. Updated after every sprint. |
 | `findings/*.md` | Each finding from the initial analysis becomes a separate file with severity, evidence, and recommendations. |
 | `sprints/SPRINT-N-*.md` | Each sprint document includes phases, tasks, debt table, retro, and recommendations. |
-| `.agents/kyro/rules.md` | Learned rules for this project. Loaded automatically at session start. |
+| `.agents/kyro-workflow/rules.md` | Learned rules for this project. Loaded automatically at session start. |
 
 ---
 
@@ -172,7 +172,7 @@ Agent proposes rule
     |
 User approves
     |
-Rule saved to .agents/kyro/rules.md
+Rule saved to .agents/kyro-workflow/rules.md
     |
 Future sessions load rules automatically
     |
