@@ -43,9 +43,13 @@ kyro-workflow/
 │   ├── kyro-metrics/   # Velocity trends and debt heatmap
 │   ├── kyro-handoff/   # Enriched context transfer
 │   └── deslop/           # AI slop detection and removal
+├── .claude-plugin/   # Plugin packaging for Claude Code
+│   ├── plugin.json   # Plugin manifest (version must match package.json)
+│   ├── marketplace.json # Marketplace listing metadata
+│   ├── settings.json # Default permissions
+│   └── README.md     # Installation instructions
 ├── docs/             # 8 documentation guides
 ├── config.json       # Workflow configuration
-├── marketplace.json  # Plugin marketplace metadata
 ├── package.json      # NPM package definition
 └── WORKFLOW.yaml     # Workflow definition (version must match package.json)
 ```
@@ -76,8 +80,9 @@ node scripts/test-hooks.js
 
 ## Plugin Metadata
 
-Plugin metadata is defined in `marketplace.json`. When updating version, description, or capabilities, keep these files in sync:
+Plugin metadata lives in the `.claude-plugin/` directory. When updating version, description, or capabilities, keep these files in sync:
 
 - `package.json` — canonical version and description
-- `marketplace.json` — marketplace listing (hook/agent/command/skill counts)
+- `.claude-plugin/plugin.json` — plugin manifest (version must match package.json)
+- `.claude-plugin/marketplace.json` — marketplace listing (hook/agent/command/skill counts)
 - `WORKFLOW.yaml` — human-readable workflow definition (version, hooks list)

@@ -147,15 +147,19 @@ kyro-workflow/
 │   ├── db/                     # Database init, schema, store
 │   └── search/                 # Full-text search with BM25 ranking
 │
+├── .claude-plugin/                # Plugin packaging for Claude Code
+│   ├── plugin.json                # Plugin manifest (version must match package.json)
+│   ├── marketplace.json           # Marketplace listing metadata
+│   ├── settings.json              # Default permissions
+│   └── README.md                  # Installation instructions
+│
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── ci.yml                  # Build + test on push/PR
 │   └── release.yml             # GitHub release on tag push
 │
 ├── WORKFLOW.yaml               # Workflow definition (version must match package.json)
 ├── config.json                 # Workflow configuration
-├── marketplace.json            # Plugin marketplace listing
 ├── settings.example.json       # Production settings template
-├── WORKFLOW.yaml               # Workflow definition
 └── CLAUDE.md                   # Development instructions
 ```
 
@@ -163,30 +167,72 @@ kyro-workflow/
 
 ## Installation
 
-### Claude Code — Plugin Install
+### Option 1: Claude Code Plugin (Recommended)
+
+From inside a Claude Code session, run:
 
 ```bash
-/plugin install SynapSync/kyro-workflow
+# Step 1 — Register the marketplace
+/plugin marketplace add SynapSync/kyro-workflow
+
+# Step 2 — Install the plugin
+/plugin install kyro-workflow@kyro-workflow
 ```
 
-### Claude Code — Manual
+That's it. All commands, agents, skills, and hooks are available immediately.
+
+### Option 2: Claude Code CLI
 
 ```bash
-git clone https://github.com/SynapSync/kyro-workflow.git ~/.claude/plugins/kyro-workflow
-cd ~/.claude/plugins/kyro-workflow
+# Register marketplace and install from your terminal
+claude plugin install kyro-workflow@SynapSync/kyro-workflow
+```
+
+### Option 3: Local Development
+
+If you want to hack on Kyro itself or test changes before publishing:
+
+```bash
+# Clone the repo
+git clone https://github.com/SynapSync/kyro-workflow.git
+cd kyro-workflow
+
+# Install dependencies and build the database layer
 npm install && npm run build
+
+# Option A — Load for a single session
+claude --plugin-dir /path/to/kyro-workflow
+
+# Option B — Install permanently from local path
+claude plugin install /path/to/kyro-workflow
 ```
 
-Then load it:
+### Option 4: npm
 
 ```bash
-claude --plugin-dir ~/.claude/plugins/kyro-workflow
+npm install -g kyro-workflow
+claude plugin install kyro-workflow
 ```
 
-### SkillKit (Any Agent)
+### Option 5: SkillKit (Any Agent)
 
 ```bash
 npx skillkit install kyro-workflow
+```
+
+### Verify Installation
+
+Once installed, confirm everything is working:
+
+```bash
+# Inside Claude Code, run any command
+/kyro-workflow:status
+```
+
+You should see the Kyro status dashboard. If you get "unknown command", check that the plugin is enabled:
+
+```bash
+/plugin list
 ```
 
 ---
@@ -322,7 +368,7 @@ See [`settings.example.json`](settings.example.json) for production permission a
 | Database | None | SQLite + FTS5 (learnings, sessions, debt) |
 | CI/CD | None | 2 GitHub Actions workflows (CI + Release) |
 | Documentation | README only | 8 guides + SOUL.md template |
-| Distribution | Manual clone | marketplace.json + npm pack ready |
+| Distribution | Manual clone | .claude-plugin/ + npm pack ready |
 
 ---
 
@@ -344,9 +390,9 @@ See [`settings.example.json`](settings.example.json) for production permission a
 ## Quick Start
 
 ```bash
-# 1. Install
-git clone https://github.com/SynapSync/kyro-workflow.git ~/.claude/plugins/kyro-workflow
-cd ~/.claude/plugins/kyro-workflow && npm install && npm run build
+# 1. Install (inside Claude Code)
+/plugin marketplace add SynapSync/kyro-workflow
+/plugin install kyro-workflow@kyro-workflow
 
 # 2. Start a project
 /kyro-workflow:forge analyze the authentication module    # Full cycle with gates
