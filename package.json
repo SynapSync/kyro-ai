@@ -62,7 +62,7 @@
     "contexts",
     "templates",
     "config.json",
-    "marketplace.json",
+    ".claude-plugin",
     "settings.example.json",
     "README.md"
   ]

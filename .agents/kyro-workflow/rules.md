@@ -24,6 +24,6 @@
 
 ## Version Management
 
-- [RULE-004] When bumping version, update ALL of: package.json, marketplace.json, WORKFLOW.yaml -- then run `node scripts/check-sync.js` to verify (2026-03-10, updated 2026-03-10)
+- [RULE-004] When bumping version, update ALL of: package.json, .claude-plugin/plugin.json, .claude-plugin/marketplace.json, WORKFLOW.yaml -- then run `node scripts/check-sync.js` to verify (2026-03-10, updated 2026-03-12)
 - [RULE-007] When modifying hooks.json (adding/removing events), also update the hooks list in WORKFLOW.yaml to match -- check-sync.js validates this (2026-03-10)
-- [RULE-008] Do not reference .claude-plugin/ or .cursor-plugin/ directories -- they do not exist. Plugin metadata lives in marketplace.json (2026-03-10)
+- [RULE-008] Plugin metadata lives in .claude-plugin/ directory (plugin.json, marketplace.json, settings.json). The root marketplace.json no longer exists (2026-03-10, updated 2026-03-12)
