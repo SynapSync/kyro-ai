@@ -13,7 +13,7 @@ function check(label, passed, detail) {
 
 // Load files
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const marketplace = JSON.parse(fs.readFileSync(path.join(root, 'marketplace.json'), 'utf8'));
+const marketplace = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'marketplace.json'), 'utf8'));
 const hooksJson = JSON.parse(fs.readFileSync(path.join(root, 'hooks', 'hooks.json'), 'utf8'));
 
 // Parse WORKFLOW.yaml (simple key-value extraction, no yaml parser needed)

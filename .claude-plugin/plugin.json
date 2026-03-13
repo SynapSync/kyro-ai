@@ -1,0 +1,37 @@
+{
+  "name": "kyro-workflow",
+  "version": "2.8.0",
+  "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive per-project learning",
+  "author": {
+    "name": "SynapSync",
+    "email": "synapsync@proton.me"
+  },
+  "homepage": "https://synapsync.dev/cognitives/kyro-workflow",
+  "repository": "https://github.com/SynapSync/kyro-workflow",
+  "license": "Apache-2.0",
+  "keywords": [
+    "claude-code",
+    "workflow",
+    "sprint",
+    "planning",
+    "execution",
+    "debt-tracking",
+    "roadmap",
+    "iterative",
+    "adaptive",
+    "hooks",
+    "agents",
+    "subagents",
+    "self-correction",
+    "worktrees",
+    "context-persistence"
+  ],
+  "skills": ["./skills/"],
+  "agents": [
+    "./agents/debugger.md",
+    "./agents/explorer.md",
+    "./agents/orchestrator.md",
+    "./agents/reviewer.md"
+  ],
+  "commands": ["./commands/"]
+}
