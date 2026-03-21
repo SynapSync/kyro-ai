@@ -25,7 +25,7 @@ Unlike rigid project planners, Kyro:
 
 - **Analyzes first** — deep codebase exploration before committing to a plan
 - **Generates sprints one at a time** — each sprint feeds from the previous one's retro
-- **Learns across sprints** — corrections become persistent rules in `.agents/kyro-workflow/rules.md`
+- **Learns across sprints** — corrections become persistent rules in `.agents/sprint-forge/rules.md`
 - **Validates at every step** — BLOCKER/WARNING/SUGGESTION checklist per task
 - **Adapts the roadmap** — the plan evolves based on what execution reveals
 - **Persists context** — re-entry prompts + enriched handoffs with mental model
@@ -38,7 +38,7 @@ Unlike rigid project planners, Kyro:
 <tr><td><b>4 Agents</b></td><td>Explorer (read-only analysis), Reviewer (task validation), Debugger (root cause), Orchestrator (full cycle)</td></tr>
 <tr><td><b>9 Commands</b></td><td><code>/kyro-workflow:forge</code>, <code>/kyro-workflow:sprint</code>, <code>/kyro-workflow:status</code>, <code>/kyro-workflow:debt</code>, <code>/kyro-workflow:retro</code>, <code>/kyro-workflow:wrap-up</code>, <code>/kyro-workflow:insights</code>, <code>/kyro-workflow:deslop</code>, <code>/kyro-workflow:parallel</code></td></tr>
 <tr><td><b>12 Hooks</b></td><td>SessionStart, PreToolUse, PostToolUse, Stop, SessionEnd, UserPromptSubmit, PreCompact, SubagentStart/Stop, TaskCompleted, PostToolUseFailure</td></tr>
-<tr><td><b>Per-Project Learning</b></td><td>Corrections become rules in <code>.agents/kyro-workflow/rules.md</code> — applied automatically in future sprints</td></tr>
+<tr><td><b>Per-Project Learning</b></td><td>Corrections become rules in <code>.agents/sprint-forge/rules.md</code> — applied automatically in future sprints</td></tr>
 <tr><td><b>Validation Gates</b></td><td>BLOCKER/WARNING/SUGGESTION checklist per task, phase gates with user approval</td></tr>
 <tr><td><b>Velocity Metrics</b></td><td>Sprint velocity trends, debt heatmap, underestimation pattern detection</td></tr>
 <tr><td><b>Enriched Handoffs</b></td><td>Mental context: active hypotheses, pending decisions, blockers, next action</td></tr>
@@ -79,7 +79,7 @@ Every gate requires explicit user approval. The plan serves execution, not the r
 ```
 User corrects agent → Agent proposes rule → User approves
         ↓
-Rule saved to .agents/kyro-workflow/rules.md
+Rule saved to .agents/sprint-forge/rules.md
         ↓
 Future sessions load rules automatically
         ↓
@@ -271,7 +271,7 @@ You should see the Kyro status dashboard. If you get "unknown command", check th
 | `sprint-forge` | Core orchestration — modes (INIT/SPRINT/STATUS), helpers, templates |
 | `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
 | `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
-| `kyro-learner` | Per-project rule accumulation via `.agents/kyro-workflow/rules.md` |
+| `kyro-learner` | Per-project rule accumulation via `.agents/sprint-forge/rules.md` |
 | `kyro-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
 | `kyro-handoff` | Enriched session handoff with mental context (hypotheses, decisions, blockers) |
 | `deslop` | AI slop detection and removal — 7 categories, confidence ratings, safety rules |
@@ -302,7 +302,7 @@ You should see the Kyro status dashboard. If you get "unknown command", check th
 Learnings, sessions, and debt items stored in SQLite with FTS5 full-text search:
 
 ```
-.agents/kyro-workflow/
+.agents/sprint-forge/
 ├── data.db       # SQLite database (learnings, sessions, debt)
 ├── rules.md      # Persistent learned rules (accumulated across sprints)
 └── sprint-forge/ # Per-project sprint documents
@@ -329,8 +329,8 @@ Learnings, sessions, and debt items stored in SQLite with FTS5 full-text search:
 
 ```json
 {
-  "database": { "path": ".agents/kyro-workflow/data.db" },
-  "rules": { "path": ".agents/kyro-workflow/rules.md", "auto_load": true },
+  "database": { "path": ".agents/sprint-forge/data.db" },
+  "rules": { "path": ".agents/sprint-forge/rules.md", "auto_load": true },
   "quality_gates": { "run_lint": true, "run_typecheck": true, "run_tests": true },
   "sprint": { "checkpoint_per_phase": true, "require_retro": true, "debt_aged_threshold_sprints": 3 },
   "model_preferences": { "exploration": "haiku", "planning": "sonnet", "implementation": "opus" }

@@ -118,7 +118,7 @@ This skill works for **any** project type, language, or framework.
 
 1. **Re-entry prompt** — If the user's message contains file paths (e.g. `/Users/.../ROADMAP.md`), extract `{output_kyro_dir}` from those paths. It's already there.
 2. **INIT (first time)** — Ask the user where to save documents. Store the chosen path in `README.md` and `RE-ENTRY-PROMPTS.md`. These are the only sources of truth.
-3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/kyro-workflow/` in `{cwd}`, or ask the user directly.
+3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/sprint-forge/` in `{cwd}`, or ask the user directly.
 
 No AGENTS.md. No branded blocks. The re-entry prompts and README carry the path across sessions.
 
@@ -236,7 +236,7 @@ Kyro v2.0 operates as a workflow with specialized agents and commands. The SKILL
 ### Lifecycle Hooks
 
 The workflow fires hooks at key moments during sprint execution. See `hooks/hooks.json` for the full list. Key hooks:
-- **SessionStart** — loads learned rules from `.agents/kyro-workflow/rules.md`
+- **SessionStart** — loads learned rules from `.agents/sprint-forge/rules.md`
 - **PostToolUse** — checks for debug artifacts after code edits
 - **TaskCompleted** — runs reviewer checklist
 - **PostToolUseFailure** — suggests debugger invocation
@@ -244,7 +244,7 @@ The workflow fires hooks at key moments during sprint execution. See `hooks/hook
 
 ### Per-Project Learning
 
-Corrections during sprint execution are captured as persistent rules in `.agents/kyro-workflow/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the `kyro-learner` skill for details.
+Corrections during sprint execution are captured as persistent rules in `.agents/sprint-forge/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the `kyro-learner` skill for details.
 
 ---
 

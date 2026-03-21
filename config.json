@@ -1,10 +1,10 @@
 {
   "database": {
-    "path": ".agents/kyro-workflow/data.db",
+    "path": ".agents/sprint-forge/data.db",
     "auto_init": true
   },
   "rules": {
-    "path": ".agents/kyro-workflow/rules.md",
+    "path": ".agents/sprint-forge/rules.md",
     "auto_load": true,
     "require_approval": true
   },
@@ -15,7 +15,7 @@
   "self_correction": {
     "enabled": true,
     "require_approval": true,
-    "learned_file": ".agents/kyro-workflow/rules.md"
+    "learned_file": ".agents/sprint-forge/rules.md"
   },
   "quality_gates": {
     "run_lint": true,
