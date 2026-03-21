@@ -17,7 +17,7 @@ Coordinates the complete sprint lifecycle with validation gates between each pha
 
 Before starting, determine which flow to follow:
 
-1. Scan `.agents/kyro-workflow/sprint-forge/` for existing project directories
+1. Scan `.agents/sprint-forge/` for existing project directories
 2. Check if a `ROADMAP.md` exists for this project
 
 - **NO ROADMAP** → New project. Follow **INIT flow** (full analysis, findings, roadmap, scaffolding, then first sprint)
@@ -105,7 +105,7 @@ The `skills: ["sprint-forge"]` declaration is metadata only — it does NOT auto
 
 ### 2. Rules Loading
 
-1. Read `.agents/kyro-workflow/rules.md` if it exists
+1. Read `.agents/sprint-forge/rules.md` if it exists
 2. Apply relevant rules throughout all phases
 3. If a rule is about to be violated, pause and show the rule to the user
 4. At the end, propose new rules based on corrections made during the session
@@ -132,7 +132,7 @@ After all tasks are complete:
 4. Update frontmatter (status, dates, agents)
 5. Generate/update re-entry prompts
 6. Update roadmap if needed
-7. Propose new rules for `.agents/kyro-workflow/rules.md`
+7. Propose new rules for `.agents/sprint-forge/rules.md`
 
 ## Rules
 

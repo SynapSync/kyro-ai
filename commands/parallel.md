@@ -10,7 +10,7 @@ Analyze the current sprint's tasks for dependencies, group independent tasks int
 ## Execution
 
 > **IMPORTANT**: Before analyzing tasks, read the current sprint file from
-> `.agents/kyro-workflow/sprint-forge/{project}/` to understand task definitions and dependencies.
+> `.agents/sprint-forge/{project}/` to understand task definitions and dependencies.
 > No agent spawn required — this command operates directly on sprint data.
 
 ## Sprint: $ARGUMENTS

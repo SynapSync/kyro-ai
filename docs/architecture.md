@@ -73,7 +73,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
                      |
                      v
             +------------------+
-            |   ORCHESTRATOR   |---------> .agents/kyro-workflow/rules.md [LOAD]
+            |   ORCHESTRATOR   |---------> .agents/sprint-forge/rules.md [LOAD]
             +------------------+
                  |    |    |
       +----------+    |    +----------+
@@ -90,7 +90,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
       +-------+-------+-------+-------+
               |               |
               v               v
-    .agents/kyro-workflow/
+    .agents/sprint-forge/
     sprint-forge/{project}/
     ├── findings/
     ├── data.db
@@ -109,7 +109,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
 
 ### Flow for /kyro-workflow:forge
 
-1. **Rules Loading** -- Orchestrator reads `.agents/kyro-workflow/rules.md`
+1. **Rules Loading** -- Orchestrator reads `.agents/sprint-forge/rules.md`
 2. **Analysis** -- Orchestrator delegates to Explorer agent. Explorer reads the codebase and produces an analysis report. Findings are written to `findings/`.
 3. **Gate 1** -- User approves analysis.
 4. **Planning** -- Orchestrator generates a sprint document with phases and tasks. Writes to `sprints/`.
@@ -132,24 +132,24 @@ Direct read of all project files. No agents involved. Computes metrics and outpu
 
 Kyro uses two storage locations:
 
-### Per-Project: `.agents/kyro-workflow/`
+### Per-Project: `.agents/sprint-forge/`
 
 Stores data that persists across sprints within this project.
 
 ```
-.agents/kyro-workflow/
+.agents/sprint-forge/
 ├── data.db       # SQLite database
 └── rules.md      # Learned rules (accumulated across sprints)
 ```
 
 The database path is configurable via `config.json` (`database.path`) or the `KYRO_DB_PATH` environment variable.
 
-### Per-Project: `.agents/kyro-workflow/sprint-forge/{project}/`
+### Per-Project: `.agents/sprint-forge/{project}/`
 
 Stores all sprint documents for a specific project. Created during INIT and used by all subsequent commands.
 
 ```
-.agents/kyro-workflow/sprint-forge/{project-name}/
+.agents/sprint-forge/{project-name}/
 ├── README.md              # Project overview with paths and baseline
 ├── ROADMAP.md             # Adaptive roadmap with sprint definitions
 ├── RE-ENTRY-PROMPTS.md    # Context recovery prompts
@@ -303,7 +303,7 @@ v2.0:  User command --> Agent (orchestrator/explorer/reviewer/debugger)
 |-----------|-------------|-----------------|
 | Type | Single skill | Full workflow (commands + agents + skills + hooks) |
 | Entry point | Text triggers detected by skill | Slash commands (`/kyro-workflow:forge`, `/kyro-workflow:sprint`, etc.) |
-| Learning | Per-project retro only | Persistent rules across sprints via `.agents/kyro-workflow/rules.md` |
+| Learning | Per-project retro only | Persistent rules across sprints via `.agents/sprint-forge/rules.md` |
 | Agents | 1 (the skill itself) | 4 specialized (explorer, reviewer, debugger, orchestrator) |
 | Hooks | 0 | 12 lifecycle events |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase gates with approval |

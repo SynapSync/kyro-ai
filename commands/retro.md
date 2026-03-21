@@ -72,7 +72,7 @@ Numbered recommendations that MUST be addressed in the next sprint's disposition
 Based on corrections and learnings:
 
 ```text
-Proposed rules for .agents/kyro-workflow/rules.md:
+Proposed rules for .agents/sprint-forge/rules.md:
 
 [RULE-XXX] Category: One-line rule
   Context: Why this rule exists (from this sprint's experience)
@@ -94,4 +94,4 @@ Formal capture of learnings:
 Write the retro directly into the sprint file's Retro section, then:
 1. Update re-entry prompts
 2. Update roadmap if recommendations affect future sprints
-3. Save confirmed rules to `.agents/kyro-workflow/rules.md`
+3. Save confirmed rules to `.agents/sprint-forge/rules.md`

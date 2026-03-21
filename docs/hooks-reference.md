@@ -15,7 +15,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 **When it fires:** At the beginning of every new Claude Code session.
 
 **What the script does:**
-- Loads learned rules from `.agents/kyro-workflow/rules.md`
+- Loads learned rules from `.agents/sprint-forge/rules.md`
 - Displays a summary of the active sprint (if one exists)
 - Initializes session tracking
 
@@ -104,7 +104,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 
 **What the script does:**
 - Scans the response for `[LEARN]` blocks
-- Auto-captures identified learnings into `.agents/kyro-workflow/rules.md`
+- Auto-captures identified learnings into `.agents/sprint-forge/rules.md`
 - Formats captures with date and project context
 
 **Script:** `scripts/learn-capture.js`
@@ -119,7 +119,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 
 **What the script does:**
 - Prompts for any final learnings to capture
-- Updates `.agents/kyro-workflow/rules.md` with confirmed rules
+- Updates `.agents/sprint-forge/rules.md` with confirmed rules
 - Saves session statistics to the database (edit count, corrections, tasks completed)
 
 **Script:** `scripts/session-end.js`
@@ -150,7 +150,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 **What the script does:**
 - Checks if the prompt or resulting action is about to violate a learned rule
 - Warns the user before the violation occurs
-- References the specific rule from `.agents/kyro-workflow/rules.md`
+- References the specific rule from `.agents/sprint-forge/rules.md`
 
 **Script:** `scripts/rule-checker.js`
 
@@ -331,14 +331,14 @@ Set `run_lint`, `run_typecheck`, or `run_tests` to `false` to disable specific q
 ```json
 {
   "rules": {
-    "path": ".agents/kyro-workflow/rules.md",
+    "path": ".agents/sprint-forge/rules.md",
     "auto_load": true,
     "require_approval": true
   },
   "self_correction": {
     "enabled": true,
     "require_approval": true,
-    "learned_file": ".agents/kyro-workflow/rules.md"
+    "learned_file": ".agents/sprint-forge/rules.md"
   }
 }
 ```

@@ -19,7 +19,7 @@ Execute the full sprint lifecycle with validation gates between each phase.
 
 Before anything else, the orchestrator must determine the project state:
 
-1. Scan `.agents/kyro-workflow/sprint-forge/` for existing project directories
+1. Scan `.agents/sprint-forge/` for existing project directories
 2. Check if a `ROADMAP.md` exists for this project
 
 **If NO ROADMAP exists** → This is a new project. Run **INIT flow** (Phases 1-2 below).
@@ -98,7 +98,7 @@ Execute task by task with quality gates:
 4. Update accumulated debt table
 5. Update re-entry prompts
 6. Update roadmap if execution revealed changes
-7. Propose new rules for `.agents/kyro-workflow/rules.md`
+7. Propose new rules for `.agents/sprint-forge/rules.md`
 8. Commit with conventional message
 
 ### Learning Capture

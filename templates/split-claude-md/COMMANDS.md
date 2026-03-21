@@ -62,7 +62,7 @@ Sprint retrospective ritual. Required after every completed sprint.
 
 Captures: what worked, what did not, estimation accuracy, and concrete
 improvements. Writes learnings to `LEARNED.md` and to the project rules
-file at `.agents/kyro-workflow/rules.md`.
+file at `.agents/sprint-forge/rules.md`.
 
 ---
 

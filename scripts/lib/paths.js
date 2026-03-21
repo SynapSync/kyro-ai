@@ -9,11 +9,11 @@ function debugLog(msg) {
 }
 
 function getKyroDir() {
-  return path.join(process.cwd(), '.agents', 'kyro-workflow');
+  return path.join(process.cwd(), '.agents', 'sprint-forge');
 }
 
 function getSprintForgeDir() {
-  return path.join(getKyroDir(), 'sprint-forge');
+  return getKyroDir();
 }
 
 function getRulesPath() {

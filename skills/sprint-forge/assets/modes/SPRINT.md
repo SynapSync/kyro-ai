@@ -34,10 +34,10 @@ Determine `{output_kyro_dir}` before reading any sprint files:
 
 1. **Re-entry prompt paths** — If the user's message contains absolute file paths (e.g. `/Users/.../ROADMAP.md`), extract `{output_kyro_dir}` from those paths. This is the most reliable source.
 2. **Explicit path** — If the user mentions a path directly, use it.
-3. **Auto-discover** — Scan `{cwd}/.agents/kyro-workflow/sprint-forge/`:
+3. **Auto-discover** — Scan `{cwd}/.agents/sprint-forge/`:
    - Single directory found → use it
    - Multiple directories → ask: "Which project? Found: {list}"
-4. **Ask** — If none of the above: "Where are your kyro-workflow documents? (e.g. `.agents/kyro-workflow/sprint-forge/my-project/`)"
+4. **Ask** — If none of the above: "Where are your kyro-workflow documents? (e.g. `.agents/sprint-forge/my-project/`)"
 
 Once resolved, all subsequent steps use `{output_kyro_dir}` as the base for all file paths.
 

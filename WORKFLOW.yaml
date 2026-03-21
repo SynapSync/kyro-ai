@@ -50,7 +50,7 @@ hooks:
   - PostToolUseFailure   # Detect failures, suggest debugger
 
 storage:
-  project: .agents/kyro-workflow/    # Rules, database, sprint documents (per-project)
+  project: .agents/sprint-forge/    # Rules, database, sprint documents (per-project)
 
 philosophy:
   - "Learn from every sprint, apply in the next"
