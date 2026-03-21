@@ -33,7 +33,7 @@ The argument describes what to analyze or work on. It can be a path, a module na
 The `/kyro-workflow:forge` command runs the complete lifecycle:
 
 ```
-[GATE 0: RULES]     Load learned rules from .agents/kyro-workflow/rules.md
+[GATE 0: RULES]     Load learned rules from .agents/sprint-forge/rules.md
         |
 [PHASE 1: ANALYZE]  Explorer agent investigates codebase (read-only)
         |
@@ -368,7 +368,7 @@ Numbered recommendations that MUST be addressed in the next sprint's disposition
 Based on corrections and learnings during the sprint:
 
 ```
-Proposed rules for .agents/kyro-workflow/rules.md:
+Proposed rules for .agents/sprint-forge/rules.md:
 
 [RULE-XXX] Category: One-line rule
   Context: Why this rule exists (from this sprint's experience)
@@ -392,4 +392,4 @@ Formal capture of confirmed learnings:
 The retro is written directly into the sprint file's Retro section. After completion:
 1. Re-entry prompts are updated
 2. Roadmap is updated if recommendations affect future sprints
-3. Save confirmed rules to `.agents/kyro-workflow/rules.md`
+3. Save confirmed rules to `.agents/sprint-forge/rules.md`

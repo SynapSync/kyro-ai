@@ -44,7 +44,7 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
    - **What went wrong** — blockers, underestimates, regressions
    - **Recommendations** — numbered list of improvements for Sprint N+1
    - **Estimation corrections** — adjusted buffers for task types
-   - **New learned rules** — proposed additions to `.agents/kyro-workflow/rules.md`
+   - **New learned rules** — proposed additions to `.agents/sprint-forge/rules.md`
 4. Update the debt table with any new items or status changes.
 
 ### Metrics Analysis
@@ -63,7 +63,7 @@ Review outputs feed directly into next sprint planning:
 
 - Recommendations become the disposition table in Sprint N+1.
 - Estimation corrections update buffer percentages.
-- New rules are proposed for `.agents/kyro-workflow/rules.md`.
+- New rules are proposed for `.agents/sprint-forge/rules.md`.
 - Unresolved debt items carry forward with updated age.
 
 ## Constraints

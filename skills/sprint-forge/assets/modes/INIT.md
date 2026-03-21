@@ -53,7 +53,7 @@ Gather or detect the following configuration:
 
 > "Where should I save kyro-workflow documents for **{project_name}**?
 >
-> 1. **Default** (Recommended) — `.agents/kyro-workflow/sprint-forge/{project-name}/`
+> 1. **Default** (Recommended) — `.agents/sprint-forge/{project-name}/`
 > 2. **Custom path** — provide your preferred directory"
 
 Set `{output_kyro_dir}` based on the choice. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.

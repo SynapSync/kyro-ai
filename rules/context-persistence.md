@@ -42,7 +42,7 @@ Re-entry prompts are the authoritative source for output directory paths.
 
 - Never hardcode or guess output paths — always read from the re-entry prompt.
 - If the re-entry prompt is missing or corrupted, ask the user to confirm the output directory before proceeding.
-- Output directory format: `{cwd}/.agents/kyro-workflow/sprint-forge/{project}/`
+- Output directory format: `{cwd}/.agents/sprint-forge/{project}/`
 
 ## R-CP-05: Session Continuity Verification
 
