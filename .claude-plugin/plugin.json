@@ -1,6 +1,6 @@
 {
   "name": "kyro-workflow",
-  "version": "2.8.0",
+  "version": "3.0.0",
   "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive per-project learning",
   "author": {
     "name": "SynapSync",

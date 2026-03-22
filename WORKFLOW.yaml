@@ -1,6 +1,6 @@
 name: kyro-workflow
 type: workflow
-version: "2.8.0"
+version: "3.0.0"
 description: >
   Complete sprint workflow system with specialized agents, guardian-based
   lifecycle events, adaptive per-project learning, and formal validation gates.
