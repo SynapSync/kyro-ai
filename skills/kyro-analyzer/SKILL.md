@@ -1,15 +1,15 @@
 ---
 name: kyro-analyzer
 description: >
-  Isolated codebase analysis skill for the explorer agent. Provides analysis strategies
-  per work type and structured finding output format.
+  Codebase analysis skill used by the orchestrator during the analysis phase. Provides
+  analysis strategies per work type and structured finding output format.
 ---
 
 # Kyro Analyzer — Codebase Analysis Strategies
 
 ## Purpose
 
-Provides the explorer agent with structured analysis strategies based on work type classification. This is the knowledge base that powers INIT mode's deep analysis.
+Provides the orchestrator with structured analysis strategies based on work type classification during the analysis phase. This is the knowledge base that powers INIT mode's deep analysis.
 
 ## Work Type Detection
 

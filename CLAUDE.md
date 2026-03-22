@@ -2,13 +2,13 @@
 
 ## Overview
 
-Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based project execution through specialized agents, lifecycle hooks, and persistent learning.
+Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based project execution through the orchestrator agent, lifecycle hooks, and persistent learning.
 
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro, /kyro-workflow:wrap-up, /kyro-workflow:insights, /kyro-workflow:deslop, /kyro-workflow:parallel)
-  └── Agent (explorer, reviewer, debugger, orchestrator)
+User Command (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up)
+  └── Agent (orchestrator)
         └── Skill (sprint-forge, kyro-learner, kyro-reviewer, kyro-metrics, kyro-handoff, kyro-analyzer, deslop)
               └── Hook (lifecycle events that fire automatically)
 ```
@@ -17,21 +17,12 @@ User Command (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status
 
 ```
 kyro-workflow/
-├── agents/           # 4 specialized agents
-│   ├── explorer.md   # Read-only codebase analysis (INIT)
-│   ├── reviewer.md   # Task quality validation (SPRINT)
-│   ├── debugger.md   # Root cause analysis (on failure)
-│   └── orchestrator.md # Full cycle coordinator (/kyro-workflow:forge)
-├── commands/         # 9 slash commands
+├── agents/           # 1 agent
+│   └── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
+├── commands/         # 3 slash commands
 │   ├── forge.md      # /kyro-workflow:forge — full cycle with gates
-│   ├── sprint.md     # /kyro-workflow:sprint — generate/execute next sprint
 │   ├── status.md     # /kyro-workflow:status — metrics and debt heatmap
-│   ├── debt.md       # /kyro-workflow:debt — manage technical debt
-│   ├── retro.md      # /kyro-workflow:retro — sprint retrospective ritual
-│   ├── wrap-up.md    # /kyro-workflow:wrap-up — session closure ritual
-│   ├── insights.md   # /kyro-workflow:insights — DB-backed analytics
-│   ├── deslop.md     # /kyro-workflow:deslop — AI slop removal
-│   └── parallel.md   # /kyro-workflow:parallel — worktree parallel execution
+│   └── wrap-up.md    # /kyro-workflow:wrap-up — session closure ritual
 ├── hooks/            # Lifecycle event handlers
 │   └── hooks.json    # 10 hook events, 15 hook entries
 ├── scripts/          # Hook implementation scripts

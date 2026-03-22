@@ -9,10 +9,10 @@ This document describes the internal architecture of Kyro v2.0, including the Co
 Kyro is organized in three layers:
 
 ```
-User Command (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro)
+User Command (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up)
   |
   v
-Agent (explorer, reviewer, debugger, orchestrator)
+Agent (orchestrator)
   |
   v
 Skill (sprint-forge, kyro-analyzer, kyro-reviewer, kyro-learner, kyro-metrics, kyro-handoff)
@@ -28,23 +28,18 @@ Commands are the user-facing interface. Each command is defined as a markdown fi
 | Command | Primary Agent | Purpose |
 |---------|--------------|---------|
 | `/kyro-workflow:forge` | orchestrator | Full cycle: Analyze, Plan, Implement, Review, Close |
-| `/kyro-workflow:sprint` | orchestrator | Generate and/or execute the next sprint |
 | `/kyro-workflow:status` | -- (direct) | Read-only metrics report |
-| `/kyro-workflow:debt` | -- (direct) | Debt table management |
-| `/kyro-workflow:retro` | orchestrator | Sprint retrospective ritual |
+| `/kyro-workflow:wrap-up` | -- (direct) | End-of-session closure ritual with quality check and context handoff |
 
-### Agents (Execution Engines)
+### Agent (Execution Engine)
 
-Agents are specialized execution engines defined as markdown files in `agents/`. Each agent has a specific role, toolset, model preference, and set of constraints. Agents are invoked by commands or by other agents (e.g., the orchestrator invokes the explorer, reviewer, and debugger).
+The orchestrator is the single agent, defined as a markdown file in `agents/`. It handles all phases of the sprint lifecycle through specialized protocols: analysis (read-only exploration), review (quality validation), debugging (root cause analysis), and full cycle coordination.
 
 | Agent | Toolset | Can Write? | Model | Memory |
 |-------|---------|-----------|-------|--------|
-| explorer | Read, Glob, Grep, Bash | No | sonnet | project |
-| reviewer | Read, Glob, Grep, Bash | No | sonnet | -- |
-| debugger | Read, Glob, Grep, Bash | No | opus | project |
 | orchestrator | Read, Glob, Grep, Bash, Edit, Write | Yes | opus | project |
 
-Only the orchestrator has write permissions. The explorer, reviewer, and debugger are read-only, which prevents unintended modifications during analysis, validation, and debugging.
+The orchestrator self-constrains to read-only operations during analysis phases and uses the review checklist and debug protocol as internal workflows.
 
 ### Skills (Domain Knowledge)
 
@@ -68,7 +63,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
                      |
                      v
               +--------------+
-              |   /kyro-workflow:forge     |  (or /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro)
+              |   /kyro-workflow:forge     |  (or /kyro-workflow:status, /kyro-workflow:wrap-up)
               +--------------+
                      |
                      v
@@ -79,9 +74,8 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
       +----------+    |    +----------+
       |               |               |
       v               v               v
- +---------+    +-----------+    +----------+
- | EXPLORER |    | REVIEWER  |    | DEBUGGER |
- +---------+    +-----------+    +----------+
+  [Analysis      [Review         [Debug
+   Protocol]      Checklist]      Protocol]
       |               |               |
       v               v               v
   Analysis        PASS/FAIL       Root Cause
@@ -110,17 +104,13 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
 ### Flow for /kyro-workflow:forge
 
 1. **Rules Loading** -- Orchestrator reads `.agents/sprint-forge/rules.md`
-2. **Analysis** -- Orchestrator delegates to Explorer agent. Explorer reads the codebase and produces an analysis report. Findings are written to `findings/`.
+2. **Analysis** -- Orchestrator runs the analysis protocol. Reads the codebase and produces an analysis report. Findings are written to `findings/`.
 3. **Gate 1** -- User approves analysis.
 4. **Planning** -- Orchestrator generates a sprint document with phases and tasks. Writes to `sprints/`.
 5. **Gate 2** -- User approves the plan.
-6. **Implementation** -- Orchestrator executes tasks. After each task, invokes Reviewer. On failure, invokes Debugger. Checkpoints saved per phase.
+6. **Implementation** -- Orchestrator executes tasks. After each task, runs the review checklist. On failure, runs the debug protocol. Checkpoints saved per phase.
 7. **Gate 3** -- User approves implementation.
 8. **Review and Close** -- Orchestrator runs retro, updates debt, proposes rules, updates re-entry prompts.
-
-### Flow for /kyro-workflow:sprint
-
-Same as phases 4-8 of `/kyro-workflow:forge`, but can also run phase 4 alone (generate only) or phases 5-8 alone (execute only).
 
 ### Flow for /kyro-workflow:status
 
@@ -248,12 +238,12 @@ Session Lifecycle:
        |
        v
   Tool Result --------> [PostToolUse: check artifacts / detect failures]
-       |                 [PostToolUseFailure: suggest debugger]
+       |                 [PostToolUseFailure: suggest debug protocol]
        v
   Subagent -----------> [SubagentStart / SubagentStop: log lifecycle]
        |
        v
-  Task Done ----------> [TaskCompleted: reviewer checklist]
+  Task Done ----------> [TaskCompleted: review checklist]
        |
        v
   Response -----------> [Stop: session check + learn capture]
@@ -291,7 +281,7 @@ v1.x:  User message --> sprint-forge skill --> output files
 In v2.0, the skill is decomposed into commands, agents, skills, and hooks. Each component has a single responsibility.
 
 ```
-v2.0:  User command --> Agent (orchestrator/explorer/reviewer/debugger)
+v2.0:  User command --> Agent (orchestrator)
                            --> Skill (domain knowledge)
                            --> Hook (lifecycle automation)
                            --> Database (persistent state)
@@ -302,27 +292,26 @@ v2.0:  User command --> Agent (orchestrator/explorer/reviewer/debugger)
 | Dimension | v1.x (Skill) | v2.0 (Workflow) |
 |-----------|-------------|-----------------|
 | Type | Single skill | Full workflow (commands + agents + skills + hooks) |
-| Entry point | Text triggers detected by skill | Slash commands (`/kyro-workflow:forge`, `/kyro-workflow:sprint`, etc.) |
+| Entry point | Text triggers detected by skill | Slash commands (`/kyro-workflow:forge`, `/kyro-workflow:status`, `/kyro-workflow:wrap-up`) |
 | Learning | Per-project retro only | Persistent rules across sprints via `.agents/sprint-forge/rules.md` |
-| Agents | 1 (the skill itself) | 4 specialized (explorer, reviewer, debugger, orchestrator) |
+| Agents | 1 (the skill itself) | 1 orchestrator (with analysis, review, and debug protocols) |
 | Hooks | 0 | 12 lifecycle events |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase gates with approval |
 | Metrics | Basic STATUS report | Velocity trends, debt heatmap, estimation patterns, sprint health score |
 | Context transfer | Re-entry prompts (file paths) | Enriched handoff (mental context: hypotheses, decisions, blockers) |
 | Database | None | SQLite + FTS5 (learnings, sessions, debt) |
-| Parallel execution | Not supported | Worktree-based parallel tasks when dependencies allow |
 | Model selection | Single model | Per-phase model preferences (haiku for exploration, sonnet for planning, opus for implementation) |
 
 ### What Moved Where
 
 | v1.x Component | v2.0 Location |
 |----------------|---------------|
-| INIT mode logic | `skills/sprint-forge/assets/modes/INIT.md` + `agents/explorer.md` |
+| INIT mode logic | `skills/sprint-forge/assets/modes/INIT.md` + `agents/orchestrator.md` (analysis protocol) |
 | SPRINT mode logic | `skills/sprint-forge/assets/modes/SPRINT.md` + `agents/orchestrator.md` |
 | STATUS mode logic | `skills/sprint-forge/assets/modes/STATUS.md` + `skills/kyro-metrics/` |
 | Analysis helpers | `skills/kyro-analyzer/` |
-| Quality validation | `skills/kyro-reviewer/` + `agents/reviewer.md` |
-| Debugging | `agents/debugger.md` (new in v2.0) |
+| Quality validation | `skills/kyro-reviewer/` + `agents/orchestrator.md` (review checklist) |
+| Debugging | `agents/orchestrator.md` (debug protocol) |
 | Learning/rules | `skills/kyro-learner/` + hooks (new in v2.0) |
 | Context handoff | `skills/kyro-handoff/` (enriched in v2.0) |
 | Templates | `skills/sprint-forge/assets/templates/` (unchanged) |

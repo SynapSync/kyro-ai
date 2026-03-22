@@ -89,7 +89,7 @@ If compaction happens mid-session, a new agent can use the re-entry prompt to re
 
 2. **Minimize CLAUDE.md** — Move detailed instructions to separate files that are loaded on-demand, not on every message.
 
-3. **Use Haiku for exploration** — The explorer agent reads many files. Using Haiku keeps context cost low and leaves more room for implementation.
+3. **Use Haiku for exploration** — The analysis phase reads many files. Using Haiku keeps context cost low and leaves more room for implementation.
 
 4. **Checkpoint aggressively** — Kyro checkpoints after each phase. This means progress survives compaction.
 

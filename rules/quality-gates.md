@@ -52,9 +52,9 @@ No hardcoded secrets, API keys, tokens, or credentials in source code.
 - If a placeholder is needed, use the format `PLACEHOLDER_<SERVICE>_<TYPE>` (e.g., `PLACEHOLDER_STRIPE_API_KEY`).
 - The `PreToolUse` hook scans for common secret patterns before allowing commits.
 
-## R-QG-06: Reviewer Checklist
+## R-QG-06: Review Checklist
 
-After each task, the reviewer agent runs a checklist:
+After each task, the orchestrator runs a review checklist:
 
 1. Does the change match the task description?
 2. Are there any regressions in existing functionality?

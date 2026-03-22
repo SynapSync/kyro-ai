@@ -2,8 +2,8 @@
 name: review
 description: Assessment context for sprint status reporting, retrospectives, and metrics analysis. Read-only — no code changes.
 mode: assessment
-agent: reviewer
-model: sonnet
+agent: orchestrator
+model: opus
 ---
 
 # Context: REVIEW — Assessment Mode
@@ -13,9 +13,7 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
 ## When Active
 
 - `/kyro-workflow:status` — project metrics and debt heatmap
-- `/kyro-workflow:retro` — sprint retrospective ritual
 - `/kyro-workflow:forge` Phase 4 (Review & Close)
-- `/kyro-workflow:debt` — technical debt review
 
 ## Behavior
 
@@ -32,7 +30,7 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
    - Age of each item (sprints since creation)
    - Items flagged as `[AGED]` (open > 3 sprints)
 
-### Retrospective (`/kyro-workflow:retro`)
+### Retrospective (forge Phase 4)
 
 1. Read the completed sprint file.
 2. Evaluate each task:
@@ -74,7 +72,7 @@ Review outputs feed directly into next sprint planning:
 
 ## Delegation
 
-- **Primary agent**: reviewer (quality assessment and metrics)
+- **Primary agent**: orchestrator (using review checklist protocol)
 - Tools: `Read`, `Glob`, `Grep`, `Bash` (read-only commands only)
 - Skills: `kyro-metrics`, `kyro-reviewer`
 

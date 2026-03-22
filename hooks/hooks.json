@@ -51,10 +51,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const out=i.tool_output?.output||'';if(/fail|error|FAIL/i.test(out)){console.error('[Kyro] Tests failed — invoking debugger for root cause analysis');console.error('[Kyro] TaskFailed: '+out.split('\\n').find(l=>/fail|error/i.test(l))?.slice(0,80))}console.log(d)})\""
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const out=i.tool_output?.output||'';if(/fail|error|FAIL/i.test(out)){console.error('[Kyro] Tests failed — invoking debug protocol for root cause analysis');console.error('[Kyro] TaskFailed: '+out.split('\\n').find(l=>/fail|error/i.test(l))?.slice(0,80))}console.log(d)})\""
           }
         ],
-        "description": "Detect test failures and suggest debugger agent invocation"
+        "description": "Detect test failures and suggest debug protocol invocation"
       }
     ],
     "Stop": [
@@ -165,10 +165,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);console.error('[Kyro] Tool failed: '+(i.tool||'unknown'));console.error('[Kyro] Consider invoking debugger agent for investigation');console.log(d)})\""
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);console.error('[Kyro] Tool failed: '+(i.tool||'unknown'));console.error('[Kyro] Consider invoking debug protocol for investigation');console.log(d)})\""
           }
         ],
-        "description": "TaskFailed: detect failures and suggest debugger invocation"
+        "description": "TaskFailed: detect failures and suggest debug protocol invocation"
       }
     ]
   }
