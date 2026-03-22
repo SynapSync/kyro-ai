@@ -29,7 +29,7 @@ AI models have finite context windows. When your conversation approaches the lim
 }
 ```
 
-- **`warning_threshold_percent`**: When context usage exceeds this %, the `PreCompact` hook fires and warns about upcoming compaction.
+- **`warning_threshold_percent`**: When context usage exceeds this %, the guardian `pre_compact` event fires and warns about upcoming compaction.
 - **`auto_save_reentry`**: Automatically save re-entry prompt state before compaction.
 
 ---
@@ -97,9 +97,9 @@ If compaction happens mid-session, a new agent can use the re-entry prompt to re
 
 ---
 
-## PreCompact Hook
+## Guardian pre_compact Event
 
-Kyro's `context-warning.js` hook fires on the `PreCompact` event:
+The guardian's `pre_compact` event fires before context compaction:
 
 - Logs a warning that compaction is about to happen
 - Checks for active sprint and reminds about re-entry prompts

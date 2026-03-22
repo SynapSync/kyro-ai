@@ -2,8 +2,8 @@ name: kyro-workflow
 type: workflow
 version: "2.8.0"
 description: >
-  Complete sprint workflow system with specialized agents, lifecycle hooks,
-  adaptive per-project learning, and formal validation gates.
+  Complete sprint workflow system with specialized agents, guardian-based
+  lifecycle events, adaptive per-project learning, and formal validation gates.
 
 author:
   name: SynapSync
@@ -18,27 +18,10 @@ commands:
 
 agents:
   - orchestrator  # Full cycle coordination — analysis, review, debugging, and sprint execution
+  - guardian       # Event-based checkpoints — configurable lifecycle events (rules loading, drift detection, quality checks)
 
 skills:
-  - sprint-forge      # Core orchestration (base skill)
-  - kyro-analyzer    # Analysis strategies per work type
-  - kyro-reviewer    # Quality checklist (BLOCKER/WARNING/SUGGESTION)
-  - kyro-learner     # Per-project rule accumulation
-  - kyro-metrics     # Velocity trends and debt heatmap
-  - kyro-handoff     # Enriched context transfer with mental model
-  - deslop           # AI slop detection and removal
-
-hooks:
-  - SessionStart         # Load rules, show active sprint
-  - PreToolUse           # Track edits, remind quality gates
-  - PostToolUse          # Check for debug artifacts, detect test failures
-  - Stop                 # Session check, capture learnings
-  - SessionEnd           # Save stats, prompt for learnings
-  - UserPromptSubmit     # Drift detection, rule violation check
-  - PreCompact           # Save re-entry state before compaction
-  - SubagentStart        # Log agent lifecycle
-  - SubagentStop         # Log agent completion, post-task quality checklist
-  - PostToolUseFailure   # Detect failures, suggest debug protocol
+  - sprint-forge      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 
 storage:
   project: .agents/sprint-forge/    # Rules, database, sprint documents (per-project)

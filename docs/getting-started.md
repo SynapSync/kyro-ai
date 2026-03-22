@@ -1,12 +1,12 @@
 # Getting Started with Kyro
 
-Kyro is a workflow system that orchestrates sprint-based project execution through the orchestrator agent, lifecycle hooks, and persistent learning. This guide walks you through installation, first run, and core concepts.
+Kyro is a workflow system that orchestrates sprint-based project execution through the orchestrator agent, guardian agent, and persistent learning. This guide walks you through installation, first run, and core concepts.
 
 ---
 
 ## Prerequisites
 
-- **Node.js >= 18** -- required for the SQLite database and hook scripts
+- **Node.js >= 18** -- required for the SQLite database
 - **Claude Code** -- Kyro is built as a Claude Code plugin (also compatible with any agent via SkillKit)
 - **Git** -- recommended for worktree-based parallel execution
 
@@ -27,7 +27,7 @@ node --version
 /plugin install SynapSync/kyro-workflow
 ```
 
-This installs Kyro as a Claude Code plugin with all commands, agents, hooks, and skills registered automatically.
+This installs Kyro as a Claude Code plugin with all commands, agents, and skills registered automatically.
 
 ### Method 2: Manual Clone
 
@@ -187,6 +187,5 @@ Technical debt items are tracked formally across sprints. Items are never delete
 
 - [Commands Reference](commands-reference.md) -- detailed syntax and examples for all 3 commands
 - [Agents Reference](agents-reference.md) -- how the orchestrator agent and its protocols work
-- [Hooks Reference](hooks-reference.md) -- the 12 lifecycle hooks and how to customize them
 - [Rules Guide](rules-guide.md) -- the per-project learning system
 - [Architecture](architecture.md) -- system design and data flow

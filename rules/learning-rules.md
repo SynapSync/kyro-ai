@@ -45,7 +45,7 @@ Before proposing a new rule, check `.agents/sprint-forge/rules.md` for existing 
 
 - If a match exists, update or refine the existing rule instead of adding a duplicate.
 - If the new rule contradicts an existing one, present both to the user for resolution.
-- Use the `kyro-learner` skill's search capability to find semantic matches.
+- Use the learner helper's search capability to find semantic matches.
 
 ## R-LR-05: Maximum 50 Active Rules
 
@@ -62,5 +62,5 @@ The active rule set must not exceed 50 rules.
 Track which rules are applied during each sprint.
 
 - Record rule applications in the sprint file's "Applied Rules" section.
-- Rules that are consistently applied become candidates for automation (hooks or linting).
+- Rules that are consistently applied become candidates for automation (guardian events or linting).
 - Rules that are never triggered become candidates for deprecation.

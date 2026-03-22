@@ -1,12 +1,6 @@
 flowchart TD
-    subgraph SKILLS_ENTRY["Skills (standalone slash commands)"]
-        SK1["/sprint-forge — Core: INIT · SPRINT · STATUS"]
-        SK2["/kyro-analyzer"]
-        SK3["/kyro-learner"]
-        SK4["/kyro-metrics"]
-        SK5["/kyro-handoff"]
-        SK6["/kyro-reviewer"]
-        SK7["/deslop"]
+    subgraph SKILLS_ENTRY["Skills"]
+        SK1["/sprint-forge — Core: INIT · SPRINT · STATUS + helpers"]
     end
 
     subgraph COMMANDS_ENTRY["Commands (kyro-workflow:*)"]
@@ -15,8 +9,9 @@ flowchart TD
         CMD3["/kyro-workflow:wrap-up"]
     end
 
-    subgraph AGENTS["AGENT"]
+    subgraph AGENTS["AGENTS"]
         ORCH["orchestrator — opus · read+write"]
+        GUARDIAN["guardian — configurable event-based checkpoints"]
     end
 
     subgraph PROTOCOLS["ORCHESTRATOR PROTOCOLS"]
@@ -26,24 +21,7 @@ flowchart TD
     end
 
     subgraph KNOWLEDGE["SKILLS — domain knowledge"]
-        S_FORGE["sprint-forge — modes · helpers · templates"]
-        S_ANALYZER["kyro-analyzer — strategies per work type"]
-        S_REVIEWER["kyro-reviewer — BLOCKER/WARNING/SUGGESTION"]
-        S_LEARNER["kyro-learner — per-project rules"]
-        S_METRICS["kyro-metrics — velocity · debt heatmap"]
-        S_HANDOFF["kyro-handoff — mental context transfer"]
-        S_DESLOP["deslop — AI slop detection"]
-    end
-
-    subgraph HOOKS["HOOKS — 12 lifecycle events"]
-        H1["SessionStart — load rules"]
-        H2["UserPromptSubmit — drift check"]
-        H3["PreToolUse — track edits"]
-        H4["PostToolUse — check artifacts"]
-        H5["TaskCompleted — review checklist"]
-        H6["Stop — capture learnings"]
-        H7["PreCompact — save re-entry"]
-        H8["SessionEnd — save stats"]
+        S_FORGE["sprint-forge — modes · helpers (analyzer, reviewer, learner, metrics, handoff) · templates"]
     end
 
     subgraph STORAGE["STORAGE — .agents/sprint-forge/"]
@@ -55,20 +33,19 @@ flowchart TD
 
     CMD1 --> ORCH
     CMD2 -.->|direct| PROJ
-    CMD3 -.-> S_HANDOFF
+    CMD3 -.-> S_FORGE
 
     ORCH -->|INIT| ANALYSIS
     ORCH -->|validate| REVIEW
     ORCH -->|failure| DEBUG
 
     ORCH -.-> S_FORGE
-    ANALYSIS -.-> S_ANALYZER
-    REVIEW -.-> S_REVIEWER
+    ORCH --> GUARDIAN
+    ANALYSIS -.-> S_FORGE
+    REVIEW -.-> S_FORGE
 
-    H1 --> RULES
-    H5 --> DB
-    H6 --> RULES
-    H8 --> DB
-    H3 --> SESSION
+    GUARDIAN --> RULES
+    GUARDIAN --> DB
+    GUARDIAN --> SESSION
     ORCH --> PROJ
     ORCH --> DB

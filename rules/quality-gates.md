@@ -42,7 +42,7 @@ The following are prohibited in production code:
 - Commented-out code blocks longer than 3 lines
 - `TODO` or `FIXME` without an associated debt table entry
 
-Detection is automated via the `PostToolUse` hook.
+Detection is automated via the guardian `post_tool_use` event.
 
 ## R-QG-05: No Hardcoded Secrets
 
@@ -50,7 +50,7 @@ No hardcoded secrets, API keys, tokens, or credentials in source code.
 
 - Use environment variables or a secrets manager.
 - If a placeholder is needed, use the format `PLACEHOLDER_<SERVICE>_<TYPE>` (e.g., `PLACEHOLDER_STRIPE_API_KEY`).
-- The `PreToolUse` hook scans for common secret patterns before allowing commits.
+- The guardian `pre_tool_use` event scans for common secret patterns before allowing commits.
 
 ## R-QG-06: Review Checklist
 

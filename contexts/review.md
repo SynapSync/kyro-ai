@@ -47,7 +47,7 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
 
 ### Metrics Analysis
 
-The `kyro-metrics` skill provides:
+The metrics helper provides:
 
 - Velocity trend (SP/sprint over last 5 sprints)
 - Estimation accuracy trend (mean absolute error over time)
@@ -74,7 +74,7 @@ Review outputs feed directly into next sprint planning:
 
 - **Primary agent**: orchestrator (using review checklist protocol)
 - Tools: `Read`, `Glob`, `Grep`, `Bash` (read-only commands only)
-- Skills: `kyro-metrics`, `kyro-reviewer`
+- Helpers: `metrics`, `reviewer` (in `skills/sprint-forge/assets/helpers/`)
 
 ## Output
 
