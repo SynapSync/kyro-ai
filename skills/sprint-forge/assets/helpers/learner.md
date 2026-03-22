@@ -1,10 +1,3 @@
----
-name: kyro-learner
-description: >
-  Captures corrections and patterns as persistent rules for this project.
-  Manages .agents/sprint-forge/rules.md — the accumulated wisdom from sprint executions.
----
-
 # Kyro Learner — Per-Project Rule Accumulation
 
 ## Purpose
