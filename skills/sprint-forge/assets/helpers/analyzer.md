@@ -1,10 +1,3 @@
----
-name: kyro-analyzer
-description: >
-  Codebase analysis skill used by the orchestrator during the analysis phase. Provides
-  analysis strategies per work type and structured finding output format.
----
-
 # Kyro Analyzer — Codebase Analysis Strategies
 
 ## Purpose
