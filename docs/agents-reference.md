@@ -1,6 +1,6 @@
 # Agents Reference
 
-Kyro uses 4 specialized agents, each with a distinct role, toolset, and set of constraints. Agents are defined as markdown files in the `agents/` directory and are invoked by commands or by other agents during the sprint lifecycle.
+Kyro uses a single **orchestrator** agent that handles all phases of the sprint lifecycle: analysis, review, debugging, and full cycle coordination. The orchestrator incorporates specialized protocols for each concern rather than delegating to separate agents.
 
 ---
 
@@ -8,42 +8,39 @@ Kyro uses 4 specialized agents, each with a distinct role, toolset, and set of c
 
 | Agent | Role | Model | Tools | Memory |
 |-------|------|-------|-------|--------|
-| **explorer** | Read-only codebase analysis | sonnet | Read, Glob, Grep, Bash | project |
-| **reviewer** | Task quality validation | sonnet | Read, Glob, Grep, Bash | -- |
-| **debugger** | Root cause investigation | opus | Read, Glob, Grep, Bash | project |
-| **orchestrator** | Full cycle coordination | opus | Read, Glob, Grep, Bash, Edit, Write | project |
+| **orchestrator** | Full cycle coordination — analysis, review, debugging, sprint execution | opus | Read, Glob, Grep, Bash, Edit, Write | project |
 
 ---
 
-## Explorer
+## Orchestrator
 
-**File:** `agents/explorer.md`
+**File:** `agents/orchestrator.md`
 
-The explorer agent performs read-only codebase analysis during the INIT phase. It investigates architecture, risks, dependencies, and visible debt without ever modifying files.
+The orchestrator coordinates the complete sprint lifecycle. It is the brain of the `/kyro-workflow:forge` command, managing gates, executing all protocols, and handling sprint close.
 
 ### When Triggered
 
-- Phase 1 of `/kyro-workflow:forge` (delegated by the orchestrator)
-- Directly when the user wants to analyze a project before planning
+- `/kyro-workflow:forge` command (always)
+- Any command requiring agent coordination
 
 ### Tools
 
 | Tool | Usage |
 |------|-------|
-| Read | Examine specific files in detail |
-| Glob | Find files by pattern (e.g., `**/*.ts`, `**/test/**`) |
-| Grep | Search for patterns across the codebase (TODOs, deprecated APIs, etc.) |
-| Bash | Run read-only commands (e.g., `npm ls`, `git log`, `wc -l`) |
+| Read | Read sprint files, roadmaps, rules, examine code paths |
+| Glob | Find project files by pattern |
+| Grep | Search codebase for patterns, debug artifacts, secrets |
+| Bash | Run commands, tests, quality gates, read-only analysis |
+| Edit | Modify code files during implementation |
+| Write | Create sprint documents, findings, roadmaps |
 
-### Constraints
+### Protocols
 
-- **NEVER edits files.** Read-only exploration only.
-- **NEVER writes files.** The orchestrator handles all file creation.
-- Operates in worktree isolation when available.
-- Loads rules from `.agents/sprint-forge/rules.md` and applies relevant ones during analysis.
-- Uses the `kyro-analyzer` skill for analysis strategies per work type.
+The orchestrator incorporates three specialized protocols that were previously handled by separate agents:
 
-### Workflow
+#### Analysis Protocol (formerly explorer agent)
+
+Used during the INIT phase and any codebase exploration. The orchestrator performs read-only analysis:
 
 1. **Detect work type** -- classify the project intent (Audit/Refactor, New Feature, Bugfix, New Project, Tech Debt)
 2. **Deep analysis** -- explore based on work type:
@@ -54,10 +51,12 @@ The explorer agent performs read-only codebase analysis during the INIT phase. I
    - Debt: TODOs, FIXMEs, deprecated APIs, known workarounds
 3. **Generate report** -- structured output with findings
 
-### Output Format
+The analysis protocol uses the `kyro-analyzer` skill for analysis strategies per work type. During analysis, the orchestrator restricts itself to read-only operations.
+
+**Output Format:**
 
 ```
-EXPLORER REPORT
+ANALYSIS REPORT
 Project: [name]
 Work Type: [classification]
 Analyzed: [date]
@@ -83,34 +82,11 @@ Analyzed: [date]
 - [count] files across [count] directories
 ```
 
----
+#### Review Checklist (formerly reviewer agent)
 
-## Reviewer
+Used after each task completion during sprint execution. The orchestrator validates each task using a three-tier checklist:
 
-**File:** `agents/reviewer.md`
-
-The reviewer agent validates each task before it can be marked as completed. It enforces quality gates at the task level using a three-tier checklist.
-
-### When Triggered
-
-- After each task completion during sprint execution (Phase 3 of `/kyro-workflow:forge` or `/kyro-workflow:sprint execute`)
-- Manually when the user requests a quality check
-- Via the `TaskCompleted` hook
-
-### Tools
-
-| Tool | Usage |
-|------|-------|
-| Read | Examine changed files |
-| Glob | Find related test files |
-| Grep | Search for debug artifacts, secrets, broken imports |
-| Bash | Run tests, linter, type checker |
-
-### Checklist Tiers
-
-#### BLOCKER (must pass -- blocks task closure)
-
-These must ALL pass. If any fails, the task cannot be closed.
+##### BLOCKER (must pass -- blocks task closure)
 
 | Check | What It Verifies |
 |-------|-----------------|
@@ -120,9 +96,7 @@ These must ALL pass. If any fails, the task cannot be closed.
 | No secrets | No hardcoded API keys, passwords, tokens, or credentials |
 | No broken imports | All imports resolve correctly |
 
-#### WARNING (should pass -- requires justification)
-
-These should pass. If they don't, the developer must provide a justification to proceed.
+##### WARNING (should pass -- requires justification)
 
 | Check | What It Verifies |
 |-------|-----------------|
@@ -131,9 +105,7 @@ These should pass. If they don't, the developer must provide a justification to 
 | Debt tracking | Debt table updated if new debt was introduced |
 | Performance | No visible performance regressions |
 
-#### SUGGESTION (noted for retro -- does not block)
-
-These are recorded for the sprint retrospective.
+##### SUGGESTION (noted for retro -- does not block)
 
 | Check | What It Verifies |
 |-------|-----------------|
@@ -141,7 +113,7 @@ These are recorded for the sprint retrospective.
 | Refactoring | DRY violations or simplification opportunities identified |
 | Documentation | Related docs should be updated |
 
-### Output Format
+**Output Format:**
 
 ```
 REVIEW: Task T{phase}.{task} -- "{task title}"
@@ -161,64 +133,17 @@ SUGGESTIONS:       [0 found / N found]
 VERDICT: PASS / FAIL (N blockers) / PASS WITH WARNINGS (N)
 ```
 
-### Validation Commands
+#### Debug Protocol (formerly debugger agent)
 
-The reviewer adapts commands to the project stack:
+Used when a sprint task fails or tests break. The orchestrator performs systematic root cause analysis using a hypothesis-driven workflow:
 
-```bash
-# Tests
-npm test -- --related
-# or: pytest, go test, dart test, flutter test
-
-# Typecheck
-npm run typecheck
-# or: mypy, go vet
-
-# Lint
-npm run lint
-# or: ruff, golangci-lint
-
-# Debug artifacts
-grep -rn "console\.log\|debugger\|print(" src/ --include="*.ts"
-
-# Secrets
-grep -rn "apikey\|api_key\|secret\|password\|token" src/ -i
-```
-
----
-
-## Debugger
-
-**File:** `agents/debugger.md`
-
-The debugger agent performs systematic root cause analysis. It uses a hypothesis-driven workflow and escalates to the user if unable to resolve after 3 investigation rounds.
-
-### When Triggered
-
-- Automatically when a sprint task fails during execution (via `TaskFailed` / `PostToolUseFailure` hook)
-- When the reviewer reports a BLOCKER that needs investigation
-- Manually when the user encounters a hard bug, test failure, or runtime error
-
-### Tools
-
-| Tool | Usage |
-|------|-------|
-| Read | Examine code paths, stack traces, error logs |
-| Glob | Find related files |
-| Grep | Search for patterns, recent changes, similar bugs |
-| Bash | Reproduce errors, run tests, check `git blame`, `git log` |
-
-### Hypothesis Workflow
-
-The debugger follows a strict investigation protocol:
-
-#### Step 1: Reproduce
+##### Step 1: Reproduce
 
 - Run the failing test or reproduce the error
 - Capture the exact error message, stack trace, and context
 - Determine: regression (worked before) or new behavior?
 
-#### Step 2: Hypothesize
+##### Step 2: Hypothesize
 
 Generate 2-3 hypotheses ranked by likelihood:
 
@@ -231,23 +156,16 @@ Hypothesis 1 (70%): [most likely cause]
 Hypothesis 2 (20%): [alternative cause]
   Evidence for: ...
   Test: ...
-
-Hypothesis 3 (10%): [unlikely but possible]
-  Evidence for: ...
-  Test: ...
 ```
 
-#### Step 3: Investigate
+##### Step 3: Investigate
 
 Test each hypothesis starting with the most likely:
 - Read relevant code paths
 - Check `git log` for recent changes to affected files
 - Search for similar patterns that work correctly
-- Add targeted debug output if needed
 
-#### Step 4: Root Cause
-
-Present the confirmed root cause:
+##### Step 4: Root Cause
 
 ```
 ROOT CAUSE: [what is actually wrong]
@@ -256,9 +174,7 @@ WHY: [how it got this way]
 SINCE: [when it was introduced, if knowable]
 ```
 
-#### Step 5: Fix Proposal
-
-Propose the minimal fix with justification:
+##### Step 5: Fix Proposal
 
 ```
 FIX: [description]
@@ -268,58 +184,7 @@ RISK: [low/medium/high]
 TESTS: [how to verify the fix]
 ```
 
-The debugger waits for approval before implementing any fix.
-
-### Escalation Protocol
-
-If unable to resolve after 3 rounds of investigation:
-
-```
-ESCALATION REPORT
-Task: [task ID]
-Error: [original error]
-Investigated: [what was checked]
-Hypotheses tested: [results]
-Remaining unknowns: [what is still unclear]
-Recommended next step: [suggestion for the human]
-```
-
-### Constraints
-
-- Never guess. Investigate systematically.
-- Never apply fixes without finding root cause first.
-- Never use "shotgun debugging" (changing random things hoping something works).
-- Never fix symptoms instead of root causes.
-- Check `git blame` -- recent changes are more likely to be the cause.
-- Use project memory to recall previous bugs in the same area.
-- If stuck after 3 rounds, escalate with findings so far.
-- Capture debugging insights as rule proposals for `.agents/sprint-forge/rules.md`.
-
----
-
-## Orchestrator
-
-**File:** `agents/orchestrator.md`
-
-The orchestrator coordinates the complete sprint lifecycle. It is the brain of the `/kyro-workflow:forge` command, managing gates, delegating to other agents, and handling sprint close.
-
-### When Triggered
-
-- `/kyro-workflow:forge` command (always)
-- Indirectly manages the flow when `/kyro-workflow:sprint` runs with execution
-
-### Tools
-
-| Tool | Usage |
-|------|-------|
-| Read | Read sprint files, roadmaps, rules |
-| Glob | Find project files |
-| Grep | Search codebase |
-| Bash | Run commands, tests, quality gates |
-| Edit | Modify code files during implementation |
-| Write | Create sprint documents, findings, roadmaps |
-
-The orchestrator is the only agent with write permissions (Edit, Write).
+The orchestrator waits for approval before implementing any fix. If unable to resolve after 3 rounds of investigation, it escalates to the user.
 
 ### Gate Protocol
 
@@ -360,10 +225,10 @@ During Phase 3 (Implement), for each task:
 
 1. Read the task definition from the sprint file
 2. Execute the task
-3. Invoke the **reviewer** agent for validation
-4. If reviewer reports BLOCKER: invoke the **debugger** agent
-5. If debugger resolves: re-run reviewer
-6. If debugger escalates: mark task as blocked `[!]`, move to next task
+3. Run the **review checklist** for validation
+4. If review reports BLOCKER: run the **debug protocol**
+5. If debug resolves: re-run review checklist
+6. If debug escalates: mark task as blocked `[!]`, move to next task
 7. Write checkpoint to sprint file after each phase completes
 
 ### Sprint Close Protocol

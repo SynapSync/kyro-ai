@@ -48,7 +48,7 @@
       "version": "2.0.0",
       "date": "2026-03-08",
       "changes": [
-        "Evolve from standalone skill to full workflow with specialized agents (explorer, reviewer, debugger, orchestrator), lifecycle hooks, slash commands (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro), and per-project learning via persistent rules"
+        "Evolve from standalone skill to full workflow with orchestrator agent (analysis, review, and debug protocols), lifecycle hooks, slash commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up), and per-project learning via persistent rules"
       ]
     },
     {

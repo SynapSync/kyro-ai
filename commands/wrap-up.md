@@ -81,4 +81,4 @@ Display session stats:
 After completing all 5 steps:
 1. Display the summary
 2. Confirm session is ready to close
-3. Suggest using `/kyro-workflow:retro` if a sprint milestone was reached
+3. Suggest running `/kyro-workflow:forge` if a sprint milestone was reached and a retrospective is needed

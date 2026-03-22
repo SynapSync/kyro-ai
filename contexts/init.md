@@ -2,8 +2,8 @@
 name: init
 description: Read-only analysis context for project exploration and roadmap generation. No code changes allowed.
 mode: analysis
-agent: explorer
-model: sonnet
+agent: orchestrator
+model: opus
 ---
 
 # Context: INIT — Analysis Mode
@@ -36,7 +36,7 @@ Activated during project initialization and analysis phases. This context puts K
 
 ## Delegation
 
-All exploration work is delegated to the **explorer** agent, which operates with:
+All exploration work is handled by the **orchestrator** using its analysis protocol, which self-constrains to:
 
 - Tools: `Read`, `Glob`, `Grep`, `Bash` (read-only commands only)
 - Isolation: worktree (when available)
@@ -44,7 +44,7 @@ All exploration work is delegated to the **explorer** agent, which operates with
 
 ## Output
 
-The context produces an **Explorer Report** containing:
+The context produces an **Analysis Report** containing:
 
 1. Work type classification
 2. Architecture overview

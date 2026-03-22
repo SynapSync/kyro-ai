@@ -1,6 +1,6 @@
 # Getting Started with Kyro
 
-Kyro is a workflow system that orchestrates sprint-based project execution through specialized agents, lifecycle hooks, and persistent learning. This guide walks you through installation, first run, and core concepts.
+Kyro is a workflow system that orchestrates sprint-based project execution through the orchestrator agent, lifecycle hooks, and persistent learning. This guide walks you through installation, first run, and core concepts.
 
 ---
 
@@ -63,22 +63,18 @@ Once installed, navigate to a project directory and run the `/kyro-workflow:forg
 
 This starts the full sprint cycle:
 
-1. The **explorer agent** analyzes the codebase (read-only)
+1. The **analysis phase** explores the codebase (read-only)
 2. You approve the analysis at **Gate 1**
 3. Kyro generates a sprint plan with phases and tasks
 4. You approve the plan at **Gate 2**
-5. Tasks are executed one by one, each validated by the **reviewer agent**
+5. Tasks are executed one by one, each validated by the **review step**
 6. You approve the implementation at **Gate 3**
 7. A retrospective is run and the sprint is closed
 
-You can also run steps individually:
+You can also check project progress:
 
 ```
-/kyro-workflow:sprint generate          # Generate the next sprint without executing
-/kyro-workflow:sprint execute           # Execute an already-generated sprint
 /kyro-workflow:status                   # Check project progress and metrics
-/kyro-workflow:debt list                # View technical debt
-/kyro-workflow:retro                    # Run the retrospective ritual
 ```
 
 ---
@@ -189,8 +185,8 @@ Technical debt items are tracked formally across sprints. Items are never delete
 
 ## Next Steps
 
-- [Commands Reference](commands-reference.md) -- detailed syntax and examples for all 9 commands
-- [Agents Reference](agents-reference.md) -- how the 4 specialized agents work
+- [Commands Reference](commands-reference.md) -- detailed syntax and examples for all 3 commands
+- [Agents Reference](agents-reference.md) -- how the orchestrator agent and its protocols work
 - [Hooks Reference](hooks-reference.md) -- the 12 lifecycle hooks and how to customize them
 - [Rules Guide](rules-guide.md) -- the per-project learning system
 - [Architecture](architecture.md) -- system design and data flow
