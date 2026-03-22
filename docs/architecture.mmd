@@ -11,21 +11,18 @@ flowchart TD
 
     subgraph COMMANDS_ENTRY["Commands (kyro-workflow:*)"]
         CMD1["/kyro-workflow:forge"]
-        CMD2["/kyro-workflow:sprint"]
-        CMD3["/kyro-workflow:status"]
-        CMD4["/kyro-workflow:debt"]
-        CMD5["/kyro-workflow:retro"]
-        CMD6["/kyro-workflow:wrap-up"]
-        CMD7["/kyro-workflow:insights"]
-        CMD8["/kyro-workflow:deslop"]
-        CMD9["/kyro-workflow:parallel"]
+        CMD2["/kyro-workflow:status"]
+        CMD3["/kyro-workflow:wrap-up"]
     end
 
-    subgraph AGENTS["AGENTS"]
+    subgraph AGENTS["AGENT"]
         ORCH["orchestrator — opus · read+write"]
-        EXPL["explorer — sonnet · read-only"]
-        REVW["reviewer — sonnet · read-only"]
-        DBGR["debugger — opus · read-only"]
+    end
+
+    subgraph PROTOCOLS["ORCHESTRATOR PROTOCOLS"]
+        ANALYSIS["Analysis Protocol — read-only exploration"]
+        REVIEW["Review Checklist — BLOCKER/WARNING/SUGGESTION"]
+        DEBUG["Debug Protocol — hypothesis-driven root cause"]
     end
 
     subgraph KNOWLEDGE["SKILLS — domain knowledge"]
@@ -43,7 +40,7 @@ flowchart TD
         H2["UserPromptSubmit — drift check"]
         H3["PreToolUse — track edits"]
         H4["PostToolUse — check artifacts"]
-        H5["TaskCompleted — reviewer checklist"]
+        H5["TaskCompleted — review checklist"]
         H6["Stop — capture learnings"]
         H7["PreCompact — save re-entry"]
         H8["SessionEnd — save stats"]
@@ -57,23 +54,16 @@ flowchart TD
     end
 
     CMD1 --> ORCH
-    CMD2 --> ORCH
-    CMD5 --> ORCH
-    CMD3 -.->|direct| PROJ
-    CMD4 -.->|direct| PROJ
+    CMD2 -.->|direct| PROJ
+    CMD3 -.-> S_HANDOFF
 
-    ORCH -->|INIT| EXPL
-    ORCH -->|validate| REVW
-    ORCH -->|failure| DBGR
+    ORCH -->|INIT| ANALYSIS
+    ORCH -->|validate| REVIEW
+    ORCH -->|failure| DEBUG
 
     ORCH -.-> S_FORGE
-    EXPL -.-> S_ANALYZER
-    REVW -.-> S_REVIEWER
-
-    CMD5 -.-> S_LEARNER
-    CMD6 -.-> S_HANDOFF
-    CMD7 -.-> S_METRICS
-    CMD8 -.-> S_DESLOP
+    ANALYSIS -.-> S_ANALYZER
+    REVIEW -.-> S_REVIEWER
 
     H1 --> RULES
     H5 --> DB

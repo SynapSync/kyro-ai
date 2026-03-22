@@ -28,10 +28,7 @@
   ],
   "skills": ["./skills/"],
   "agents": [
-    "./agents/debugger.md",
-    "./agents/explorer.md",
-    "./agents/orchestrator.md",
-    "./agents/reviewer.md"
+    "./agents/orchestrator.md"
   ],
   "commands": ["./commands/"]
 }

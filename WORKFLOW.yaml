@@ -13,20 +13,11 @@ license: Apache-2.0
 
 commands:
   - forge       # Full cycle: Analyze → Plan → Implement → Review → Commit
-  - sprint      # Generate and/or execute the next sprint
   - status      # Project metrics, velocity, debt heatmap
-  - debt        # Technical debt management
-  - retro       # Sprint retrospective ritual
   - wrap-up     # End-of-session closure ritual with quality check
-  - insights    # Database-backed analytics and correction trends
-  - deslop      # AI slop detection and removal
-  - parallel    # Parallel sprint execution via git worktrees
 
 agents:
-  - explorer      # Read-only codebase analysis (INIT)
-  - reviewer      # Task quality validation (SPRINT)
-  - debugger      # Root cause investigation (on failure)
-  - orchestrator  # Full cycle coordination (/kyro-workflow:forge)
+  - orchestrator  # Full cycle coordination — analysis, review, debugging, and sprint execution
 
 skills:
   - sprint-forge      # Core orchestration (base skill)
@@ -47,7 +38,7 @@ hooks:
   - PreCompact           # Save re-entry state before compaction
   - SubagentStart        # Log agent lifecycle
   - SubagentStop         # Log agent completion, post-task quality checklist
-  - PostToolUseFailure   # Detect failures, suggest debugger
+  - PostToolUseFailure   # Detect failures, suggest debug protocol
 
 storage:
   project: .agents/sprint-forge/    # Rules, database, sprint documents (per-project)

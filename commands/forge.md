@@ -31,7 +31,7 @@ Before anything else, the orchestrator must determine the project state:
 
 ### Phase 1: Analyze (INIT mode)
 
-The orchestrator delegates to the **explorer** agent and follows the sprint-forge INIT mode:
+The orchestrator follows the **analysis protocol** and the sprint-forge INIT mode:
 
 1. Detect work type (audit, new feature, bugfix, new project, tech debt)
 2. Resolve configuration — project name, codebase path, output directory
@@ -82,8 +82,8 @@ Execute task by task with quality gates:
 
 1. For each task:
    - Execute the task
-   - Run **reviewer** agent checklist (BLOCKER/WARNING/SUGGESTION)
-   - If BLOCKER found → invoke **debugger** agent
+   - Run **review checklist** (BLOCKER/WARNING/SUGGESTION)
+   - If BLOCKER found → invoke **debug protocol**
    - Checkpoint after each phase completes (write sprint file to disk)
 2. Handle emergent work — add new phases when discoveries surface
 3. Pause for review every 5 edits

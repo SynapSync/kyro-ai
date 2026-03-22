@@ -11,7 +11,7 @@
 
 <p align="center">
   <b>Complete sprint workflow system for AI-assisted development.</b><br/>
-  4 agents &bull; 10 hooks &bull; 9 commands &bull; 7 skills &bull; Adaptive per-project learning<br/>
+  1 agent &bull; 10 hooks &bull; 3 commands &bull; 7 skills &bull; Adaptive per-project learning<br/>
   Built for <b>Claude Code</b>. Compatible with any AI coding agent via SkillKit.
 </p>
 
@@ -19,7 +19,7 @@
 
 ## What Is Kyro?
 
-Kyro is a **workflow** that orchestrates iterative project execution through specialized agents, lifecycle hooks, and persistent learning. It evolves from the [sprint-forge skill](https://github.com/SynapSync/skills-registry) into a full Command > Agent > Skill architecture.
+Kyro is a **workflow** that orchestrates iterative project execution through the orchestrator agent, lifecycle hooks, and persistent learning. It evolves from the [sprint-forge skill](https://github.com/SynapSync/skills-registry) into a full Command > Agent > Skill architecture.
 
 Unlike rigid project planners, Kyro:
 
@@ -35,8 +35,8 @@ Unlike rigid project planners, Kyro:
 ## What's New in v2.0
 
 <table>
-<tr><td><b>4 Agents</b></td><td>Explorer (read-only analysis), Reviewer (task validation), Debugger (root cause), Orchestrator (full cycle)</td></tr>
-<tr><td><b>9 Commands</b></td><td><code>/kyro-workflow:forge</code>, <code>/kyro-workflow:sprint</code>, <code>/kyro-workflow:status</code>, <code>/kyro-workflow:debt</code>, <code>/kyro-workflow:retro</code>, <code>/kyro-workflow:wrap-up</code>, <code>/kyro-workflow:insights</code>, <code>/kyro-workflow:deslop</code>, <code>/kyro-workflow:parallel</code></td></tr>
+<tr><td><b>1 Agent</b></td><td>Orchestrator (full cycle coordination with analysis, review, and debug protocols)</td></tr>
+<tr><td><b>3 Commands</b></td><td><code>/kyro-workflow:forge</code>, <code>/kyro-workflow:status</code>, <code>/kyro-workflow:wrap-up</code></td></tr>
 <tr><td><b>12 Hooks</b></td><td>SessionStart, PreToolUse, PostToolUse, Stop, SessionEnd, UserPromptSubmit, PreCompact, SubagentStart/Stop, TaskCompleted, PostToolUseFailure</td></tr>
 <tr><td><b>Per-Project Learning</b></td><td>Corrections become rules in <code>.agents/sprint-forge/rules.md</code> — applied automatically in future sprints</td></tr>
 <tr><td><b>Validation Gates</b></td><td>BLOCKER/WARNING/SUGGESTION checklist per task, phase gates with user approval</td></tr>
@@ -52,7 +52,7 @@ Unlike rigid project planners, Kyro:
 ### The `/kyro-workflow:forge` Cycle
 
 ```
-[PHASE 1: ANALYZE]  → Explorer agent investigates codebase (read-only)
+[PHASE 1: ANALYZE]  → Analysis phase investigates codebase (read-only)
         ↓
    GATE 1: User approves analysis
         ↓
@@ -61,8 +61,8 @@ Unlike rigid project planners, Kyro:
    GATE 2: User approves sprint plan
         ↓
 [PHASE 3: IMPLEMENT] → Execute task by task
-   ├── After each task → Reviewer validates (BLOCKER/WARNING/SUGGESTION)
-   ├── On failure     → Debugger investigates root cause
+   ├── After each task → Review step validates (BLOCKER/WARNING/SUGGESTION)
+   ├── On failure     → Debug protocol investigates root cause
    └── Checkpoint after each phase
         ↓
    GATE 3: User approves implementation
@@ -101,22 +101,13 @@ Command (user entry point)
 
 ```
 kyro-workflow/
-├── agents/                     # 4 specialized agents
-│   ├── explorer.md             # Read-only codebase analysis (INIT)
-│   ├── reviewer.md             # Task quality validation (SPRINT)
-│   ├── debugger.md             # Root cause investigation (on failure)
-│   └── orchestrator.md         # Full cycle coordinator (/kyro-workflow:forge)
+├── agents/                     # 1 agent
+│   └── orchestrator.md         # Full cycle coordinator — analysis, review, debugging, and sprint execution
 │
-├── commands/                   # 9 slash commands
+├── commands/                   # 3 slash commands
 │   ├── forge.md                # /kyro-workflow:forge — full cycle with gates
-│   ├── sprint.md               # /kyro-workflow:sprint — generate/execute next sprint
 │   ├── status.md               # /kyro-workflow:status — metrics + debt heatmap
-│   ├── debt.md                 # /kyro-workflow:debt — manage technical debt
-│   ├── retro.md                # /kyro-workflow:retro — sprint retrospective ritual
-│   ├── wrap-up.md              # /kyro-workflow:wrap-up — session closure ritual
-│   ├── insights.md             # /kyro-workflow:insights — DB-backed analytics
-│   ├── deslop.md               # /kyro-workflow:deslop — AI slop removal
-│   └── parallel.md             # /kyro-workflow:parallel — worktree parallel execution
+│   └── wrap-up.md              # /kyro-workflow:wrap-up — session closure ritual
 │
 ├── skills/                     # 7 skills (domain knowledge)
 │   ├── sprint-forge/            # Core orchestration (base skill from v1.x)
@@ -242,25 +233,16 @@ You should see the Kyro status dashboard. If you get "unknown command", check th
 | Command | Purpose |
 |---------|---------|
 | `/kyro-workflow:forge` | Full cycle: Analyze → Plan → Implement → Review → Commit |
-| `/kyro-workflow:sprint` | Generate and/or execute the next sprint |
 | `/kyro-workflow:status` | Project metrics, velocity trends, debt heatmap |
-| `/kyro-workflow:debt` | List, add, resolve, or escalate technical debt |
-| `/kyro-workflow:retro` | Sprint retrospective ritual with rule proposals |
 | `/kyro-workflow:wrap-up` | End-of-session closure ritual with quality check and context handoff |
-| `/kyro-workflow:insights` | Database-backed analytics — correction trends, learning heatmap, velocity |
-| `/kyro-workflow:deslop` | Detect and remove AI-generated slop — unnecessary comments, over-engineering |
-| `/kyro-workflow:parallel` | Analyze sprint tasks for parallel execution via git worktrees |
 
 ---
 
-## Agents
+## Agent
 
 | Agent | Purpose | Tools | Key Feature |
 |-------|---------|-------|-------------|
-| **explorer** | Read-only codebase analysis | Read, Glob, Grep, Bash | Worktree-isolated, never writes |
-| **reviewer** | Task quality validation | Read, Glob, Grep, Bash | BLOCKER/WARNING/SUGGESTION tiers |
-| **debugger** | Root cause investigation | Read, Glob, Grep, Bash | Hypothesis-driven, escalation protocol |
-| **orchestrator** | Full cycle coordination | Read, Glob, Grep, Bash, Edit, Write | Memory-enabled, gate protocol |
+| **orchestrator** | Full cycle coordination — analysis, review, debugging, sprint execution | Read, Glob, Grep, Bash, Edit, Write | Memory-enabled, gate protocol, integrated analysis/review/debug protocols |
 
 ---
 
@@ -286,14 +268,14 @@ You should see the Kyro status dashboard. If you get "unknown command", check th
 | PreToolUse | Before edits | Track edit count, quality gate reminders |
 | PreToolUse | Before git commit | Remind about quality gates |
 | PostToolUse | After code edits | Check for debug artifacts, secrets, TODOs |
-| PostToolUse | After tests | Detect failures, suggest debugger |
+| PostToolUse | After tests | Detect failures, suggest debug protocol |
 | Stop | Each response | Session check, capture [LEARN] blocks |
 | SessionEnd | Session close | Save stats, prompt for learnings |
 | UserPromptSubmit | Each prompt | Drift detection, rule violation check |
 | PreCompact | Before compaction | Save re-entry state |
 | SubagentStart/Stop | Agent lifecycle | Log for observability |
 | TaskCompleted | Task marked done | Post-task quality checklist |
-| PostToolUseFailure | Tool fails | Suggest debugger invocation |
+| PostToolUseFailure | Tool fails | Suggest debug protocol invocation |
 
 ---
 
@@ -359,9 +341,9 @@ See [`settings.example.json`](settings.example.json) for production permission a
 |-----------|--------------|-----------------|
 | Type | Single skill | Full workflow |
 | Learning | Per-project retro | Persistent rules across sprints |
-| Agents | 1 (the skill itself) | 4 specialized (explorer, reviewer, debugger, orchestrator) |
+| Agents | 1 (the skill itself) | 1 orchestrator (with analysis, review, and debug protocols) |
 | Hooks | 0 | 12 lifecycle events |
-| Commands | 0 (text triggers) | 9 commands (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro, /kyro-workflow:wrap-up, /kyro-workflow:insights, /kyro-workflow:deslop, /kyro-workflow:parallel) |
+| Commands | 0 (text triggers) | 3 commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up) |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase |
 | Metrics | Basic STATUS | Velocity trends + debt heatmap + estimation patterns |
 | Context transfer | Re-entry prompts (files) | Enriched handoff (mental context) |
@@ -397,12 +379,8 @@ See [`settings.example.json`](settings.example.json) for production permission a
 # 2. Start a project
 /kyro-workflow:forge analyze the authentication module    # Full cycle with gates
 
-# 3. Or step by step
-/kyro-workflow:sprint generate                            # Generate next sprint
-/kyro-workflow:sprint execute                             # Execute current sprint
+# 3. Check progress
 /kyro-workflow:status                                     # Check progress + metrics
-/kyro-workflow:debt escalate                              # Flag aged debt items
-/kyro-workflow:retro                                      # Run retrospective ritual
 ```
 
 ---

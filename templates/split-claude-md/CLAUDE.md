@@ -12,7 +12,7 @@ This project uses **Kyro** for structured sprint execution.
 
 See [AGENTS.md](./AGENTS.md) for:
 - Sprint discipline and quality gate requirements
-- Agent delegation rules (explorer, reviewer, debugger, orchestrator)
+- Orchestrator protocols (analysis, review, debug)
 - Re-entry prompt conventions
 
 ## Learned Rules

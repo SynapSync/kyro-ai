@@ -45,7 +45,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 
 **What the script does:**
 - Emits a stderr reminder to run quality gates before committing
-- Reminds about lint, typecheck, tests, and reviewer checklist
+- Reminds about lint, typecheck, tests, and review checklist
 
 **Script:** Inline Node.js one-liner
 
@@ -74,7 +74,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 
 **What the script does:**
 - Parses test output for failure indicators (`fail`, `error`, `FAIL`)
-- If failures detected, suggests invoking the debugger agent for root cause analysis
+- If failures detected, suggests invoking the debug protocol for root cause analysis
 - Extracts and reports the first failing line
 
 **Script:** Inline Node.js one-liner
@@ -89,7 +89,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 
 **What the script does:**
 - Checks session context: reminds to save re-entry prompts if a sprint is active
-- Suggests running a retro if the sprint appears complete
+- Suggests running the retrospective phase if the sprint appears complete
 - Provides context-aware reminders based on current workflow state
 
 **Script:** `scripts/session-check.js`
@@ -175,7 +175,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 
 ### 12. SubagentStart / SubagentStop
 
-**When they fire:** When a subagent (explorer, reviewer, debugger) starts or finishes execution.
+**When they fire:** When a subagent starts or finishes execution.
 
 **What the scripts do:**
 - Log the agent name and lifecycle event for observability
@@ -192,7 +192,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 **When it fires:** When a task is marked as completed during sprint execution.
 
 **What the script does:**
-- Runs the reviewer checklist automatically
+- Runs the review checklist automatically
 - Updates the sprint checkpoint file
 - Records task completion in session statistics
 
@@ -208,7 +208,7 @@ All hooks are defined in `hooks/hooks.json` and their implementation scripts liv
 
 **What the script does:**
 - Logs the failed tool name
-- Suggests invoking the debugger agent for investigation
+- Suggests invoking the debug protocol for investigation
 - Helps catch and respond to unexpected failures during sprint execution
 
 **Script:** Inline Node.js one-liner
@@ -251,7 +251,7 @@ Agent processes prompt
   |       +---> Failure
   |               |
   |               v
-  |             [PostToolUseFailure] --> Suggest debugger
+  |             [PostToolUseFailure] --> Suggest debug protocol
   |
   +---> Subagent invoked
   |       |
@@ -267,7 +267,7 @@ Agent processes prompt
   +---> Task completed
   |       |
   |       v
-  |     [TaskCompleted] --> Run reviewer checklist, update checkpoint
+  |     [TaskCompleted] --> Run review checklist, update checkpoint
   |
   v
 Agent responds
