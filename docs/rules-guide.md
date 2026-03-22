@@ -109,7 +109,7 @@ Rules are organized into categories that correspond to different phases of sprin
 
 ### Loading
 
-At the start of every session, the `SessionStart` hook:
+At the start of every session, the guardian `session_start` event:
 
 1. Reads `.agents/sprint-forge/rules.md` (path configurable in `config.json`)
 2. Parses all active rules
@@ -128,7 +128,7 @@ Rules are applied contextually based on their category:
 
 ### Rule Violation Warning
 
-When the agent is about to violate a learned rule, the `UserPromptSubmit` hook triggers a warning:
+When the agent is about to violate a learned rule, the guardian `user_prompt_submit` event triggers a warning:
 
 ```
 [Kyro] Rule violation detected:
@@ -182,7 +182,7 @@ After accumulating many rules, related rules can be consolidated:
 
 ### Rule Limits
 
-The kyro-learner skill enforces a maximum of **50 active rules**. When approaching this limit:
+The learner helper enforces a maximum of **50 active rules**. When approaching this limit:
 - Review rules by `times_applied` -- rarely-applied rules may be candidates for deprecation
 - Consolidate related rules into broader, more useful ones
 - Deprecate rules tied to completed or abandoned projects

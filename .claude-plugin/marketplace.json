@@ -11,7 +11,7 @@
     {
       "name": "kyro-workflow",
       "source": "./",
-      "description": "Complete sprint workflow system: 1 agent, 10 hooks, 3 commands, 7 skills, adaptive per-project learning, and formal debt tracking.",
+      "description": "Complete sprint workflow system: 2 agents (orchestrator + guardian), 3 commands, 1 skill, 10 guardian events (configurable), adaptive per-project learning, and formal debt tracking.",
       "author": {
         "name": "SynapSync"
       },
@@ -23,7 +23,7 @@
         "sprint",
         "planning",
         "agents",
-        "hooks",
+        "guardian",
         "adaptive",
         "debt-tracking",
         "self-correction",
@@ -35,7 +35,7 @@
         "workflow",
         "sprint",
         "planning",
-        "hooks",
+        "guardian",
         "agents",
         "commands",
         "productivity",

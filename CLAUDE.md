@@ -2,38 +2,30 @@
 
 ## Overview
 
-Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based project execution through the orchestrator agent, lifecycle hooks, and persistent learning.
+Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based project execution through the orchestrator agent, guardian agent, and persistent learning.
 
 ## Architecture: Command → Agent → Skill
 
 ```
 User Command (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up)
   └── Agent (orchestrator)
-        └── Skill (sprint-forge, kyro-learner, kyro-reviewer, kyro-metrics, kyro-handoff, kyro-analyzer, deslop)
-              └── Hook (lifecycle events that fire automatically)
+        ├── Skill (sprint-forge)
+        └── Agent (guardian — configurable event-based checkpoints)
 ```
 
 ## Directory Structure
 
 ```
 kyro-workflow/
-├── agents/           # 1 agent
-│   └── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
+├── agents/           # 2 agents
+│   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
+│   └── guardian.md     # Event-based checkpoints — configurable lifecycle events (rules loading, drift detection, quality checks)
 ├── commands/         # 3 slash commands
 │   ├── forge.md      # /kyro-workflow:forge — full cycle with gates
 │   ├── status.md     # /kyro-workflow:status — metrics and debt heatmap
 │   └── wrap-up.md    # /kyro-workflow:wrap-up — session closure ritual
-├── hooks/            # Lifecycle event handlers
-│   └── hooks.json    # 10 hook events, 15 hook entries
-├── scripts/          # Hook implementation scripts
-├── skills/           # 7 skills (domain knowledge)
-│   ├── sprint-forge/      # Core orchestration (from v1.x)
-│   ├── kyro-analyzer/  # Analysis strategies per work type
-│   ├── kyro-reviewer/  # Quality checklist (BLOCKER/WARNING/SUGGESTION)
-│   ├── kyro-learner/   # Per-project rule accumulation
-│   ├── kyro-metrics/   # Velocity trends and debt heatmap
-│   ├── kyro-handoff/   # Enriched context transfer
-│   └── deslop/           # AI slop detection and removal
+├── skills/           # 1 skill (domain knowledge)
+│   └── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 ├── .claude-plugin/   # Plugin packaging for Claude Code
 │   ├── plugin.json   # Plugin manifest (version must match package.json)
 │   ├── marketplace.json # Marketplace listing metadata
@@ -61,19 +53,11 @@ npm install
 npm run build
 ```
 
-## Testing hooks
-
-Hook scripts are in `scripts/` and read/write JSON via stdin/stdout following Claude Code's hook protocol.
-
-```bash
-node scripts/test-hooks.js
-```
-
 ## Plugin Metadata
 
 Plugin metadata lives in the `.claude-plugin/` directory. When updating version, description, or capabilities, keep these files in sync:
 
 - `package.json` — canonical version and description
 - `.claude-plugin/plugin.json` — plugin manifest (version must match package.json)
-- `.claude-plugin/marketplace.json` — marketplace listing (hook/agent/command/skill counts)
-- `WORKFLOW.yaml` — human-readable workflow definition (version, hooks list)
+- `.claude-plugin/marketplace.json` — marketplace listing (agent/command/skill counts)
+- `WORKFLOW.yaml` — human-readable workflow definition (version, agents list)

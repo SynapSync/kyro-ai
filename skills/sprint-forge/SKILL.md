@@ -212,7 +212,7 @@ This will: read all sprints, calculate metrics, display progress and accumulated
 
 ## Workflow Components
 
-Kyro v2.0 operates as a workflow with specialized agents and commands. The SKILL.md remains the core orchestration logic, but execution is now distributed:
+Kyro v2.0 operates as a workflow with specialized agents (orchestrator + guardian) and commands. The SKILL.md remains the core orchestration logic, but execution is now distributed:
 
 ### Agent
 
@@ -233,18 +233,18 @@ The orchestrator is the single agent, handling all phases through specialized pr
 | `/kyro-workflow:status` | STATUS mode with velocity metrics and debt heatmap |
 | `/kyro-workflow:wrap-up` | End-of-session closure ritual with quality check and context handoff |
 
-### Lifecycle Hooks
+### Guardian Events
 
-The workflow fires hooks at key moments during sprint execution. See `hooks/hooks.json` for the full list. Key hooks:
-- **SessionStart** — loads learned rules from `.agents/sprint-forge/rules.md`
-- **PostToolUse** — checks for debug artifacts after code edits
-- **TaskCompleted** — runs review checklist
-- **PostToolUseFailure** — suggests debug protocol invocation
-- **PreCompact** — saves re-entry state before context compaction
+The guardian agent runs configurable checkpoints at lifecycle moments, invoked by the orchestrator. See `agents/guardian.md` for the full list. Key events:
+- **session_start** — loads learned rules from `.agents/sprint-forge/rules.md`
+- **post_tool_use** — checks for debug artifacts after code edits
+- **task_completed** — runs review checklist
+- **pre_compact** — saves re-entry state before context compaction
+- **user_prompt_submit** — drift detection and rule violation check
 
 ### Per-Project Learning
 
-Corrections during sprint execution are captured as persistent rules in `.agents/sprint-forge/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the `kyro-learner` skill for details.
+Corrections during sprint execution are captured as persistent rules in `.agents/sprint-forge/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the learner helper (`assets/helpers/learner.md`) for details.
 
 ---
 

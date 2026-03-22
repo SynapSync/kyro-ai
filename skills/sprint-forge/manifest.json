@@ -3,7 +3,7 @@
   "name": "sprint-forge",
   "type": "workflow",
   "version": "2.0.0",
-  "description": "Adaptive sprint workflow with specialized agents, lifecycle hooks, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",
+  "description": "Adaptive sprint workflow with specialized agents, guardian-based lifecycle events, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",
   "author": {
     "name": "SynapSync",
     "url": "https://github.com/SynapSync",
@@ -48,7 +48,7 @@
       "version": "2.0.0",
       "date": "2026-03-08",
       "changes": [
-        "Evolve from standalone skill to full workflow with orchestrator agent (analysis, review, and debug protocols), lifecycle hooks, slash commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up), and per-project learning via persistent rules"
+        "Evolve from standalone skill to full workflow with orchestrator + guardian agents, guardian-based lifecycle events, slash commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up), and per-project learning via persistent rules"
       ]
     },
     {

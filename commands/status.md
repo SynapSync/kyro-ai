@@ -97,5 +97,5 @@ Flag aged debt items (open >3 sprints) and prompt for triage:
 
 - Debt items are never deleted — only their status changes
 - Every sprint inherits the full debt table from the previous sprint
-- Items open for >3 sprints trigger the `DebtItemAged` hook automatically
+- Items open for >3 sprints trigger a guardian escalation prompt automatically
 - New debt discovered during execution gets added with origin "Sprint N phase"

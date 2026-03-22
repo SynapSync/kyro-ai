@@ -2,7 +2,7 @@
 
 This file is auto-populated by kyro-workflow during sprint retrospectives.
 Do not edit manually unless correcting an error. New entries are appended
-by the kyro-learner skill after each sprint retrospective.
+by the learner helper after each sprint retrospective.
 
 Format: each entry includes the sprint ID, date, and a concise rule.
 

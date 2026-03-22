@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the internal architecture of Kyro v2.0, including the Command > Agent > Skill pattern, data flow, storage layout, database schema, hook lifecycle, and differences from the v1.x skill.
+This document describes the internal architecture of Kyro v2.0, including the Command > Agent > Skill pattern, data flow, storage layout, database schema, guardian events, and differences from the v1.x skill.
 
 ---
 
@@ -14,11 +14,9 @@ User Command (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-u
   v
 Agent (orchestrator)
   |
-  v
-Skill (sprint-forge, kyro-analyzer, kyro-reviewer, kyro-learner, kyro-metrics, kyro-handoff)
+  +---> Skill (sprint-forge)
   |
-  v
-Hook (lifecycle events that fire automatically)
+  +---> Agent (guardian — configurable event-based checkpoints)
 ```
 
 ### Commands (Entry Points)
@@ -33,7 +31,7 @@ Commands are the user-facing interface. Each command is defined as a markdown fi
 
 ### Agent (Execution Engine)
 
-The orchestrator is the single agent, defined as a markdown file in `agents/`. It handles all phases of the sprint lifecycle through specialized protocols: analysis (read-only exploration), review (quality validation), debugging (root cause analysis), and full cycle coordination.
+The orchestrator is the primary agent, defined as a markdown file in `agents/`. It handles all phases of the sprint lifecycle through specialized protocols: analysis (read-only exploration), review (quality validation), debugging (root cause analysis), and full cycle coordination. It invokes the guardian agent at lifecycle moments for configurable event-based checkpoints.
 
 | Agent | Toolset | Can Write? | Model | Memory |
 |-------|---------|-----------|-------|--------|
@@ -47,12 +45,7 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
 
 | Skill | Knowledge Domain |
 |-------|-----------------|
-| `sprint-forge` | Core orchestration: modes (INIT/SPRINT/STATUS), helpers, templates |
-| `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
-| `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
-| `kyro-learner` | Per-project rule accumulation and management |
-| `kyro-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
-| `kyro-handoff` | Enriched context transfer with mental model (hypotheses, decisions, blockers) |
+| `sprint-forge` | Core orchestration: modes (INIT/SPRINT/STATUS), helpers (analyzer, reviewer, learner, metrics, handoff), templates |
 
 ---
 
@@ -94,11 +87,11 @@ Skills provide domain knowledge that agents consume. Each skill is defined in a 
     ├── ROADMAP.md
     └── RE-ENTRY-PROMPTS.md
 
-              HOOKS fire at every lifecycle event
-              (SessionStart, PreToolUse, PostToolUse,
-               Stop, SessionEnd, UserPromptSubmit,
-               PreCompact, SubagentStart/Stop,
-               TaskCompleted, PostToolUseFailure)
+              GUARDIAN runs configurable checkpoints
+              at lifecycle moments (session_start, pre_tool_use,
+              post_tool_use, stop, session_end, user_prompt_submit,
+              pre_compact, subagent_start, subagent_stop,
+              task_completed)
 ```
 
 ### Flow for /kyro-workflow:forge
@@ -222,45 +215,40 @@ Tracks technical debt across sprints.
 
 ---
 
-## Hook Lifecycle
+## Guardian Events
 
-Hooks fire automatically at specific points in the Claude Code session lifecycle. They are defined in `hooks/hooks.json` and implemented as Node.js scripts in `scripts/`.
+The guardian agent runs configurable checkpoints at lifecycle moments. The orchestrator invokes the guardian at key points during sprint execution. Events are defined in `agents/guardian.md`.
 
 ```
 Session Lifecycle:
-  SessionStart ------> [Load rules, show sprint]
+  session_start ------> [Load rules, show sprint]
        |
        v
-  User Prompt -------> [UserPromptSubmit: drift + rule check]
+  user_prompt_submit -> [Drift + rule check]
        |
        v
-  Tool Call ----------> [PreToolUse: track edits / remind gates]
+  pre_tool_use -------> [Track edits / remind gates]
        |
        v
-  Tool Result --------> [PostToolUse: check artifacts / detect failures]
-       |                 [PostToolUseFailure: suggest debug protocol]
-       v
-  Subagent -----------> [SubagentStart / SubagentStop: log lifecycle]
+  post_tool_use ------> [Check artifacts / detect failures]
        |
        v
-  Task Done ----------> [TaskCompleted: review checklist]
+  subagent_start/stop > [Log lifecycle]
        |
        v
-  Response -----------> [Stop: session check + learn capture]
+  task_completed -----> [Review checklist]
        |
        v
-  Context Full -------> [PreCompact: save re-entry state]
+  stop ---------------> [Session check + learn capture]
        |
        v
-  Session Close ------> [SessionEnd: save stats, prompt learnings]
+  pre_compact --------> [Save re-entry state]
+       |
+       v
+  session_end --------> [Save stats, prompt learnings]
 ```
 
-Hook scripts follow the Claude Code hook protocol:
-- Receive event data as JSON on stdin
-- Emit the (possibly modified) data as JSON on stdout
-- Use stderr for user-visible messages
-
-See [hooks-reference.md](hooks-reference.md) for detailed documentation of each hook.
+See [agents-reference.md](agents-reference.md) for detailed documentation of the guardian agent.
 
 ---
 
@@ -270,7 +258,7 @@ Kyro v2.0 is a full workflow that replaces the v1.x single-skill approach.
 
 ### v1.x: Single Skill
 
-In v1.x, `sprint-forge` (then called `kyro-workflow`) was a single skill with mode detection (INIT/SPRINT/STATUS). The skill contained all logic inline and had no hooks, no specialized agents, and no persistent learning.
+In v1.x, `sprint-forge` (then called `kyro-workflow`) was a single skill with mode detection (INIT/SPRINT/STATUS). The skill contained all logic inline and had no guardian events, no specialized agents, and no persistent learning.
 
 ```
 v1.x:  User message --> sprint-forge skill --> output files
@@ -283,7 +271,7 @@ In v2.0, the skill is decomposed into commands, agents, skills, and hooks. Each 
 ```
 v2.0:  User command --> Agent (orchestrator)
                            --> Skill (domain knowledge)
-                           --> Hook (lifecycle automation)
+                           --> Agent (guardian — lifecycle checkpoints)
                            --> Database (persistent state)
 ```
 
@@ -291,11 +279,10 @@ v2.0:  User command --> Agent (orchestrator)
 
 | Dimension | v1.x (Skill) | v2.0 (Workflow) |
 |-----------|-------------|-----------------|
-| Type | Single skill | Full workflow (commands + agents + skills + hooks) |
+| Type | Single skill | Full workflow (commands + agents + skills + guardian events) |
 | Entry point | Text triggers detected by skill | Slash commands (`/kyro-workflow:forge`, `/kyro-workflow:status`, `/kyro-workflow:wrap-up`) |
 | Learning | Per-project retro only | Persistent rules across sprints via `.agents/sprint-forge/rules.md` |
-| Agents | 1 (the skill itself) | 1 orchestrator (with analysis, review, and debug protocols) |
-| Hooks | 0 | 12 lifecycle events |
+| Agents | 1 (the skill itself) | 2 (orchestrator + guardian with 10 configurable events) |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase gates with approval |
 | Metrics | Basic STATUS report | Velocity trends, debt heatmap, estimation patterns, sprint health score |
 | Context transfer | Re-entry prompts (file paths) | Enriched handoff (mental context: hypotheses, decisions, blockers) |
@@ -308,12 +295,12 @@ v2.0:  User command --> Agent (orchestrator)
 |----------------|---------------|
 | INIT mode logic | `skills/sprint-forge/assets/modes/INIT.md` + `agents/orchestrator.md` (analysis protocol) |
 | SPRINT mode logic | `skills/sprint-forge/assets/modes/SPRINT.md` + `agents/orchestrator.md` |
-| STATUS mode logic | `skills/sprint-forge/assets/modes/STATUS.md` + `skills/kyro-metrics/` |
-| Analysis helpers | `skills/kyro-analyzer/` |
-| Quality validation | `skills/kyro-reviewer/` + `agents/orchestrator.md` (review checklist) |
+| STATUS mode logic | `skills/sprint-forge/assets/modes/STATUS.md` + `skills/sprint-forge/assets/helpers/metrics.md` |
+| Analysis helpers | `skills/sprint-forge/assets/helpers/analyzer.md` |
+| Quality validation | `skills/sprint-forge/assets/helpers/reviewer.md` + `agents/orchestrator.md` (review checklist) |
 | Debugging | `agents/orchestrator.md` (debug protocol) |
-| Learning/rules | `skills/kyro-learner/` + hooks (new in v2.0) |
-| Context handoff | `skills/kyro-handoff/` (enriched in v2.0) |
+| Learning/rules | `skills/sprint-forge/assets/helpers/learner.md` + guardian events (new in v2.0) |
+| Context handoff | `skills/sprint-forge/assets/helpers/handoff.md` (enriched in v2.0) |
 | Templates | `skills/sprint-forge/assets/templates/` (unchanged) |
 
-The v1.x skill still exists as `skills/sprint-forge/` and provides the core orchestration knowledge (modes, helpers, templates). The new agents, commands, and hooks layer on top of it.
+The v1.x skill still exists as `skills/sprint-forge/` and provides the core orchestration knowledge (modes, helpers, templates). The new agents, commands, and guardian events layer on top of it.

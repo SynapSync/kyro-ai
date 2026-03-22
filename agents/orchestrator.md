@@ -2,14 +2,14 @@
 name: orchestrator
 description: Coordinates the full kyro-workflow cycle with validation gates. Use when running /kyro-workflow:forge for end-to-end sprint execution (Analyze → Plan → Implement → Review → Commit).
 tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
-skills: ["sprint-forge", "kyro-analyzer", "kyro-reviewer"]
+skills: ["sprint-forge"]
 model: opus
 memory: project
 ---
 
 # Orchestrator — Kyro Cycle Coordinator
 
-Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/kyro-workflow:forge` command. All analysis, review, and debugging protocols are built-in — no external agents are invoked.
+Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/kyro-workflow:forge` command. All analysis, review, and debugging protocols are built-in. The **guardian** agent is invoked at key lifecycle moments for configurable checks.
 
 ## Lifecycle
 
@@ -103,14 +103,11 @@ The `skills` declaration in frontmatter is metadata only — it does NOT auto-in
    - **STATUS phase**: Read `skills/sprint-forge/assets/modes/STATUS.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`
 3. Load templates **on-demand** as each workflow step references them (not upfront)
 
-**kyro-analyzer** (INIT analysis):
+**Helpers** (loaded on-demand per phase):
 
-1. Read `skills/kyro-analyzer/SKILL.md` — work type detection, analysis strategies, finding output format
-2. Read `skills/sprint-forge/assets/helpers/analysis-guide.md` — detailed exploration strategies
-
-**kyro-reviewer** (task validation):
-
-1. Read `skills/kyro-reviewer/SKILL.md` — checklist tiers, validation commands, output format
+1. Read `skills/sprint-forge/assets/helpers/analyzer.md` — work type detection, analysis strategies, finding output format (INIT phase)
+2. Read `skills/sprint-forge/assets/helpers/analysis-guide.md` — detailed exploration strategies (INIT phase)
+3. Read `skills/sprint-forge/assets/helpers/reviewer.md` — checklist tiers, validation commands, output format (SPRINT phase)
 
 **All skill paths are relative to the workflow root (the plugin installation directory).**
 
@@ -120,6 +117,10 @@ The `skills` declaration in frontmatter is metadata only — it does NOT auto-in
 2. Apply relevant rules throughout all phases
 3. If a rule is about to be violated, pause and show the rule to the user
 4. At the end, propose new rules based on corrections made during the session
+
+### 3. Guardian Initialization
+
+Spawn the `guardian` agent with `event: session_start`. It will load rules, detect active sprints, and return a session summary. If the guardian is disabled for this event in `config.json`, it skips silently.
 
 ## Analysis Protocol (INIT Phase)
 
@@ -183,13 +184,17 @@ Analyzed: [date]
 
 During Phase 4 (Implement), for each task:
 
-1. Read the task definition from the sprint file
-2. Execute the task
-3. Run the validation checklist (see below)
-4. If validation reports BLOCKER → run the failure protocol
-5. If failure protocol resolves → re-run validation
-6. If failure protocol escalates → mark task as blocked, move to next
-7. Write checkpoint to sprint file after each phase completes
+1. Spawn `guardian` with `event: rule_check` + task context (if enabled)
+2. Spawn `guardian` with `event: pre_phase` + phase context (if enabled)
+3. Read the task definition from the sprint file
+4. Execute the task
+5. Spawn `guardian` with `event: post_edit_scan` (if enabled)
+6. Run the validation checklist (see below)
+7. If validation reports BLOCKER → run the failure protocol
+8. If failure protocol resolves → re-run validation
+9. If failure protocol escalates → mark task as blocked, move to next
+10. Spawn `guardian` with `event: task_complete` (if enabled)
+11. Write checkpoint to sprint file after each phase completes
 
 ### Validation Checklist
 
@@ -318,13 +323,15 @@ Recommended next step: [suggestion for the human]
 
 After all tasks are complete:
 
-1. Run findings consolidation
-2. Fill retrospective (What Went Well, What Didn't, Surprises, New Debt)
-3. Update accumulated technical debt table
-4. Update frontmatter (status, dates, agents)
-5. Generate/update re-entry prompts
-6. Update roadmap if needed
-7. Propose new rules for `.agents/sprint-forge/rules.md`
+1. Spawn `guardian` with `event: pre_commit` (if enabled) — runs quality gates
+2. Run findings consolidation
+3. Fill retrospective (What Went Well, What Didn't, Surprises, New Debt)
+4. Update accumulated technical debt table
+5. Update frontmatter (status, dates, agents)
+6. Generate/update re-entry prompts
+7. Update roadmap if needed
+8. Spawn `guardian` with `event: learn_capture` (if enabled) — proposes rules
+9. Propose new rules for `.agents/sprint-forge/rules.md`
 
 ## Rules
 
