@@ -11,7 +11,7 @@
 
 <p align="center">
   <b>Complete sprint workflow system for AI-assisted development.</b><br/>
-  1 agent &bull; 10 hooks &bull; 3 commands &bull; 7 skills &bull; Adaptive per-project learning<br/>
+  2 agents &bull; 3 commands &bull; 1 skill &bull; 10 guardian events (configurable) &bull; Adaptive per-project learning<br/>
   Built for <b>Claude Code</b>. Compatible with any AI coding agent via SkillKit.
 </p>
 
@@ -19,7 +19,7 @@
 
 ## What Is Kyro?
 
-Kyro is a **workflow** that orchestrates iterative project execution through the orchestrator agent, lifecycle hooks, and persistent learning. It evolves from the [sprint-forge skill](https://github.com/SynapSync/skills-registry) into a full Command > Agent > Skill architecture.
+Kyro is a **workflow** that orchestrates iterative project execution through the orchestrator agent, guardian agent, and persistent learning. It evolves from the [sprint-forge skill](https://github.com/SynapSync/skills-registry) into a full Command > Agent > Skill architecture.
 
 Unlike rigid project planners, Kyro:
 
@@ -35,9 +35,9 @@ Unlike rigid project planners, Kyro:
 ## What's New in v2.0
 
 <table>
-<tr><td><b>1 Agent</b></td><td>Orchestrator (full cycle coordination with analysis, review, and debug protocols)</td></tr>
+<tr><td><b>2 Agents</b></td><td>Orchestrator (full cycle coordination) + Guardian (configurable event-based checkpoints)</td></tr>
 <tr><td><b>3 Commands</b></td><td><code>/kyro-workflow:forge</code>, <code>/kyro-workflow:status</code>, <code>/kyro-workflow:wrap-up</code></td></tr>
-<tr><td><b>12 Hooks</b></td><td>SessionStart, PreToolUse, PostToolUse, Stop, SessionEnd, UserPromptSubmit, PreCompact, SubagentStart/Stop, TaskCompleted, PostToolUseFailure</td></tr>
+<tr><td><b>10 Guardian Events</b></td><td>session_start, pre_tool_use, post_tool_use, stop, session_end, user_prompt_submit, pre_compact, subagent_start, subagent_stop, task_completed</td></tr>
 <tr><td><b>Per-Project Learning</b></td><td>Corrections become rules in <code>.agents/sprint-forge/rules.md</code> — applied automatically in future sprints</td></tr>
 <tr><td><b>Validation Gates</b></td><td>BLOCKER/WARNING/SUGGESTION checklist per task, phase gates with user approval</td></tr>
 <tr><td><b>Velocity Metrics</b></td><td>Sprint velocity trends, debt heatmap, underestimation pattern detection</td></tr>
@@ -94,45 +94,35 @@ Rules are specific, dated, and tied to the project where they were learned. Afte
 
 ```
 Command (user entry point)
-  └── Agent (specialized execution engine)
-        └── Skill (domain knowledge, injected at startup)
-              └── Hook (lifecycle event, fires automatically)
+  └── Agent (orchestrator — full cycle coordination)
+        ├── Skill (domain knowledge, injected at startup)
+        └── Agent (guardian — configurable event-based checkpoints)
 ```
 
 ```
 kyro-workflow/
-├── agents/                     # 1 agent
-│   └── orchestrator.md         # Full cycle coordinator — analysis, review, debugging, and sprint execution
+├── agents/                     # 2 agents
+│   ├── orchestrator.md         # Full cycle coordinator — analysis, review, debugging, and sprint execution
+│   └── guardian.md             # Event-based checkpoints — configurable lifecycle events (rules loading, drift detection, quality checks)
 │
 ├── commands/                   # 3 slash commands
 │   ├── forge.md                # /kyro-workflow:forge — full cycle with gates
 │   ├── status.md               # /kyro-workflow:status — metrics + debt heatmap
 │   └── wrap-up.md              # /kyro-workflow:wrap-up — session closure ritual
 │
-├── skills/                     # 7 skills (domain knowledge)
-│   ├── sprint-forge/            # Core orchestration (base skill from v1.x)
-│   │   ├── SKILL.md
-│   │   └── assets/             # Modes, helpers, templates
-│   ├── kyro-analyzer/        # Analysis strategies per work type
-│   ├── kyro-reviewer/        # Quality checklist (BLOCKER/WARNING/SUGGESTION)
-│   ├── kyro-learner/         # Per-project rule accumulation
-│   ├── kyro-metrics/         # Velocity trends + debt heatmap
-│   ├── kyro-handoff/         # Enriched context transfer
-│   └── deslop/                 # AI slop detection and removal
+├── skills/                     # 1 skill (domain knowledge)
+│   └── sprint-forge/            # Core orchestration (base skill from v1.x)
+│       ├── SKILL.md
+│       └── assets/             # Modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │
-├── docs/                       # 8 documentation guides
+├── docs/                       # 7 documentation guides
 │   ├── getting-started.md      # Quick start walkthrough
 │   ├── commands-reference.md   # Full command documentation
 │   ├── agents-reference.md     # Agent capabilities and tools
-│   ├── hooks-reference.md      # Hook event documentation
 │   ├── rules-guide.md          # Self-correction rules system
 │   ├── architecture.md         # System architecture deep dive
 │   ├── model-selection.md      # Model tier selection guide
 │   └── context-management.md   # Token limits and compaction strategies
-│
-├── hooks/                      # Lifecycle event handlers
-│   └── hooks.json              # 10 hook events, 15 hook entries
-├── scripts/                    # 11 Node.js hook handler + test scripts
 │
 ├── src/                        # TypeScript source (SQLite + FTS5)
 │   ├── db/                     # Database init, schema, store
@@ -170,7 +160,7 @@ From inside a Claude Code session, run:
 /plugin install kyro-workflow@kyro-workflow
 ```
 
-That's it. All commands, agents, skills, and hooks are available immediately.
+That's it. All commands, agents, and skills are available immediately.
 
 ### Option 2: Claude Code CLI
 
@@ -238,11 +228,12 @@ You should see the Kyro status dashboard. If you get "unknown command", check th
 
 ---
 
-## Agent
+## Agents
 
 | Agent | Purpose | Tools | Key Feature |
 |-------|---------|-------|-------------|
 | **orchestrator** | Full cycle coordination — analysis, review, debugging, sprint execution | Read, Glob, Grep, Bash, Edit, Write | Memory-enabled, gate protocol, integrated analysis/review/debug protocols |
+| **guardian** | Event-based checkpoints — rules loading, drift detection, quality checks | Read, Glob, Grep, Bash | 10 configurable events, invoked by orchestrator at lifecycle moments |
 
 ---
 
@@ -250,32 +241,25 @@ You should see the Kyro status dashboard. If you get "unknown command", check th
 
 | Skill | Description |
 |-------|-------------|
-| `sprint-forge` | Core orchestration — modes (INIT/SPRINT/STATUS), helpers, templates |
-| `kyro-analyzer` | Analysis strategies per work type (audit, feature, bugfix, new project, debt) |
-| `kyro-reviewer` | Quality checklist with BLOCKER/WARNING/SUGGESTION classification |
-| `kyro-learner` | Per-project rule accumulation via `.agents/sprint-forge/rules.md` |
-| `kyro-metrics` | Velocity trends, debt heatmap, underestimation pattern detection |
-| `kyro-handoff` | Enriched session handoff with mental context (hypotheses, decisions, blockers) |
-| `deslop` | AI slop detection and removal — 7 categories, confidence ratings, safety rules |
-
+| `sprint-forge` | Core orchestration — modes (INIT/SPRINT/STATUS), helpers (analyzer, reviewer, learner, metrics, handoff), templates |
 ---
 
-## Hooks (12 Events)
+## Guardian Events (10 Configurable)
 
-| Hook | When | What |
-|------|------|------|
-| SessionStart | New session | Load learned rules, show active sprint |
-| PreToolUse | Before edits | Track edit count, quality gate reminders |
-| PreToolUse | Before git commit | Remind about quality gates |
-| PostToolUse | After code edits | Check for debug artifacts, secrets, TODOs |
-| PostToolUse | After tests | Detect failures, suggest debug protocol |
-| Stop | Each response | Session check, capture [LEARN] blocks |
-| SessionEnd | Session close | Save stats, prompt for learnings |
-| UserPromptSubmit | Each prompt | Drift detection, rule violation check |
-| PreCompact | Before compaction | Save re-entry state |
-| SubagentStart/Stop | Agent lifecycle | Log for observability |
-| TaskCompleted | Task marked done | Post-task quality checklist |
-| PostToolUseFailure | Tool fails | Suggest debug protocol invocation |
+The guardian agent runs configurable checkpoints at lifecycle moments, invoked by the orchestrator:
+
+| Event | When | What |
+|-------|------|------|
+| session_start | New session | Load learned rules, show active sprint |
+| pre_tool_use | Before edits / git commit | Track edit count, quality gate reminders |
+| post_tool_use | After code edits / tests | Check for debug artifacts, secrets, detect failures |
+| stop | Each response | Session check, capture [LEARN] blocks |
+| session_end | Session close | Save stats, prompt for learnings |
+| user_prompt_submit | Each prompt | Drift detection, rule violation check |
+| pre_compact | Before compaction | Save re-entry state |
+| subagent_start | Agent starts | Log for observability |
+| subagent_stop | Agent stops | Log completion, post-task quality checklist |
+| task_completed | Task marked done | Post-task quality checklist |
 
 ---
 
@@ -341,8 +325,7 @@ See [`settings.example.json`](settings.example.json) for production permission a
 |-----------|--------------|-----------------|
 | Type | Single skill | Full workflow |
 | Learning | Per-project retro | Persistent rules across sprints |
-| Agents | 1 (the skill itself) | 1 orchestrator (with analysis, review, and debug protocols) |
-| Hooks | 0 | 12 lifecycle events |
+| Agents | 1 (the skill itself) | 2 (orchestrator + guardian with 10 configurable events) |
 | Commands | 0 (text triggers) | 3 commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up) |
 | Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase |
 | Metrics | Basic STATUS | Velocity trends + debt heatmap + estimation patterns |
@@ -361,7 +344,6 @@ See [`settings.example.json`](settings.example.json) for production permission a
 | [Getting Started](docs/getting-started.md) | Quick start walkthrough |
 | [Commands Reference](docs/commands-reference.md) | Full command documentation |
 | [Agents Reference](docs/agents-reference.md) | Agent capabilities and tools |
-| [Hooks Reference](docs/hooks-reference.md) | Hook event documentation |
 | [Rules Guide](docs/rules-guide.md) | Self-correction rules system |
 | [Architecture](docs/architecture.md) | System architecture deep dive |
 | [Model Selection](docs/model-selection.md) | Model tier selection and cost tradeoffs |

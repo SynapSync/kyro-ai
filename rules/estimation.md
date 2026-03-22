@@ -34,7 +34,7 @@ Track actual completion time against estimates for every task.
 
 - Record in the sprint file: `estimated: Xh | actual: Yh | delta: ±Z%`
 - Deltas are inputs to the retro's estimation accuracy analysis.
-- The `kyro-metrics` skill aggregates these across sprints for trend detection.
+- The metrics helper aggregates these across sprints for trend detection.
 
 ## R-ES-04: Flag Significant Estimation Errors
 

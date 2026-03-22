@@ -1,6 +1,6 @@
 # Agents Reference
 
-Kyro uses a single **orchestrator** agent that handles all phases of the sprint lifecycle: analysis, review, debugging, and full cycle coordination. The orchestrator incorporates specialized protocols for each concern rather than delegating to separate agents.
+Kyro uses two agents: an **orchestrator** that handles all phases of the sprint lifecycle, and a **guardian** that runs configurable event-based checkpoints at lifecycle moments. The orchestrator incorporates specialized protocols for each concern and invokes the guardian at key points during execution.
 
 ---
 
@@ -9,6 +9,7 @@ Kyro uses a single **orchestrator** agent that handles all phases of the sprint 
 | Agent | Role | Model | Tools | Memory |
 |-------|------|-------|-------|--------|
 | **orchestrator** | Full cycle coordination — analysis, review, debugging, sprint execution | opus | Read, Glob, Grep, Bash, Edit, Write | project |
+| **guardian** | Event-based checkpoints — rules loading, drift detection, quality checks | opus | Read, Glob, Grep, Bash | project |
 
 ---
 
@@ -51,7 +52,7 @@ Used during the INIT phase and any codebase exploration. The orchestrator perfor
    - Debt: TODOs, FIXMEs, deprecated APIs, known workarounds
 3. **Generate report** -- structured output with findings
 
-The analysis protocol uses the `kyro-analyzer` skill for analysis strategies per work type. During analysis, the orchestrator restricts itself to read-only operations.
+The analysis protocol uses the analyzer helper (`skills/sprint-forge/assets/helpers/analyzer.md`) for analysis strategies per work type. During analysis, the orchestrator restricts itself to read-only operations.
 
 **Output Format:**
 
@@ -251,3 +252,66 @@ After all tasks are complete:
 - Use project memory to recall patterns from previous sprints.
 - Capture learnings and propose rules at the end of every cycle.
 - Keep the user informed at each step -- no silent operations.
+
+---
+
+## Guardian
+
+**File:** `agents/guardian.md`
+
+The guardian agent runs configurable event-based checkpoints at lifecycle moments. It is invoked by the orchestrator (not directly by commands) to handle cross-cutting concerns like rules loading, drift detection, quality checks, and learning capture.
+
+### When Triggered
+
+- Invoked by the orchestrator at lifecycle moments during sprint execution
+- Not directly triggered by user commands
+
+### Tools
+
+| Tool | Usage |
+|------|-------|
+| Read | Read rules file, sprint files, session state |
+| Glob | Find project files by pattern |
+| Grep | Search for patterns, debug artifacts, secrets |
+| Bash | Run read-only commands for validation |
+
+### Configurable Events (10)
+
+The guardian handles 10 configurable events:
+
+| Event | When | What It Does |
+|-------|------|-------------|
+| `session_start` | New session begins | Load learned rules from `.agents/sprint-forge/rules.md`, show active sprint |
+| `pre_tool_use` | Before edits or git commit | Track edit count, remind about quality gates |
+| `post_tool_use` | After code edits or tests | Check for debug artifacts, secrets, TODOs; detect test failures |
+| `stop` | Each response | Session check, capture `[LEARN]` blocks |
+| `session_end` | Session close | Save stats, prompt for learnings |
+| `user_prompt_submit` | Each prompt | Drift detection, rule violation check |
+| `pre_compact` | Before context compaction | Save re-entry state |
+| `subagent_start` | Agent starts | Log for observability |
+| `subagent_stop` | Agent stops | Log completion |
+| `task_completed` | Task marked done | Post-task quality checklist |
+
+### Rules Loading
+
+At `session_start`, the guardian:
+
+1. Reads `.agents/sprint-forge/rules.md` if it exists
+2. Parses all active rules
+3. Makes them available to the orchestrator for the session
+
+### Drift Detection
+
+At `user_prompt_submit`, the guardian:
+
+1. Checks the current prompt against the active sprint plan
+2. Detects if the user is drifting from the planned work
+3. Warns about potential rule violations
+
+### Learn Capture
+
+At `stop`, the guardian:
+
+1. Scans the response for `[LEARN]` blocks
+2. Proposes new rules based on corrections made during the session
+3. Logs learnings to the database

@@ -20,7 +20,7 @@ Update re-entry prompts after INIT completes and after each executed sprint.
 
 Save re-entry state before context compaction occurs.
 
-- The `PreCompact` hook triggers this automatically.
+- The guardian `pre_compact` event triggers this automatically.
 - State includes: current phase, task index, in-progress work, and any uncommitted decisions.
 - If compaction happens without a save, the session must restart from the last checkpoint.
 
@@ -34,7 +34,7 @@ Generate a handoff document when ending a session mid-sprint.
   - Any in-flight decisions or blockers
   - Modified files not yet committed
   - Active debt items relevant to current work
-- Use the `kyro-handoff` skill to generate enriched handoffs with mental model context.
+- Use the handoff helper (`skills/sprint-forge/assets/helpers/handoff.md`) to generate enriched handoffs with mental model context.
 
 ## R-CP-04: Re-Entry Prompts Are Source of Truth
 
