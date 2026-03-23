@@ -2,7 +2,7 @@
   "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
   "name": "sprint-forge",
   "type": "workflow",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Adaptive sprint workflow with specialized agents, guardian-based lifecycle events, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",
   "author": {
     "name": "SynapSync",
@@ -44,6 +44,15 @@
     "templates": 4
   },
   "changelog": [
+    {
+      "version": "2.1.0",
+      "date": "2026-03-23",
+      "changes": [
+        "Replace {project-name} with {scope} in Configuration Resolution and default output_dir paths — {scope} is a kebab-case work topic (e.g., oauth-implementation, ui-redesign), not the repo name",
+        "Update INIT Step 2 config table: Project Name → Scope with clarification that repo is already {cwd}",
+        "Update architecture, getting-started, and WORKFLOW.yaml to reflect {scope} convention"
+      ]
+    },
     {
       "version": "2.0.0",
       "date": "2026-03-08",

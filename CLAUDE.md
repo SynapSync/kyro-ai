@@ -41,7 +41,7 @@ kyro-workflow/
 
 - **Rules file**: `.agents/sprint-forge/rules.md` — persistent learned rules for this project
 - **Database**: `.agents/sprint-forge/data.db` — session stats and searchable learnings
-- **Sprint output**: `{cwd}/.agents/sprint-forge/{project}/` — per-project sprint documents
+- **Sprint output**: `{cwd}/.agents/sprint-forge/{scope}/` — per-scope sprint documents (where `{scope}` is the work topic, e.g., `oauth-implementation`, `ui-redesign`)
 - **Checkpoint-per-phase**: Sprint file saved after each phase completes
 - **Debt never disappears**: Items are only closed when explicitly resolved
 - **Gates require approval**: Never proceed past a validation gate without user confirmation
