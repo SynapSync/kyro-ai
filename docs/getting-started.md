@@ -81,10 +81,10 @@ You can also check project progress:
 
 ## Understanding the Output Structure
 
-After running `/kyro-workflow:forge` (INIT mode), Kyro creates a project workspace:
+After running `/kyro-workflow:forge` (INIT mode), Kyro creates a scope workspace (where `{scope}` is the work topic in kebab-case, e.g., `oauth-implementation`, `ui-redesign`):
 
 ```
-.agents/sprint-forge/{project-name}/
+.agents/sprint-forge/{scope}/
 ├── README.md              # Project overview, paths, baseline metrics
 ├── ROADMAP.md             # Adaptive roadmap with sprint definitions
 ├── RE-ENTRY-PROMPTS.md    # Context recovery prompts for new sessions

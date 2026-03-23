@@ -127,12 +127,12 @@ Stores data that persists across sprints within this project.
 
 The database path is configurable via `config.json` (`database.path`) or the `KYRO_DB_PATH` environment variable.
 
-### Per-Project: `.agents/sprint-forge/{project}/`
+### Per-Scope: `.agents/sprint-forge/{scope}/`
 
-Stores all sprint documents for a specific project. Created during INIT and used by all subsequent commands.
+Stores all sprint documents for a specific scope (where `{scope}` is the work topic in kebab-case, e.g., `oauth-implementation`, `ui-redesign`). Created during INIT and used by all subsequent commands.
 
 ```
-.agents/sprint-forge/{project-name}/
+.agents/sprint-forge/{scope}/
 ├── README.md              # Project overview with paths and baseline
 ├── ROADMAP.md             # Adaptive roadmap with sprint definitions
 ├── RE-ENTRY-PROMPTS.md    # Context recovery prompts
