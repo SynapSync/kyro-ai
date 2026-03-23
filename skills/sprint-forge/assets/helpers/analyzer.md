@@ -60,7 +60,7 @@ Each finding becomes a numbered file in `{output_kyro_dir}/findings/`:
 ---
 title: "[Finding Title]"
 date: YYYY-MM-DD
-project: "{project_name}"
+scope: "{scope}"
 type: finding
 status: open
 severity: critical|high|medium|low

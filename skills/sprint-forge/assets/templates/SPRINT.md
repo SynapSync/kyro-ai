@@ -2,7 +2,7 @@
 title: "Sprint {N} — {title}"
 date: "{date}"
 updated: "{date}"
-project: "{project_name}"
+scope: "{scope}"
 type: "sprint-plan"
 status: "active"
 version: "1.0"
@@ -14,7 +14,7 @@ parent_doc: "[[ROADMAP]]"
 agents:
   - "{agent_model}"
 tags:
-  - "{project_name}"
+  - "{scope}"
   - "sprint-plan"
   - "sprint-{N}"
 changelog:
