@@ -1,6 +1,6 @@
 name: kyro-workflow
 type: workflow
-version: "3.0.0"
+version: "3.1.0"
 description: >
   Complete sprint workflow system with specialized agents, guardian-based
   lifecycle events, adaptive per-project learning, and formal validation gates.
@@ -24,7 +24,7 @@ skills:
   - sprint-forge      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 
 storage:
-  project: .agents/sprint-forge/    # Rules, database, sprint documents (per-project)
+  scope: .agents/sprint-forge/    # Rules, database, sprint documents (per-scope)
 
 philosophy:
   - "Learn from every sprint, apply in the next"

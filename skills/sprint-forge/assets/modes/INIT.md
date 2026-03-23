@@ -45,22 +45,22 @@ Gather or detect the following configuration:
 
 | Config | How to Resolve |
 |--------|---------------|
-| **Project Name** | Ask the user or derive from the codebase directory name. Use a slug format: `my-project-audit`. |
+| **Scope** | Ask the user. A short kebab-case name for the work topic (e.g., `oauth-implementation`, `ui-redesign`, `q2-growth`). NOT the repo name — the repo is already `{cwd}`. |
 | **Codebase Path** | The absolute path to the codebase. Usually the current working directory. |
 | **Sprint Output Dir** | `{output_kyro_dir}/sprints/` (automatic, resolved below) |
 
 **Resolve `{output_kyro_dir}`** — ask the user:
 
-> "Where should I save kyro-workflow documents for **{project_name}**?
+> "Where should I save kyro-workflow documents for **{scope}**?
 >
-> 1. **Default** (Recommended) — `.agents/sprint-forge/{project-name}/`
+> 1. **Default** (Recommended) — `.agents/sprint-forge/{scope}/`
 > 2. **Custom path** — provide your preferred directory"
 
 Set `{output_kyro_dir}` based on the choice. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.
 
 Confirm with the user:
 
-> **Project**: {project_name}
+> **Scope**: {scope}
 > **Codebase**: `{codebase_path}`
 > **Output**: `{output_kyro_dir}`
 >
