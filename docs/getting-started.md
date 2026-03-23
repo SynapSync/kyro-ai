@@ -95,6 +95,7 @@ After running `/kyro-workflow:forge` (INIT mode), Kyro creates a scope workspace
 ├── sprints/               # Sprint documents, one file per sprint
 │   ├── SPRINT-1-architecture-cleanup.md
 │   ├── SPRINT-2-api-consistency.md
+│   ├── SPRINT-x-abc-defg.md
 │   └── ...
 └── handoffs/              # Enriched session handoff documents
     └── 2026-03-08-sprint-3.md
@@ -110,13 +111,13 @@ Project data is stored in `.agents/sprint-forge/`:
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `ROADMAP.md` | Defines planned sprints, dependencies, and suggested phases. Updated adaptively as execution reveals changes. |
-| `RE-ENTRY-PROMPTS.md` | Contains copy-paste prompts for recovering context in a new session. Updated after every sprint. |
-| `findings/*.md` | Each finding from the initial analysis becomes a separate file with severity, evidence, and recommendations. |
-| `sprints/SPRINT-N-*.md` | Each sprint document includes phases, tasks, debt table, retro, and recommendations. |
-| `.agents/sprint-forge/rules.md` | Learned rules for this project. Loaded automatically at session start. |
+| File                            | Purpose                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ROADMAP.md`                    | Defines planned sprints, dependencies, and suggested phases. Updated adaptively as execution reveals changes. |
+| `RE-ENTRY-PROMPTS.md`           | Contains copy-paste prompts for recovering context in a new session. Updated after every sprint.              |
+| `findings/*.md`                 | Each finding from the initial analysis becomes a separate file with severity, evidence, and recommendations.  |
+| `sprints/SPRINT-N-*.md`         | Each sprint document includes phases, tasks, debt table, retro, and recommendations.                          |
+| `.agents/sprint-forge/rules.md` | Learned rules for this project. Loaded automatically at session start.                                        |
 
 ---
 
@@ -126,11 +127,11 @@ Project data is stored in `.agents/sprint-forge/`:
 
 Kyro operates in three modes, determined by your intent:
 
-| Mode | When to Use | What It Does |
-|------|-------------|--------------|
-| **INIT** | Starting a new project workflow | Analyzes the codebase, generates findings, creates a roadmap, scaffolds the output directory |
-| **SPRINT** | Ready to work on the next iteration | Generates a sprint from the roadmap and previous retro, optionally executes it task by task |
-| **STATUS** | Checking progress | Reads all sprint files and reports metrics, debt heatmap, velocity trends |
+| Mode       | When to Use                         | What It Does                                                                                 |
+| ---------- | ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| **INIT**   | Starting a new project workflow     | Analyzes the codebase, generates findings, creates a roadmap, scaffolds the output directory |
+| **SPRINT** | Ready to work on the next iteration | Generates a sprint from the roadmap and previous retro, optionally executes it task by task  |
+| **STATUS** | Checking progress                   | Reads all sprint files and reports metrics, debt heatmap, velocity trends                    |
 
 ### Gates
 
@@ -141,6 +142,7 @@ Gates are mandatory approval checkpoints between phases. Kyro never proceeds pas
 - **Gate 3** -- after implementation, before review and close
 
 At each gate, you can:
+
 - **proceed** -- continue to the next phase
 - **adjust** -- modify the output before continuing
 - **cancel** -- stop the workflow
