@@ -62,7 +62,7 @@ From the roadmap and sprint files, compute:
 Output the report directly to the console (do NOT write to a file):
 
 ```
-# {project_name} — Status Report
+# {scope} — Status Report
 
 > Generated: {date}
 > Codebase: `{codebase_path}`

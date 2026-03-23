@@ -47,7 +47,7 @@ The following variables are filled with actual values during INIT and updated af
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `{project_name}` | Project name | `nebux-design-system-audit` |
+| `{scope}` | Work scope (kebab-case topic) | `nebux-design-system-audit` |
 | `{codebase_path}` | Absolute path to the codebase | `/Users/dev/projects/nebux` |
 | `{output_kyro_dir}` | Working directory for sprint artifacts | `/Users/dev/projects/nebux/.agents/sprint-forge/nebux-design-system-audit` |
 | `{current_sprint}` | Current sprint number | `3` |

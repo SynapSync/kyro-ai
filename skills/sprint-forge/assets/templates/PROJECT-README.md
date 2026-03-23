@@ -1,15 +1,15 @@
 ---
-title: "{project_name} — Working Project"
+title: "{scope} — Working Project"
 date: "{date}"
 updated: "{date}"
-project: "{project_name}"
+scope: "{scope}"
 type: "progress"
 status: "active"
 version: "1.0"
 agents:
   - "{agent_model}"
 tags:
-  - "{project_name}"
+  - "{scope}"
   - "progress"
   - "kyro-workflow"
 changelog:
@@ -21,7 +21,7 @@ related:
   - "[[RE-ENTRY-PROMPTS]]"
 ---
 
-# {project_name} — Working Project
+# {scope} — Working Project
 
 > Type: {work_type}
 > Created: {date}
