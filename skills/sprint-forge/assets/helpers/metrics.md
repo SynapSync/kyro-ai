@@ -1,10 +1,3 @@
----
-name: kyro-metrics
-description: >
-  Sprint velocity tracking, technical debt heatmap, and estimation pattern analysis.
-  Enriches STATUS mode with historical data and trend visualization.
----
-
 # Kyro Metrics — Velocity & Debt Analytics
 
 ## Purpose

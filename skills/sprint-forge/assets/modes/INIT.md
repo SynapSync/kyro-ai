@@ -45,22 +45,22 @@ Gather or detect the following configuration:
 
 | Config | How to Resolve |
 |--------|---------------|
-| **Project Name** | Ask the user or derive from the codebase directory name. Use a slug format: `my-project-audit`. |
+| **Scope** | Ask the user. A short kebab-case name for the work topic (e.g., `oauth-implementation`, `ui-redesign`, `q2-growth`). NOT the repo name — the repo is already `{cwd}`. |
 | **Codebase Path** | The absolute path to the codebase. Usually the current working directory. |
 | **Sprint Output Dir** | `{output_kyro_dir}/sprints/` (automatic, resolved below) |
 
 **Resolve `{output_kyro_dir}`** — ask the user:
 
-> "Where should I save kyro-workflow documents for **{project_name}**?
+> "Where should I save kyro-workflow documents for **{scope}**?
 >
-> 1. **Default** (Recommended) — `.agents/kyro-workflow/sprint-forge/{project-name}/`
+> 1. **Default** (Recommended) — `.agents/sprint-forge/{scope}/`
 > 2. **Custom path** — provide your preferred directory"
 
 Set `{output_kyro_dir}` based on the choice. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.
 
 Confirm with the user:
 
-> **Project**: {project_name}
+> **Scope**: {scope}
 > **Codebase**: `{codebase_path}`
 > **Output**: `{output_kyro_dir}`
 >
@@ -154,7 +154,7 @@ Using the [reentry-generator.md](../helpers/reentry-generator.md) helper:
 
 1. Use the [REENTRY-PROMPTS.md template](../templates/REENTRY-PROMPTS.md)
 2. Fill in all template variables with actual values:
-   - `{project_name}`, `{codebase_path}`, `{output_kyro_dir}`
+   - `{scope}`, `{codebase_path}`, `{output_kyro_dir}`
    - `{current_sprint}` = 1 (no sprints yet)
    - Sprint 1 finding file path
 3. Generate all 4 scenario prompts with real paths
@@ -167,7 +167,7 @@ At the end of INIT, present a summary:
 ```
 ## INIT Complete
 
-**Project**: {project_name}
+**Scope**: {scope}
 **Type**: {work_type}
 **Findings**: {N} files in findings/
 **Sprints Planned**: {M} sprints in roadmap

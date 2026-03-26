@@ -1,12 +1,12 @@
 # Getting Started with Kyro
 
-Kyro is a workflow system that orchestrates sprint-based project execution through specialized agents, lifecycle hooks, and persistent learning. This guide walks you through installation, first run, and core concepts.
+Kyro is a workflow system that orchestrates sprint-based project execution through the orchestrator agent, guardian agent, and persistent learning. This guide walks you through installation, first run, and core concepts.
 
 ---
 
 ## Prerequisites
 
-- **Node.js >= 18** -- required for the SQLite database and hook scripts
+- **Node.js >= 18** -- required for the SQLite database
 - **Claude Code** -- Kyro is built as a Claude Code plugin (also compatible with any agent via SkillKit)
 - **Git** -- recommended for worktree-based parallel execution
 
@@ -27,7 +27,7 @@ node --version
 /plugin install SynapSync/kyro-workflow
 ```
 
-This installs Kyro as a Claude Code plugin with all commands, agents, hooks, and skills registered automatically.
+This installs Kyro as a Claude Code plugin with all commands, agents, and skills registered automatically.
 
 ### Method 2: Manual Clone
 
@@ -63,32 +63,28 @@ Once installed, navigate to a project directory and run the `/kyro-workflow:forg
 
 This starts the full sprint cycle:
 
-1. The **explorer agent** analyzes the codebase (read-only)
+1. The **analysis phase** explores the codebase (read-only)
 2. You approve the analysis at **Gate 1**
 3. Kyro generates a sprint plan with phases and tasks
 4. You approve the plan at **Gate 2**
-5. Tasks are executed one by one, each validated by the **reviewer agent**
+5. Tasks are executed one by one, each validated by the **review step**
 6. You approve the implementation at **Gate 3**
 7. A retrospective is run and the sprint is closed
 
-You can also run steps individually:
+You can also check project progress:
 
 ```
-/kyro-workflow:sprint generate          # Generate the next sprint without executing
-/kyro-workflow:sprint execute           # Execute an already-generated sprint
 /kyro-workflow:status                   # Check project progress and metrics
-/kyro-workflow:debt list                # View technical debt
-/kyro-workflow:retro                    # Run the retrospective ritual
 ```
 
 ---
 
 ## Understanding the Output Structure
 
-After running `/kyro-workflow:forge` (INIT mode), Kyro creates a project workspace:
+After running `/kyro-workflow:forge` (INIT mode), Kyro creates a scope workspace (where `{scope}` is the work topic in kebab-case, e.g., `oauth-implementation`, `ui-redesign`):
 
 ```
-.agents/kyro-workflow/sprint-forge/{project-name}/
+.agents/sprint-forge/{scope}/
 ├── README.md              # Project overview, paths, baseline metrics
 ├── ROADMAP.md             # Adaptive roadmap with sprint definitions
 ├── RE-ENTRY-PROMPTS.md    # Context recovery prompts for new sessions
@@ -99,28 +95,29 @@ After running `/kyro-workflow:forge` (INIT mode), Kyro creates a project workspa
 ├── sprints/               # Sprint documents, one file per sprint
 │   ├── SPRINT-1-architecture-cleanup.md
 │   ├── SPRINT-2-api-consistency.md
+│   ├── SPRINT-x-abc-defg.md
 │   └── ...
 └── handoffs/              # Enriched session handoff documents
     └── 2026-03-08-sprint-3.md
 ```
 
-Project data is stored in `.agents/kyro-workflow/`:
+Project data is stored in `.agents/sprint-forge/`:
 
 ```
-.agents/kyro-workflow/
+.agents/sprint-forge/
 ├── data.db       # SQLite database (learnings, sessions, debt items)
 └── rules.md      # Persistent learned rules (accumulated across sprints)
 ```
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `ROADMAP.md` | Defines planned sprints, dependencies, and suggested phases. Updated adaptively as execution reveals changes. |
-| `RE-ENTRY-PROMPTS.md` | Contains copy-paste prompts for recovering context in a new session. Updated after every sprint. |
-| `findings/*.md` | Each finding from the initial analysis becomes a separate file with severity, evidence, and recommendations. |
-| `sprints/SPRINT-N-*.md` | Each sprint document includes phases, tasks, debt table, retro, and recommendations. |
-| `.agents/kyro-workflow/rules.md` | Learned rules for this project. Loaded automatically at session start. |
+| File                            | Purpose                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ROADMAP.md`                    | Defines planned sprints, dependencies, and suggested phases. Updated adaptively as execution reveals changes. |
+| `RE-ENTRY-PROMPTS.md`           | Contains copy-paste prompts for recovering context in a new session. Updated after every sprint.              |
+| `findings/*.md`                 | Each finding from the initial analysis becomes a separate file with severity, evidence, and recommendations.  |
+| `sprints/SPRINT-N-*.md`         | Each sprint document includes phases, tasks, debt table, retro, and recommendations.                          |
+| `.agents/sprint-forge/rules.md` | Learned rules for this project. Loaded automatically at session start.                                        |
 
 ---
 
@@ -130,11 +127,11 @@ Project data is stored in `.agents/kyro-workflow/`:
 
 Kyro operates in three modes, determined by your intent:
 
-| Mode | When to Use | What It Does |
-|------|-------------|--------------|
-| **INIT** | Starting a new project workflow | Analyzes the codebase, generates findings, creates a roadmap, scaffolds the output directory |
-| **SPRINT** | Ready to work on the next iteration | Generates a sprint from the roadmap and previous retro, optionally executes it task by task |
-| **STATUS** | Checking progress | Reads all sprint files and reports metrics, debt heatmap, velocity trends |
+| Mode       | When to Use                         | What It Does                                                                                 |
+| ---------- | ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| **INIT**   | Starting a new project workflow     | Analyzes the codebase, generates findings, creates a roadmap, scaffolds the output directory |
+| **SPRINT** | Ready to work on the next iteration | Generates a sprint from the roadmap and previous retro, optionally executes it task by task  |
+| **STATUS** | Checking progress                   | Reads all sprint files and reports metrics, debt heatmap, velocity trends                    |
 
 ### Gates
 
@@ -145,6 +142,7 @@ Gates are mandatory approval checkpoints between phases. Kyro never proceeds pas
 - **Gate 3** -- after implementation, before review and close
 
 At each gate, you can:
+
 - **proceed** -- continue to the next phase
 - **adjust** -- modify the output before continuing
 - **cancel** -- stop the workflow
@@ -172,7 +170,7 @@ Agent proposes rule
     |
 User approves
     |
-Rule saved to .agents/kyro-workflow/rules.md
+Rule saved to .agents/sprint-forge/rules.md
     |
 Future sessions load rules automatically
     |
@@ -189,8 +187,7 @@ Technical debt items are tracked formally across sprints. Items are never delete
 
 ## Next Steps
 
-- [Commands Reference](commands-reference.md) -- detailed syntax and examples for all 9 commands
-- [Agents Reference](agents-reference.md) -- how the 4 specialized agents work
-- [Hooks Reference](hooks-reference.md) -- the 12 lifecycle hooks and how to customize them
+- [Commands Reference](commands-reference.md) -- detailed syntax and examples for all 3 commands
+- [Agents Reference](agents-reference.md) -- how the orchestrator agent and its protocols work
 - [Rules Guide](rules-guide.md) -- the per-project learning system
 - [Architecture](architecture.md) -- system design and data flow
