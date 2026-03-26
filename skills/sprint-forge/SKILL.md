@@ -106,7 +106,7 @@ This skill works for **any** project type, language, or framework.
 | Read vault/sprints | Yes | Yes | Yes |
 | Update accumulated debt | No | Yes | No |
 | Report progress | No | No | Yes |
-| Delegate to specialized agents | No | Yes (reviewer, debugger) | No |
+| Run review and debug protocols | No | Yes (review checklist, debug protocol) | No |
 | Propose learned rules | No | Yes (via retro) | No |
 | Validate tasks with checklist | No | Yes (BLOCKER/WARNING/SUGGESTION) | No |
 
@@ -118,7 +118,7 @@ This skill works for **any** project type, language, or framework.
 
 1. **Re-entry prompt** — If the user's message contains file paths (e.g. `/Users/.../ROADMAP.md`), extract `{output_kyro_dir}` from those paths. It's already there.
 2. **INIT (first time)** — Ask the user where to save documents. Store the chosen path in `README.md` and `RE-ENTRY-PROMPTS.md`. These are the only sources of truth.
-3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/kyro-workflow/` in `{cwd}`, or ask the user directly.
+3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/sprint-forge/` in `{cwd}`, or ask the user directly.
 
 No AGENTS.md. No branded blocks. The re-entry prompts and README carry the path across sessions.
 
@@ -212,39 +212,39 @@ This will: read all sprints, calculate metrics, display progress and accumulated
 
 ## Workflow Components
 
-Kyro v2.0 operates as a workflow with specialized agents and commands. The SKILL.md remains the core orchestration logic, but execution is now distributed:
+Kyro v2.0 operates as a workflow with specialized agents (orchestrator + guardian) and commands. The SKILL.md remains the core orchestration logic, but execution is now distributed:
 
-### Agents
+### Agent
 
-| Agent | Role | When Used |
-|-------|------|-----------|
-| `explorer` | Read-only codebase analysis | INIT mode — delegates deep analysis |
-| `reviewer` | Task quality validation | SPRINT mode — validates each task before closure |
-| `debugger` | Root cause investigation | SPRINT mode — invoked on task failure |
-| `orchestrator` | Full cycle coordination | /kyro-workflow:forge command — coordinates all phases with gates |
+The orchestrator is the single agent, handling all phases through specialized protocols:
+
+| Protocol | Role | When Used |
+|----------|------|-----------|
+| Analysis protocol | Read-only codebase analysis | INIT mode — deep codebase exploration |
+| Review checklist | Task quality validation | SPRINT mode — validates each task before closure |
+| Debug protocol | Root cause investigation | SPRINT mode — invoked on task failure |
+| Full cycle coordination | Gate management and sprint lifecycle | /kyro-workflow:forge command — coordinates all phases with gates |
 
 ### Commands
 
 | Command | Maps To |
 |---------|---------|
 | `/kyro-workflow:forge` | Full cycle: INIT → SPRINT → Review → Close with validation gates |
-| `/kyro-workflow:sprint` | SPRINT mode (generate and/or execute) |
 | `/kyro-workflow:status` | STATUS mode with velocity metrics and debt heatmap |
-| `/kyro-workflow:debt` | Debt management (list, add, resolve, escalate) |
-| `/kyro-workflow:retro` | Sprint retrospective ritual with rule proposals |
+| `/kyro-workflow:wrap-up` | End-of-session closure ritual with quality check and context handoff |
 
-### Lifecycle Hooks
+### Guardian Events
 
-The workflow fires hooks at key moments during sprint execution. See `hooks/hooks.json` for the full list. Key hooks:
-- **SessionStart** — loads learned rules from `.agents/kyro-workflow/rules.md`
-- **PostToolUse** — checks for debug artifacts after code edits
-- **TaskCompleted** — runs reviewer checklist
-- **PostToolUseFailure** — suggests debugger invocation
-- **PreCompact** — saves re-entry state before context compaction
+The guardian agent runs configurable checkpoints at lifecycle moments, invoked by the orchestrator. See `agents/guardian.md` for the full list. Key events:
+- **session_start** — loads learned rules from `.agents/sprint-forge/rules.md`
+- **post_tool_use** — checks for debug artifacts after code edits
+- **task_completed** — runs review checklist
+- **pre_compact** — saves re-entry state before context compaction
+- **user_prompt_submit** — drift detection and rule violation check
 
 ### Per-Project Learning
 
-Corrections during sprint execution are captured as persistent rules in `.agents/kyro-workflow/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the `kyro-learner` skill for details.
+Corrections during sprint execution are captured as persistent rules in `.agents/sprint-forge/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the learner helper (`assets/helpers/learner.md`) for details.
 
 ---
 

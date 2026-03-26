@@ -9,8 +9,9 @@ Structured 5-step checklist to close the current session cleanly. Ensures no wor
 
 ## Execution
 
-> **IMPORTANT**: Before running the closure ritual, read the handoff skill:
-> 1. Read `skills/kyro-handoff/SKILL.md` — context transfer format and checklist
+> **IMPORTANT**: Before running the closure ritual:
+> 1. Read `skills/sprint-forge/assets/helpers/handoff.md` — context transfer format and checklist
+> 2. Spawn the `guardian` agent with `event: session_end` — it will check uncommitted changes, sprint progress, and capture learnings (if enabled in config)
 
 ## Session Notes: $ARGUMENTS
 
@@ -44,7 +45,7 @@ Prompt for learnings from this session:
    ```
    [LEARN] Category: One-line rule
    ```
-4. Learnings are automatically persisted to both `.agents/kyro-workflow/rules.md` and the database
+4. Learnings are automatically persisted to both `.agents/sprint-forge/rules.md` and the database
 
 ### Step 4: Next Session Context
 
@@ -81,4 +82,4 @@ Display session stats:
 After completing all 5 steps:
 1. Display the summary
 2. Confirm session is ready to close
-3. Suggest using `/kyro-workflow:retro` if a sprint milestone was reached
+3. Suggest running `/kyro-workflow:forge` if a sprint milestone was reached and a retrospective is needed

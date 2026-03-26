@@ -1,15 +1,15 @@
 ---
-title: "{project_name} — Re-entry Prompts"
+title: "{scope} — Re-entry Prompts"
 date: "{date}"
 updated: "{date}"
-project: "{project_name}"
+scope: "{scope}"
 type: "execution-plan"
 status: "active"
 version: "1.0"
 agents:
   - "{agent_model}"
 tags:
-  - "{project_name}"
+  - "{scope}"
   - "execution-plan"
   - "reentry"
   - "kyro-workflow"
@@ -22,7 +22,7 @@ related:
   - "[[ROADMAP]]"
 ---
 
-# {project_name} — Re-entry Prompts
+# {scope} — Re-entry Prompts
 
 > Last updated: {date}
 > Current sprint: {current_sprint_number}
@@ -65,7 +65,7 @@ This is where all kyro-workflow documents for this project live. All file paths 
 Use this prompt when INIT has been completed and you need to generate Sprint 1.
 
 ```
-I'm working on the {project_name} project. The analysis and roadmap have been created.
+I'm working on the {scope} project. The analysis and roadmap have been created.
 
 Read these files in order:
 1. {output_kyro_dir}/README.md
@@ -83,7 +83,7 @@ and the corresponding finding file(s) as input.
 Use this prompt when Sprint N-1 is complete and you need to generate Sprint N.
 
 ```
-I'm continuing work on the {project_name} project. Sprint {N-1} has been completed.
+I'm continuing work on the {scope} project. Sprint {N-1} has been completed.
 
 Read these files in order:
 1. {output_kyro_dir}/README.md
@@ -102,7 +102,7 @@ are addressed in the Disposition table.
 Use this prompt when a sprint has been generated but not yet executed.
 
 ```
-I'm working on the {project_name} project. Sprint {N} has been generated and needs execution.
+I'm working on the {scope} project. Sprint {N} has been generated and needs execution.
 
 Read these files in order:
 1. {output_kyro_dir}/README.md
@@ -120,7 +120,7 @@ marking progress as you go. Add emergent phases if new work is discovered.
 Use this prompt to get a progress report.
 
 ```
-I need a status report on the {project_name} project.
+I need a status report on the {scope} project.
 
 Read these files:
 1. {output_kyro_dir}/README.md
