@@ -2,8 +2,8 @@
 name: review
 description: Assessment context for sprint status reporting, retrospectives, and metrics analysis. Read-only — no code changes.
 mode: assessment
-agent: reviewer
-model: sonnet
+agent: orchestrator
+model: opus
 ---
 
 # Context: REVIEW — Assessment Mode
@@ -13,9 +13,7 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
 ## When Active
 
 - `/kyro-workflow:status` — project metrics and debt heatmap
-- `/kyro-workflow:retro` — sprint retrospective ritual
 - `/kyro-workflow:forge` Phase 4 (Review & Close)
-- `/kyro-workflow:debt` — technical debt review
 
 ## Behavior
 
@@ -32,7 +30,7 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
    - Age of each item (sprints since creation)
    - Items flagged as `[AGED]` (open > 3 sprints)
 
-### Retrospective (`/kyro-workflow:retro`)
+### Retrospective (forge Phase 4)
 
 1. Read the completed sprint file.
 2. Evaluate each task:
@@ -44,12 +42,12 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
    - **What went wrong** — blockers, underestimates, regressions
    - **Recommendations** — numbered list of improvements for Sprint N+1
    - **Estimation corrections** — adjusted buffers for task types
-   - **New learned rules** — proposed additions to `.agents/kyro/rules.md`
+   - **New learned rules** — proposed additions to `.agents/sprint-forge/rules.md`
 4. Update the debt table with any new items or status changes.
 
 ### Metrics Analysis
 
-The `kyro-metrics` skill provides:
+The metrics helper provides:
 
 - Velocity trend (SP/sprint over last 5 sprints)
 - Estimation accuracy trend (mean absolute error over time)
@@ -63,7 +61,7 @@ Review outputs feed directly into next sprint planning:
 
 - Recommendations become the disposition table in Sprint N+1.
 - Estimation corrections update buffer percentages.
-- New rules are proposed for `.agents/kyro/rules.md`.
+- New rules are proposed for `.agents/sprint-forge/rules.md`.
 - Unresolved debt items carry forward with updated age.
 
 ## Constraints
@@ -74,9 +72,9 @@ Review outputs feed directly into next sprint planning:
 
 ## Delegation
 
-- **Primary agent**: reviewer (quality assessment and metrics)
+- **Primary agent**: orchestrator (using review checklist protocol)
 - Tools: `Read`, `Glob`, `Grep`, `Bash` (read-only commands only)
-- Skills: `kyro-metrics`, `kyro-reviewer`
+- Helpers: `metrics`, `reviewer` (in `skills/sprint-forge/assets/helpers/`)
 
 ## Output
 

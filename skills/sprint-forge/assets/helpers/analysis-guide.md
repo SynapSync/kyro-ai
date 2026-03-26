@@ -144,7 +144,7 @@ Each finding becomes a separate file. This is important for:
 title: "Finding: {Title}"
 date: "{date}"
 updated: "{date}"
-project: "{project_name}"
+scope: "{scope}"
 type: "analysis"
 status: "active"
 version: "1.0"
@@ -152,7 +152,7 @@ severity: "{critical | high | medium | low}"
 agents:
   - "{agent_model}"
 tags:
-  - "{project_name}"
+  - "{scope}"
   - "analysis"
   - "finding"
 changelog:
