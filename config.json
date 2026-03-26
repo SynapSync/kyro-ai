@@ -1,10 +1,10 @@
 {
   "database": {
-    "path": ".agents/kyro-workflow/data.db",
+    "path": ".agents/sprint-forge/data.db",
     "auto_init": true
   },
   "rules": {
-    "path": ".agents/kyro-workflow/rules.md",
+    "path": ".agents/sprint-forge/rules.md",
     "auto_load": true,
     "require_approval": true
   },
@@ -15,7 +15,7 @@
   "self_correction": {
     "enabled": true,
     "require_approval": true,
-    "learned_file": ".agents/kyro-workflow/rules.md"
+    "learned_file": ".agents/sprint-forge/rules.md"
   },
   "quality_gates": {
     "run_lint": true,
@@ -45,5 +45,49 @@
   "context": {
     "warning_threshold_percent": 70,
     "auto_save_reentry": true
+  },
+  "guardian": {
+    "events": {
+      "session_start": {
+        "enabled": true,
+        "description": "Load rules.md, detect active sprint, show session summary"
+      },
+      "pre_phase": {
+        "enabled": true,
+        "description": "Validate state before starting a new phase (rules loaded, sprint file exists)"
+      },
+      "post_edit_scan": {
+        "enabled": true,
+        "description": "Scan edited files for console.log, debugger, secrets, TODOs"
+      },
+      "pre_commit": {
+        "enabled": true,
+        "description": "Run quality gates (lint, typecheck, tests) before committing"
+      },
+      "test_failure": {
+        "enabled": true,
+        "description": "On test failure, trigger structured debug protocol"
+      },
+      "task_complete": {
+        "enabled": true,
+        "description": "Run BLOCKER/WARNING/SUGGESTION checklist after each task"
+      },
+      "drift_check": {
+        "enabled": false,
+        "description": "Check if current work drifts from the active sprint task"
+      },
+      "rule_check": {
+        "enabled": true,
+        "description": "Verify learned rules are not being violated"
+      },
+      "learn_capture": {
+        "enabled": true,
+        "description": "Capture corrections and patterns as rule proposals"
+      },
+      "session_end": {
+        "enabled": true,
+        "description": "Save re-entry prompts, session stats, and pending learnings"
+      }
+    }
   }
 }

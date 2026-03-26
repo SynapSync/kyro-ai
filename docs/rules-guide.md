@@ -1,6 +1,6 @@
 # Rules Guide -- Per-Project Learning System
 
-Kyro accumulates knowledge across sprints through a persistent rules file at `.agents/kyro-workflow/rules.md`. Rules capture corrections, patterns, and estimation insights so that mistakes made once are never repeated.
+Kyro accumulates knowledge across sprints through a persistent rules file at `.agents/sprint-forge/rules.md`. Rules capture corrections, patterns, and estimation insights so that mistakes made once are never repeated.
 
 ---
 
@@ -18,7 +18,7 @@ The learning flow moves from correction to persistent rule in four steps:
 3. User approves (or edits) the proposed rule
        |
        v
-4. Rule is appended to .agents/kyro-workflow/rules.md
+4. Rule is appended to .agents/sprint-forge/rules.md
 ```
 
 ### Detection
@@ -49,7 +49,7 @@ The user can:
 
 ### Storage
 
-Approved rules are appended to `.agents/kyro-workflow/rules.md` and logged in the sprint's `LEARNED` section.
+Approved rules are appended to `.agents/sprint-forge/rules.md` and logged in the sprint's `LEARNED` section.
 
 ---
 
@@ -109,9 +109,9 @@ Rules are organized into categories that correspond to different phases of sprin
 
 ### Loading
 
-At the start of every session, the `SessionStart` hook:
+At the start of every session, the guardian `session_start` event:
 
-1. Reads `.agents/kyro-workflow/rules.md` (path configurable in `config.json`)
+1. Reads `.agents/sprint-forge/rules.md` (path configurable in `config.json`)
 2. Parses all active rules
 3. Makes them available to all agents for the session
 
@@ -128,7 +128,7 @@ Rules are applied contextually based on their category:
 
 ### Rule Violation Warning
 
-When the agent is about to violate a learned rule, the `UserPromptSubmit` hook triggers a warning:
+When the agent is about to violate a learned rule, the guardian `user_prompt_submit` event triggers a warning:
 
 ```
 [Kyro] Rule violation detected:
@@ -182,7 +182,7 @@ After accumulating many rules, related rules can be consolidated:
 
 ### Rule Limits
 
-The kyro-learner skill enforces a maximum of **50 active rules**. When approaching this limit:
+The learner helper enforces a maximum of **50 active rules**. When approaching this limit:
 - Review rules by `times_applied` -- rarely-applied rules may be candidates for deprecation
 - Consolidate related rules into broader, more useful ones
 - Deprecate rules tied to completed or abandoned projects
@@ -225,7 +225,7 @@ The kyro-learner skill enforces a maximum of **50 active rules**. When approachi
 
 ## Rules in the Database
 
-In addition to the `rules.md` file, learnings are stored in the SQLite database (`.agents/kyro-workflow/data.db`) in the `learnings` table:
+In addition to the `rules.md` file, learnings are stored in the SQLite database (`.agents/sprint-forge/data.db`) in the `learnings` table:
 
 | Column | Type | Description |
 |--------|------|-------------|

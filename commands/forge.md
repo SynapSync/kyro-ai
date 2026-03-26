@@ -19,7 +19,7 @@ Execute the full sprint lifecycle with validation gates between each phase.
 
 Before anything else, the orchestrator must determine the project state:
 
-1. Scan `.agents/kyro-workflow/sprint-forge/` for existing project directories
+1. Scan `.agents/sprint-forge/` for existing project directories
 2. Check if a `ROADMAP.md` exists for this project
 
 **If NO ROADMAP exists** → This is a new project. Run **INIT flow** (Phases 1-2 below).
@@ -31,7 +31,7 @@ Before anything else, the orchestrator must determine the project state:
 
 ### Phase 1: Analyze (INIT mode)
 
-The orchestrator delegates to the **explorer** agent and follows the sprint-forge INIT mode:
+The orchestrator follows the **analysis protocol** and the sprint-forge INIT mode:
 
 1. Detect work type (audit, new feature, bugfix, new project, tech debt)
 2. Resolve configuration — project name, codebase path, output directory
@@ -82,8 +82,8 @@ Execute task by task with quality gates:
 
 1. For each task:
    - Execute the task
-   - Run **reviewer** agent checklist (BLOCKER/WARNING/SUGGESTION)
-   - If BLOCKER found → invoke **debugger** agent
+   - Run **review checklist** (BLOCKER/WARNING/SUGGESTION)
+   - If BLOCKER found → invoke **debug protocol**
    - Checkpoint after each phase completes (write sprint file to disk)
 2. Handle emergent work — add new phases when discoveries surface
 3. Pause for review every 5 edits
@@ -98,7 +98,7 @@ Execute task by task with quality gates:
 4. Update accumulated debt table
 5. Update re-entry prompts
 6. Update roadmap if execution revealed changes
-7. Propose new rules for `.agents/kyro-workflow/rules.md`
+7. Propose new rules for `.agents/sprint-forge/rules.md`
 8. Commit with conventional message
 
 ### Learning Capture

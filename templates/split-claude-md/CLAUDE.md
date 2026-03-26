@@ -5,14 +5,14 @@
 This project uses **Kyro** for structured sprint execution.
 
 - Workflow: `kyro-workflow` (installed via Claude Code plugin or local path)
-- Sprint output: `.agents/kyro-workflow/sprint-forge/{project}/`
-- Learned rules: `.agents/kyro-workflow/rules.md`
+- Sprint output: `.agents/sprint-forge/{project}/`
+- Learned rules: `.agents/sprint-forge/rules.md`
 
 ## Agent Rules
 
 See [AGENTS.md](./AGENTS.md) for:
 - Sprint discipline and quality gate requirements
-- Agent delegation rules (explorer, reviewer, debugger, orchestrator)
+- Orchestrator protocols (analysis, review, debug)
 - Re-entry prompt conventions
 
 ## Learned Rules
