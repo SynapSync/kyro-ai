@@ -31,6 +31,7 @@ export interface DebtItem {
   item: string;
   origin: string;
   sprint_target?: string;
+  sprint_created?: string;
   status?: string;
   resolved_in?: string;
   directory?: string;
@@ -108,11 +109,12 @@ export function createStore(db: Database.Database) {
     // Debt Items
     addDebtItem(item: DebtItem): number {
       const stmt = db.prepare(`
-        INSERT INTO debt_items (project, item, origin, sprint_target, status, directory, severity)
-        VALUES (@project, @item, @origin, @sprint_target, @status, @directory, @severity)
+        INSERT INTO debt_items (project, item, origin, sprint_target, sprint_created, status, directory, severity)
+        VALUES (@project, @item, @origin, @sprint_target, @sprint_created, @status, @directory, @severity)
       `);
       const result = stmt.run({
         sprint_target: null,
+        sprint_created: null,
         status: 'open',
         resolved_in: null,
         directory: null,
@@ -136,13 +138,27 @@ export function createStore(db: Database.Database) {
         .all(project) as DebtItem[];
     },
 
+    // NOTE: getAgedDebt() counts distinct sprint names from the sessions table to
+    // determine how many sprints have passed since a debt item was created. This
+    // means it depends on session records existing with non-null sprint values.
+    // If sessions are started without sprint names, or if sprint naming conventions
+    // change, the age calculation may be inaccurate. This is an accepted limitation
+    // — the alternative (a dedicated sprint counter table) is not worth the complexity.
     getAgedDebt(project: string, maxSprints = 3): DebtItem[] {
-      // Returns items that have been open across multiple sprints
       return db.prepare(`
-        SELECT * FROM debt_items
-        WHERE project = ? AND status IN ('open', 'in-progress')
-        ORDER BY created_at ASC
-      `).all(project) as DebtItem[];
+        SELECT d.* FROM debt_items d
+        WHERE d.project = ? AND d.status IN ('open', 'in-progress')
+          AND (
+            d.sprint_created IS NULL
+            OR (
+              SELECT COUNT(DISTINCT s.sprint) FROM sessions s
+              WHERE s.project = d.project
+                AND s.sprint IS NOT NULL
+                AND s.sprint > d.sprint_created
+            ) >= ?
+          )
+        ORDER BY d.created_at ASC
+      `).all(project, maxSprints) as DebtItem[];
     }
   };
 }

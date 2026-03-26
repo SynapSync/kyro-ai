@@ -1,6 +1,6 @@
 {
   "name": "kyro-workflow",
-  "version": "2.4.0",
+  "version": "3.1.0",
   "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive per-project learning",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,8 @@
     "postbuild": "cp src/db/schema.sql dist/db/schema.sql",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build",
-    "db:init": "node dist/db/index.js"
+    "db:init": "node dist/db/index.js",
+    "check-sync": "node scripts/check-sync.js"
   },
   "keywords": [
     "claude-code",
@@ -61,7 +62,7 @@
     "contexts",
     "templates",
     "config.json",
-    "marketplace.json",
+    ".claude-plugin",
     "settings.example.json",
     "README.md"
   ]

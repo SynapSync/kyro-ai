@@ -10,9 +10,9 @@
 
 ### Retrospective Required
 
-- Every completed sprint MUST end with a retrospective (`/kyro-workflow:retro`).
+- Every completed sprint MUST end with a retrospective (the retrospective phase of forge).
 - The retro captures: what worked, what did not, estimation accuracy, and concrete improvements.
-- Learnings from the retro are written to `LEARNED.md` and to `.agents/kyro/rules.md` for per-project reuse.
+- Learnings from the retro are written to `LEARNED.md` and to `.agents/sprint-forge/rules.md` for per-project reuse.
 - Skipping the retro is a workflow violation.
 
 ### Debt is Inherited
@@ -28,10 +28,10 @@
 
 Every sprint phase transition requires a quality gate:
 
-1. **Analysis gate** — Explorer findings reviewed and approved before planning.
+1. **Analysis gate** — Analysis phase findings reviewed and approved before planning.
 2. **Plan gate** — Sprint plan reviewed and approved before implementation.
 3. **Implementation gate** — Each task passes lint, type-check, and tests before marking complete.
-4. **Review gate** — Reviewer agent validates task output against acceptance criteria.
+4. **Review gate** — Review step validates task output against acceptance criteria.
 5. **Commit gate** — All quality checks pass before final commit.
 
 Rules:
@@ -44,25 +44,24 @@ Rules:
 When a session ends or context is compacted:
 
 1. Save the current sprint state as a checkpoint.
-2. Write a re-entry prompt to `.agents/kyro/{project}/reentry.md` that contains:
+2. Write a re-entry prompt to `.agents/sprint-forge/{project}/reentry.md` that contains:
    - Current sprint ID and phase.
    - Last completed task.
    - Next task and its context.
    - Any blockers or open questions.
 3. On session start, load the re-entry prompt to restore context.
 
-## Agent Delegation
+## Orchestrator Protocols
 
-### Explorer Agent
+### Analysis Protocol
 
 Use for: initial codebase analysis, architecture mapping, risk identification.
 
-- Read-only. Must not modify any files.
-- Preferred model: haiku (fast, cheap).
-- Delegated automatically during the Analyze phase of `/kyro-workflow:forge`.
+- Read-only during this phase. Must not modify any files.
+- Runs automatically during the Analyze phase of `/kyro-workflow:forge`.
 - Can be invoked manually for ad-hoc exploration.
 
-### Reviewer Agent
+### Review Checklist
 
 Use for: task validation, quality checklist enforcement.
 
@@ -71,21 +70,19 @@ Use for: task validation, quality checklist enforcement.
 - Classifies findings as BLOCKER, WARNING, or SUGGESTION.
 - BLOCKERs must be resolved before task is marked done.
 
-### Debugger Agent
+### Debug Protocol
 
 Use for: root cause analysis when a task fails or tests break.
 
-- Invoked automatically on repeated failures or via manual delegation.
-- Preferred model: opus (deep reasoning).
+- Invoked automatically on repeated failures.
 - Must produce a root cause report before suggesting a fix.
 - Fixes are proposed, not applied — user approves before changes.
 
-### Orchestrator Agent
+### Full Cycle Coordination
 
-Use for: full-cycle coordination via `/kyro-workflow:forge`.
+The orchestrator manages the Analyze -> Plan -> Implement -> Review -> Commit lifecycle.
 
-- Manages the Analyze -> Plan -> Implement -> Review -> Commit lifecycle.
-- Delegates to explorer, reviewer, and debugger as needed.
+- Runs analysis, review, and debug protocols as needed.
 - Enforces gate transitions and checkpoint saves.
 - Handles parallel task suggestions when worktrees are available.
 
