@@ -1,84 +1,117 @@
 flowchart TD
-    subgraph SKILLS_ENTRY["Skills (standalone slash commands)"]
-        SK1["/sprint-forge — Core: INIT · SPRINT · STATUS"]
-        SK2["/kyro-analyzer"]
-        SK3["/kyro-learner"]
-        SK4["/kyro-metrics"]
-        SK5["/kyro-handoff"]
-        SK6["/kyro-reviewer"]
-        SK7["/deslop"]
+    classDef user fill:#1a1a2e,stroke:#e94560,color:#fff,stroke-width:2px
+    classDef cmd fill:#16213e,stroke:#0f3460,color:#fff
+    classDef agent fill:#0f3460,stroke:#e94560,color:#fff,stroke-width:2px
+    classDef protocol fill:#1a1a2e,stroke:#533483,color:#fff
+    classDef skill fill:#533483,stroke:#e94560,color:#fff
+    classDef helper fill:#2a2a4a,stroke:#533483,color:#ccc
+    classDef storage fill:#0a0a1a,stroke:#0f3460,color:#aaa
+    classDef config fill:#1a1a2e,stroke:#e94560,color:#e94560,stroke-dasharray: 5 5
+
+    USER(("User")):::user
+
+    subgraph COMMANDS["Commands"]
+        FORGE["/forge"]:::cmd
+        STATUS["/status"]:::cmd
+        WRAPUP["/wrap-up"]:::cmd
     end
 
-    subgraph COMMANDS_ENTRY["Commands (kyro-workflow:*)"]
-        CMD1["/kyro-workflow:forge"]
-        CMD2["/kyro-workflow:sprint"]
-        CMD3["/kyro-workflow:status"]
-        CMD4["/kyro-workflow:debt"]
-        CMD5["/kyro-workflow:retro"]
-        CMD6["/kyro-workflow:wrap-up"]
-        CMD7["/kyro-workflow:insights"]
-        CMD8["/kyro-workflow:deslop"]
-        CMD9["/kyro-workflow:parallel"]
+    subgraph AGENTS["Agents"]
+        ORCH["Orchestrator\n─────────\nopus · read+write\nFull cycle coordinator"]:::agent
+        GUARD["Guardian\n─────────\nsonnet · read-only\nLifecycle checkpoints"]:::agent
     end
 
-    subgraph AGENTS["AGENTS"]
-        ORCH["orchestrator — opus · read+write"]
-        EXPL["explorer — sonnet · read-only"]
-        REVW["reviewer — sonnet · read-only"]
-        DBGR["debugger — opus · read-only"]
+    subgraph PROTOCOLS["Orchestrator Protocols"]
+        direction LR
+        P_ANALYSIS["Analysis\nread-only exploration"]:::protocol
+        P_REVIEW["Review\nBLOCKER · WARNING\nSUGGESTION"]:::protocol
+        P_DEBUG["Debug\nhypothesis-driven\nroot cause"]:::protocol
     end
 
-    subgraph KNOWLEDGE["SKILLS — domain knowledge"]
-        S_FORGE["sprint-forge — modes · helpers · templates"]
-        S_ANALYZER["kyro-analyzer — strategies per work type"]
-        S_REVIEWER["kyro-reviewer — BLOCKER/WARNING/SUGGESTION"]
-        S_LEARNER["kyro-learner — per-project rules"]
-        S_METRICS["kyro-metrics — velocity · debt heatmap"]
-        S_HANDOFF["kyro-handoff — mental context transfer"]
-        S_DESLOP["deslop — AI slop detection"]
+    subgraph SKILL["Skill: sprint-forge"]
+        direction TB
+        SKILL_CORE["SKILL.md\nmodes · rules · capabilities"]:::skill
+
+        subgraph MODES["Modes"]
+            direction LR
+            M_INIT["INIT"]:::helper
+            M_SPRINT["SPRINT"]:::helper
+            M_STATUS["STATUS"]:::helper
+        end
+
+        subgraph HELPERS["Helpers"]
+            direction LR
+            H_ANALYZER["analyzer"]:::helper
+            H_REVIEWER["reviewer"]:::helper
+            H_LEARNER["learner"]:::helper
+            H_METRICS["metrics"]:::helper
+            H_HANDOFF["handoff"]:::helper
+            H_ANALYSIS["analysis\nguide"]:::helper
+            H_SPRINT["sprint\ngenerator"]:::helper
+            H_DEBT["debt\ntracker"]:::helper
+            H_REENTRY["reentry\ngenerator"]:::helper
+        end
+
+        TEMPLATES["Templates\nROADMAP · SPRINT\nREADME · RE-ENTRY"]:::helper
     end
 
-    subgraph HOOKS["HOOKS — 12 lifecycle events"]
-        H1["SessionStart — load rules"]
-        H2["UserPromptSubmit — drift check"]
-        H3["PreToolUse — track edits"]
-        H4["PostToolUse — check artifacts"]
-        H5["TaskCompleted — reviewer checklist"]
-        H6["Stop — capture learnings"]
-        H7["PreCompact — save re-entry"]
-        H8["SessionEnd — save stats"]
+    subgraph GUARDIAN_EVENTS["Guardian Events (config.json)"]
+        direction LR
+        E_START["session\nstart"]:::config
+        E_PHASE["pre\nphase"]:::config
+        E_EDIT["post edit\nscan"]:::config
+        E_COMMIT["pre\ncommit"]:::config
+        E_TASK["task\ncomplete"]:::config
+        E_LEARN["learn\ncapture"]:::config
+        E_END["session\nend"]:::config
+        E_RULE["rule\ncheck"]:::config
+        E_TEST["test\nfailure"]:::config
+        E_DRIFT["drift\ncheck"]:::config
     end
 
-    subgraph STORAGE["STORAGE — .agents/kyro/"]
-        DB["data.db — SQLite"]
-        RULES["rules.md — learned rules"]
-        SESSION[".active-session"]
-        PROJ["{project}/ — findings · sprints · ROADMAP"]
+    subgraph STORAGE["Storage: .agents/sprint-forge/"]
+        direction LR
+        S_RULES["rules.md"]:::storage
+        S_DB["data.db"]:::storage
+        S_SESSION[".active-session"]:::storage
+        S_PROJ["{project}/\nfindings · sprints\nROADMAP · RE-ENTRY"]:::storage
     end
 
-    CMD1 --> ORCH
-    CMD2 --> ORCH
-    CMD5 --> ORCH
-    CMD3 -.->|direct| PROJ
-    CMD4 -.->|direct| PROJ
+    %% User → Commands
+    USER --> FORGE
+    USER --> STATUS
+    USER --> WRAPUP
 
-    ORCH -->|INIT| EXPL
-    ORCH -->|validate| REVW
-    ORCH -->|failure| DBGR
+    %% Commands → Agents
+    FORGE ==> ORCH
+    STATUS -.->|reads directly| S_PROJ
+    STATUS -.-> SKILL_CORE
+    WRAPUP -.-> GUARD
 
-    ORCH -.-> S_FORGE
-    EXPL -.-> S_ANALYZER
-    REVW -.-> S_REVIEWER
+    %% Orchestrator → Protocols
+    ORCH -->|"Phase 1: Analyze"| P_ANALYSIS
+    ORCH -->|"Phase 4: Validate"| P_REVIEW
+    ORCH -->|"on failure"| P_DEBUG
 
-    CMD5 -.-> S_LEARNER
-    CMD6 -.-> S_HANDOFF
-    CMD7 -.-> S_METRICS
-    CMD8 -.-> S_DESLOP
+    %% Orchestrator → Guardian
+    ORCH ==>|"lifecycle events"| GUARD
 
-    H1 --> RULES
-    H5 --> DB
-    H6 --> RULES
-    H8 --> DB
-    H3 --> SESSION
-    ORCH --> PROJ
-    ORCH --> DB
+    %% Orchestrator → Skill
+    ORCH -.->|reads| SKILL_CORE
+
+    %% Protocols → Skill helpers
+    P_ANALYSIS -.-> H_ANALYZER
+    P_ANALYSIS -.-> H_ANALYSIS
+    P_REVIEW -.-> H_REVIEWER
+    ORCH -.-> H_LEARNER
+
+    %% Guardian → Storage
+    GUARD --> S_RULES
+    GUARD --> S_DB
+    GUARD --> S_SESSION
+
+    %% Guardian → Events
+    GUARD -.->|"checks config"| E_START
+
+    %% Orchestrator → Storage
+    ORCH --> S_PROJ

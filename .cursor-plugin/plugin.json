@@ -1,7 +1,0 @@
-{
-  "name": "kyro-workflow",
-  "version": "2.4.0",
-  "description": "Agentic execution kernel for structured work. 4 agents, 12 hooks, 9 commands, 7 skills, adaptive learning.",
-  "skills": ["./skills/"],
-  "rules": ["./rules/"]
-}

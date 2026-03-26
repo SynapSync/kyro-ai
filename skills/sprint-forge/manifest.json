@@ -2,8 +2,8 @@
   "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
   "name": "sprint-forge",
   "type": "workflow",
-  "version": "2.0.0",
-  "description": "Adaptive sprint workflow with specialized agents, lifecycle hooks, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",
+  "version": "2.1.0",
+  "description": "Adaptive sprint workflow with specialized agents, guardian-based lifecycle events, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",
   "author": {
     "name": "SynapSync",
     "url": "https://github.com/SynapSync",
@@ -45,10 +45,19 @@
   },
   "changelog": [
     {
+      "version": "2.1.0",
+      "date": "2026-03-23",
+      "changes": [
+        "Replace {project-name} with {scope} in Configuration Resolution and default output_dir paths — {scope} is a kebab-case work topic (e.g., oauth-implementation, ui-redesign), not the repo name",
+        "Update INIT Step 2 config table: Project Name → Scope with clarification that repo is already {cwd}",
+        "Update architecture, getting-started, and WORKFLOW.yaml to reflect {scope} convention"
+      ]
+    },
+    {
       "version": "2.0.0",
       "date": "2026-03-08",
       "changes": [
-        "Evolve from standalone skill to full workflow with specialized agents (explorer, reviewer, debugger, orchestrator), lifecycle hooks, slash commands (/kyro-workflow:forge, /kyro-workflow:sprint, /kyro-workflow:status, /kyro-workflow:debt, /kyro-workflow:retro), and per-project learning via persistent rules"
+        "Evolve from standalone skill to full workflow with orchestrator + guardian agents, guardian-based lifecycle events, slash commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up), and per-project learning via persistent rules"
       ]
     },
     {
@@ -112,7 +121,7 @@
       "date": "2026-02-18",
       "changes": [
         "Replaced staging pattern with interactive path resolution — ask once before first write",
-        "Option 1: {cwd}/.agents/kyro/{project-name}/ (default)",
+        "Option 1: {cwd}/.agents/sprint-forge/{project-name}/ (default)",
         "Option 2: {user-root}/kyro/{project-name}/ (custom)",
         "Removed post-production delivery steps from INIT and SPRINT modes",
         "Added Step 0 to SPRINT and STATUS for locating {output_kyro_dir} in future sessions"

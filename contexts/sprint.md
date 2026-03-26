@@ -1,6 +1,6 @@
 ---
 name: sprint
-description: Execution context for task-by-task sprint implementation with quality gates, reviewer validation, and emergent phase handling.
+description: Execution context for task-by-task sprint implementation with quality gates, review validation, and emergent phase handling.
 mode: execution
 agent: orchestrator
 model: opus
@@ -13,7 +13,6 @@ Activated during sprint implementation. This context puts Kyro in **active execu
 ## When Active
 
 - `/kyro-workflow:forge` Phase 3 (Implement)
-- `/kyro-workflow:sprint execute`
 - Resuming a sprint from a checkpoint
 
 ## Behavior
@@ -24,8 +23,8 @@ For each task in the sprint plan:
 
 1. **Execute** — Implement the task according to its description and acceptance criteria.
 2. **Checkpoint** — Save the sprint file after the task completes.
-3. **Review** — Delegate to the **reviewer** agent for quality checklist validation.
-4. **Resolve** — If the reviewer finds BLOCKERs, delegate to the **debugger** agent.
+3. **Review** — Run the **review checklist** for quality validation.
+4. **Resolve** — If the review finds BLOCKERs, run the **debug protocol**.
 5. **Record** — Log actual time, notes, and any discovered work.
 
 ### Quality Gates
@@ -47,9 +46,9 @@ When implementation reveals work not in the original plan:
 3. If the emergent work is a prerequisite for planned tasks, insert a new phase.
 4. If it is independent, add it to the backlog or current sprint (with user approval).
 
-### Reviewer Validation
+### Review Validation
 
-The **reviewer** agent runs after each task with a checklist:
+The **review checklist** runs after each task:
 
 - Does the change match the task description?
 - Are there regressions?
@@ -57,20 +56,20 @@ The **reviewer** agent runs after each task with a checklist:
 - Is there new debt to track?
 - Any SUGGESTION-level improvements?
 
-### Debugger on Failure
+### Debug on Failure
 
 When a task fails (tests break, type errors, runtime errors):
 
-1. Automatically delegate to the **debugger** agent.
-2. The debugger performs root cause analysis.
+1. Automatically run the **debug protocol**.
+2. The orchestrator performs root cause analysis.
 3. Fix is applied and the task re-enters the review cycle.
-4. If the debugger cannot resolve, escalate to the user.
+4. If the debug protocol cannot resolve, escalate to the user.
 
 ## Delegation
 
 - **Primary agent**: orchestrator (coordinates the full flow)
-- **Reviewer**: invoked after each task
-- **Debugger**: invoked on failure
+- **Review checklist**: run after each task
+- **Debug protocol**: run on failure
 - Tools: all tools available (Read, Write, Edit, Glob, Grep, Bash)
 
 ## Output

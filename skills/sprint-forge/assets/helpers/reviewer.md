@@ -1,10 +1,3 @@
----
-name: kyro-reviewer
-description: >
-  Quality validation checklist for sprint tasks. Provides BLOCKER/WARNING/SUGGESTION
-  classification for task closure decisions.
----
-
 # Kyro Reviewer — Task Quality Validation
 
 ## Purpose
@@ -36,7 +29,7 @@ Provides a structured quality checklist that runs after each sprint task complet
 
 ## Validation Commands
 
-The reviewer uses these commands to validate (adapt to project stack):
+The orchestrator uses these commands during the review step to validate (adapt to project stack):
 
 ```bash
 # Tests
