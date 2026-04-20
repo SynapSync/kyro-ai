@@ -28,7 +28,8 @@
   ],
   "skills": ["./skills/"],
   "agents": [
-    "./agents/orchestrator.md"
+    "./agents/orchestrator.md",
+    "./agents/guardian.md"
   ],
   "commands": ["./commands/"]
 }
