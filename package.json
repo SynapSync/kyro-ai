@@ -9,8 +9,7 @@
     "postbuild": "cp src/db/schema.sql dist/db/schema.sql",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build",
-    "db:init": "node dist/db/index.js",
-    "check-sync": "node scripts/check-sync.js"
+    "db:init": "node dist/db/index.js"
   },
   "keywords": [
     "claude-code",
@@ -52,8 +51,6 @@
   },
   "files": [
     "dist",
-    "scripts",
-    "hooks",
     "commands",
     "agents",
     "skills",
