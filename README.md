@@ -32,12 +32,12 @@ Unlike rigid project planners, Kyro:
 
 ---
 
-## What's New in v2.0
+## What's New in v3.0
 
 <table>
 <tr><td><b>2 Agents</b></td><td>Orchestrator (full cycle coordination) + Guardian (configurable event-based checkpoints)</td></tr>
 <tr><td><b>3 Commands</b></td><td><code>/kyro-workflow:forge</code>, <code>/kyro-workflow:status</code>, <code>/kyro-workflow:wrap-up</code></td></tr>
-<tr><td><b>10 Guardian Events</b></td><td>session_start, pre_tool_use, post_tool_use, stop, session_end, user_prompt_submit, pre_compact, subagent_start, subagent_stop, task_completed</td></tr>
+<tr><td><b>10 Guardian Events</b></td><td>configurable checkpoints replacing Node.js hooks/scripts with intelligent, context-aware validation</td></tr>
 <tr><td><b>Per-Project Learning</b></td><td>Corrections become rules in <code>.agents/sprint-forge/rules.md</code> — applied automatically in future sprints</td></tr>
 <tr><td><b>Validation Gates</b></td><td>BLOCKER/WARNING/SUGGESTION checklist per task, phase gates with user approval</td></tr>
 <tr><td><b>Velocity Metrics</b></td><td>Sprint velocity trends, debt heatmap, underestimation pattern detection</td></tr>
@@ -111,18 +111,19 @@ kyro-workflow/
 │   └── wrap-up.md              # /kyro-workflow:wrap-up — session closure ritual
 │
 ├── skills/                     # 1 skill (domain knowledge)
-│   └── sprint-forge/            # Core orchestration (base skill from v1.x)
+│   └── sprint-forge/            # Core orchestration and sprint execution
 │       ├── SKILL.md
 │       └── assets/             # Modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │
-├── docs/                       # 7 documentation guides
+├── docs/                       # 8 documentation guides
 │   ├── getting-started.md      # Quick start walkthrough
 │   ├── commands-reference.md   # Full command documentation
 │   ├── agents-reference.md     # Agent capabilities and tools
 │   ├── rules-guide.md          # Self-correction rules system
 │   ├── architecture.md         # System architecture deep dive
 │   ├── model-selection.md      # Model tier selection guide
-│   └── context-management.md   # Token limits and compaction strategies
+│   ├── context-management.md   # Token limits and compaction strategies
+│   └── (+ additional guides)   # Coverage for all major workflows
 │
 ├── src/                        # TypeScript source (SQLite + FTS5)
 │   ├── db/                     # Database init, schema, store
@@ -250,16 +251,16 @@ The guardian agent runs configurable checkpoints at lifecycle moments, invoked b
 
 | Event | When | What |
 |-------|------|------|
-| session_start | New session | Load learned rules, show active sprint |
-| pre_tool_use | Before edits / git commit | Track edit count, quality gate reminders |
-| post_tool_use | After code edits / tests | Check for debug artifacts, secrets, detect failures |
-| stop | Each response | Session check, capture [LEARN] blocks |
-| session_end | Session close | Save stats, prompt for learnings |
-| user_prompt_submit | Each prompt | Drift detection, rule violation check |
-| pre_compact | Before compaction | Save re-entry state |
-| subagent_start | Agent starts | Log for observability |
-| subagent_stop | Agent stops | Log completion, post-task quality checklist |
-| task_completed | Task marked done | Post-task quality checklist |
+| session_start | New session | Load learned rules, detect active sprint, show session summary |
+| pre_phase | Before each phase | Validate state (rules loaded, sprint file exists) |
+| post_edit_scan | After code edits | Scan for console.log, debugger, secrets, TODOs |
+| pre_commit | Before git commit | Run quality gates (lint, typecheck, tests) |
+| test_failure | Test failure detected | Trigger structured debug protocol |
+| task_complete | Task completion | Run BLOCKER/WARNING/SUGGESTION checklist |
+| drift_check | Configurable timing | Verify work aligns with active sprint task |
+| rule_check | Per phase | Verify learned rules not being violated |
+| learn_capture | End of session | Capture corrections and patterns as rule proposals |
+| session_end | Session close | Save re-entry prompts, session stats, pending learnings |
 
 ---
 
@@ -316,24 +317,6 @@ See [`settings.example.json`](settings.example.json) for production permission a
 5. **Zero dead time** — parallel tasks via worktrees when dependencies allow
 6. **Debt never disappears** — only its status changes
 7. **The plan serves execution, not the reverse** — roadmaps adapt to reality
-
----
-
-## Comparison: v1.x Skill vs v2.0 Workflow
-
-| Dimension | v1.x (Skill) | v2.0 (Workflow) |
-|-----------|--------------|-----------------|
-| Type | Single skill | Full workflow |
-| Learning | Per-project retro | Persistent rules across sprints |
-| Agents | 1 (the skill itself) | 2 (orchestrator + guardian with 10 configurable events) |
-| Commands | 0 (text triggers) | 3 commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up) |
-| Quality gates | 0 | Per-task (BLOCKER/WARNING/SUGGESTION) + per-phase |
-| Metrics | Basic STATUS | Velocity trends + debt heatmap + estimation patterns |
-| Context transfer | Re-entry prompts (files) | Enriched handoff (mental context) |
-| Database | None | SQLite + FTS5 (learnings, sessions, debt) |
-| CI/CD | None | 2 GitHub Actions workflows (CI + Release) |
-| Documentation | README only | 8 guides + SOUL.md template |
-| Distribution | Manual clone | .claude-plugin/ + npm pack ready |
 
 ---
 
