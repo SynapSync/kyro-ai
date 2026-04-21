@@ -5,7 +5,7 @@
     "email": "synapsync@proton.me"
   },
   "metadata": {
-    "description": "Complete sprint workflow system for AI-assisted development"
+    "description": "Complete sprint workflow system — 2 agents, 3 commands, 10 guardian events, adaptive learning, and formal debt tracking"
   },
   "plugins": [
     {
