@@ -57,7 +57,30 @@ npm run build
 
 Plugin metadata lives in the `.claude-plugin/` directory. When updating version, description, or capabilities, keep these files in sync:
 
-- `package.json` — canonical version and description
+- `package.json` — canonical version and description (source of truth)
 - `.claude-plugin/plugin.json` — plugin manifest (version must match package.json)
-- `.claude-plugin/marketplace.json` — marketplace listing (agent/command/skill counts)
+- `.claude-plugin/marketplace.json` — marketplace listing (description and agent/command/skill counts)
 - `WORKFLOW.yaml` — human-readable workflow definition (version, agents list)
+
+### Version & Description Update Checklist
+
+When bumping version or changing the description:
+
+1. **Update `package.json`** (canonical source)
+   - Change `"version": "X.Y.Z"`
+   - Change `"description": "..."`
+
+2. **Sync 3 other files** to match:
+   - `.claude-plugin/plugin.json` — update `"version"`
+   - `.claude-plugin/marketplace.json` — update `"description"`
+   - `WORKFLOW.yaml` — update `version:` and optionally `description:`
+
+3. **Compile and verify:**
+   ```bash
+   npm run build
+   npm pack --dry-run  # verify tarball contents
+   ```
+
+4. **Commit with message** containing: "chore: bump version to X.Y.Z" or "docs: update descriptions"
+
+⚠️ **Important:** All 4 files must be kept in sync. Mismatched versions will cause installation issues.
