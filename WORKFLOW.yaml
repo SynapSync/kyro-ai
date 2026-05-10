@@ -22,6 +22,7 @@ agents:
 
 skills:
   - sprint-forge      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+  - qa-review         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 
 storage:
   scope: .agents/sprint-forge/    # Rules, database, sprint documents (per-scope)

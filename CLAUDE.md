@@ -24,8 +24,9 @@ kyro-workflow/
 │   ├── forge.md      # /kyro-workflow:forge — full cycle with gates
 │   ├── status.md     # /kyro-workflow:status — metrics and debt heatmap
 │   └── wrap-up.md    # /kyro-workflow:wrap-up — session closure ritual
-├── skills/           # 1 skill (domain knowledge)
-│   └── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+├── skills/           # 2 skills
+│   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+│   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 ├── .claude-plugin/   # Plugin packaging for Claude Code
 │   ├── plugin.json   # Plugin manifest (version must match package.json)
 │   ├── marketplace.json # Marketplace listing metadata
