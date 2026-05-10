@@ -11,7 +11,7 @@
 
 <p align="center">
   <b>Complete sprint workflow system for AI-assisted development.</b><br/>
-  2 agents &bull; 3 commands &bull; 1 skill &bull; 10 guardian events (configurable) &bull; Adaptive per-project learning<br/>
+  2 agents &bull; 3 commands &bull; 2 skills &bull; 10 guardian events (configurable) &bull; Adaptive per-project learning<br/>
   Built for <b>Claude Code</b>. Compatible with any AI coding agent via SkillKit.
 </p>
 
