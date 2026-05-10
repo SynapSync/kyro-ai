@@ -5,13 +5,13 @@
     "email": "synapsync@proton.me"
   },
   "metadata": {
-    "description": "Complete sprint workflow system — 2 agents, 3 commands, 10 guardian events, adaptive learning, and formal debt tracking"
+    "description": "Complete sprint workflow system — 2 agents, 3 commands, 2 skills, 10 guardian events, adaptive learning, and formal debt tracking"
   },
   "plugins": [
     {
       "name": "kyro-workflow",
       "source": "./",
-      "description": "Complete sprint workflow system: 2 agents (orchestrator + guardian), 3 commands, 1 skill, 10 guardian events (configurable), adaptive per-project learning, and formal debt tracking.",
+      "description": "Complete sprint workflow system: 2 agents (orchestrator + guardian), 3 commands, 2 skills (sprint-forge + qa-review), 10 guardian events (configurable), adaptive per-project learning, and formal debt tracking.",
       "author": {
         "name": "SynapSync"
       },

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
+  "name": "qa-review",
+  "type": "skill",
+  "version": "1.0.0",
+  "description": "Senior QA auditor — code review, architecture validation, security audit, and sprint-forge planning synchronization verification",
+  "author": {
+    "name": "SynapSync",
+    "url": "https://github.com/SynapSync",
+    "email": "hello@synapsync.dev"
+  },
+  "license": "Apache-2.0",
+  "category": "quality",
+  "tags": [
+    "code-review",
+    "qa",
+    "security",
+    "architecture",
+    "sprint-forge",
+    "audit",
+    "planning",
+    "approval"
+  ],
+  "providers": [
+    "claude",
+    "openai",
+    "cursor",
+    "windsurf",
+    "copilot",
+    "gemini",
+    "codex"
+  ],
+  "file": "SKILL.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SynapSync/kyro-workflow"
+  },
+  "homepage": "https://github.com/SynapSync/kyro-workflow",
+  "createdAt": "2026-05-10T00:00:00Z",
+  "updatedAt": "2026-05-10T00:00:00Z"
+}
