@@ -12,7 +12,7 @@
 <p align="center">
   <b>Complete sprint workflow system for AI-assisted development.</b><br/>
   2 agents &bull; 3 commands &bull; 2 skills &bull; 10 guardian events (configurable) &bull; Adaptive per-project learning<br/>
-  Built for <b>Claude Code</b>. Compatible with any AI coding agent via SkillKit.
+  Built for <b>Claude Code</b>, <b>Codex</b>, <b>OpenCode</b>, and <b>Claude API</b>.
 </p>
 
 ---
@@ -44,6 +44,21 @@ Unlike rigid project planners, Kyro:
 <tr><td><b>Enriched Handoffs</b></td><td>Mental context: active hypotheses, pending decisions, blockers, next action</td></tr>
 <tr><td><b>SQLite + FTS5</b></td><td>Searchable learnings, session stats, and debt tracking database</td></tr>
 </table>
+
+---
+
+## Supported Platforms
+
+Kyro works on multiple AI coding platforms:
+
+| Platform | Plugin | Skills | Agents | Docs |
+|----------|--------|--------|--------|------|
+| **Claude Code** | ✓ Full | ✓ Direct | ✓ Direct | [Setup](#installation) |
+| **Codex** | — | ✓ Copy | ✓ Copy | [Guide](docs/HOW-TO-USE-CODEX.md) |
+| **OpenCode** | — | ✓ Copy | ✓ Copy | [Guide](docs/HOW-TO-USE-OPENCODE.md) |
+| **Claude API** | — | ✓ Include | ✓ Include | [Guide](docs/HOW-TO-USE-CLAUDE-API.md) |
+
+See the platform-specific guides in `docs/` for setup and usage instructions.
 
 ---
 

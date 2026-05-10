@@ -11,7 +11,7 @@
     {
       "name": "kyro-workflow",
       "source": "./",
-      "description": "Complete sprint workflow system: 2 agents (orchestrator + guardian), 3 commands, 2 skills (sprint-forge + qa-review), 10 guardian events (configurable), adaptive per-project learning, and formal debt tracking.",
+      "description": "Complete sprint workflow system: 2 agents, 3 commands, 2 skills, 10 guardian events. Multi-platform support (Claude Code + API + Codex + OpenCode). Adaptive learning & formal debt tracking.",
       "author": {
         "name": "SynapSync"
       },
