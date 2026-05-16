@@ -1,3 +1,13 @@
+---
+name: qa-review
+description: Senior QA auditor — code review, architecture validation, security audit, and sprint-forge planning synchronization verification
+license: Apache-2.0
+metadata:
+  author: synapsync
+  version: "1.0"
+  scope: [root]
+---
+
 # QA Code Review Senior Auditor
 
 ## Purpose
