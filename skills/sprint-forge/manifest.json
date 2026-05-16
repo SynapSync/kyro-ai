@@ -1,7 +1,7 @@
 {
   "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
   "name": "sprint-forge",
-  "type": "workflow",
+  "type": "skill",
   "version": "2.1.0",
   "description": "Adaptive sprint workflow with specialized agents, guardian-based lifecycle events, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",
   "author": {
