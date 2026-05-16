@@ -37,6 +37,10 @@
     "url": "https://github.com/SynapSync/kyro-workflow"
   },
   "homepage": "https://synapsync.dev/cognitives/kyro-workflow",
+  "skills": [
+    "./skills/sprint-forge",
+    "./skills/qa-review"
+  ],
   "license": "Apache-2.0",
   "engines": {
     "node": ">=18.0.0"

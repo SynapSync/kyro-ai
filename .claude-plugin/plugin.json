@@ -26,7 +26,10 @@
     "worktrees",
     "context-persistence"
   ],
-  "skills": ["./skills/"],
+  "skills": [
+    "./skills/sprint-forge",
+    "./skills/qa-review"
+  ],
   "agents": [
     "./agents/orchestrator.md",
     "./agents/guardian.md"
