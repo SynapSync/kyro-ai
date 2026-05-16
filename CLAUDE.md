@@ -47,6 +47,32 @@ kyro-workflow/
 - **Debt never disappears**: Items are only closed when explicitly resolved
 - **Gates require approval**: Never proceed past a validation gate without user confirmation
 
+## Skill Creation Requirements
+
+When creating a new skill, the `SKILL.md` file **MUST** start with YAML frontmatter block. This is required for `npx skills add` to discover and parse the skill:
+
+```yaml
+---
+name: skill-name
+description: One-line description of what the skill does
+license: Apache-2.0
+metadata:
+  author: synapsync
+  version: "1.0"
+  scope: [root]
+---
+```
+
+**Why**: The `npx skills add` command relies on parsing the YAML frontmatter to extract the skill's `name` and `description`. Without this block, the skill discovery mechanism fails and the skill will not be detected during installation.
+
+**Every new skill must have**:
+- `name:` — kebab-case skill identifier
+- `description:` — single-line summary of functionality
+- `license:` — typically `Apache-2.0`
+- `metadata.author:` — synapsync (or your organization)
+- `metadata.version:` — version string (e.g., "1.0")
+- `metadata.scope:` — `[root]` for root-level skills
+
 ## Development
 
 ```bash
