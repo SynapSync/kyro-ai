@@ -8,10 +8,7 @@
       "Bash(git status)",
       "Bash(git diff *)",
       "Bash(git log *)",
-      "Bash(npm test)",
-      "Bash(npm test -- *)",
       "Bash(npm run build)",
-      "Bash(npm run lint)",
       "Bash(npm run typecheck)",
       "Bash(git worktree *)"
     ]

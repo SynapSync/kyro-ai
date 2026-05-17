@@ -109,11 +109,11 @@ Rules are organized into categories that correspond to different phases of sprin
 
 ### Loading
 
-At the start of every session, the guardian `session_start` event:
+At the start of every session, the orchestrator startup checkpoint:
 
 1. Reads `.agents/sprint-forge/rules.md` (path configurable in `config.json`)
 2. Parses all active rules
-3. Makes them available to all agents for the session
+3. Makes them available to the orchestrator for the session
 
 Loading is automatic when `config.json` has `rules.auto_load: true` (the default).
 
@@ -128,7 +128,7 @@ Rules are applied contextually based on their category:
 
 ### Rule Violation Warning
 
-When the agent is about to violate a learned rule, the guardian `user_prompt_submit` event triggers a warning:
+When the agent is about to violate a learned rule, the orchestrator rule checkpoint triggers a warning:
 
 ```
 [Kyro] Rule violation detected:
@@ -138,12 +138,6 @@ When the agent is about to violate a learned rule, the guardian `user_prompt_sub
 The current action appears to skip version validation.
 Proceed anyway? (yes/no)
 ```
-
-### Application Tracking
-
-Each time a rule is applied, its `times_applied` counter is incremented in the database. This helps identify which rules are providing the most value.
-
----
 
 ## Managing Rules
 
@@ -183,7 +177,7 @@ After accumulating many rules, related rules can be consolidated:
 ### Rule Limits
 
 The learner helper enforces a maximum of **50 active rules**. When approaching this limit:
-- Review rules by `times_applied` -- rarely-applied rules may be candidates for deprecation
+- Review rules during sprint retros -- rarely-used rules may be candidates for deprecation
 - Consolidate related rules into broader, more useful ones
 - Deprecate rules tied to completed or abandoned projects
 
@@ -220,23 +214,3 @@ The learner helper enforces a maximum of **50 active rules**. When approaching t
 - [RULE-007] Always validate version compatibility before adding new dependencies (2026-03-05, project: synap-sync)
 - ~~[RULE-012] Use npm ci instead of npm install in CI pipelines (2026-03-07, project: nebux-api)~~ [DEPRECATED: migrated to pnpm]
 ```
-
----
-
-## Rules in the Database
-
-In addition to the `rules.md` file, learnings are stored in the SQLite database (`.agents/sprint-forge/data.db`) in the `learnings` table:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER | Auto-incrementing primary key |
-| `created_at` | TEXT | Timestamp when the rule was learned |
-| `project` | TEXT | Project where the rule was learned |
-| `category` | TEXT | Rule category (estimation, quality, architecture, testing, process) |
-| `rule` | TEXT | The rule text |
-| `mistake` | TEXT | What went wrong (if captured from a correction) |
-| `correction` | TEXT | What the user said to correct the agent |
-| `sprint` | TEXT | Sprint where the rule was learned |
-| `times_applied` | INTEGER | How many times this rule has been applied |
-
-The database also provides full-text search via FTS5 with BM25 ranking, allowing agents to search for relevant past learnings by keyword.

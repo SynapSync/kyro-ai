@@ -14,7 +14,7 @@ user approval before proceeding to the next phase.
 
 ## /kyro-workflow:status
 
-Project metrics, velocity trends, and debt heatmap.
+Project progress and technical debt summary.
 
 ```
 /kyro-workflow:status                    # Full project status

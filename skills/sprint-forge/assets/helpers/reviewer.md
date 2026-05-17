@@ -32,17 +32,16 @@ Provides a structured quality checklist that runs after each sprint task complet
 The orchestrator uses these commands during the review step to validate (adapt to project stack):
 
 ```bash
-# Tests
-npm test -- --related
-# or: pytest, go test, dart test, flutter test
-
 # Typecheck
 npm run typecheck
 # or: mypy, go vet
 
-# Lint
-npm run lint
-# or: ruff, golangci-lint
+# Build
+npm run build
+
+# Tests and lint
+# Run the target project's configured test/lint commands when they exist.
+# Examples: pytest, go test, dart test, flutter test, ruff, golangci-lint
 
 # Debug artifacts
 grep -rn "console\.log\|debugger\|print(" src/ --include="*.ts" --include="*.tsx"
