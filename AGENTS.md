@@ -25,7 +25,7 @@ kyro-workflow/
 ├── skills/           # 2 skills
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
-├── .claude-plugin/   # Claude Code adapter packaging
+├── .claude-plugin/  # Claude Code adapter packaging
 │   ├── plugin.json   # Plugin manifest (version must match package.json)
 │   ├── marketplace.json # Marketplace listing metadata
 │   ├── settings.json # Default permissions

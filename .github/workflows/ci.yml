@@ -26,14 +26,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Build TypeScript
         run: npm run build
 
       - name: Verify build artifacts
         run: |
           test -f dist/index.js
-          test -f dist/db/schema.sql
           echo "Build artifacts verified"
-
-      - name: Run hook smoke tests
-        run: node scripts/test-hooks.js

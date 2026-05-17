@@ -36,7 +36,7 @@ Choices that need to be made before proceeding:
 
 ```text
 ### Pending Decisions
-- Redis vs in-memory cache for session storage (waiting for load test results)
+- Redis vs in-memory cache backend (waiting for load test results)
 - Migrate to new payments API now or defer to Sprint 5 (cost-benefit unclear)
 - Monorepo restructure: packages/ or apps/ pattern?
 ```

@@ -1,117 +1,21 @@
 flowchart TD
-    classDef user fill:#1a1a2e,stroke:#e94560,color:#fff,stroke-width:2px
-    classDef cmd fill:#16213e,stroke:#0f3460,color:#fff
-    classDef agent fill:#0f3460,stroke:#e94560,color:#fff,stroke-width:2px
-    classDef protocol fill:#1a1a2e,stroke:#533483,color:#fff
-    classDef skill fill:#533483,stroke:#e94560,color:#fff
-    classDef helper fill:#2a2a4a,stroke:#533483,color:#ccc
-    classDef storage fill:#0a0a1a,stroke:#0f3460,color:#aaa
-    classDef config fill:#1a1a2e,stroke:#e94560,color:#e94560,stroke-dasharray: 5 5
+    USER["User command"]
+    FORGE["/kyro-workflow:forge"]
+    STATUS["/kyro-workflow:status"]
+    WRAP["/kyro-workflow:wrap-up"]
+    ORCH["orchestrator agent"]
+    SPRINT["sprint-forge skill"]
+    QA["qa-review skill"]
+    RULES[".agents/sprint-forge/rules.md"]
+    SCOPE[".agents/sprint-forge/{scope}/ markdown artifacts"]
 
-    USER(("User")):::user
-
-    subgraph COMMANDS["Commands"]
-        FORGE["/forge"]:::cmd
-        STATUS["/status"]:::cmd
-        WRAPUP["/wrap-up"]:::cmd
-    end
-
-    subgraph AGENTS["Agents"]
-        ORCH["Orchestrator\n─────────\nopus · read+write\nFull cycle coordinator"]:::agent
-        GUARD["Guardian\n─────────\nsonnet · read-only\nLifecycle checkpoints"]:::agent
-    end
-
-    subgraph PROTOCOLS["Orchestrator Protocols"]
-        direction LR
-        P_ANALYSIS["Analysis\nread-only exploration"]:::protocol
-        P_REVIEW["Review\nBLOCKER · WARNING\nSUGGESTION"]:::protocol
-        P_DEBUG["Debug\nhypothesis-driven\nroot cause"]:::protocol
-    end
-
-    subgraph SKILL["Skill: sprint-forge"]
-        direction TB
-        SKILL_CORE["SKILL.md\nmodes · rules · capabilities"]:::skill
-
-        subgraph MODES["Modes"]
-            direction LR
-            M_INIT["INIT"]:::helper
-            M_SPRINT["SPRINT"]:::helper
-            M_STATUS["STATUS"]:::helper
-        end
-
-        subgraph HELPERS["Helpers"]
-            direction LR
-            H_ANALYZER["analyzer"]:::helper
-            H_REVIEWER["reviewer"]:::helper
-            H_LEARNER["learner"]:::helper
-            H_METRICS["metrics"]:::helper
-            H_HANDOFF["handoff"]:::helper
-            H_ANALYSIS["analysis\nguide"]:::helper
-            H_SPRINT["sprint\ngenerator"]:::helper
-            H_DEBT["debt\ntracker"]:::helper
-            H_REENTRY["reentry\ngenerator"]:::helper
-        end
-
-        TEMPLATES["Templates\nROADMAP · SPRINT\nREADME · RE-ENTRY"]:::helper
-    end
-
-    subgraph GUARDIAN_EVENTS["Guardian Events (config.json)"]
-        direction LR
-        E_START["session\nstart"]:::config
-        E_PHASE["pre\nphase"]:::config
-        E_EDIT["post edit\nscan"]:::config
-        E_COMMIT["pre\ncommit"]:::config
-        E_TASK["task\ncomplete"]:::config
-        E_LEARN["learn\ncapture"]:::config
-        E_END["session\nend"]:::config
-        E_RULE["rule\ncheck"]:::config
-        E_TEST["test\nfailure"]:::config
-        E_DRIFT["drift\ncheck"]:::config
-    end
-
-    subgraph STORAGE["Storage: .agents/sprint-forge/"]
-        direction LR
-        S_RULES["rules.md"]:::storage
-        S_DB["data.db"]:::storage
-        S_SESSION[".active-session"]:::storage
-        S_PROJ["{project}/\nfindings · sprints\nROADMAP · RE-ENTRY"]:::storage
-    end
-
-    %% User → Commands
     USER --> FORGE
     USER --> STATUS
-    USER --> WRAPUP
-
-    %% Commands → Agents
-    FORGE ==> ORCH
-    STATUS -.->|reads directly| S_PROJ
-    STATUS -.-> SKILL_CORE
-    WRAPUP -.-> GUARD
-
-    %% Orchestrator → Protocols
-    ORCH -->|"Phase 1: Analyze"| P_ANALYSIS
-    ORCH -->|"Phase 4: Validate"| P_REVIEW
-    ORCH -->|"on failure"| P_DEBUG
-
-    %% Orchestrator → Guardian
-    ORCH ==>|"lifecycle events"| GUARD
-
-    %% Orchestrator → Skill
-    ORCH -.->|reads| SKILL_CORE
-
-    %% Protocols → Skill helpers
-    P_ANALYSIS -.-> H_ANALYZER
-    P_ANALYSIS -.-> H_ANALYSIS
-    P_REVIEW -.-> H_REVIEWER
-    ORCH -.-> H_LEARNER
-
-    %% Guardian → Storage
-    GUARD --> S_RULES
-    GUARD --> S_DB
-    GUARD --> S_SESSION
-
-    %% Guardian → Events
-    GUARD -.->|"checks config"| E_START
-
-    %% Orchestrator → Storage
-    ORCH --> S_PROJ
+    USER --> WRAP
+    FORGE --> ORCH
+    WRAP --> ORCH
+    STATUS --> SCOPE
+    ORCH --> SPRINT
+    ORCH --> QA
+    ORCH --> RULES
+    ORCH --> SCOPE

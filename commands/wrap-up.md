@@ -11,7 +11,7 @@ Structured 5-step checklist to close the current session cleanly. Ensures no wor
 
 > **IMPORTANT**: Before running the closure ritual:
 > 1. Read `skills/sprint-forge/assets/helpers/handoff.md` — context transfer format and checklist
-> 2. Spawn the `guardian` agent with `event: session_end` — it will check uncommitted changes, sprint progress, and capture learnings (if enabled in config)
+> 2. Run the orchestrator's session-end checkpoint — check uncommitted changes, sprint progress, and pending learnings
 
 ## Session Notes: $ARGUMENTS
 
@@ -45,7 +45,7 @@ Prompt for learnings from this session:
    ```
    [LEARN] Category: One-line rule
    ```
-4. Learnings are automatically persisted to both `.agents/sprint-forge/rules.md` and the database
+4. Learnings are proposed for `.agents/sprint-forge/rules.md` and recorded in the sprint retro after approval
 
 ### Step 4: Next Session Context
 
@@ -59,12 +59,12 @@ Generate a context note for the next session:
 
 ### Step 5: Session Summary
 
-Display session stats:
+Display session summary:
 
-1. Query the database for the active session:
-   - Session duration (started_at → now)
-   - Tasks completed count
-   - Learnings captured count
+1. Inspect sprint artifacts and git history for current progress:
+   - Tasks completed this session
+   - Learnings proposed or captured
+   - Commits created this session
 2. Display summary table:
    ```
    Session Summary
@@ -75,7 +75,7 @@ Display session stats:
    Commits:     {count} this session
    Status:      {clean/uncommitted changes}
    ```
-3. Close the session in the database
+3. Confirm the handoff and re-entry prompts reflect the current state
 
 ### Output
 

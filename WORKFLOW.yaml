@@ -2,8 +2,8 @@ name: kyro-workflow
 type: workflow
 version: "3.2.0"
 description: >
-  Complete sprint workflow system with specialized agents, guardian-based
-  lifecycle events, adaptive per-project learning, and formal validation gates.
+  Portable sprint workflow kit for AI coding agents, with markdown artifacts,
+  adapter guides, adaptive per-project learning, and formal validation gates.
 
 author:
   name: SynapSync
@@ -13,19 +13,18 @@ license: Apache-2.0
 
 commands:
   - forge       # Full cycle: Analyze → Plan → Implement → Review → Commit
-  - status      # Project metrics, velocity, debt heatmap
+  - status      # Project progress and technical debt summary
   - wrap-up     # End-of-session closure ritual with quality check
 
 agents:
   - orchestrator  # Full cycle coordination — analysis, review, debugging, and sprint execution
-  - guardian       # Event-based checkpoints — configurable lifecycle events (rules loading, drift detection, quality checks)
 
 skills:
   - sprint-forge      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
   - qa-review         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 
-storage:
-  scope: .agents/sprint-forge/    # Rules, database, sprint documents (per-scope)
+artifacts:
+  root: .agents/sprint-forge/    # Rules and sprint documents (per-scope)
 
 philosophy:
   - "Learn from every sprint, apply in the next"
