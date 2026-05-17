@@ -4,7 +4,7 @@
 
 This project uses **Kyro** for structured sprint execution.
 
-- Workflow: `kyro-workflow` (installed via Claude Code plugin or local path)
+- Workflow: `kyro-workflow` (installed via Claude Code adapter, generic markdown setup, or local path)
 - Sprint output: `.agents/sprint-forge/{project}/`
 - Learned rules: `.agents/sprint-forge/rules.md`
 
@@ -40,14 +40,14 @@ See [COMMANDS.md](./COMMANDS.md) for the full slash-command reference.
 # Run dev server
 # npm run dev
 
-# Run tests
-# npm test
-
-# Lint
-# npm run lint
-
 # Type-check
 # npm run typecheck
+
+# Build
+# npm run build
+
+# Tests/lint
+# Add project-specific commands here when available.
 ```
 
 ### Code Style

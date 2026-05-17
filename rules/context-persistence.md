@@ -20,7 +20,7 @@ Update re-entry prompts after INIT completes and after each executed sprint.
 
 Save re-entry state before context compaction occurs.
 
-- The guardian `pre_compact` event triggers this automatically.
+- The orchestrator should trigger this before compaction when possible.
 - State includes: current phase, task index, in-progress work, and any uncommitted decisions.
 - If compaction happens without a save, the session must restart from the last checkpoint.
 

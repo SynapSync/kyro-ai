@@ -31,9 +31,9 @@ For each task in the sprint plan:
 
 Quality gates run after every task (not just at the end):
 
-- Lint: `npm run lint` (or project-configured command)
 - Typecheck: `npm run typecheck` (or project-configured command)
-- Tests: `npm test -- --related` (scoped to changed files)
+- Build: `npm run build` (or project-configured command)
+- Tests/lint: run only when the target project defines those commands
 
 A task is not closed until all gates pass or WARNINGs are explicitly justified.
 

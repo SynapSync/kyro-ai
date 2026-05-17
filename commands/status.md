@@ -1,18 +1,18 @@
 ---
-description: Show project status, velocity metrics, and technical debt heatmap
-argument-hint: [brief|full|debt|velocity|debt-add|debt-resolve|debt-escalate]
+description: Show project status, sprint progress, and technical debt summary
+argument-hint: [brief|full|debt|debt-add|debt-resolve|debt-escalate]
 ---
 
-# /kyro-workflow:status — Project Status & Metrics
+# /kyro-workflow:status — Project Status
 
-Report project progress, sprint velocity, technical debt heatmap, and next sprint preview.
+Report project progress, technical debt status, and next sprint preview from markdown artifacts.
 
 ## Execution
 
 > **IMPORTANT**: Before generating the report, read the sprint-forge skill's STATUS mode:
 > 1. Read `skills/sprint-forge/SKILL.md` — capabilities matrix, configuration resolution
 > 2. Read `skills/sprint-forge/assets/modes/STATUS.md` — report workflow and format
-> 3. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` — debt heatmap format
+> 3. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` — debt table rules
 
 ## View: $ARGUMENTS
 
@@ -20,7 +20,7 @@ Report project progress, sprint velocity, technical debt heatmap, and next sprin
 
 1. **Locate output directory** — resolve `{output_kyro_dir}`
 2. **Read project state** — README, ROADMAP, all sprint files
-3. **Calculate metrics** and generate report:
+3. **Summarize state** and generate report:
 
 ```text
 ══════════════════════════════════════
@@ -33,19 +33,11 @@ Sprint 2: ████████░░  8/10 ( 80%) ✓ Complete
 Sprint 3: ███████░░░  7/10 ( 70%) ~ In Progress
 Sprint 4: ░░░░░░░░░░  0/10 (  0%)   Planned
 
-## Velocity Trend
-Sprint 1: ████████░░  80%
-Sprint 2: ██████████ 100%
-Sprint 3: ███████░░░  70% ← underperformance: DB tasks x2
-
-## Debt Heatmap
-src/auth/    ████████ 4 items (2 critical, aged: 3 sprints)
-src/db/      █████░░░ 3 items (1 critical)
-src/api/     ██░░░░░░ 1 item
-
-## Underestimation Patterns
-- DB/migration tasks: underestimated by ~40%
-- Auth tasks: frequently reveal hidden dependencies
+## Technical Debt
+- Open: 4
+- In progress: 1
+- Aged: 2
+- Critical: 1
 
 ## Roadmap Health
 - Sprints completed: 2/5
@@ -63,8 +55,7 @@ Sprint 4: [title from roadmap]
 
 - **brief** — Sprint progress + next sprint preview only
 - **full** — Complete report with all sections
-- **debt** — Focus on technical debt table and heatmap
-- **velocity** — Focus on velocity trends and estimation patterns
+- **debt** — Focus on technical debt table and aged items
 
 ## Debt Management
 
@@ -97,5 +88,5 @@ Flag aged debt items (open >3 sprints) and prompt for triage:
 
 - Debt items are never deleted — only their status changes
 - Every sprint inherits the full debt table from the previous sprint
-- Items open for >3 sprints trigger a guardian escalation prompt automatically
+- Items open for >3 sprints should be escalated during status review
 - New debt discovered during execution gets added with origin "Sprint N phase"

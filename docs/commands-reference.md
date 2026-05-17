@@ -23,7 +23,7 @@ The argument describes what to analyze or work on. It can be a path, a module na
 ```
 /kyro-workflow:forge analyze the authentication module
 /kyro-workflow:forge audit code quality in src/api/
-/kyro-workflow:forge refactor the database layer
+/kyro-workflow:forge refactor the persistence layer
 /kyro-workflow:forge add user profile feature
 /kyro-workflow:forge fix the login timeout bug
 ```
@@ -76,12 +76,12 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 
 ## /kyro-workflow:status
 
-**Project metrics, velocity trends, and technical debt heatmap.**
+**Project progress, sprint state, and technical debt summary.**
 
 ### Syntax
 
 ```
-/kyro-workflow:status [brief|full|debt|velocity]
+/kyro-workflow:status [brief|full|debt]
 ```
 
 ### Variants
@@ -90,8 +90,7 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 |---------|---------------|
 | `brief` | Sprint progress bars and next sprint preview only |
 | `full` | Complete report with all sections (default) |
-| `debt` | Technical debt table and debt heatmap by directory |
-| `velocity` | Velocity trends, estimation accuracy, underestimation patterns |
+| `debt` | Technical debt table and aged debt items |
 
 ### Examples
 
@@ -99,7 +98,6 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 /kyro-workflow:status                # Full report
 /kyro-workflow:status brief          # Quick progress check
 /kyro-workflow:status debt           # Focus on technical debt
-/kyro-workflow:status velocity       # Focus on sprint velocity trends
 ```
 
 ### Report Sections
@@ -114,19 +112,11 @@ Sprint 1: xxxxxxxxxx 10/10 (100%)  Complete
 Sprint 2: xxxxxxxx--  8/10 ( 80%)  Complete
 Sprint 3: xxxxxxx--- 7/10 ( 70%)  In Progress
 
-## Velocity Trend
-Sprint 1: xxxxxxxx-- 80%
-Sprint 2: xxxxxxxxxx 100%
-Sprint 3: xxxxxxx--- 70%  <-- underperformance: DB tasks x2
-
-## Debt Heatmap
-src/auth/    xxxxxxxx 4 items (2 critical, aged: 3 sprints)
-src/db/      xxxxx--- 3 items (1 critical)
-src/api/     xx------ 1 item
-
-## Underestimation Patterns
-- DB/migration tasks: underestimated by ~40%
-- Auth tasks: frequently reveal hidden dependencies
+## Technical Debt
+- Open: 4
+- In progress: 1
+- Aged: 2
+- Critical: 1
 
 ## Roadmap Health
 - Sprints completed: 2/5
@@ -146,4 +136,3 @@ The status command reads all files in the output directory:
 - `README.md` for project overview
 - `ROADMAP.md` for planned sprints
 - All `sprints/SPRINT-*.md` files for progress, debt, and retro data
-
