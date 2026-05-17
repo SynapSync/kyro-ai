@@ -9,7 +9,7 @@ memory: project
 
 # Orchestrator — Kyro Cycle Coordinator
 
-Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/kyro-workflow:forge` command. All analysis, review, and debugging protocols are built-in. The **guardian** agent is invoked at key lifecycle moments for configurable checks.
+Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/kyro-workflow:forge` command. Analysis, review, debugging, and checkpoint protocols are built in.
 
 ## Lifecycle
 
@@ -118,9 +118,13 @@ The `skills` declaration in frontmatter is metadata only — it does NOT auto-in
 3. If a rule is about to be violated, pause and show the rule to the user
 4. At the end, propose new rules based on corrections made during the session
 
-### 3. Guardian Initialization
+### 3. Startup Checkpoint
 
-Spawn the `guardian` agent with `event: session_start`. It will load rules, detect active sprints, and return a session summary. If the guardian is disabled for this event in `config.json`, it skips silently.
+Run the startup checkpoint:
+
+1. Confirm rules were loaded or explicitly note that no rules file exists.
+2. Detect active sprint files under `.agents/sprint-forge/*/sprints/`.
+3. Summarize the current project state before continuing.
 
 ## Analysis Protocol (INIT Phase)
 
@@ -184,17 +188,63 @@ Analyzed: [date]
 
 During Phase 4 (Implement), for each task:
 
-1. Spawn `guardian` with `event: rule_check` + task context (if enabled)
-2. Spawn `guardian` with `event: pre_phase` + phase context (if enabled)
-3. Read the task definition from the sprint file
-4. Execute the task
-5. Spawn `guardian` with `event: post_edit_scan` (if enabled)
-6. Run the validation checklist (see below)
-7. If validation reports BLOCKER → run the failure protocol
-8. If failure protocol resolves → re-run validation
-9. If failure protocol escalates → mark task as blocked, move to next
-10. Spawn `guardian` with `event: task_complete` (if enabled)
-11. Write checkpoint to sprint file after each phase completes
+1. Run the rule checkpoint for the task context.
+2. Run the pre-phase checkpoint for the current phase.
+3. Read the task definition from the sprint file.
+4. Execute the task.
+5. Run the post-edit scan.
+6. Run the validation checklist (see below).
+7. If validation reports BLOCKER → run the failure protocol.
+8. If failure protocol resolves → re-run validation.
+9. If failure protocol escalates → mark task as blocked, move to next.
+10. Run the task-complete checkpoint.
+11. Write checkpoint to sprint file after each phase completes.
+
+## Checkpoint Protocol
+
+The orchestrator owns lifecycle checkpoints directly. These checks are not delegated to another agent.
+
+### Startup Checkpoint
+
+- Load `.agents/sprint-forge/rules.md` if it exists.
+- Detect active sprint files.
+- Present the current sprint state before planning or execution.
+
+### Pre-Phase Checkpoint
+
+- Verify rules are loaded or explicitly unavailable.
+- Verify the expected sprint file exists for execution phases.
+- Check `git status` for uncommitted changes that may affect the phase.
+
+### Rule Checkpoint
+
+- Compare the current task against relevant learned rules.
+- If a rule may be violated, pause and ask the user before continuing.
+
+### Post-Edit Scan
+
+- Run `git diff --name-only` to identify changed files.
+- Scan changed source files for debug artifacts (`console.log`, `debugger`, unsafe `print` usage).
+- Scan changed files for likely hardcoded secrets, API keys, passwords, or tokens.
+- Report findings as BLOCKER items before task closure.
+
+### Task-Complete Checkpoint
+
+- Verify the task is marked complete in the sprint file.
+- Verify checkpoint content was written for the completed phase.
+- Record remaining tasks and any new debt in the sprint file.
+
+### Pre-Commit Checkpoint
+
+- Run quality gate commands from `config.json`.
+- Run the post-edit scan again.
+- Block commit if typecheck/build fails or if debug artifacts/secrets are found.
+
+### Learn-Capture Checkpoint
+
+- Review corrections and discoveries from the session.
+- Propose rule additions for `.agents/sprint-forge/rules.md`.
+- Wait for approval before adding new rules.
 
 ### Validation Checklist
 
@@ -323,14 +373,14 @@ Recommended next step: [suggestion for the human]
 
 After all tasks are complete:
 
-1. Spawn `guardian` with `event: pre_commit` (if enabled) — runs quality gates
+1. Run the pre-commit checkpoint.
 2. Run findings consolidation
 3. Fill retrospective (What Went Well, What Didn't, Surprises, New Debt)
 4. Update accumulated technical debt table
 5. Update frontmatter (status, dates, agents)
 6. Generate/update re-entry prompts
 7. Update roadmap if needed
-8. Spawn `guardian` with `event: learn_capture` (if enabled) — proposes rules
+8. Run the learn-capture checkpoint.
 9. Propose new rules for `.agents/sprint-forge/rules.md`
 
 ## Rules

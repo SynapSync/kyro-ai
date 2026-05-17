@@ -10,27 +10,11 @@ AI models have finite context windows. When your conversation approaches the lim
 
 | Factor | Guideline |
 |--------|-----------|
-| CLAUDE.md (root) | < 60 lines — loaded on every message |
-| CLAUDE.md (total, all nested) | < 150 lines — larger files waste context on every turn |
+| Root agent instructions | < 60 lines — loaded on every message |
+| Total agent instructions | < 150 lines — larger files waste context on every turn |
 | MCP servers | < 10 active MCPs — each adds tool definitions to context |
 | MCP tools total | < 80 tools — tool descriptions consume tokens |
 | Sprint file size | Keep under 500 lines — use separate files for large sprints |
-
----
-
-## Kyro Context Config
-
-`config.json` has a context section:
-
-```json
-"context": {
-  "warning_threshold_percent": 70,
-  "auto_save_reentry": true
-}
-```
-
-- **`warning_threshold_percent`**: When context usage exceeds this %, the guardian `pre_compact` event fires and warns about upcoming compaction.
-- **`auto_save_reentry`**: Automatically save re-entry prompt state before compaction.
 
 ---
 
@@ -89,7 +73,7 @@ If compaction happens mid-session, a new agent can use the re-entry prompt to re
 
 2. **Minimize CLAUDE.md** — Move detailed instructions to separate files that are loaded on-demand, not on every message.
 
-3. **Use Haiku for exploration** — The analysis phase reads many files. Using Haiku keeps context cost low and leaves more room for implementation.
+3. **Use lighter models for read-only exploration** — The analysis phase reads many files. A lighter model can reduce cost when the task is status, inventory, or summarization. Use the strongest available model for implementation, debugging, and architecture decisions.
 
 4. **Checkpoint aggressively** — Kyro checkpoints after each phase. This means progress survives compaction.
 
@@ -97,9 +81,9 @@ If compaction happens mid-session, a new agent can use the re-entry prompt to re
 
 ---
 
-## Guardian pre_compact Event
+## Pre-Compaction Checkpoint
 
-The guardian's `pre_compact` event fires before context compaction:
+Before context compaction, save the current sprint state and update re-entry prompts:
 
 - Logs a warning that compaction is about to happen
 - Checks for active sprint and reminds about re-entry prompts

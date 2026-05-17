@@ -3,7 +3,7 @@
   "name": "sprint-forge",
   "type": "skill",
   "version": "2.1.0",
-  "description": "Adaptive sprint workflow with specialized agents, guardian-based lifecycle events, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",
+  "description": "Adaptive sprint workflow with one orchestrator agent, built-in checkpoints, and slash commands — analysis, roadmap, iterative sprints, debt tracking, context persistence, and per-project learning",
   "author": {
     "name": "SynapSync",
     "url": "https://github.com/SynapSync",
@@ -57,7 +57,7 @@
       "version": "2.0.0",
       "date": "2026-03-08",
       "changes": [
-        "Evolve from standalone skill to full workflow with orchestrator + guardian agents, guardian-based lifecycle events, slash commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up), and per-project learning via persistent rules"
+        "Evolve from standalone skill to full workflow with one orchestrator agent, built-in checkpoints, slash commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up), and per-project learning via persistent rules"
       ]
     },
     {
@@ -72,7 +72,7 @@
       "date": "2026-03-06",
       "changes": [
         "Add YAML frontmatter properties to all templates (SPRINT, ROADMAP, PROJECT-README, REENTRY-PROMPTS) and finding file format",
-        "Add `agents` field to frontmatter — tracks AI model names (e.g., claude-opus-4-6, gpt-4o, codex) that created or modified the document",
+        "Add `agents` field to frontmatter — tracks AI model or agent names (e.g., gpt-5, codex, cursor, opencode) that created or modified the document",
         "Update INIT and SPRINT modes with frontmatter generation instructions and close-time frontmatter updates"
       ]
     },

@@ -1,18 +1,21 @@
 {
   "name": "kyro-workflow",
   "version": "3.2.0",
-  "description": "Complete sprint workflow system — 2 agents, 3 commands, 2 skills, 10 guardian events, adaptive learning, and formal debt tracking",
+  "description": "Portable sprint workflow kit for AI coding agents, with markdown artifacts, adapter guides, and formal debt tracking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "postbuild": "cp src/db/schema.sql dist/db/schema.sql",
+    "build": "npm run clean && tsc",
+    "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run build",
-    "db:init": "node dist/db/index.js"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "claude-code",
+    "ai-agents",
+    "agent-workflow",
+    "llm-workflow",
+    "agentic-development",
+    "markdown-workflow",
     "workflow",
     "sprint",
     "planning",
@@ -21,9 +24,8 @@
     "roadmap",
     "iterative",
     "adaptive",
-    "hooks",
     "agents",
-    "subagents",
+    "claude-code",
     "self-correction",
     "worktrees",
     "context-persistence"
@@ -45,11 +47,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "better-sqlite3": "^12.6.2"
-  },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^25.2.2",
     "typescript": "^5.7.3"
   },

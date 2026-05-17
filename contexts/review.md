@@ -1,6 +1,6 @@
 ---
 name: review
-description: Assessment context for sprint status reporting, retrospectives, and metrics analysis. Read-only — no code changes.
+description: Assessment context for sprint status reporting and retrospectives. Read-only — no code changes.
 mode: assessment
 agent: orchestrator
 model: opus
@@ -12,7 +12,7 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
 
 ## When Active
 
-- `/kyro-workflow:status` — project metrics and debt heatmap
+- `/kyro-workflow:status` — project progress and debt summary
 - `/kyro-workflow:forge` Phase 4 (Review & Close)
 
 ## Behavior
@@ -20,13 +20,12 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
 ### Status Assessment (`/kyro-workflow:status`)
 
 1. Read the current sprint file and extract task statuses.
-2. Calculate progress metrics:
+2. Summarize progress:
    - Tasks completed / total tasks
    - Story points completed / total story points
    - Estimation accuracy (actual vs estimated per task)
-3. Generate velocity trend from historical sprints.
-4. Produce a debt heatmap showing:
-   - Open debt items by file/module
+3. Produce a debt summary showing:
+   - Open debt items
    - Age of each item (sprints since creation)
    - Items flagged as `[AGED]` (open > 3 sprints)
 
@@ -45,13 +44,13 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
    - **New learned rules** — proposed additions to `.agents/sprint-forge/rules.md`
 4. Update the debt table with any new items or status changes.
 
-### Metrics Analysis
+### Progress Analysis
 
 The metrics helper provides:
 
-- Velocity trend (SP/sprint over last 5 sprints)
-- Estimation accuracy trend (mean absolute error over time)
-- Debt accumulation rate (new items per sprint vs resolved)
+- Sprint completion status
+- Estimate variance noted in sprint retros
+- Debt movement (new items vs resolved)
 - Most common BLOCKER categories
 - Task type distribution
 
@@ -78,9 +77,8 @@ Review outputs feed directly into next sprint planning:
 
 ## Output
 
-- Status report with progress metrics and debt heatmap
+- Status report with progress and debt summary
 - Retro document with recommendations and estimation corrections
-- Velocity and accuracy trend data
 - Proposed learned rules
 
 ## Rules in Effect

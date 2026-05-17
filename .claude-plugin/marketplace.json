@@ -5,13 +5,13 @@
     "email": "synapsync@proton.me"
   },
   "metadata": {
-    "description": "Complete sprint workflow system — 2 agents, 3 commands, 2 skills, 10 guardian events, adaptive learning, and formal debt tracking"
+    "description": "Claude Code adapter for Kyro, a portable sprint workflow kit for AI coding agents"
   },
   "plugins": [
     {
       "name": "kyro-workflow",
       "source": "./",
-      "description": "Complete sprint workflow system: 2 agents, 3 commands, 2 skills, 10 guardian events. Multi-platform support (Claude Code + API + Codex + OpenCode). Adaptive learning & formal debt tracking.",
+      "description": "Claude Code adapter for Kyro: one orchestrator agent, 3 slash commands, 2 skills, markdown artifacts, and formal debt tracking.",
       "author": {
         "name": "SynapSync"
       },
@@ -19,11 +19,16 @@
       "repository": "https://github.com/SynapSync/kyro-workflow",
       "license": "Apache-2.0",
       "keywords": [
+        "ai-agents",
+        "agent-workflow",
+        "llm-workflow",
+        "agentic-development",
+        "markdown-workflow",
+        "claude-code",
         "workflow",
         "sprint",
         "planning",
         "agents",
-        "guardian",
         "adaptive",
         "debt-tracking",
         "self-correction",
@@ -35,7 +40,6 @@
         "workflow",
         "sprint",
         "planning",
-        "guardian",
         "agents",
         "commands",
         "productivity",

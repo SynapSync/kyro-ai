@@ -12,7 +12,7 @@ Format: each entry includes the sprint ID, date, and a concise rule.
 
 <!-- Learnings about task estimation accuracy for this project -->
 <!-- Example: -->
-<!-- - [S-003 / 2025-01-15] Database migrations consistently take 2x estimated time due to seed data updates. -->
+<!-- - [S-003 / 2025-01-15] Release validation consistently takes 2x estimated time due to environment setup. -->
 
 ## Quality
 

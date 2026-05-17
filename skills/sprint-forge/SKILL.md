@@ -124,7 +124,7 @@ No AGENTS.md. No branded blocks. The re-entry prompts and README carry the path 
 
 ### Frontmatter Properties
 
-All generated markdown documents include YAML frontmatter following the [Obsidian markdown standard](../integrations/obsidian/assets/standards/obsidian-md-standard.md). The `agents` field tracks the AI model that generated or modified the document. Resolve `{agent_model}` from the model ID powering the current session (e.g., `"claude-opus-4-6"`, `"gpt-4o"`, `"codex"`, `"grok"`). When modifying an existing document, append the current model to the `agents` array if not already present.
+All generated markdown documents include YAML frontmatter following the [Obsidian markdown standard](../integrations/obsidian/assets/standards/obsidian-md-standard.md). The `agents` field tracks the AI model or agent that generated or modified the document. Resolve `{agent_model}` from the model or agent ID powering the current session (e.g., `"gpt-5"`, `"codex"`, `"cursor"`, `"opencode"`). When modifying an existing document, append the current model or agent to the `agents` array if not already present.
 
 ---
 
@@ -212,7 +212,7 @@ This will: read all sprints, calculate metrics, display progress and accumulated
 
 ## Workflow Components
 
-Kyro v2.0 operates as a workflow with specialized agents (orchestrator + guardian) and commands. The SKILL.md remains the core orchestration logic, but execution is now distributed:
+Kyro v2.0 operates as a workflow with one orchestrator agent, built-in checkpoints, and commands. The SKILL.md remains the core orchestration logic:
 
 ### Agent
 
@@ -230,17 +230,17 @@ The orchestrator is the single agent, handling all phases through specialized pr
 | Command | Maps To |
 |---------|---------|
 | `/kyro-workflow:forge` | Full cycle: INIT → SPRINT → Review → Close with validation gates |
-| `/kyro-workflow:status` | STATUS mode with velocity metrics and debt heatmap |
+| `/kyro-workflow:status` | STATUS mode with sprint progress and debt summary |
 | `/kyro-workflow:wrap-up` | End-of-session closure ritual with quality check and context handoff |
 
-### Guardian Events
+### Built-In Checkpoints
 
-The guardian agent runs configurable checkpoints at lifecycle moments, invoked by the orchestrator. See `agents/guardian.md` for the full list. Key events:
+The orchestrator runs checkpoints at lifecycle moments. Key checkpoints:
 - **session_start** — loads learned rules from `.agents/sprint-forge/rules.md`
-- **post_tool_use** — checks for debug artifacts after code edits
-- **task_completed** — runs review checklist
-- **pre_compact** — saves re-entry state before context compaction
-- **user_prompt_submit** — drift detection and rule violation check
+- **post_edit_scan** — checks for debug artifacts after code edits
+- **task_complete** — runs review checklist
+- **drift_check** — detects possible scope drift when enabled
+- **rule_check** — checks relevant learned rules before task execution
 
 ### Per-Project Learning
 

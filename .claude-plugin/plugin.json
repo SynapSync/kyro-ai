@@ -1,7 +1,7 @@
 {
   "name": "kyro-workflow",
   "version": "3.2.0",
-  "description": "Complete sprint workflow system with orchestration patterns, specialized agents, lifecycle hooks, and adaptive per-project learning",
+  "description": "Claude Code adapter for Kyro, a portable sprint workflow kit for AI coding agents",
   "author": {
     "name": "SynapSync",
     "email": "synapsync@proton.me"
@@ -10,6 +10,11 @@
   "repository": "https://github.com/SynapSync/kyro-workflow",
   "license": "Apache-2.0",
   "keywords": [
+    "ai-agents",
+    "agent-workflow",
+    "llm-workflow",
+    "agentic-development",
+    "markdown-workflow",
     "claude-code",
     "workflow",
     "sprint",
@@ -19,9 +24,7 @@
     "roadmap",
     "iterative",
     "adaptive",
-    "hooks",
     "agents",
-    "subagents",
     "self-correction",
     "worktrees",
     "context-persistence"
@@ -31,8 +34,7 @@
     "./skills/qa-review"
   ],
   "agents": [
-    "./agents/orchestrator.md",
-    "./agents/guardian.md"
+    "./agents/orchestrator.md"
   ],
   "commands": ["./commands/"]
 }

@@ -27,7 +27,7 @@ Example:
 Rules must describe a concrete behavior to adopt or avoid. Vague rules are rejected.
 
 - BAD: "Be more careful with error handling"
-- GOOD: "Wrap all database calls in try/catch and log the query on failure"
+- GOOD: "Wrap all external API calls in try/catch and log the operation on failure"
 - BAD: "Tests are important"
 - GOOD: "Add integration tests for every new API endpoint before closing the task"
 
@@ -62,5 +62,5 @@ The active rule set must not exceed 50 rules.
 Track which rules are applied during each sprint.
 
 - Record rule applications in the sprint file's "Applied Rules" section.
-- Rules that are consistently applied become candidates for automation (guardian events or linting).
+- Rules that are consistently applied become candidates for automation or linting.
 - Rules that are never triggered become candidates for deprecation.
