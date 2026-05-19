@@ -49,18 +49,24 @@ Gather or detect the following configuration:
 | **Codebase Path** | The absolute path to the codebase. Usually the current working directory. |
 | **Sprint Output Dir** | `{output_kyro_dir}/sprints/` (automatic, resolved below) |
 
-**Resolve `{output_kyro_dir}`** — ask the user:
+**Resolve `{output_kyro_dir}`** — auto-calculate the scope directory:
 
-> "Where should I save kyro-workflow documents for **{scope}**?
->
-> 1. **Default** (Recommended) — `.agents/sprint-forge/{scope}/`
-> 2. **Custom path** — provide your preferred directory"
+1. Scan `.agents/sprint-forge/` for existing numbered scope folders matching the pattern `NN-*` (e.g., `01-auth`, `02-ui-redesign`)
+2. Find the highest existing number. If none exist, start at `01`
+3. Assign `{next_number}-{scope}` as the folder name, zero-padded to 2 digits
 
-Set `{output_kyro_dir}` based on the choice. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.
+Examples:
+- No existing scopes → `01-{scope}`
+- Existing `01-auth` → `02-{scope}`
+- Existing `01-auth`, `02-payments` → `03-{scope}`
+
+Set `{output_kyro_dir}` to `.agents/sprint-forge/{NN}-{scope}/` automatically. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.
+
+> **Note**: Custom paths are not supported via this auto-numbering system. If the user explicitly requests a custom path, honor it but skip the numbering prefix.
 
 Confirm with the user:
 
-> **Scope**: {scope}
+> **Scope**: `{NN}-{scope}`
 > **Codebase**: `{codebase_path}`
 > **Output**: `{output_kyro_dir}`
 >

@@ -1,6 +1,6 @@
 name: kyro-workflow
 type: workflow
-version: "3.2.0"
+version: "3.3.0"
 description: >
   Portable sprint workflow kit for AI coding agents, with markdown artifacts,
   adapter guides, adaptive per-project learning, and formal validation gates.
