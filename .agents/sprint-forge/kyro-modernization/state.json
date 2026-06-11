@@ -1,0 +1,592 @@
+{
+  "schema_version": 1,
+  "scope": "kyro-modernization",
+  "created_at": "2026-06-11T00:00:00.000Z",
+  "updated_at": "2026-06-11T00:00:00.000Z",
+  "sprints": [
+    {
+      "number": 0,
+      "slug": "quick-wins",
+      "status": "completed",
+      "version_target": "3.3.1",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Fix broken Obsidian standard link.",
+          "status": "completed",
+          "estimated_sp": 1
+        },
+        {
+          "id": "T1.2",
+          "description": "Update stale Kyro v2.0 references.",
+          "status": "completed",
+          "estimated_sp": 1
+        },
+        {
+          "id": "T2.1",
+          "description": "Remove empty src/db and src/search directories.",
+          "status": "completed",
+          "estimated_sp": 1
+        },
+        {
+          "id": "T3.1",
+          "description": "Add version-sync script.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T3.2",
+          "description": "Wire version-sync check into CI and release workflows.",
+          "status": "completed",
+          "estimated_sp": 2
+        },
+        {
+          "id": "T3.3",
+          "description": "Trim forge command into a delegating wrapper.",
+          "status": "completed",
+          "estimated_sp": 3
+        }
+      ]
+    },
+    {
+      "number": 1,
+      "slug": "deterministic-layer",
+      "status": "completed",
+      "version_target": "3.4.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add shared script utilities.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T2.1",
+          "description": "Add post-edit scan.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T2.2",
+          "description": "Add pre-commit checkpoint.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T2.3",
+          "description": "Add deterministic sprint numbering.",
+          "status": "completed",
+          "estimated_sp": 2
+        },
+        {
+          "id": "T2.4",
+          "description": "Add markdown debt inheritance check.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T2.5",
+          "description": "Add metrics aggregation.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T3.1",
+          "description": "Add Claude Code hook adapter.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T3.2",
+          "description": "Document multi-harness fallback commands.",
+          "status": "completed",
+          "estimated_sp": 2
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "slug": "structured-state",
+      "status": "completed",
+      "version_target": "3.5.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add versioned state schema.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T1.2",
+          "description": "Add state CLI and store helpers.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T2.1",
+          "description": "Add migration script from markdown sprint docs.",
+          "status": "completed",
+          "estimated_sp": 6
+        },
+        {
+          "id": "T3.1",
+          "description": "Add state renderers for summary, debt, and metrics.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T4.1",
+          "description": "Wire debt/state invariants into checkpoint scripts.",
+          "status": "completed",
+          "estimated_sp": 3
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "slug": "context-economy",
+      "status": "completed",
+      "version_target": "3.5.1",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Split qa-review into a compact core and focused references.",
+          "status": "completed",
+          "estimated_sp": 5
+        },
+        {
+          "id": "T1.2",
+          "description": "Preserve legacy QA reference as fallback.",
+          "status": "completed",
+          "estimated_sp": 1
+        },
+        {
+          "id": "T2.1",
+          "description": "Capture line-count reduction evidence.",
+          "status": "completed",
+          "estimated_sp": 1
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "slug": "autonomy-gates",
+      "status": "completed",
+      "version_target": "3.6.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add gate taxonomy and config.",
+          "status": "completed",
+          "estimated_sp": 2
+        },
+        {
+          "id": "T2.1",
+          "description": "Add gate decision script with state audit trail.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T3.1",
+          "description": "Update orchestrator gate protocol and docs.",
+          "status": "completed",
+          "estimated_sp": 4
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "slug": "eval-harness",
+      "status": "completed",
+      "version_target": "3.7.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add fixture repos for INIT and mid-sprint states.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T2.1",
+          "description": "Add deterministic scenario runner.",
+          "status": "completed",
+          "estimated_sp": 7
+        },
+        {
+          "id": "T3.1",
+          "description": "Add invariant scenarios for artifacts, debt, recommendations, and gates.",
+          "status": "completed",
+          "estimated_sp": 5
+        },
+        {
+          "id": "T4.1",
+          "description": "Wire deterministic evals into CI.",
+          "status": "completed",
+          "estimated_sp": 1
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "slug": "subagent-parallelism",
+      "status": "completed",
+      "version_target": "3.8.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add subagent parallelism helper and INIT fan-out contract.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T2.1",
+          "description": "Add isolated QA review guidance.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T3.1",
+          "description": "Add fail-closed worktree task helper behind config flag.",
+          "status": "completed",
+          "estimated_sp": 7
+        },
+        {
+          "id": "T3.2",
+          "description": "Extend deterministic evals for parallelism contracts.",
+          "status": "completed",
+          "estimated_sp": 3
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "slug": "memory-mcp",
+      "status": "completed",
+      "version_target": "3.9.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add memory config with rules.md canonical policy.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T2.1",
+          "description": "Add local rules memory sync/query script.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T3.1",
+          "description": "Document optional MCP behavior and no-MCP fallback.",
+          "status": "completed",
+          "estimated_sp": 2
+        },
+        {
+          "id": "T3.2",
+          "description": "Update learner and evals for canonical memory policy.",
+          "status": "completed",
+          "estimated_sp": 3
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "slug": "harness-parity",
+      "status": "completed",
+      "version_target": "3.10.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add KYRO_* env vars with CLAUDE_* aliases.",
+          "status": "completed",
+          "estimated_sp": 2
+        },
+        {
+          "id": "T1.2",
+          "description": "Add harness section to config.json and orchestrator neutrality.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T2.1",
+          "description": "Remove model bias from contexts and agents-reference.",
+          "status": "completed",
+          "estimated_sp": 2
+        },
+        {
+          "id": "T2.2",
+          "description": "Ship adapters/ templates for Cursor, generic, Kilo Code.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T3.1",
+          "description": "Reorder docs generic-first; add Cursor and Kilo Code guides.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T3.2",
+          "description": "Extend evals with portability scenarios.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T4.1",
+          "description": "Bump version to 3.10.0 and package adapters/.",
+          "status": "completed",
+          "estimated_sp": 2
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "slug": "eval-hardening",
+      "status": "completed",
+      "version_target": "3.11.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add eval temp-project helper.",
+          "status": "completed",
+          "estimated_sp": 2
+        },
+        {
+          "id": "T2.1",
+          "description": "Add gate unknown and auto-audit temp-state eval scenarios.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T2.2",
+          "description": "Add rules-memory sync and query temp-state eval scenario.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T3.1",
+          "description": "Add harness-detect CLI and docs.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T4.1",
+          "description": "Retire qa-review legacy fallback.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T4.2",
+          "description": "Add progressive-only QA eval guard.",
+          "status": "completed",
+          "estimated_sp": 1
+        },
+        {
+          "id": "T5.1",
+          "description": "Bump version to 3.11.0.",
+          "status": "completed",
+          "estimated_sp": 2
+        }
+      ]
+    }
+  ],
+  "debt": [
+    {
+      "id": 1,
+      "item": "Sprint 1 should move checkpoint enforcement from prose to scripts and hooks.",
+      "origin": "findings/deterministic-layer.md",
+      "sprint_target": "Sprint 1",
+      "status": "resolved",
+      "resolved_in": "Sprint 1",
+      "created_in": 0,
+      "aged": false
+    },
+    {
+      "id": 2,
+      "item": "Sprint 2 should make debt and metrics state machine-checkable through state.json.",
+      "origin": "findings/structured-state.md",
+      "sprint_target": "Sprint 2",
+      "status": "resolved",
+      "resolved_in": "Sprint 2",
+      "created_in": 0,
+      "aged": false
+    },
+    {
+      "id": 3,
+      "item": "debt-inherit currently parses markdown and should be retargeted to state.json after Sprint 2 lands.",
+      "origin": "Sprint 1 Phase 2",
+      "sprint_target": "Sprint 2",
+      "status": "resolved",
+      "resolved_in": "Sprint 2",
+      "created_in": 1,
+      "aged": false
+    },
+    {
+      "id": 4,
+      "item": "Sprint 3 should split qa-review and complete lifecycle dedupe to reduce token load.",
+      "origin": "findings/context-economy.md",
+      "sprint_target": "Sprint 3",
+      "status": "resolved",
+      "resolved_in": "Sprint 3",
+      "created_in": 2,
+      "aged": false
+    },
+    {
+      "id": 5,
+      "item": "Sprint 4 should add configurable autonomy gates and audit gate decisions in state.",
+      "origin": "findings/autonomy-gates.md",
+      "sprint_target": "Sprint 4",
+      "status": "resolved",
+      "resolved_in": "Sprint 4",
+      "created_in": 3,
+      "aged": false
+    },
+    {
+      "id": 6,
+      "item": "Sprint 5 should add eval fixtures and invariant scenarios before subagent parallelism.",
+      "origin": "findings/eval-harness.md",
+      "sprint_target": "Sprint 5",
+      "status": "resolved",
+      "resolved_in": "Sprint 5",
+      "created_in": 4,
+      "aged": false
+    },
+    {
+      "id": 7,
+      "item": "Sprint 6 should add subagent fan-out, isolated QA review, and optional worktree execution behind safe fallbacks.",
+      "origin": "findings/subagent-parallelism.md",
+      "sprint_target": "Sprint 6",
+      "status": "resolved",
+      "resolved_in": "Sprint 6",
+      "created_in": 5,
+      "aged": false
+    },
+    {
+      "id": 8,
+      "item": "Sprint 7 should add optional MCP memory sync while keeping rules.md canonical.",
+      "origin": "findings/memory-mcp.md",
+      "sprint_target": "Sprint 7",
+      "status": "resolved",
+      "resolved_in": "Sprint 7",
+      "created_in": 6,
+      "aged": false
+    },
+    {
+      "id": 9,
+      "item": "Eval gate audit with temp-state pattern to avoid mutating fixtures.",
+      "origin": "Sprint 5 retro",
+      "sprint_target": "Sprint 9",
+      "status": "resolved",
+      "resolved_in": "Sprint 9",
+      "created_in": 8,
+      "aged": false
+    },
+    {
+      "id": 10,
+      "item": "Retire qa-review legacy fallback after broader eval coverage.",
+      "origin": "Sprint 7 retro",
+      "sprint_target": "Sprint 9",
+      "status": "resolved",
+      "resolved_in": "Sprint 9",
+      "created_in": 8,
+      "aged": false
+    },
+    {
+      "id": 11,
+      "item": "MCP server-specific memory adapters after API selection.",
+      "origin": "Sprint 7 retro",
+      "sprint_target": "TBD",
+      "status": "open",
+      "resolved_in": null,
+      "created_in": 8,
+      "aged": false
+    },
+    {
+      "id": 12,
+      "item": "Runtime harness auto-detection or --apply for harness-detect output.",
+      "origin": "Sprint 9 retro",
+      "sprint_target": "Sprint 10+",
+      "status": "open",
+      "resolved_in": null,
+      "created_in": 9,
+      "aged": false
+    }
+  ],
+  "metrics": {
+    "estimated_sp_completed": 155,
+    "actual_sp_recorded": 0
+  },
+  "audit": [
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "state.created",
+      "details": {
+        "scope": "kyro-modernization"
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "state.seeded_from_current_sprints",
+      "details": {
+        "sprints": [0, 1, 2]
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 2
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 3
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 4
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 5
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 6
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 7
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 8
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 9
+      }
+    }
+  ]
+}

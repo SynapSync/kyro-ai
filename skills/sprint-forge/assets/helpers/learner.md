@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Captures corrections, patterns, and estimation insights as persistent rules stored in `.agents/sprint-forge/rules.md`. These rules are project-scoped and accumulated across sprints.
+Captures corrections, patterns, and estimation insights as persistent rules stored in `.agents/sprint-forge/rules.md`. These rules are project-scoped and accumulated across sprints. `rules.md` is canonical; any memory MCP or JSON index is derived from it.
 
 ## Rule Format
 
@@ -49,10 +49,12 @@ Save this rule? (yes/no/edit)
 ## Rule Application
 
 At the start of every session:
-1. Load `.agents/sprint-forge/rules.md`
-2. Before generating sprint estimates, check estimation rules
-3. Before architecture decisions, check architecture rules
-4. If about to violate a rule, pause and show it (RuleViolation event)
+1. Run `npm run kyro:rules-memory -- sync` when scripts are available.
+2. Query relevant rules with `npm run kyro:rules-memory -- query "{task context}"`.
+3. If scripts or memory are unavailable, load `.agents/sprint-forge/rules.md` directly.
+4. Before generating sprint estimates, check estimation rules.
+5. Before architecture decisions, check architecture rules.
+6. If about to violate a rule, pause and show it (RuleViolation event).
 
 ## Rule Lifecycle
 

@@ -124,7 +124,7 @@ No AGENTS.md. No branded blocks. The re-entry prompts and README carry the path 
 
 ### Frontmatter Properties
 
-All generated markdown documents include YAML frontmatter following the [Obsidian markdown standard](../integrations/obsidian/assets/standards/obsidian-md-standard.md). The `agents` field tracks the AI model or agent that generated or modified the document. Resolve `{agent_model}` from the model or agent ID powering the current session (e.g., `"gpt-5"`, `"codex"`, `"cursor"`, `"opencode"`). When modifying an existing document, append the current model or agent to the `agents` array if not already present.
+All generated markdown documents include YAML frontmatter compatible with the local templates in `assets/templates/`. The `agents` field tracks the AI model or agent that generated or modified the document. Resolve `{agent_model}` from the model or agent ID powering the current session (e.g., `"gpt-5"`, `"codex"`, `"cursor"`, `"opencode"`). When modifying an existing document, append the current model or agent to the `agents` array if not already present.
 
 ---
 
@@ -148,8 +148,8 @@ After detecting the mode, read ONLY the assets listed for that mode. Do NOT read
 
 | Mode | Read These Assets | Do NOT Read |
 |------|-------------------|-------------|
-| **INIT** | `INIT.md`, `analysis-guide.md`, `reentry-generator.md` | SPRINT.md, STATUS.md, sprint-generator.md, debt-tracker.md |
-| **SPRINT** | `SPRINT.md`, `sprint-generator.md`, `debt-tracker.md`, `reentry-generator.md` | INIT.md, STATUS.md, analysis-guide.md |
+| **INIT** | `INIT.md`, `analysis-guide.md`, `subagent-parallelism.md`, `reentry-generator.md` | SPRINT.md, STATUS.md, sprint-generator.md, debt-tracker.md |
+| **SPRINT** | `SPRINT.md`, `sprint-generator.md`, `debt-tracker.md`, `subagent-parallelism.md`, `reentry-generator.md` | INIT.md, STATUS.md, analysis-guide.md |
 | **STATUS** | `STATUS.md`, `debt-tracker.md` | INIT.md, SPRINT.md, analysis-guide.md, sprint-generator.md, reentry-generator.md, all templates |
 
 **On-demand assets**: Templates are loaded as each workflow step references them, not upfront.
@@ -212,7 +212,7 @@ This will: read all sprints, calculate metrics, display progress and accumulated
 
 ## Workflow Components
 
-Kyro v2.0 operates as a workflow with one orchestrator agent, built-in checkpoints, and commands. The SKILL.md remains the core orchestration logic:
+Kyro v3.3 operates as a workflow with one orchestrator agent, built-in checkpoints, and commands. The SKILL.md remains the core orchestration logic:
 
 ### Agent
 

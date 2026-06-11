@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check version metadata sync
+        run: npm run check:versions
+
       - name: Build TypeScript
         run: npm run build
 

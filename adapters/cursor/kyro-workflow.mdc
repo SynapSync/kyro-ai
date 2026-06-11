@@ -1,0 +1,58 @@
+---
+description: Kyro sprint workflow — orchestrator, skills, intents, and artifact conventions
+globs:
+alwaysApply: true
+---
+
+# Kyro Workflow (Cursor)
+
+Use Kyro for sprint-based development on this project. Kyro is agent-agnostic — any model in Cursor can follow these instructions.
+
+## Required Reading
+
+Before forge, status, or wrap-up work, read:
+- `.agents/orchestrator.md`
+- `.skills/sprint-forge/SKILL.md`
+- `.skills/qa-review/SKILL.md`
+
+## Artifact Root
+
+Persist all sprint output under `.agents/sprint-forge/{scope}/` (README, ROADMAP, findings, sprints, RE-ENTRY-PROMPTS, state.json).
+
+## Workflow Intents
+
+Cursor does not register Kyro slash commands by default. Use manual intents:
+
+| Intent | Action |
+|--------|--------|
+| `forge` | Analyze → plan → implement → review → close |
+| `status` | Read artifacts; report progress and debt |
+| `wrap-up` | Update retro, re-entry prompts, and learned rules |
+
+## Harness Config
+
+In `config.json`, set:
+```json
+"harness": {
+  "id": "cursor",
+  "capabilities": {
+    "slash_commands": false,
+    "subagents": true,
+    "post_edit_hooks": false,
+    "project_memory": false
+  },
+  "enforcement": "manual"
+}
+```
+
+Adjust `subagents` based on whether your Cursor setup supports parallel subagents.
+
+## Deterministic Checks
+
+When `harness.enforcement` is `manual`, run after edits:
+```bash
+npm run check:post-edit
+npm run check:pre-commit
+```
+
+Never skip gates in `config.json` → `gates.always_gate` without explicit user approval.

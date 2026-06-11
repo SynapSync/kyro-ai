@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synapsync.dev/schemas/kyro-workflow/state.schema.json",
+  "title": "Kyro Workflow State",
+  "type": "object",
+  "required": ["schema_version", "scope", "created_at", "updated_at", "sprints", "debt", "metrics", "audit"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "sprints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["number", "slug", "status", "tasks"],
+        "properties": {
+          "number": { "type": "integer" },
+          "slug": { "type": "string" },
+          "status": { "enum": ["pending", "active", "completed", "blocked"] },
+          "version_target": { "type": "string" },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "description", "status"],
+              "properties": {
+                "id": { "type": "string" },
+                "description": { "type": "string" },
+                "status": { "enum": ["pending", "in-progress", "completed", "blocked", "skipped", "carry-over"] },
+                "estimated_sp": { "type": "number" },
+                "actual_sp": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "debt": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "item", "origin", "sprint_target", "status"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "item": { "type": "string" },
+          "origin": { "type": "string" },
+          "sprint_target": { "type": "string" },
+          "status": { "enum": ["open", "in-progress", "resolved", "deferred", "carry-over"] },
+          "resolved_in": { "type": ["string", "null"] },
+          "created_in": { "type": ["integer", "null"] },
+          "aged": { "type": "boolean" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "audit": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["at", "action"],
+        "properties": {
+          "at": { "type": "string" },
+          "action": { "type": "string" },
+          "details": { "type": "object" }
+        }
+      }
+    }
+  }
+}

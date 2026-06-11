@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "node \"${KYRO_PACKAGE_ROOT}/scripts/post-edit-scan.js\""
+      }
+    ]
+  },
+  "_comment": "Optional Cursor hooks example. Set KYRO_PACKAGE_ROOT to your kyro-workflow install path. If hooks are enabled, set config.json harness.enforcement to hooks and harness.capabilities.post_edit_hooks to true."
+}

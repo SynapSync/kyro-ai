@@ -3,10 +3,11 @@ name: init
 description: Read-only analysis context for project exploration and roadmap generation. No code changes allowed.
 mode: analysis
 agent: orchestrator
-model: opus
 ---
 
 # Context: INIT — Analysis Mode
+
+> Model selection is host-owned. Kyro does not prescribe a provider or model.
 
 Activated during project initialization and analysis phases. This context puts Kyro in **read-only exploration mode** where the goal is understanding, not action.
 

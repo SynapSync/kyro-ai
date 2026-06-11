@@ -8,10 +8,44 @@
     "typecheck": "npm run typecheck",
     "build": "npm run build"
   },
+  "gates": {
+    "mode": "standard",
+    "always_gate": ["sprint_plan", "commit"],
+    "taxonomy": {
+      "init_approval": "Approval after INIT analysis and roadmap creation",
+      "sprint_plan": "Approval before sprint implementation starts",
+      "task_blocked": "Decision point when a task is blocked",
+      "implementation": "Approval after implementation summary",
+      "commit": "Approval before commit or release handoff",
+      "rule_capture": "Approval before learned rules are persisted"
+    }
+  },
   "sprint": {
     "max_tasks_per_sprint": 10,
     "checkpoint_per_phase": true,
     "require_retro": true,
     "debt_aged_threshold_sprints": 3
+  },
+  "parallelism": {
+    "init_fanout": true,
+    "isolated_qa_review": true,
+    "worktree_tasks": false,
+    "fallback": "sequential"
+  },
+  "memory": {
+    "rules_canonical": ".agents/sprint-forge/rules.md",
+    "mcp_enabled": false,
+    "derived_index": ".agents/sprint-forge/rules.index.json",
+    "max_retrieved_rules": 5
+  },
+  "harness": {
+    "id": "auto",
+    "capabilities": {
+      "slash_commands": false,
+      "subagents": false,
+      "post_edit_hooks": false,
+      "project_memory": false
+    },
+    "enforcement": "manual"
   }
 }

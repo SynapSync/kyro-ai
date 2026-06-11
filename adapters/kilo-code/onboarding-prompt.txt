@@ -1,0 +1,18 @@
+Use Kyro for this project.
+
+Read:
+- .agents/orchestrator.md
+- .skills/sprint-forge/SKILL.md
+- .skills/qa-review/SKILL.md
+
+Persist artifacts under .agents/sprint-forge/{scope}/.
+
+Intents (no slash commands required):
+- forge = analyze/plan/execute/review/close
+- status = read artifacts and report progress/debt
+- wrap-up = close session and update re-entry prompts
+
+After code edits: npm run check:post-edit
+Before commit: npm run check:pre-commit
+
+Model selection is host-owned.

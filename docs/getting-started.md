@@ -2,15 +2,15 @@
 
 Kyro is a portable, markdown-first workflow kit for AI coding agents. It coordinates sprint-based execution through one orchestrator, reusable skills, command intent documents, persistent project rules, and `.agents/sprint-forge/{scope}/` artifacts.
 
-Kyro does not require a specific model provider. Claude Code is supported through a native adapter, while Codex, OpenCode, Cursor, and generic agents can use the same core files manually.
+Kyro does not require a specific model provider. Any capable agent — Cursor, Codex, OpenCode, Kilo Code, Claude Code, or a custom LLM API — can use the same core files.
 
 ---
 
 ## Prerequisites
 
-- **Node.js >= 18** -- required to build and package Kyro
+- **Node.js >= 18** -- required for deterministic scripts (`check:post-edit`, `kyro:state`, etc.)
 - **Git** -- recommended for project workflows and review
-- **An AI coding agent** -- Claude Code, Codex, OpenCode, Cursor, or another agent that can read markdown instructions
+- **An AI coding agent** -- any host that can read markdown instructions and write files
 
 Verify your Node.js version:
 
@@ -21,11 +21,57 @@ node --version
 
 ---
 
-## Installation Paths
+## Generic Agent Setup (Recommended First)
 
-### Claude Code Adapter
+Use this path for **any** agent without a native Kyro plugin:
 
-Use this path when you want Claude Code to register Kyro slash commands, agents, and skills automatically:
+```bash
+git clone https://github.com/SynapSync/kyro-workflow.git ~/kyro-workflow
+cd your-project
+mkdir -p .agents .skills .agents/sprint-forge
+
+cp -R ~/kyro-workflow/agents/orchestrator.md .agents/
+cp -R ~/kyro-workflow/skills/sprint-forge .skills/sprint-forge
+cp -R ~/kyro-workflow/skills/qa-review .skills/qa-review
+cp ~/kyro-workflow/config.json .
+```
+
+Optional: copy a harness template from `adapters/`:
+
+| Host | Template |
+|------|----------|
+| Any | `adapters/generic/AGENTS.snippet.md` → append to your `AGENTS.md` |
+| Cursor | `adapters/cursor/kyro-workflow.mdc` → `.cursor/rules/` |
+| Kilo Code | `adapters/kilo-code/onboarding-prompt.txt` |
+
+Expose these files as project context or rules:
+
+- `.agents/orchestrator.md`
+- `.skills/sprint-forge/SKILL.md`
+- `.skills/qa-review/SKILL.md`
+
+Set `config.json` → `harness` to match your host (defaults work on any LLM):
+
+```json
+"harness": {
+  "id": "generic",
+  "capabilities": {
+    "slash_commands": false,
+    "subagents": false,
+    "post_edit_hooks": false,
+    "project_memory": false
+  },
+  "enforcement": "manual"
+}
+```
+
+See [agent-adapters.md](agent-adapters.md) for Cursor, Codex, OpenCode, Kilo Code, and programmatic usage.
+
+---
+
+## Optional: Claude Code Native Adapter
+
+Claude Code can register slash commands, the orchestrator, skills, and post-edit hooks automatically:
 
 ```bash
 /plugin install SynapSync/kyro-workflow
@@ -41,28 +87,7 @@ npm run build
 claude --plugin-dir ~/.claude/plugins/kyro-workflow
 ```
 
-### Generic Agent Setup
-
-Use this path for agents without a verified Kyro-native plugin mechanism:
-
-```bash
-git clone https://github.com/SynapSync/kyro-workflow.git ~/kyro-workflow
-cd your-project
-mkdir -p .agents .skills
-cp -R ~/kyro-workflow/agents .agents/kyro
-cp -R ~/kyro-workflow/skills/sprint-forge .skills/sprint-forge
-cp -R ~/kyro-workflow/skills/qa-review .skills/qa-review
-mkdir -p .agents/sprint-forge
-```
-
-Then expose these files as project context or rules in your agent:
-
-- `.agents/kyro/orchestrator.md`
-- `.skills/sprint-forge/SKILL.md`
-- `.skills/qa-review/SKILL.md`
-- Kyro command intent files from `commands/*.md`, when your agent supports slash commands or reusable prompts
-
-See [agent-adapters.md](agent-adapters.md) for Codex, OpenCode, Cursor, and generic AGENTS guidance.
+When using the Claude adapter, set `harness.enforcement` to `hooks` and enable capabilities in `config.json`. See [adapters/claude-code/README.md](../adapters/claude-code/README.md).
 
 ---
 
@@ -74,7 +99,7 @@ If your platform supports Kyro slash commands, start with:
 /kyro-workflow:forge analyze the authentication module
 ```
 
-If your platform does not support slash commands, invoke the same intent manually:
+If your platform does not support slash commands, invoke the **forge** intent manually:
 
 ```text
 Use Kyro forge mode. Read the orchestrator, sprint-forge, and qa-review instructions. Analyze the authentication module, produce findings, create or update the sprint artifacts under .agents/sprint-forge/{scope}/, and stop at each approval gate.
@@ -90,7 +115,13 @@ This starts the full sprint cycle:
 6. You approve the implementation at Gate 3.
 7. A retrospective is run and the sprint is closed.
 
-To check progress, use `/kyro-workflow:status` or ask the agent to run Kyro status mode by reading `.agents/sprint-forge/{scope}/`.
+To check progress, use the **status** intent or ask the agent to read `.agents/sprint-forge/{scope}/`.
+
+When `harness.enforcement` is `manual`, run after code edits:
+
+```bash
+npm run check:post-edit
+```
 
 ---
 
@@ -158,8 +189,9 @@ Technical debt is tracked formally across sprints. Items are never deleted; only
 
 ## Next Steps
 
-- [Agent Adapters](agent-adapters.md) -- setup guidance for Claude Code, Codex, OpenCode, Cursor, and generic agents
-- [Commands Reference](commands-reference.md) -- syntax and examples for all 3 command intents
-- [Agents Reference](agents-reference.md) -- how the orchestrator and protocols work
-- [Rules Guide](rules-guide.md) -- the per-project learning system
-- [Architecture](architecture.md) -- system design and data flow
+- [Agent Adapters](agent-adapters.md) -- harness matrix and per-platform setup
+- [HOW-TO-USE-CURSOR.md](HOW-TO-USE-CURSOR.md) -- Cursor-specific guide
+- [HOW-TO-USE-KILO-CODE.md](HOW-TO-USE-KILO-CODE.md) -- Kilo Code guide
+- [Commands Reference](commands-reference.md) -- syntax and manual intents
+- [Agents Reference](agents-reference.md) -- orchestrator protocols
+- [Architecture](architecture.md) -- core vs adapters

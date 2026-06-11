@@ -4,6 +4,13 @@
 
 Provides quantitative analysis of sprint execution history to identify patterns, improve estimation accuracy, and visualize technical debt distribution.
 
+As of Kyro 3.5, metrics should be read from `{output_kyro_dir}/state.json` when available. Use the CLI before hand-parsing sprint files:
+
+```bash
+npm run kyro:metrics -- {scope}
+npm run kyro:render-state -- {scope} metrics
+```
+
 ## Metrics
 
 ### Velocity Trend
@@ -73,7 +80,7 @@ Score: 72/100 (Good)
 
 ## Calculation
 
-Read all sprint files in `{output_kyro_dir}/sprints/` and compute:
+Read `state.json` first. If it is unavailable in a legacy project, migrate with `npm run kyro:migrate-state -- {scope} --dry-run` before falling back to sprint file parsing. Compute:
 
 1. Count tasks per sprint (total, completed, blocked, skipped, carry-over)
 2. Map debt items to source directories

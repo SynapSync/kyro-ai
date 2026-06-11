@@ -3,13 +3,30 @@ name: orchestrator
 description: Coordinates the full kyro-workflow cycle with validation gates. Use when running /kyro-workflow:forge for end-to-end sprint execution (Analyze → Plan → Implement → Review → Commit).
 tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
 skills: ["sprint-forge"]
-model: opus
 memory: project
 ---
 
 # Orchestrator — Kyro Cycle Coordinator
 
 Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/kyro-workflow:forge` command. Analysis, review, debugging, and checkpoint protocols are built in.
+
+## Harness Neutrality
+
+Kyro is **agent-agnostic**. The host platform owns model selection — never hardcode or assume a provider.
+
+Read `config.json` → `harness` at startup:
+
+| Field | Purpose |
+|-------|---------|
+| `harness.capabilities.subagents` | When `true`, parallel INIT fan-out and isolated QA review are allowed |
+| `harness.capabilities.post_edit_hooks` | When `true`, the platform runs post-edit scans automatically |
+| `harness.enforcement` | `manual` (default) — you must run `npm run check:post-edit` after edits; `hooks` — platform handles scans |
+
+**Frontmatter notes:**
+- `memory: project` — Claude Code only. Ignore on Cursor, Codex, OpenCode, Kilo Code, and generic API hosts.
+- Slash commands (`/kyro-workflow:forge`) are optional. Use manual intents when `harness.capabilities.slash_commands` is `false`: forge, status, wrap-up.
+
+Set harness capabilities in the consumer project's `config.json` to match the host. Defaults are safe for any LLM (`subagents: false`, `enforcement: manual`).
 
 ## Lifecycle
 
@@ -64,11 +81,22 @@ Before starting, determine which flow to follow:
 
 ## Gate Protocol
 
-At each gate, present a clear summary and wait for explicit approval:
+At each gate, resolve the configured behavior before prompting:
+
+```bash
+npm run kyro:gate -- {scope} {gate_name}
+```
+
+Gate names come from `config.json` under `gates.taxonomy`. The default safety floor keeps `sprint_plan` and `commit` in `always_gate`.
+
+- If the gate script returns `decision: "ask"`, present structured options and wait for explicit approval.
+- If it returns `decision: "auto"`, continue and rely on the `state.json.audit` entry written by the script.
+
+Structured prompt format:
 
 ```text
 ═══════════════════════════════════════
-GATE [N]: [Phase Name] Complete
+GATE: [gate_name]
 ═══════════════════════════════════════
 
 Summary:
@@ -77,14 +105,14 @@ Summary:
 Next phase: [what happens next]
 
 Options:
-  → "proceed" — continue to next phase
-  → "adjust" — modify before continuing (describe changes)
-  → "cancel" — stop the workflow
+1. proceed — continue to next phase
+2. adjust — modify before continuing
+3. cancel — stop the workflow
 
 Waiting for your decision...
 ```
 
-**Never proceed past a gate without explicit user approval.**
+**Never bypass `always_gate` items without explicit user approval.**
 
 ## Startup Loading
 
@@ -98,8 +126,8 @@ The `skills` declaration in frontmatter is metadata only — it does NOT auto-in
 
 1. Read `skills/sprint-forge/SKILL.md` — core orchestration logic, critical rules, mode detection, capabilities matrix
 2. Load mode-gated assets based on the current phase:
-   - **INIT phase**: Read `skills/sprint-forge/assets/modes/INIT.md`, `skills/sprint-forge/assets/helpers/analysis-guide.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
-   - **SPRINT phase**: Read `skills/sprint-forge/assets/modes/SPRINT.md`, `skills/sprint-forge/assets/helpers/sprint-generator.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
+   - **INIT phase**: Read `skills/sprint-forge/assets/modes/INIT.md`, `skills/sprint-forge/assets/helpers/analysis-guide.md`, `skills/sprint-forge/assets/helpers/subagent-parallelism.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
+   - **SPRINT phase**: Read `skills/sprint-forge/assets/modes/SPRINT.md`, `skills/sprint-forge/assets/helpers/sprint-generator.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`, `skills/sprint-forge/assets/helpers/subagent-parallelism.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
    - **STATUS phase**: Read `skills/sprint-forge/assets/modes/STATUS.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`
 3. Load templates **on-demand** as each workflow step references them (not upfront)
 
@@ -149,6 +177,8 @@ Based on work type, explore these areas:
 - **Dependencies** — external packages, version health, security advisories
 - **Risks** — fragile areas, complex modules, missing tests, hardcoded values
 - **Debt** — TODOs, FIXMEs, deprecated APIs, known workarounds
+
+If `config.json` has `parallelism.init_fanout: true` **and** `harness.capabilities.subagents: true`, run the architecture, dependencies, risks, and debt tracks in parallel using `skills/sprint-forge/assets/helpers/subagent-parallelism.md`. Otherwise run the same tracks sequentially and produce the same finding files.
 
 ### 3. Generate Report
 
@@ -223,10 +253,14 @@ The orchestrator owns lifecycle checkpoints directly. These checks are not deleg
 
 ### Post-Edit Scan
 
-- Run `git diff --name-only` to identify changed files.
-- Scan changed source files for debug artifacts (`console.log`, `debugger`, unsafe `print` usage).
-- Scan changed files for likely hardcoded secrets, API keys, passwords, or tokens.
-- Report findings as BLOCKER items before task closure.
+When `harness.enforcement` is `manual` (default) or `harness.capabilities.post_edit_hooks` is `false`:
+
+- Run `npm run check:post-edit` after every code edit.
+- Treat a failing script result as a BLOCKER before task closure.
+
+When `harness.enforcement` is `hooks` and `harness.capabilities.post_edit_hooks` is `true`, the platform may run the scan automatically — still verify a pass before closing the task.
+
+The script owns changed-file detection, debug artifact checks, and likely secret checks.
 
 ### Task-Complete Checkpoint
 
@@ -236,9 +270,9 @@ The orchestrator owns lifecycle checkpoints directly. These checks are not deleg
 
 ### Pre-Commit Checkpoint
 
-- Run quality gate commands from `config.json`.
-- Run the post-edit scan again.
-- Block commit if typecheck/build fails or if debug artifacts/secrets are found.
+- Run `npm run check:pre-commit`.
+- The script reads quality gates from `config.json`, reruns the post-edit scan, and returns a blocking exit code on failure.
+- If the user explicitly disables automatic CLI verification for the session, run `npm run check:pre-commit -- --skip-quality` and document that quality gates were skipped.
 
 ### Learn-Capture Checkpoint
 
@@ -249,6 +283,8 @@ The orchestrator owns lifecycle checkpoints directly. These checks are not deleg
 ### Validation Checklist
 
 After each task, run this three-tier checklist:
+
+When `config.json` has `parallelism.isolated_qa_review: true` **and** `harness.capabilities.subagents: true`, run `qa-review` in a clean-context subagent. Provide only the diff or changed files, the relevant sprint artifact, `state.json` if present, and the focused QA references required for the review type. Otherwise perform the same checklist in-process.
 
 **BLOCKER** (must all pass — task cannot close otherwise):
 - All related tests pass

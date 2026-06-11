@@ -1,14 +1,28 @@
 # Commands Reference
 
-Kyro provides 3 slash commands. Each command maps to one or more agents and skills that handle the actual work.
+Kyro defines 3 workflow intents. On Claude Code they map to slash commands; on other harnesses use the **manual intent** equivalents below.
+
+| Intent | Slash command (Claude Code) | Manual equivalent |
+|--------|----------------------------|-------------------|
+| `forge` | `/kyro-workflow:forge` | Analyze, plan, implement, review, and close the sprint |
+| `status` | `/kyro-workflow:status` | Read artifacts and report progress/debt |
+| `wrap-up` | `/kyro-workflow:wrap-up` | Close session and update re-entry prompts |
 
 ---
 
-## /kyro-workflow:forge
+## forge
 
 **Full sprint cycle: Analyze, Plan, Implement, Review, Close.**
 
-### Syntax
+### Manual intent
+
+```text
+Use Kyro forge mode. Read .agents/orchestrator.md and the sprint-forge skill.
+Target: {scope or description}. Persist artifacts under .agents/sprint-forge/{scope}/.
+Stop at each approval gate.
+```
+
+### Slash syntax (Claude Code)
 
 ```
 /kyro-workflow:forge <project path or description>
@@ -74,11 +88,19 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 
 ---
 
-## /kyro-workflow:status
+## status
 
 **Project progress, sprint state, and technical debt summary.**
 
-### Syntax
+### Manual intent
+
+```text
+Run Kyro status intent for .agents/sprint-forge/{scope}/.
+Report sprint progress, open debt, aged items, and next action.
+Optional variant: brief | full | debt
+```
+
+### Slash syntax (Claude Code)
 
 ```
 /kyro-workflow:status [brief|full|debt]

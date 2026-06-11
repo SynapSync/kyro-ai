@@ -3,10 +3,11 @@ name: sprint
 description: Execution context for task-by-task sprint implementation with quality gates, review validation, and emergent phase handling.
 mode: execution
 agent: orchestrator
-model: opus
 ---
 
 # Context: SPRINT — Execution Mode
+
+> Model selection is host-owned. Kyro does not prescribe a provider or model.
 
 Activated during sprint implementation. This context puts Kyro in **active execution mode** where tasks are implemented one by one with quality validation at each step.
 

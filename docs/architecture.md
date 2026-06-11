@@ -4,6 +4,38 @@ This document describes Kyro's Command > Agent > Skill workflow architecture and
 
 ---
 
+## Portable Core vs Optional Adapters
+
+Kyro separates **portable core** from **harness-specific adapters**:
+
+```mermaid
+flowchart TB
+    subgraph core [PortableCore]
+        Orchestrator[agents/orchestrator.md]
+        Skills[skills]
+        Commands[commands]
+        Scripts[scripts + config.json]
+        Artifacts[.agents/sprint-forge]
+    end
+
+    subgraph adapters [OptionalAdapters]
+        ClaudePlugin[.claude-plugin]
+        AdaptersDir[adapters/cursor generic kilo-code]
+        Docs[docs/HOW-TO-USE-*]
+    end
+
+    core --> adapters
+```
+
+- **Core** — same on every LLM host; source of truth is markdown + Node scripts.
+- **Adapters** — copy-and-customize templates or native plugin packaging; never required for the workflow to function.
+
+See [adapters/README.md](../adapters/README.md) and [agent-adapters.md](agent-adapters.md).
+
+Entry points may be slash commands (Claude Code) or **manual intents** (`forge`, `status`, `wrap-up`) on Cursor, Codex, OpenCode, Kilo Code, and generic API hosts.
+
+---
+
 ## Command > Agent > Skill Pattern
 
 Kyro is organized in three layers:
@@ -124,18 +156,18 @@ The orchestrator runs checkpoints at lifecycle moments:
 
 ## How the Workflow Differs from v1.x
 
-Kyro v2.0 is a full workflow that replaces the v1.x single-skill approach.
+Kyro 3.x is a full workflow that replaces the v1.x single-skill approach.
 
 ```
 v1.x: User message -> sprint-forge skill -> markdown artifacts
 
-v2.0: User command -> orchestrator
+3.x:  User command -> orchestrator
                     -> sprint-forge / qa-review skills
                     -> built-in checkpoints
                     -> markdown artifacts
 ```
 
-| Dimension | v1.x | v2.0 |
+| Dimension | v1.x | 3.x |
 |-----------|------|------|
 | Type | Single skill | Full workflow with commands, one agent, skills, and checkpoints |
 | Entry point | Text triggers | Slash commands |
@@ -155,5 +187,9 @@ v2.0: User command -> orchestrator
 | Orchestrator | `agents/orchestrator.md` |
 | Sprint workflow skill | `skills/sprint-forge/` |
 | QA review skill | `skills/qa-review/` |
+| Deterministic scripts | `scripts/` |
+| Harness config | `config.json` → `harness` |
+| Harness templates | `adapters/` |
+| Claude Code plugin | `.claude-plugin/` (adapter only) |
 | Templates | `skills/sprint-forge/assets/templates/` |
 | Rules | `.agents/sprint-forge/rules.md` in the target project |

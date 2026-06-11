@@ -25,12 +25,13 @@ kyro-workflow/
 ├── skills/           # 2 skills
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
-├── .claude-plugin/   # Claude Code adapter packaging
+├── adapters/         # Copy-and-customize harness templates (Cursor, generic, Kilo Code)
+├── .claude-plugin/   # Claude Code adapter packaging (optional)
 │   ├── plugin.json   # Plugin manifest (version must match package.json)
 │   ├── marketplace.json # Marketplace listing metadata
 │   ├── settings.json # Default permissions
 │   └── README.md     # Installation instructions
-├── docs/             # 10 markdown guides plus architecture.mmd
+├── docs/             # Guides plus architecture; see adapters/ for per-harness setup
 ├── config.json       # Workflow configuration
 ├── package.json      # NPM package definition
 └── WORKFLOW.yaml     # Workflow definition (version must match package.json)

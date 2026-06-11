@@ -1,0 +1,21 @@
+Use Kyro as the workflow for this project.
+
+Read these files first:
+- .agents/orchestrator.md
+- .skills/sprint-forge/SKILL.md
+- .skills/qa-review/SKILL.md
+
+Persist workflow artifacts under:
+- .agents/sprint-forge/{scope}/
+
+If native slash commands are unavailable, use these intents:
+- forge = analyze/plan/execute/review/close
+- status = read artifacts and report progress/debt
+- wrap-up = close session and update re-entry prompts
+
+After code edits, run:
+- npm run check:post-edit
+Before commit, run:
+- npm run check:pre-commit
+
+Model selection is host-owned. Kyro does not prescribe a provider.

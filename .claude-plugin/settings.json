@@ -8,9 +8,26 @@
       "Bash(git status)",
       "Bash(git diff *)",
       "Bash(git log *)",
+      "Bash(git ls-files *)",
       "Bash(npm run build)",
       "Bash(npm run typecheck)",
+      "Bash(npm run check:post-edit)",
+      "Bash(npm run check:pre-commit)",
+      "Bash(npm run check:versions)",
       "Bash(git worktree *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hooks/post-edit-hook.js\""
+          }
+        ]
+      }
     ]
   }
 }

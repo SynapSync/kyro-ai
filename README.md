@@ -149,6 +149,7 @@ kyro-workflow/
 ├── rules/
 ├── templates/
 ├── config.json
+├── adapters/             # Harness templates (Cursor, generic, Kilo Code)
 └── .claude-plugin/       # Claude Code adapter only
 ```
 
@@ -195,7 +196,10 @@ Kyro does not enforce model selection. Use the strongest available model for imp
 | Guide | Description |
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Quick start walkthrough |
-| [Agent Adapters](docs/agent-adapters.md) | Generic setup for Claude Code, Codex, OpenCode, Cursor, and AGENTS-style tools |
+| [Agent Adapters](docs/agent-adapters.md) | Harness matrix: generic, Cursor, Codex, OpenCode, Kilo Code, Claude Code |
+| [Harness Templates](adapters/README.md) | Copy-and-customize adapter files per platform |
+| [HOW-TO-USE-CURSOR](docs/HOW-TO-USE-CURSOR.md) | Cursor setup and prompts |
+| [HOW-TO-USE-KILO-CODE](docs/HOW-TO-USE-KILO-CODE.md) | Kilo Code setup and prompts |
 | [Commands Reference](docs/commands-reference.md) | Workflow intents and command semantics |
 | [Agents Reference](docs/agents-reference.md) | Orchestrator protocols and checkpoints |
 | [Rules Guide](docs/rules-guide.md) | Learned rules system |

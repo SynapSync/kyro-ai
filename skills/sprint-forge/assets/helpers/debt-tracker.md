@@ -8,11 +8,19 @@ This helper defines the rules for the Accumulated Technical Debt table that pers
 
 > **Debt never disappears.** The debt table is a living ledger that grows as new debt is discovered and shrinks only when debt is explicitly resolved. It is never pruned, never reset, never "cleaned up."
 
+As of Kyro 3.5, debt is stored in `{output_kyro_dir}/state.json`. Markdown debt tables are rendered views. Agents should update debt through the state CLI instead of hand-editing generated tables.
+
+```bash
+npm run kyro:state -- add-debt {scope} --item "..." --origin "Sprint N Phase X" --target "Sprint M"
+npm run kyro:state -- resolve-debt {scope} --id 1 --sprint "Sprint N"
+npm run kyro:debt-inherit -- --state {scope}
+```
+
 ---
 
 ## Table Format
 
-The debt table appears in every sprint file, starting from Sprint 1:
+The rendered debt table appears in every sprint file, starting from Sprint 1:
 
 | # | Item | Origin | Sprint Target | Status | Resolved In |
 |---|------|--------|--------------|--------|-------------|
@@ -66,10 +74,9 @@ New debt can be discovered at any point:
 - **During sprint retro**: Origin = `Sprint {N} retro`
 
 When adding a new item:
-1. Use the next available number
-2. Set Status = `open`
-3. Set Sprint Target = best estimate of when it should be addressed
-4. Leave Resolved In empty (`—`)
+1. Call `npm run kyro:state -- add-debt {scope} --item "..." --origin "..." --target "Sprint N"`.
+2. Render markdown views with `npm run kyro:render-state -- {scope} debt`.
+3. Do not manually renumber debt rows.
 
 ---
 
@@ -77,9 +84,9 @@ When adding a new item:
 
 When a debt item is resolved during a sprint:
 
-1. Change Status to `resolved`
-2. Fill Resolved In with the current sprint number
-3. Optionally add a brief note: `Sprint 3 (migrated to new API)`
+1. Call `npm run kyro:state -- resolve-debt {scope} --id {id} --sprint "Sprint N"`.
+2. Render markdown views with `npm run kyro:render-state -- {scope} debt`.
+3. Do not delete the row from state or markdown history.
 
 ---
 

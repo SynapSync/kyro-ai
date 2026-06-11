@@ -8,7 +8,7 @@ Kyro uses one agent: the **orchestrator**. It coordinates the sprint lifecycle a
 
 | Agent | Role | Model | Tools | Memory |
 |-------|------|-------|-------|--------|
-| **orchestrator** | Full cycle coordination, validation gates, and checkpoints | opus | Read, Glob, Grep, Bash, Edit, Write | project |
+| **orchestrator** | Full cycle coordination, validation gates, and checkpoints | host-defined | Read, Glob, Grep, Bash, Edit, Write | project (Claude Code only) |
 
 ---
 

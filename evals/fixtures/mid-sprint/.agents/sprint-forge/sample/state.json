@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "scope": "sample",
+  "created_at": "2026-06-11T00:00:00.000Z",
+  "updated_at": "2026-06-11T00:00:00.000Z",
+  "sprints": [
+    {
+      "number": 1,
+      "slug": "baseline",
+      "status": "completed",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Complete baseline work.",
+          "status": "completed",
+          "estimated_sp": 1
+        }
+      ]
+    }
+  ],
+  "debt": [
+    {
+      "id": 1,
+      "item": "Keep inherited debt visible.",
+      "origin": "Sprint 1 retro",
+      "sprint_target": "Sprint 2",
+      "status": "open",
+      "resolved_in": null,
+      "created_in": 1,
+      "aged": false
+    }
+  ],
+  "metrics": {},
+  "audit": []
+}

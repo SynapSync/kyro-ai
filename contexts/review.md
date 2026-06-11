@@ -3,10 +3,11 @@ name: review
 description: Assessment context for sprint status reporting and retrospectives. Read-only — no code changes.
 mode: assessment
 agent: orchestrator
-model: opus
 ---
 
 # Context: REVIEW — Assessment Mode
+
+> Model selection is host-owned. Kyro does not prescribe a provider or model.
 
 Activated during status checks and retrospectives. This context puts Kyro in **analysis-only mode** focused on measuring, reflecting, and planning improvements.
 
