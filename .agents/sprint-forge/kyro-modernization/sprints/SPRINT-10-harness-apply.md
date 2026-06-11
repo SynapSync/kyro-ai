@@ -4,14 +4,15 @@ date: "2026-06-11"
 updated: "2026-06-11"
 scope: "kyro-modernization"
 type: "sprint-plan"
-status: "planned"
+status: "completed"
 version: "1.0"
 sprint: 10
-progress: 0
+progress: 100
 previous_doc: "[[SPRINT-9-eval-hardening]]"
 next_doc: null
 parent_doc: "[[ROADMAP]]"
-agents: []
+agents:
+  - "cursor-agent"
 tags:
   - "kyro-modernization"
   - "sprint-plan"
@@ -20,7 +21,7 @@ tags:
 changelog:
   - version: "1.0"
     date: "2026-06-11"
-    changes: ["Sprint planned from Sprint 9 retro"]
+    changes: ["Sprint planned and completed"]
 related:
   - "[[ROADMAP]]"
 ---
@@ -31,7 +32,7 @@ related:
 > Previous Sprint: `sprints/SPRINT-9-eval-hardening.md`
 > Version Target: 3.12.0
 > Type: feature
-> Status: **planned** (not started)
+> Execution Date: 2026-06-11
 
 ---
 
@@ -45,32 +46,24 @@ Make harness setup one command instead of manual `config.json` edits, and prepar
 
 | # | Recommendation | Disposition | Notes |
 |---|----------------|-------------|-------|
-| 1 | Add MCP server-specific memory bridge once a target API is chosen. | PARTIAL | Ship adapter interface + stub; full bridge waits on API choice (D11) |
-| 2 | Add `kyro:harness-detect --apply` to merge suggested harness config safely. | ADOPTED | Primary deliverable |
+| 1 | Add MCP server-specific memory bridge once a target API is chosen. | PARTIAL | `memory-bridge.js` ships sync/query stub for `mcp` provider |
+| 2 | Add `kyro:harness-detect --apply` to merge suggested harness config safely. | ADOPTED | `--dry-run` and `--apply` implemented |
 | 3 | Add agent-driven eval tier for orchestrator prose regressions (opt-in). | DEFERRED | Sprint 11+ |
 
 ---
 
 ## Phases
 
-### Phase 1 — Harness Apply
-
-- [ ] **T1.1**: Extend `scripts/harness-detect.js` with `--apply` and `--dry-run` flags.
-- [ ] **T1.2**: Merge only `config.harness` (never gates, memory, or sprint settings).
-- [ ] **T1.3**: Add eval scenario for dry-run apply without mutating repo `config.json`.
-- [ ] **T1.4**: Document apply workflow in `docs/agent-adapters.md`.
-
-### Phase 2 — MCP Bridge Prep
-
-- [ ] **T2.1**: Add `scripts/lib/memory-bridge.js` with `sync` / `query` interface.
-- [ ] **T2.2**: Wire `rules-memory.js` through the bridge (local index remains default).
-- [ ] **T2.3**: Add `memory.provider: local | mcp` to `config.json` (default `local`).
-- [ ] **T2.4**: Document provider contract in `docs/memory-adapter.md`.
-
-### Phase 3 — Release
-
-- [ ] **T3.1**: Bump version to 3.12.0 across canonical metadata files.
-- [ ] **T3.2**: Extend eval count and CI if new scenarios are added.
+- [x] **T1.1**: Extend `scripts/harness-detect.js` with `--apply` and `--dry-run` flags.
+- [x] **T1.2**: Merge only `config.harness` (never gates, memory, or sprint settings).
+- [x] **T1.3**: Add eval scenarios for dry-run and apply in temp projects.
+- [x] **T1.4**: Document apply workflow in `docs/agent-adapters.md`.
+- [x] **T2.1**: Add `scripts/lib/memory-bridge.js` with `sync` / `query` interface.
+- [x] **T2.2**: Wire `rules-memory.js` through the bridge (local index remains default).
+- [x] **T2.3**: Add `memory.provider: local | mcp` to `config.json` (default `local`).
+- [x] **T2.4**: Document provider contract in `docs/memory-adapter.md`.
+- [x] **T3.1**: Bump version to 3.12.0 across canonical metadata files.
+- [x] **T3.2**: Extend eval suite to 20 scenarios.
 
 ---
 
@@ -80,21 +73,37 @@ Make harness setup one command instead of manual `config.json` edits, and prepar
 |---|------|--------|--------------|--------|-------------|
 | 1–10 | (inherited resolved rows) | Sprints 0–9 | — | resolved | Sprints 0–9 |
 | 11 | MCP server-specific memory adapters after API selection. | Sprint 7 retro | Sprint 10 (partial) | open | — |
-| 12 | Runtime harness auto-detection or `--apply` for harness-detect output. | Sprint 9 retro | Sprint 10 | open | — |
+| 12 | Runtime harness auto-detection or `--apply` for harness-detect output. | Sprint 9 retro | Sprint 10 | resolved | Sprint 10 |
+| 13 | Agent-driven orchestrator prose eval tier (opt-in). | Sprint 10 retro | Sprint 11+ | open | — |
+| 14 | MCP provider implementation once server API is selected. | Sprint 10 retro | TBD | open | — |
 
 ---
 
-## Exit Criteria
+## Retro
 
-- `npm run kyro:harness-detect -- --dry-run` prints a merge preview.
-- `npm run kyro:harness-detect -- --apply` updates only `harness` in project `config.json`.
-- Memory bridge interface exists; `local` provider behavior is unchanged.
-- Eval suite passes with new harness-apply scenarios.
+### What Went Well
+
+- Harness profiles extracted to `scripts/lib/harness-profiles.js` for reuse and testing.
+- Temp-project evals prove `--dry-run` is non-mutating and `--apply` is scope-safe.
+- Local memory behavior is unchanged while the MCP boundary is explicit.
+
+### What Didn't Go Well
+
+- MCP provider remains a stub; no server adapter was selected.
+
+### Surprises / Unexpected Findings
+
+- Legacy `mcp_enabled` can still resolve to provider `mcp` for backward compatibility.
+
+### New Technical Debt Detected
+
+- D13: Agent-driven eval tier.
+- D14: Concrete MCP server adapter.
 
 ---
 
-## Out of Scope
+## Recommendations for Future Roadmap
 
-- Choosing or implementing a specific MCP memory server (Engram, claude-mem, etc.).
-- Agent-driven LLM eval tier (deferred).
-- Auto-detection without explicit `--apply` on every host boot.
+1. Implement Engram or claude-mem adapter behind `memory.provider: mcp`.
+2. Add opt-in LLM eval scenarios for orchestrator prose regressions.
+3. Consider `kyro init` that runs `harness-detect --apply` on first project setup.

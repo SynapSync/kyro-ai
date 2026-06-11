@@ -1,6 +1,6 @@
 {
   "name": "kyro-workflow",
-  "version": "3.11.0",
+  "version": "3.13.0",
   "description": "Claude Code adapter for Kyro, a portable sprint workflow kit for AI coding agents",
   "author": {
     "name": "SynapSync",

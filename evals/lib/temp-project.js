@@ -44,8 +44,19 @@ function writeRules(tempRoot, content) {
   fs.writeFileSync(path.join(rulesDir, 'rules.md'), content);
 }
 
+/**
+ * Writes a config.json file under a temporary project root.
+ *
+ * @param {string} tempRoot Absolute path to the temporary project root.
+ * @param {object} config Config payload to persist.
+ */
+function writeConfig(tempRoot, config) {
+  fs.writeFileSync(path.join(tempRoot, 'config.json'), `${JSON.stringify(config, null, 2)}\n`);
+}
+
 module.exports = {
   withTempProject,
+  writeConfig,
   writeRules,
   writeState
 };

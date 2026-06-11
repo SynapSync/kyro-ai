@@ -1,18 +1,24 @@
 # Kyro Harness Adapters
 
-Kyro's portable core lives in `agents/`, `skills/`, `commands/`, `scripts/`, and `config.json`. This directory contains **optional copy-and-customize templates** for specific host platforms.
+Kyro's portable core lives in `agents/`, `skills/`, `commands/`, `scripts/`, and `config.json`. Install it with:
+
+```bash
+npx @synapsync/kyro-workflow init
+```
+
+This directory contains **optional post-init templates** for specific host platforms (rules, hooks, onboarding prompts).
 
 ## Harness Matrix
 
 | Platform | Setup | Slash commands | Hooks | Subagents | Doc |
 |----------|-------|----------------|-------|-----------|-----|
-| Generic | Copy core files + `generic/` snippet | Manual intents | Manual `npm run check:*` | Set `harness.capabilities.subagents: true` if supported | [agent-adapters.md](../docs/agent-adapters.md) |
-| Cursor | Copy core + `cursor/kyro-workflow.mdc` rule | Manual intents | Optional `cursor/hooks.example.json` | Host-dependent | [HOW-TO-USE-CURSOR.md](../docs/HOW-TO-USE-CURSOR.md) |
-| Codex | Copy core files | Host-dependent | Manual | Host-dependent | [HOW-TO-USE-CODEX.md](../docs/HOW-TO-USE-CODEX.md) |
-| OpenCode | Copy core + `@file` references | Manual intents | Manual | Host-dependent | [HOW-TO-USE-OPENCODE.md](../docs/HOW-TO-USE-OPENCODE.md) |
-| Kilo Code | Copy core + `kilo-code/` prompts | Manual intents | Manual | Host-dependent | [HOW-TO-USE-KILO-CODE.md](../docs/HOW-TO-USE-KILO-CODE.md) |
-| Claude Code | `/plugin install` | Native `/kyro-workflow:*` | PostToolUse via `.claude-plugin/` | Native subagents | [claude-code/README.md](claude-code/README.md) |
-| Any LLM API | Load markdown into system prompt | N/A | Your pipeline runs scripts | Your runtime | [programmatic-usage.md](../docs/programmatic-usage.md) |
+| All | `npx @synapsync/kyro-workflow init` | Manual intents | Manual `npm run check:*` | Config flag | [getting-started.md](../docs/getting-started.md) |
+| Cursor | `init --cursor` or `cursor/kyro-workflow.mdc` | Manual intents | Optional `cursor/hooks.example.json` | Host-dependent | [HOW-TO-USE-CURSOR.md](../docs/HOW-TO-USE-CURSOR.md) |
+| Codex | `init` | Host-dependent | Manual | Host-dependent | [HOW-TO-USE-CODEX.md](../docs/HOW-TO-USE-CODEX.md) |
+| OpenCode | `init` + `@file` references | Manual intents | Manual | Host-dependent | [HOW-TO-USE-OPENCODE.md](../docs/HOW-TO-USE-OPENCODE.md) |
+| Kilo Code | `init` + `kilo-code/` prompts | Manual intents | Manual | Host-dependent | [HOW-TO-USE-KILO-CODE.md](../docs/HOW-TO-USE-KILO-CODE.md) |
+| Claude Code | `init` or `/plugin install` | Native `/kyro-workflow:*` with plugin | PostToolUse via `.claude-plugin/` | Native subagents | [claude-code/README.md](claude-code/README.md) |
+| Any LLM API | `init` + load markdown into system prompt | N/A | Your pipeline runs scripts | Your runtime | [programmatic-usage.md](../docs/programmatic-usage.md) |
 
 ## config.json Harness Section
 

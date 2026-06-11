@@ -389,6 +389,44 @@
           "estimated_sp": 2
         }
       ]
+    },
+    {
+      "number": 10,
+      "slug": "harness-apply",
+      "status": "completed",
+      "version_target": "3.12.0",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "description": "Add harness-detect --dry-run and --apply.",
+          "status": "completed",
+          "estimated_sp": 4
+        },
+        {
+          "id": "T1.2",
+          "description": "Add harness apply eval scenarios.",
+          "status": "completed",
+          "estimated_sp": 3
+        },
+        {
+          "id": "T2.1",
+          "description": "Add memory-bridge module and wire rules-memory.",
+          "status": "completed",
+          "estimated_sp": 5
+        },
+        {
+          "id": "T2.2",
+          "description": "Add memory.provider config and docs.",
+          "status": "completed",
+          "estimated_sp": 2
+        },
+        {
+          "id": "T3.1",
+          "description": "Bump version to 3.12.0.",
+          "status": "completed",
+          "estimated_sp": 2
+        }
+      ]
     }
   ],
   "debt": [
@@ -506,15 +544,35 @@
       "id": 12,
       "item": "Runtime harness auto-detection or --apply for harness-detect output.",
       "origin": "Sprint 9 retro",
-      "sprint_target": "Sprint 10+",
+      "sprint_target": "Sprint 10",
+      "status": "resolved",
+      "resolved_in": "Sprint 10",
+      "created_in": 9,
+      "aged": false
+    },
+    {
+      "id": 13,
+      "item": "Agent-driven orchestrator prose eval tier (opt-in).",
+      "origin": "Sprint 10 retro",
+      "sprint_target": "Sprint 11+",
       "status": "open",
       "resolved_in": null,
-      "created_in": 9,
+      "created_in": 10,
+      "aged": false
+    },
+    {
+      "id": 14,
+      "item": "Concrete MCP server memory adapter after API selection.",
+      "origin": "Sprint 10 retro",
+      "sprint_target": "TBD",
+      "status": "open",
+      "resolved_in": null,
+      "created_in": 10,
       "aged": false
     }
   ],
   "metrics": {
-    "estimated_sp_completed": 155,
+    "estimated_sp_completed": 171,
     "actual_sp_recorded": 0
   },
   "audit": [
@@ -586,6 +644,13 @@
       "action": "sprint.completed",
       "details": {
         "sprint": 9
+      }
+    },
+    {
+      "at": "2026-06-11T00:00:00.000Z",
+      "action": "sprint.completed",
+      "details": {
+        "sprint": 10
       }
     }
   ]

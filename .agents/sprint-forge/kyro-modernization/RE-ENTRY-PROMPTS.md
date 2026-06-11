@@ -28,9 +28,9 @@ related:
 # kyro-modernization — Re-entry Prompts
 
 > Last updated: 2026-06-11
-> Current sprint: Sprint 9 complete (eval hardening & QA cleanup)
-> Last completed task: T5.1 — Bump version to 3.11.0
-> Active debt: D11 (MCP server adapters), D12 (harness auto-apply)
+> Current sprint: Sprint 10 complete (harness apply & MCP bridge prep)
+> Last completed task: T3.1 — Bump version to 3.12.0
+> Active debt: D11/D14 (MCP server adapters), D13 (agent-driven evals)
 
 ---
 
@@ -58,6 +58,7 @@ This is the source of truth for kyro-modernization sprint artifacts.
 | 7 | `sprints/SPRINT-7-memory-mcp.md` | completed |
 | 8 | `sprints/SPRINT-8-harness-parity.md` | completed |
 | 9 | `sprints/SPRINT-9-eval-hardening.md` | completed |
+| 10 | `sprints/SPRINT-10-harness-apply.md` | completed |
 
 ---
 
@@ -68,7 +69,7 @@ This is the source of truth for kyro-modernization sprint artifacts.
 | Codebase | `/Users/rperaza/joicodev/synapsync/kyro/kyro-workflow` |
 | Working Directory | `/Users/rperaza/joicodev/synapsync/kyro/kyro-workflow/.agents/sprint-forge/kyro-modernization` |
 | Roadmap | `/Users/rperaza/joicodev/synapsync/kyro/kyro-workflow/.agents/sprint-forge/kyro-modernization/ROADMAP.md` |
-| Latest Sprint | `/Users/rperaza/joicodev/synapsync/kyro/kyro-workflow/.agents/sprint-forge/kyro-modernization/sprints/SPRINT-9-eval-hardening.md` |
+| Latest Sprint | `/Users/rperaza/joicodev/synapsync/kyro/kyro-workflow/.agents/sprint-forge/kyro-modernization/sprints/SPRINT-10-harness-apply.md` |
 | State | `/Users/rperaza/joicodev/synapsync/kyro/kyro-workflow/.agents/sprint-forge/kyro-modernization/state.json` |
 
 ---

@@ -3,11 +3,44 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const defaultPackageRoot = path.resolve(__dirname, '..', '..');
+const PACKAGE_NAMES = ['@synapsync/kyro-workflow', 'kyro-workflow'];
+
+/**
+ * Reads the consumer install manifest when present.
+ *
+ * @returns {{ package_root?: string } | null} Parsed install manifest.
+ */
+function readInstallManifest() {
+  const manifestPath = path.join(getProjectRoot(), '.kyro', 'install.json');
+
+  if (!fs.existsSync(manifestPath)) {
+    return null;
+  }
+
+  return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+}
+
+/**
+ * Resolves the installed package root through Node module resolution.
+ *
+ * @returns {string | null} Absolute package root when resolvable.
+ */
+function resolvePackageRootFromModule() {
+  for (const packageName of PACKAGE_NAMES) {
+    try {
+      return path.dirname(require.resolve(`${packageName}/package.json`));
+    } catch {
+      // try next package name
+    }
+  }
+
+  return null;
+}
 
 /**
  * Returns the installed Kyro package root.
  *
- * Resolution order: KYRO_PACKAGE_ROOT, CLAUDE_PLUGIN_ROOT, default from __dirname.
+ * Resolution order: env vars, .kyro/install.json, module resolution, default from __dirname.
  *
  * @returns {string} Absolute path to the Kyro package directory.
  */
@@ -16,6 +49,18 @@ function getPackageRoot() {
 
   if (fromEnv) {
     return path.resolve(fromEnv);
+  }
+
+  const fromManifest = readInstallManifest()?.package_root;
+
+  if (fromManifest && fs.existsSync(fromManifest)) {
+    return path.resolve(fromManifest);
+  }
+
+  const fromModule = resolvePackageRootFromModule();
+
+  if (fromModule) {
+    return fromModule;
   }
 
   return defaultPackageRoot;

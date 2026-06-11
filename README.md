@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/SynapSync/kyro-workflow/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/kyro-workflow?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
-  <a href="https://www.npmjs.com/package/kyro-workflow"><img src="https://img.shields.io/npm/v/kyro-workflow?style=for-the-badge&logo=npm&color=E8926F&labelColor=1e1e2e" alt="npm"/></a>
+  <a href="https://www.npmjs.com/package/@synapsync/kyro-workflow"><img src="https://img.shields.io/npm/v/@synapsync/kyro-workflow?style=for-the-badge&logo=npm&color=E8926F&labelColor=1e1e2e" alt="npm"/></a>
   <a href="https://github.com/SynapSync/kyro-workflow/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-22c55e?style=for-the-badge&labelColor=1e1e2e" alt="License"/></a>
   <a href="https://github.com/SynapSync/kyro-workflow/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SynapSync/kyro-workflow/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=1e1e2e" alt="CI"/></a>
 </p>
@@ -27,7 +27,38 @@ Kyro is portable because its source of truth is plain markdown:
 - **Workflow intents** in `commands/`
 - **Project state** in `.agents/sprint-forge/{scope}/`
 
-Claude Code has a native adapter through `.claude-plugin/`. Other agents can use the same core files manually or through their own project-rule/context mechanisms.
+Claude Code has a native adapter through `.claude-plugin/`. Every other agent uses the same core files installed with one command.
+
+---
+
+## Install (One Command)
+
+From any project directory (TypeScript, Python, Flutter, Go, etc.):
+
+```bash
+npx @synapsync/kyro-workflow init
+```
+
+Optional flags:
+
+```bash
+npx @synapsync/kyro-workflow init --cursor   # also install .cursor/rules/kyro-workflow.mdc
+npx @synapsync/kyro-workflow doctor          # verify installation
+```
+
+`init` copies the orchestrator and skills, writes a stack-agnostic `config.json` (empty `quality_gates`), detects your harness, merges Kyro npm scripts, and records `.kyro/install.json` so bundled scripts resolve paths automatically.
+
+After init, start a forge cycle in your agent:
+
+```text
+Use Kyro forge for <scope>.
+Read .agents/orchestrator.md and .skills/sprint-forge/SKILL.md.
+Persist artifacts under .agents/sprint-forge/<scope>/.
+```
+
+Add stack-specific commands to `config.json` → `quality_gates` when you are ready (for example `pytest`, `flutter analyze`, or `npm run typecheck`).
+
+> **Note:** `npx skills add` installs skills only — it does not install the full Kyro workflow. Use `@synapsync/kyro-workflow init` instead.
 
 ---
 
@@ -61,50 +92,17 @@ Platforms without slash commands should ask the agent to perform the matching ma
 
 | Level | Platforms | What Works | Notes |
 |-------|-----------|------------|-------|
-| Native adapter | Claude Code | Commands, agent, skills, and Claude plugin metadata | `.claude-plugin/` is adapter packaging, not Kyro's core |
-| Manual adapter | Codex, OpenCode, Cursor, generic AGENTS-style agents | Copy or reference orchestrator and skills as project context | Artifact updates depend on the agent following instructions |
+| CLI install | All agents | `npx @synapsync/kyro-workflow init` | Canonical path — works on any stack |
+| Native adapter | Claude Code | Commands, agent, skills, and Claude plugin metadata | Alternative to `init`; `.claude-plugin/` is adapter packaging |
 | Programmatic adapter | Any LLM API | Load markdown instructions into prompts/system messages | Provider integration is owned by the host application |
 
 Kyro does not claim native integration for Codex, OpenCode, Cursor, or other agents unless a verified adapter exists. Compatibility comes from portable markdown files and stable artifact conventions.
 
 ---
 
-## Generic Agent Setup
+## Claude Code Adapter (Optional)
 
-For agents without native Kyro support, copy or symlink the core files into the target project:
-
-```bash
-mkdir -p .skills .agents .agents/sprint-forge
-
-cp -r /path/to/kyro-workflow/skills/sprint-forge .skills/
-cp -r /path/to/kyro-workflow/skills/qa-review .skills/
-cp /path/to/kyro-workflow/agents/orchestrator.md .agents/
-```
-
-Then provide this context to the agent:
-
-```text
-Use Kyro for this project.
-
-Read:
-- .agents/orchestrator.md
-- .skills/sprint-forge/SKILL.md
-- .skills/qa-review/SKILL.md
-
-Use .agents/sprint-forge/{scope}/ for ROADMAP.md, findings, sprints,
-RE-ENTRY-PROMPTS.md, handoffs, and learned rules.
-
-If slash commands are unsupported:
-- forge = analyze/plan/execute/review/close the sprint
-- status = read artifacts and report progress/debt
-- wrap-up = close the session and update re-entry prompts
-```
-
----
-
-## Claude Code Adapter
-
-Claude Code is currently the only native plugin adapter included in this package.
+Claude Code can use the same `npx @synapsync/kyro-workflow init` path **or** the native plugin:
 
 ```bash
 /plugin marketplace add SynapSync/kyro-workflow
@@ -121,6 +119,12 @@ claude --plugin-dir /path/to/kyro-workflow
 ```
 
 The Claude adapter lives in `.claude-plugin/`. Core Kyro behavior remains in markdown assets shared by all agents.
+
+---
+
+## Advanced: Manual File Copy
+
+If you cannot use npm in the target project, copy core files manually. See [Getting Started](docs/getting-started.md#advanced-manual-installation).
 
 ---
 
@@ -182,10 +186,13 @@ This is the stable public interface. Any agent can inspect, modify, diff, and co
 ```json
 {
   "rules": { "path": ".agents/sprint-forge/rules.md", "auto_load": true },
-  "quality_gates": { "typecheck": "npm run typecheck", "build": "npm run build" },
+  "quality_gates": {},
+  "harness": { "id": "auto", "enforcement": "manual" },
   "sprint": { "checkpoint_per_phase": true, "require_retro": true, "debt_aged_threshold_sprints": 3 }
 }
 ```
+
+Fresh installs ship with empty `quality_gates` so non-Node stacks are not forced into `npm run typecheck`. Add your stack commands when ready.
 
 Kyro does not enforce model selection. Use the strongest available model for implementation and debugging. Lighter models are acceptable for read-only analysis, status reporting, or documentation review.
 

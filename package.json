@@ -1,13 +1,20 @@
 {
-  "name": "kyro-workflow",
-  "version": "3.11.0",
+  "name": "@synapsync/kyro-workflow",
+  "version": "3.13.0",
   "description": "Portable sprint workflow kit for AI coding agents, with markdown artifacts, adapter guides, and formal debt tracking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "kyro-workflow": "dist/cli/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "npm run clean && tsc",
     "typecheck": "tsc --noEmit",
     "check:versions": "node scripts/check-version-sync.js",
+    "check:pack": "npm pack --dry-run",
     "check:post-edit": "node scripts/post-edit-scan.js",
     "check:pre-commit": "node scripts/pre-commit-checkpoint.js",
     "kyro:sprint-number": "node scripts/sprint-number.js",
@@ -21,6 +28,7 @@
     "kyro:rules-memory": "node scripts/rules-memory.js",
     "kyro:harness-detect": "node scripts/harness-detect.js",
     "eval:deterministic": "node evals/run-evals.js",
+    "eval:install-smoke": "node evals/install-smoke.js",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"
   },

@@ -99,7 +99,7 @@ flowchart LR
 | 7 | `findings/memory-mcp.md` | 3.9.0 | feature | Add optional MCP memory retrieval while keeping `rules.md` canonical | 2, 3 | 12 | completed |
 | 8 | `findings/harness-parity.md` | 3.10.0 | refactor | Multi-agent harness parity — neutral core, adapters, harness config | 1 | 20 | completed |
 | 9 | `findings/eval-hardening.md` | 3.11.0 | feature | Temp-state evals, harness detect, QA legacy retirement | 5, 8 | 18 | completed |
-| 10 | Sprint 9 retro | 3.12.0 | feature | Harness `--apply`, MCP memory bridge prep | 9 | 20 | planned |
+| 10 | Sprint 9 retro | 3.12.0 | feature | Harness `--apply`, MCP memory bridge prep | 9 | 20 | completed |
 
 ---
 
@@ -231,6 +231,16 @@ flowchart LR
   3. QA Cleanup — remove legacy fallback guarded by progressive-only evals.
 - **Exit Criteria**: eval suite covers gate auto-audit and rules-memory sync without mutating fixtures; QA skill loads only focused references.
 - **Status**: completed in `sprints/SPRINT-9-eval-hardening.md`.
+
+### Sprint 10 — Harness Apply & MCP Bridge Prep
+
+- **Source**: Sprint 9 retro
+- **Version Target**: 3.12.0
+- **Type**: feature
+- **Focus**: One-command harness setup and MCP memory bridge interface.
+- **Dependencies**: Sprint 9
+- **Exit Criteria**: `--dry-run` / `--apply` work safely; memory bridge exists; local provider unchanged.
+- **Status**: completed in `sprints/SPRINT-10-harness-apply.md`.
 
 ---
 

@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { withTempProject, writeRules, writeState } = require('./lib/temp-project');
+const { withTempProject, writeConfig, writeRules, writeState } = require('./lib/temp-project');
 
 const root = path.resolve(__dirname, '..');
 const failures = [];
@@ -85,8 +85,10 @@ function scenarioMemoryCanonicalPolicy() {
   const docs = read('docs/memory-adapter.md');
 
   assert(config.memory.rules_canonical === '.agents/sprint-forge/rules.md', 'rules.md must remain canonical.');
+  assert(config.memory.provider === 'local', 'memory.provider must default to local.');
   assert(config.memory.mcp_enabled === false, 'MCP memory must be disabled by default.');
   assert(docs.includes('Manual edits to `rules.md` win.'), 'Memory conflict policy must preserve rules.md authority.');
+  assert(docs.includes('memory.provider'), 'memory adapter docs must document provider selection.');
 }
 
 function scenarioBlockerBlocksDebugArtifacts() {
@@ -260,6 +262,111 @@ function scenarioHarnessDetectExists() {
   assert(payload.details?.[0]?.suggested_config?.harness?.id, 'harness-detect must suggest a harness id.');
 }
 
+function sampleHarnessConfig() {
+  return {
+    gates: {
+      mode: 'strict',
+      always_gate: ['commit']
+    },
+    memory: {
+      provider: 'local'
+    },
+    harness: {
+      id: 'auto',
+      capabilities: {
+        slash_commands: false,
+        subagents: false,
+        post_edit_hooks: false,
+        project_memory: false
+      },
+      enforcement: 'manual'
+    }
+  };
+}
+
+function scenarioHarnessDryRunDoesNotMutateConfig() {
+  withTempProject((tempRoot) => {
+    const config = sampleHarnessConfig();
+    writeConfig(tempRoot, config);
+    const before = fs.readFileSync(path.join(tempRoot, 'config.json'), 'utf8');
+
+    const result = spawnSync(process.execPath, [path.join(root, 'scripts', 'harness-detect.js'), '--dry-run'], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        KYRO_PROJECT_DIR: tempRoot,
+        KYRO_PACKAGE_ROOT: root,
+        CURSOR_AGENT: '1'
+      }
+    });
+
+    const after = fs.readFileSync(path.join(tempRoot, 'config.json'), 'utf8');
+
+    assert(result.status === 0, 'harness-detect --dry-run must succeed.');
+    assert(before === after, 'harness-detect --dry-run must not mutate config.json.');
+
+    const payload = JSON.parse(result.stdout || '{}');
+    assert(payload.details?.[0]?.after?.id === 'cursor', 'dry-run preview must target detected cursor harness.');
+    assert(payload.details?.[0]?.changed === true, 'dry-run preview must report harness changes.');
+  });
+}
+
+function scenarioHarnessApplyUpdatesHarnessOnly() {
+  withTempProject((tempRoot) => {
+    writeConfig(tempRoot, sampleHarnessConfig());
+
+    const result = spawnSync(process.execPath, [path.join(root, 'scripts', 'harness-detect.js'), '--apply'], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        KYRO_PROJECT_DIR: tempRoot,
+        KYRO_PACKAGE_ROOT: root,
+        CURSOR_AGENT: '1'
+      }
+    });
+
+    assert(result.status === 0, 'harness-detect --apply must succeed.');
+
+    const updated = JSON.parse(fs.readFileSync(path.join(tempRoot, 'config.json'), 'utf8'));
+    assert(updated.harness.id === 'cursor', 'apply must update harness.id.');
+    assert(updated.harness.capabilities.subagents === true, 'apply must update harness capabilities.');
+    assert(updated.gates.mode === 'strict', 'apply must not mutate gates.');
+    assert(updated.memory.provider === 'local', 'apply must not mutate memory.');
+  });
+}
+
+function scenarioMemoryBridgeModuleExists() {
+  assert(exists('scripts/lib/memory-bridge.js'), 'memory-bridge module must exist.');
+
+  const bridge = require(path.join(root, 'scripts', 'lib', 'memory-bridge'));
+  assert(typeof bridge.sync === 'function', 'memory-bridge must export sync.');
+  assert(typeof bridge.query === 'function', 'memory-bridge must export query.');
+  assert(bridge.resolveProvider({ provider: 'local' }) === 'local', 'memory-bridge must resolve local provider.');
+  assert(bridge.resolveProvider({ mcp_enabled: true }) === 'mcp', 'memory-bridge must honor legacy mcp_enabled fallback.');
+}
+
+function scenarioPackageNameScoped() {
+  const packageJson = JSON.parse(read('package.json'));
+
+  assert(packageJson.name === '@synapsync/kyro-workflow', 'package.json name must be @synapsync/kyro-workflow.');
+  assert(packageJson.bin?.['kyro-workflow'], 'package.json must expose kyro-workflow bin.');
+  assert(packageJson.publishConfig?.access === 'public', 'package.json must publish publicly.');
+}
+
+function scenarioConfigDefaultTemplate() {
+  const config = JSON.parse(read('templates/config.default.json'));
+
+  assert(Object.keys(config.quality_gates || {}).length === 0, 'config.default.json must ship with empty quality_gates.');
+  assert(config.harness?.id === 'auto', 'config.default.json must default harness.id to auto.');
+}
+
+function scenarioCliEntryExists() {
+  assert(exists('src/cli/index.ts'), 'CLI source entry must exist.');
+  assert(exists('templates/config.default.json'), 'config.default.json template must exist.');
+}
+
 function scenarioQaReviewProgressiveOnly() {
   const skill = read('skills/qa-review/SKILL.md');
 
@@ -290,6 +397,12 @@ function scenarioQaReviewProgressiveOnly() {
   scenarioGateAutoAuditUsesTempState,
   scenarioRulesMemorySyncAndQuery,
   scenarioHarnessDetectExists,
+  scenarioHarnessDryRunDoesNotMutateConfig,
+  scenarioHarnessApplyUpdatesHarnessOnly,
+  scenarioMemoryBridgeModuleExists,
+  scenarioPackageNameScoped,
+  scenarioConfigDefaultTemplate,
+  scenarioCliEntryExists,
   scenarioQaReviewProgressiveOnly
 ].forEach((scenario) => {
   scenario();

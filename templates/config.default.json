@@ -4,10 +4,7 @@
     "auto_load": true,
     "require_approval": true
   },
-  "quality_gates": {
-    "typecheck": "npm run typecheck",
-    "build": "npm run build"
-  },
+  "quality_gates": {},
   "gates": {
     "mode": "standard",
     "always_gate": ["sprint_plan", "commit"],

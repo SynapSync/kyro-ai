@@ -18,6 +18,12 @@ const packageJson = readJson('package.json');
 const packageLock = readJson('package-lock.json');
 const pluginJson = readJson('.claude-plugin/plugin.json');
 const expected = packageJson.version;
+const expectedName = '@synapsync/kyro-workflow';
+
+if (packageJson.name !== expectedName) {
+  fail(`Package name must be ${expectedName}.`, [{ file: 'package.json', name: packageJson.name }]);
+}
+
 const versions = {
   'package.json': packageJson.version,
   'package-lock.json': packageLock.version,

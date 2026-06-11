@@ -2,15 +2,15 @@
 
 Kyro is a portable, markdown-first workflow kit for AI coding agents. It coordinates sprint-based execution through one orchestrator, reusable skills, command intent documents, persistent project rules, and `.agents/sprint-forge/{scope}/` artifacts.
 
-Kyro does not require a specific model provider. Any capable agent — Cursor, Codex, OpenCode, Kilo Code, Claude Code, or a custom LLM API — can use the same core files.
+Kyro does not require a specific model provider or language stack. Any capable agent — Cursor, Codex, OpenCode, Kilo Code, Claude Code, or a custom LLM API — can use the same core files.
 
 ---
 
 ## Prerequisites
 
-- **Node.js >= 18** -- required for deterministic scripts (`check:post-edit`, `kyro:state`, etc.)
-- **Git** -- recommended for project workflows and review
-- **An AI coding agent** -- any host that can read markdown instructions and write files
+- **Node.js >= 18** — required for `npx @synapsync/kyro-workflow init` and deterministic scripts
+- **Git** — recommended for project workflows and review
+- **An AI coding agent** — any host that can read markdown instructions and write files
 
 Verify your Node.js version:
 
@@ -21,51 +21,39 @@ node --version
 
 ---
 
-## Generic Agent Setup (Recommended First)
+## Install (Recommended)
 
-Use this path for **any** agent without a native Kyro plugin:
+From your project root:
 
 ```bash
-git clone https://github.com/SynapSync/kyro-workflow.git ~/kyro-workflow
-cd your-project
-mkdir -p .agents .skills .agents/sprint-forge
-
-cp -R ~/kyro-workflow/agents/orchestrator.md .agents/
-cp -R ~/kyro-workflow/skills/sprint-forge .skills/sprint-forge
-cp -R ~/kyro-workflow/skills/qa-review .skills/qa-review
-cp ~/kyro-workflow/config.json .
+npx @synapsync/kyro-workflow init
 ```
 
-Optional: copy a harness template from `adapters/`:
+In Cursor (also installs `.cursor/rules/kyro-workflow.mdc`):
 
-| Host | Template |
-|------|----------|
-| Any | `adapters/generic/AGENTS.snippet.md` → append to your `AGENTS.md` |
-| Cursor | `adapters/cursor/kyro-workflow.mdc` → `.cursor/rules/` |
-| Kilo Code | `adapters/kilo-code/onboarding-prompt.txt` |
-
-Expose these files as project context or rules:
-
-- `.agents/orchestrator.md`
-- `.skills/sprint-forge/SKILL.md`
-- `.skills/qa-review/SKILL.md`
-
-Set `config.json` → `harness` to match your host (defaults work on any LLM):
-
-```json
-"harness": {
-  "id": "generic",
-  "capabilities": {
-    "slash_commands": false,
-    "subagents": false,
-    "post_edit_hooks": false,
-    "project_memory": false
-  },
-  "enforcement": "manual"
-}
+```bash
+npx @synapsync/kyro-workflow init --cursor
 ```
 
-See [agent-adapters.md](agent-adapters.md) for Cursor, Codex, OpenCode, Kilo Code, and programmatic usage.
+Verify the installation:
+
+```bash
+npx kyro-workflow doctor
+```
+
+### What `init` does
+
+| Step | Result |
+|------|--------|
+| Copies orchestrator + skills | `.agents/orchestrator.md`, `.skills/sprint-forge/`, `.skills/qa-review/` |
+| Writes stack-agnostic config | `config.json` with `quality_gates: {}` and `harness.id: "auto"` |
+| Detects harness | Runs `harness-detect --apply` |
+| Merges npm scripts | `check:post-edit`, `check:pre-commit`, `kyro:gate` via `kyro-workflow run` |
+| Records install manifest | `.kyro/install.json` for path resolution |
+
+Projects without an existing `package.json` get a minimal one with Kyro scripts only.
+
+> **Do not use `npx skills add` for Kyro v3.** That command installs skills in isolation. The full workflow requires `npx @synapsync/kyro-workflow init`.
 
 ---
 
@@ -77,7 +65,9 @@ Claude Code can register slash commands, the orchestrator, skills, and post-edit
 /plugin install SynapSync/kyro-workflow
 ```
 
-For local development:
+You can use the plugin **or** `npx @synapsync/kyro-workflow init` — both install the same markdown core.
+
+For local plugin development:
 
 ```bash
 git clone https://github.com/SynapSync/kyro-workflow.git ~/.claude/plugins/kyro-workflow
@@ -121,6 +111,39 @@ When `harness.enforcement` is `manual`, run after code edits:
 
 ```bash
 npm run check:post-edit
+```
+
+Or without a local `package.json`:
+
+```bash
+npx kyro-workflow run check:post-edit
+```
+
+---
+
+## Configure Quality Gates
+
+Fresh installs ship with empty `quality_gates` so Python, Flutter, Go, and other stacks are not forced into npm scripts. Add your commands when ready:
+
+```json
+"quality_gates": {
+  "test": "pytest",
+  "lint": "ruff check ."
+}
+```
+
+```json
+"quality_gates": {
+  "analyze": "flutter analyze",
+  "test": "flutter test"
+}
+```
+
+```json
+"quality_gates": {
+  "typecheck": "npm run typecheck",
+  "build": "npm run build"
+}
 ```
 
 ---
@@ -184,6 +207,33 @@ Rules are specific, dated, and tied to the project where they were learned. See 
 ### Debt Tracking
 
 Technical debt is tracked formally across sprints. Items are never deleted; only their status changes.
+
+---
+
+## Advanced: Manual Installation
+
+Use this only when npm is unavailable in the target environment:
+
+```bash
+git clone https://github.com/SynapSync/kyro-workflow.git ~/kyro-workflow
+cd your-project
+mkdir -p .agents .skills .agents/sprint-forge
+
+cp -R ~/kyro-workflow/agents/orchestrator.md .agents/
+cp -R ~/kyro-workflow/skills/sprint-forge .skills/sprint-forge
+cp -R ~/kyro-workflow/skills/qa-review .skills/qa-review
+cp ~/kyro-workflow/templates/config.default.json config.json
+```
+
+Optional harness templates from `adapters/`:
+
+| Host | Template |
+|------|----------|
+| Any | `adapters/generic/AGENTS.snippet.md` → append to your `AGENTS.md` |
+| Cursor | `adapters/cursor/kyro-workflow.mdc` → `.cursor/rules/` |
+| Kilo Code | `adapters/kilo-code/onboarding-prompt.txt` |
+
+See [agent-adapters.md](agent-adapters.md) for per-platform details.
 
 ---
 

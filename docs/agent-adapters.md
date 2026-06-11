@@ -4,6 +4,16 @@ Kyro is an agent-agnostic workflow kit. Native platform behavior depends on whet
 
 Copy-and-customize templates live in [`adapters/`](../adapters/README.md).
 
+**Canonical install** (all platforms):
+
+```bash
+npx @synapsync/kyro-workflow init
+npx @synapsync/kyro-workflow init --cursor   # Cursor rule
+npx kyro-workflow doctor
+```
+
+`npx skills add` installs skills only — not the full workflow. Use `init` for orchestrator, config, scripts, and `.kyro/install.json`.
+
 ---
 
 ## Stable Interface
@@ -33,13 +43,13 @@ Platforms without slash commands should invoke these equivalent intents:
 
 | Platform | Setup path | Slash commands | Hooks | Subagents | Guide |
 |----------|------------|----------------|-------|-----------|-------|
-| Generic | Copy core files | Manual intents | Manual `npm run check:*` | Config flag | Below |
-| Cursor | Core + `adapters/cursor/` | Manual intents | Optional example | Config flag | [HOW-TO-USE-CURSOR.md](HOW-TO-USE-CURSOR.md) |
-| Codex | Copy core files | Host-dependent | Manual | Config flag | [HOW-TO-USE-CODEX.md](HOW-TO-USE-CODEX.md) |
-| OpenCode | Copy core + `@file` | Manual intents | Manual | Config flag | [HOW-TO-USE-OPENCODE.md](HOW-TO-USE-OPENCODE.md) |
-| Kilo Code | Core + `adapters/kilo-code/` | Manual intents | Manual | Config flag | [HOW-TO-USE-KILO-CODE.md](HOW-TO-USE-KILO-CODE.md) |
-| Claude Code | `/plugin install` | Native `/kyro-workflow:*` | PostToolUse | Native | [adapters/claude-code/README.md](../adapters/claude-code/README.md) |
-| LLM API | Load markdown into prompts | N/A | Your pipeline | Your runtime | [programmatic-usage.md](programmatic-usage.md) |
+| All | `npx @synapsync/kyro-workflow init` | Manual intents (except Claude plugin) | Manual `npm run check:*` | Config flag | [getting-started.md](getting-started.md) |
+| Cursor | `init --cursor` or post-init rule | Manual intents | Optional example | Config flag | [HOW-TO-USE-CURSOR.md](HOW-TO-USE-CURSOR.md) |
+| Codex | `init` | Host-dependent | Manual | Config flag | [HOW-TO-USE-CODEX.md](HOW-TO-USE-CODEX.md) |
+| OpenCode | `init` + `@file` refs | Manual intents | Manual | Config flag | [HOW-TO-USE-OPENCODE.md](HOW-TO-USE-OPENCODE.md) |
+| Kilo Code | `init` + `adapters/kilo-code/` prompts | Manual intents | Manual | Config flag | [HOW-TO-USE-KILO-CODE.md](HOW-TO-USE-KILO-CODE.md) |
+| Claude Code | `init` **or** `/plugin install` | Native `/kyro-workflow:*` with plugin | PostToolUse | Native | [adapters/claude-code/README.md](../adapters/claude-code/README.md) |
+| LLM API | `init` + load markdown into prompts | N/A | Your pipeline | Your runtime | [programmatic-usage.md](programmatic-usage.md) |
 
 ---
 
@@ -51,6 +61,8 @@ Scripts resolve paths in a harness-neutral way:
 |----------|---------|--------------|
 | `KYRO_PROJECT_DIR` | Consumer project root (git, sprint artifacts) | `CLAUDE_PROJECT_DIR` |
 | `KYRO_PACKAGE_ROOT` | Installed Kyro package root (bundled scripts) | `CLAUDE_PLUGIN_ROOT` |
+
+After `init`, scripts also read `.kyro/install.json` → `package_root` so env vars are optional.
 
 ---
 
@@ -83,6 +95,15 @@ To print a suggested `harness` block for the current host:
 ```bash
 npm run kyro:harness-detect
 ```
+
+Preview or apply only the `harness` section in the project `config.json`:
+
+```bash
+npm run kyro:harness-detect -- --dry-run
+npm run kyro:harness-detect -- --apply
+```
+
+`--apply` never changes `gates`, `memory`, `sprint`, `parallelism`, or `quality_gates`.
 
 ---
 

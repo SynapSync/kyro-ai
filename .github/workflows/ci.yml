@@ -29,6 +29,9 @@ jobs:
       - name: Check version metadata sync
         run: npm run check:versions
 
+      - name: Verify npm pack contents
+        run: npm run check:pack
+
       - name: Run deterministic workflow evals
         run: npm run eval:deterministic
 
@@ -41,4 +44,24 @@ jobs:
       - name: Verify build artifacts
         run: |
           test -f dist/index.js
+          test -f dist/cli/index.js
           echo "Build artifacts verified"
+
+  install-smoke:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run install smoke eval
+        run: npm run eval:install-smoke
