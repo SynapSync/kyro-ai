@@ -124,7 +124,7 @@ No AGENTS.md. No branded blocks. The re-entry prompts and README carry the path 
 
 ### Frontmatter Properties
 
-All generated markdown documents include YAML frontmatter following the [Obsidian markdown standard](../integrations/obsidian/assets/standards/obsidian-md-standard.md). The `agents` field tracks the AI model or agent that generated or modified the document. Resolve `{agent_model}` from the model or agent ID powering the current session (e.g., `"gpt-5"`, `"codex"`, `"cursor"`, `"opencode"`). When modifying an existing document, append the current model or agent to the `agents` array if not already present.
+All generated markdown documents include YAML frontmatter. See the templates at `assets/templates/` for the expected frontmatter structure. The `agents` field tracks the AI model or agent that generated or modified the document. Resolve `{agent_model}` from the model or agent ID powering the current session (e.g., `"gpt-5"`, `"codex"`, `"cursor"`, `"opencode"`). When modifying an existing document, append the current model or agent to the `agents` array if not already present.
 
 ---
 
@@ -212,7 +212,7 @@ This will: read all sprints, calculate metrics, display progress and accumulated
 
 ## Workflow Components
 
-Kyro v2.0 operates as a workflow with one orchestrator agent, built-in checkpoints, and commands. The SKILL.md remains the core orchestration logic:
+Kyro operates as a workflow with one orchestrator agent, built-in checkpoints, and commands. The SKILL.md remains the core orchestration logic:
 
 ### Agent
 
