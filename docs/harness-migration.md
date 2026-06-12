@@ -71,20 +71,22 @@ Plan A only prepares the repository so Track B can build the harness from a stab
 
 ## Track B Starting Point
 
-Track B should begin with the smallest useful runtime:
+Track B begins with the smallest useful multi-agent installer:
 
 ```bash
+kyro
+kyro install --agent opencode --scope workspace
 kyro doctor
-kyro init --agent <claude|codex|opencode|cursor|generic>
-kyro status --json
+kyro sync
+kyro uninstall
 ```
 
 Recommended first implementation order:
 
-1. `kyro doctor` for package/project health checks
-2. `kyro init --agent generic` for universal bootstrap
-3. adapter-specific init templates for Claude, Codex, OpenCode, and Cursor
-4. structured `state.json` sidecar for sprint/debt/status metadata
-5. markdown rendering from structured state where safe
+1. `kyro install --agent opencode --scope workspace` for native command/skill projection
+2. `kyro doctor` for package/project health checks
+3. `kyro sync` for managed asset refresh
+4. adapter-specific install templates for Claude, Codex, OpenCode, Cursor, and generic agents
+5. structured scoped `state.json` only when a scope is created or opened
 
 This keeps Kyro portable without forcing every agent to load the whole workflow into context.

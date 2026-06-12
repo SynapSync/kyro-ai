@@ -202,6 +202,7 @@ Kyro does not enforce model selection. Use the strongest available model for imp
 | [Architecture](docs/architecture.md) | System architecture |
 | [Programmatic Usage](docs/programmatic-usage.md) | Provider-neutral API integration pattern |
 | [Context Management](docs/context-management.md) | Token limits, compaction, and re-entry strategy |
+| [CLI](docs/cli.md) | Workspace installer, doctor, sync, and adapter commands |
 
 ---
 
