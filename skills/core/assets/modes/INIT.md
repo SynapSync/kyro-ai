@@ -15,7 +15,7 @@ This mode performs deep analysis of a project, generates findings, creates an ad
 ## Prerequisites
 
 - Access to the codebase (local path or repository)
-- No previous kyro-workflow work for this project (if resuming, use SPRINT or STATUS mode)
+- No previous kyro-ai work for this project (if resuming, use SPRINT or STATUS mode)
 
 ---
 
@@ -47,13 +47,13 @@ Gather or detect the following configuration:
 |--------|---------------|
 | **Scope** | Ask the user. A short kebab-case name for the work topic (e.g., `oauth-implementation`, `ui-redesign`, `q2-growth`). NOT the repo name — the repo is already `{cwd}`. |
 | **Codebase Path** | The absolute path to the codebase. Usually the current working directory. |
-| **Sprint Output Dir** | `{output_kyro_dir}/sprints/` (automatic, resolved below) |
+| **Sprint Output Dir** | `{output_kyro_dir}/phases/` (automatic, resolved below) |
 
 **Resolve `{output_kyro_dir}`** — ask the user:
 
-> "Where should I save kyro-workflow documents for **{scope}**?
+> "Where should I save kyro-ai documents for **{scope}**?
 >
-> 1. **Default** (Recommended) — `.agents/sprint-forge/{scope}/`
+> 1. **Default** (Recommended) — `.agents/kyro/scopes/{scope}/`
 > 2. **Custom path** — provide your preferred directory"
 
 Set `{output_kyro_dir}` based on the choice. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.
@@ -108,7 +108,7 @@ Write each distinct finding as a separate file:
 
 Using the [ROADMAP.md template](../templates/ROADMAP.md), create the adaptive roadmap:
 
-1. Fill in project paths (codebase, output dir, findings, sprints)
+1. Fill in project paths (codebase, output dir, findings, phases)
 2. Map each finding to a suggested sprint:
    - Finding 01 → Sprint 1 (usually, but not always)
    - Related findings may be grouped into a single sprint
@@ -138,7 +138,7 @@ Create the full directory structure:
 │   ├── 01-*.md
 │   ├── 02-*.md
 │   └── ...
-└── sprints/               ← Empty directory, sprints created later
+└── phases/               ← Empty directory, sprints created later
 ```
 
 **README.md**: Use the [PROJECT-README.md template](../templates/PROJECT-README.md). Fill in the frontmatter properties with actual values, then fill in:
@@ -179,7 +179,7 @@ At the end of INIT, present a summary:
   - {output_kyro_dir}/findings/02-{slug}.md
   - ...
 
-**Next Step**: Generate Sprint 1 using `/kyro-workflow` or copy the re-entry prompt from RE-ENTRY-PROMPTS.md → Scenario 1.
+**Next Step**: Generate Sprint 1 using `/kyro:forge` or copy the re-entry prompt from RE-ENTRY-PROMPTS.md → Scenario 1.
 ```
 
 ---

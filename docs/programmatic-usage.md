@@ -13,12 +13,12 @@ Kyro can be used with any LLM API by loading its markdown instructions into your
 
 ```pseudo
 orchestrator = read("agents/orchestrator.md")
-sprint_forge = read("skills/sprint-forge/SKILL.md")
+kyro_core = read("skills/core/SKILL.md")
 qa_review = read("skills/qa-review/SKILL.md")
 
 system_prompt = join([
   orchestrator,
-  sprint_forge,
+  kyro_core,
   qa_review
 ])
 
@@ -27,7 +27,7 @@ response = llm.generate({
   system: system_prompt,
   input: """
   Run the forge intent for scope: oauth-implementation.
-  Use artifact root: .agents/sprint-forge/oauth-implementation/.
+  Use artifact root: .agents/kyro/scopes/oauth-implementation/.
   Current project context:
   {PROJECT_CONTEXT}
   """
@@ -66,13 +66,13 @@ response = llm.generate({
 
 ```pseudo
 orchestrator = read("agents/orchestrator.md")
-sprint_forge = read("skills/sprint-forge/SKILL.md")
+kyro_core = read("skills/core/SKILL.md")
 
 response = llm.generate({
   model: STRONG_PLANNING_MODEL,
-  system: join([orchestrator, sprint_forge]),
+  system: join([orchestrator, kyro_core]),
   input: """
-  Run the status intent for .agents/sprint-forge/{scope}/.
+  Run the status intent for .agents/kyro/scopes/{scope}/.
   Then generate the next sprint if the roadmap and previous sprint support it.
   """
 })
@@ -84,8 +84,8 @@ response = llm.generate({
 
 Your host application is responsible for persistence:
 
-- Write findings to `.agents/sprint-forge/{scope}/findings/`.
-- Write sprint documents to `.agents/sprint-forge/{scope}/sprints/`.
+- Write findings to `.agents/kyro/scopes/{scope}/findings/`.
+- Write sprint documents to `.agents/kyro/scopes/{scope}/phases/`.
 - Keep `ROADMAP.md`, `RE-ENTRY-PROMPTS.md`, and `rules.md` in sync.
 - Run verification commands outside the model when possible.
 

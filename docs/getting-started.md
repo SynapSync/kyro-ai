@@ -1,6 +1,6 @@
 # Getting Started with Kyro
 
-Kyro is a portable, markdown-first workflow kit for AI coding agents. It coordinates sprint-based execution through one orchestrator, reusable skills, command intent documents, persistent project rules, and `.agents/sprint-forge/{scope}/` artifacts.
+Kyro is a portable, markdown-first workflow kit for AI coding agents. It coordinates sprint-based execution through one orchestrator, reusable skills, command intent documents, persistent project rules, and `.agents/kyro/scopes/{scope}/` artifacts.
 
 Kyro does not require a specific model provider. Claude Code is supported through a native adapter, while Codex, OpenCode, Cursor, and generic agents can use the same core files manually.
 
@@ -28,17 +28,17 @@ node --version
 Use this path when you want Claude Code to register Kyro slash commands, agents, and skills automatically:
 
 ```bash
-/plugin install SynapSync/kyro-workflow
+/plugin install SynapSync/kyro-ai
 ```
 
 For local development:
 
 ```bash
-git clone https://github.com/SynapSync/kyro-workflow.git ~/.claude/plugins/kyro-workflow
-cd ~/.claude/plugins/kyro-workflow
+git clone https://github.com/SynapSync/kyro-ai.git ~/.claude/plugins/kyro-ai
+cd ~/.claude/plugins/kyro-ai
 npm install
 npm run build
-claude --plugin-dir ~/.claude/plugins/kyro-workflow
+claude --plugin-dir ~/.claude/plugins/kyro-ai
 ```
 
 ### Generic Agent Setup
@@ -46,19 +46,19 @@ claude --plugin-dir ~/.claude/plugins/kyro-workflow
 Use this path for agents without a verified Kyro-native plugin mechanism:
 
 ```bash
-git clone https://github.com/SynapSync/kyro-workflow.git ~/kyro-workflow
+git clone https://github.com/SynapSync/kyro-ai.git ~/kyro-ai
 cd your-project
 mkdir -p .agents .skills
-cp -R ~/kyro-workflow/agents .agents/kyro
-cp -R ~/kyro-workflow/skills/sprint-forge .skills/sprint-forge
-cp -R ~/kyro-workflow/skills/qa-review .skills/qa-review
-mkdir -p .agents/sprint-forge
+cp -R ~/kyro-ai/agents .agents/kyro
+cp -R ~/kyro-ai/skills/core .skills/core
+cp -R ~/kyro-ai/skills/qa-review .skills/qa-review
+mkdir -p .agents/kyro/scopes
 ```
 
 Then expose these files as project context or rules in your agent:
 
 - `.agents/kyro/orchestrator.md`
-- `.skills/sprint-forge/SKILL.md`
+- `.skills/core/SKILL.md`
 - `.skills/qa-review/SKILL.md`
 - Kyro command intent files from `commands/*.md`, when your agent supports slash commands or reusable prompts
 
@@ -71,13 +71,13 @@ See [agent-adapters.md](agent-adapters.md) for Codex, OpenCode, Cursor, and gene
 If your platform supports Kyro slash commands, start with:
 
 ```text
-/kyro-workflow:forge analyze the authentication module
+/kyro:forge analyze the authentication module
 ```
 
 If your platform does not support slash commands, invoke the same intent manually:
 
 ```text
-Use Kyro forge mode. Read the orchestrator, sprint-forge, and qa-review instructions. Analyze the authentication module, produce findings, create or update the sprint artifacts under .agents/sprint-forge/{scope}/, and stop at each approval gate.
+Use Kyro forge mode. Read the orchestrator, core, and qa-review instructions. Analyze the authentication module, produce findings, create or update the sprint artifacts under .agents/kyro/scopes/{scope}/, and stop at each approval gate.
 ```
 
 This starts the full sprint cycle:
@@ -90,7 +90,7 @@ This starts the full sprint cycle:
 6. You approve the implementation at Gate 3.
 7. A retrospective is run and the sprint is closed.
 
-To check progress, use `/kyro-workflow:status` or ask the agent to run Kyro status mode by reading `.agents/sprint-forge/{scope}/`.
+To check progress, use `/kyro:status` or ask the agent to run Kyro status mode by reading `.agents/kyro/scopes/{scope}/`.
 
 ---
 
@@ -99,19 +99,19 @@ To check progress, use `/kyro-workflow:status` or ask the agent to run Kyro stat
 After running forge in INIT mode, Kyro creates a scope workspace:
 
 ```text
-.agents/sprint-forge/{scope}/
+.agents/kyro/scopes/{scope}/
 ├── README.md
 ├── ROADMAP.md
 ├── RE-ENTRY-PROMPTS.md
 ├── findings/
-├── sprints/
+├── phases/
 └── handoffs/
 ```
 
 Project rules are stored in:
 
 ```text
-.agents/sprint-forge/rules.md
+.agents/kyro/scopes/rules.md
 ```
 
 The artifact files are the compatibility layer. Any agent that can read and write these files can continue the Kyro workflow.
@@ -145,7 +145,7 @@ Sprint files are saved to disk after each phase completes. This keeps progress r
 When you correct an agent during a sprint, the correction can become a persistent project rule:
 
 ```text
-User correction -> proposed rule -> user approval -> .agents/sprint-forge/rules.md
+User correction -> proposed rule -> user approval -> .agents/kyro/scopes/rules.md
 ```
 
 Rules are specific, dated, and tied to the project where they were learned. See [rules-guide.md](rules-guide.md).

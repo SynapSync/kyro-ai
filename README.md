@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SynapSync/kyro-workflow/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/kyro-workflow?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
-  <a href="https://www.npmjs.com/package/kyro-workflow"><img src="https://img.shields.io/npm/v/kyro-workflow?style=for-the-badge&logo=npm&color=E8926F&labelColor=1e1e2e" alt="npm"/></a>
-  <a href="https://github.com/SynapSync/kyro-workflow/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-22c55e?style=for-the-badge&labelColor=1e1e2e" alt="License"/></a>
-  <a href="https://github.com/SynapSync/kyro-workflow/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SynapSync/kyro-workflow/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=1e1e2e" alt="CI"/></a>
+  <a href="https://github.com/SynapSync/kyro-ai/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/kyro-ai?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
+  <a href="https://www.npmjs.com/package/kyro-ai"><img src="https://img.shields.io/npm/v/kyro-ai?style=for-the-badge&logo=npm&color=E8926F&labelColor=1e1e2e" alt="npm"/></a>
+  <a href="https://github.com/SynapSync/kyro-ai/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-22c55e?style=for-the-badge&labelColor=1e1e2e" alt="License"/></a>
+  <a href="https://github.com/SynapSync/kyro-ai/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SynapSync/kyro-ai/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=1e1e2e" alt="CI"/></a>
 </p>
 
 <p align="center">
@@ -23,9 +23,9 @@ Kyro is an **agent-agnostic workflow kit** for iterative AI-assisted development
 Kyro is portable because its source of truth is plain markdown:
 
 - **Orchestrator instructions** in `agents/orchestrator.md`
-- **Reusable skills** in `skills/sprint-forge/` and `skills/qa-review/`
+- **Reusable skills** in `skills/core/` and `skills/qa-review/`
 - **Workflow intents** in `commands/`
-- **Project state** in `.agents/sprint-forge/{scope}/`
+- **Project state** in `.agents/kyro/scopes/{scope}/`
 
 Claude Code has a native adapter through `.claude-plugin/`. Other agents can use the same core files manually or through their own project-rule/context mechanisms.
 
@@ -49,9 +49,9 @@ Kyro has three stable workflow intents:
 
 | Intent | Native slash command | Manual equivalent |
 |--------|----------------------|-------------------|
-| `forge` | `/kyro-workflow:forge` | Analyze, plan, execute, review, and close the sprint |
-| `status` | `/kyro-workflow:status` | Read project artifacts and report progress/debt |
-| `wrap-up` | `/kyro-workflow:wrap-up` | Close the session and update re-entry context |
+| `forge` | `/kyro:forge` | Analyze, plan, execute, review, and close the sprint |
+| `status` | `/kyro:status` | Read project artifacts and report progress/debt |
+| `wrap-up` | `/kyro:wrap-up` | Close the session and update re-entry context |
 
 Platforms without slash commands should ask the agent to perform the matching manual equivalent while referencing the orchestrator and skill files.
 
@@ -74,11 +74,11 @@ Kyro does not claim native integration for Codex, OpenCode, Cursor, or other age
 For agents without native Kyro support, copy or symlink the core files into the target project:
 
 ```bash
-mkdir -p .skills .agents .agents/sprint-forge
+mkdir -p .skills .agents .agents/kyro/scopes
 
-cp -r /path/to/kyro-workflow/skills/sprint-forge .skills/
-cp -r /path/to/kyro-workflow/skills/qa-review .skills/
-cp /path/to/kyro-workflow/agents/orchestrator.md .agents/
+cp -r /path/to/kyro-ai/skills/core .skills/
+cp -r /path/to/kyro-ai/skills/qa-review .skills/
+cp /path/to/kyro-ai/agents/orchestrator.md .agents/
 ```
 
 Then provide this context to the agent:
@@ -88,10 +88,10 @@ Use Kyro for this project.
 
 Read:
 - .agents/orchestrator.md
-- .skills/sprint-forge/SKILL.md
+- .skills/core/SKILL.md
 - .skills/qa-review/SKILL.md
 
-Use .agents/sprint-forge/{scope}/ for ROADMAP.md, findings, sprints,
+Use .agents/kyro/scopes/{scope}/ for ROADMAP.md, findings, phases,
 RE-ENTRY-PROMPTS.md, handoffs, and learned rules.
 
 If slash commands are unsupported:
@@ -107,17 +107,17 @@ If slash commands are unsupported:
 Claude Code is currently the only native plugin adapter included in this package.
 
 ```bash
-/plugin marketplace add SynapSync/kyro-workflow
-/plugin install kyro-workflow@kyro-workflow
+/plugin marketplace add SynapSync/kyro-ai
+/plugin install kyro-ai@kyro-ai
 ```
 
 Local development:
 
 ```bash
-git clone https://github.com/SynapSync/kyro-workflow.git
-cd kyro-workflow
+git clone https://github.com/SynapSync/kyro-ai.git
+cd kyro-ai
 npm install && npm run build
-claude --plugin-dir /path/to/kyro-workflow
+claude --plugin-dir /path/to/kyro-ai
 ```
 
 The Claude adapter lives in `.claude-plugin/`. Core Kyro behavior remains in markdown assets shared by all agents.
@@ -129,13 +129,13 @@ The Claude adapter lives in `.claude-plugin/`. Core Kyro behavior remains in mar
 ```
 User intent
   └── Orchestrator instructions
-        ├── sprint-forge skill
+        ├── core skill
         ├── qa-review skill
         └── markdown project artifacts
 ```
 
 ```
-kyro-workflow/
+kyro-ai/
 ├── agents/
 │   └── orchestrator.md
 ├── commands/
@@ -143,7 +143,7 @@ kyro-workflow/
 │   ├── status.md
 │   └── wrap-up.md
 ├── skills/
-│   ├── sprint-forge/
+│   ├── core/
 │   └── qa-review/
 ├── docs/
 ├── rules/
@@ -159,14 +159,14 @@ kyro-workflow/
 Kyro persists workflow state in markdown artifacts:
 
 ```
-.agents/sprint-forge/
+.agents/kyro/scopes/
 ├── rules.md
 └── {scope}/
     ├── README.md
     ├── ROADMAP.md
     ├── RE-ENTRY-PROMPTS.md
     ├── findings/
-    ├── sprints/
+    ├── phases/
     └── handoffs/
 ```
 
@@ -180,7 +180,7 @@ This is the stable public interface. Any agent can inspect, modify, diff, and co
 
 ```json
 {
-  "rules": { "path": ".agents/sprint-forge/rules.md", "auto_load": true },
+  "rules": { "path": ".agents/kyro/scopes/rules.md", "auto_load": true },
   "quality_gates": { "typecheck": "npm run typecheck", "build": "npm run build" },
   "sprint": { "checkpoint_per_phase": true, "require_retro": true, "debt_aged_threshold_sprints": 3 }
 }
@@ -221,9 +221,9 @@ Kyro does not enforce model selection. Use the strongest available model for imp
   <br/>
   <b>If you find this useful, star the repo to help others discover it.</b>
   <br/><br/>
-  <a href="https://github.com/SynapSync/kyro-workflow/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/kyro-workflow?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
+  <a href="https://github.com/SynapSync/kyro-ai/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/kyro-ai?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
   <br/><br/>
-  <a href="https://github.com/SynapSync/kyro-workflow/issues">Report Issues</a> &bull;
+  <a href="https://github.com/SynapSync/kyro-ai/issues">Report Issues</a> &bull;
   <a href="https://synapsync.dev">SynapSync</a> &bull;
   <a href="https://github.com/SynapSync/skills-registry">Skills Registry</a>
   <br/><br/>

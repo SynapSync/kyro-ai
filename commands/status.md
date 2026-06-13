@@ -3,16 +3,16 @@ description: Show project status, sprint progress, and technical debt summary
 argument-hint: [brief|full|debt|debt-add|debt-resolve|debt-escalate]
 ---
 
-# /kyro-workflow:status — Project Status
+# /kyro:status — Project Status
 
 Report project progress, technical debt status, and next sprint preview from markdown artifacts.
 
 ## Execution
 
-> **IMPORTANT**: Before generating the report, read the sprint-forge skill's STATUS mode:
-> 1. Read `skills/sprint-forge/SKILL.md` — capabilities matrix, configuration resolution
-> 2. Read `skills/sprint-forge/assets/modes/STATUS.md` — report workflow and format
-> 3. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` — debt table rules
+> **IMPORTANT**: Before generating the report, read the core skill's STATUS mode:
+> 1. Read `skills/core/SKILL.md` — capabilities matrix, configuration resolution
+> 2. Read `skills/core/assets/modes/STATUS.md` — report workflow and format
+> 3. Read `skills/core/assets/helpers/debt-tracker.md` — debt table rules
 
 ## View: $ARGUMENTS
 
@@ -59,14 +59,14 @@ Sprint 4: [title from roadmap]
 
 ## Debt Management
 
-The `debt-*` variants provide direct debt lifecycle actions. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` before executing any of these.
+The `debt-*` variants provide direct debt lifecycle actions. Read `skills/core/assets/helpers/debt-tracker.md` before executing any of these.
 
 ### debt-add
 
 Add a new debt item:
 
 ```
-/kyro-workflow:status debt-add "Missing error boundary in dashboard" --origin "Sprint 3 retro" --target "Sprint 4"
+/kyro:status debt-add "Missing error boundary in dashboard" --origin "Sprint 3 retro" --target "Sprint 4"
 ```
 
 ### debt-resolve
@@ -74,7 +74,7 @@ Add a new debt item:
 Mark a debt item as resolved:
 
 ```
-/kyro-workflow:status debt-resolve 3 --sprint "Sprint 3"
+/kyro:status debt-resolve 3 --sprint "Sprint 3"
 ```
 
 ### debt-escalate

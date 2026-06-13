@@ -12,9 +12,15 @@ export function uninstall(options: CliOptions): void {
     return;
   }
 
-  const plan: OperationPlan[] = [...manifest.managedFiles]
+  const plan: OperationPlan[] = (manifest.managedBlocks ?? [])
+    .map((blockRef) => {
+      const [path, blockName] = blockRef.split('#');
+      return { action: 'remove-block' as const, path, blockName };
+    });
+
+  plan.push(...[...manifest.managedFiles]
     .sort((a, b) => b.length - a.length)
-    .map((filePath) => ({ action: 'remove', path: filePath }));
+    .map((filePath) => ({ action: 'remove' as const, path: filePath })));
 
   plan.push({ action: 'remove', path: KYRO_ROOT });
   printPlan('Uninstall plan', plan);

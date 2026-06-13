@@ -3,14 +3,14 @@ description: End-of-session closure ritual with quality check and context handof
 argument-hint: [session notes]
 ---
 
-# /kyro-workflow:wrap-up — Session Closure Ritual
+# /kyro:wrap-up — Session Closure Ritual
 
 Structured 5-step checklist to close the current session cleanly. Ensures no work is lost, quality is maintained, learnings are captured, and the next session has full context.
 
 ## Execution
 
 > **IMPORTANT**: Before running the closure ritual:
-> 1. Read `skills/sprint-forge/assets/helpers/handoff.md` — context transfer format and checklist
+> 1. Read `skills/core/assets/helpers/handoff.md` — context transfer format and checklist
 > 2. Run the orchestrator's session-end checkpoint — check uncommitted changes, sprint progress, and pending learnings
 
 ## Session Notes: $ARGUMENTS
@@ -45,7 +45,7 @@ Prompt for learnings from this session:
    ```
    [LEARN] Category: One-line rule
    ```
-4. Learnings are proposed for `.agents/sprint-forge/rules.md` and recorded in the sprint retro after approval
+4. Learnings are proposed for `.agents/kyro/scopes/rules.md` and recorded in the sprint retro after approval
 
 ### Step 4: Next Session Context
 
@@ -82,4 +82,4 @@ Display session summary:
 After completing all 5 steps:
 1. Display the summary
 2. Confirm session is ready to close
-3. Suggest running `/kyro-workflow:forge` if a sprint milestone was reached and a retrospective is needed
+3. Suggest running `/kyro:forge` if a sprint milestone was reached and a retrospective is needed

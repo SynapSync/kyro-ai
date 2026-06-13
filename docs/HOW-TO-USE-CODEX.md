@@ -7,11 +7,11 @@ This guide describes manual Kyro usage with Codex-style agents. Native command o
 ## Setup
 
 ```bash
-mkdir -p .skills .agents .agents/sprint-forge
+mkdir -p .skills .agents .agents/kyro/scopes
 
-cp -r kyro-workflow/skills/sprint-forge .skills/
-cp -r kyro-workflow/skills/qa-review .skills/
-cp kyro-workflow/agents/orchestrator.md .agents/
+cp -r kyro-ai/skills/core .skills/
+cp -r kyro-ai/skills/qa-review .skills/
+cp kyro-ai/agents/orchestrator.md .agents/
 ```
 
 ---
@@ -23,10 +23,10 @@ Use Kyro for this project.
 
 Read:
 - .agents/orchestrator.md
-- .skills/sprint-forge/SKILL.md
+- .skills/core/SKILL.md
 - .skills/qa-review/SKILL.md
 
-Persist workflow artifacts under .agents/sprint-forge/{scope}/.
+Persist workflow artifacts under .agents/kyro/scopes/{scope}/.
 If slash commands are unavailable, use these intents:
 - forge = analyze/plan/execute/review/close
 - status = read artifacts and report progress/debt
@@ -47,27 +47,27 @@ CHANGES REQUIRED, or REJECTED.
 
 Context:
 - Scope: {scope}
-- Sprint artifacts: .agents/sprint-forge/{scope}/
+- Sprint artifacts: .agents/kyro/scopes/{scope}/
 ```
 
 ### Forge
 
 ```text
 @file .agents/orchestrator.md
-@file .skills/sprint-forge/SKILL.md
+@file .skills/core/SKILL.md
 @file .skills/qa-review/SKILL.md
 
 Run the forge intent for {scope}.
-Use .agents/sprint-forge/{scope}/ for findings, roadmap, sprints,
+Use .agents/kyro/scopes/{scope}/ for findings, roadmap, phases,
 handoffs, and re-entry prompts.
 ```
 
 ### Status
 
 ```text
-@file .skills/sprint-forge/SKILL.md
+@file .skills/core/SKILL.md
 
-Run the status intent for .agents/sprint-forge/{scope}/.
+Run the status intent for .agents/kyro/scopes/{scope}/.
 Report sprint progress, open debt, aged debt, blockers, and next action.
 ```
 
@@ -77,6 +77,6 @@ Report sprint progress, open debt, aged debt, blockers, and next action.
 
 - Codex environments may not register Kyro slash commands automatically.
 - Artifact persistence depends on the agent writing files correctly.
-- Learned rules work through `.agents/sprint-forge/rules.md`, not through a runtime service.
+- Learned rules work through `.agents/kyro/scopes/rules.md`, not through a runtime service.
 
 For generic setup and Cursor/OpenCode notes, see [Agent Adapters](agent-adapters.md).

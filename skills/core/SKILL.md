@@ -1,5 +1,5 @@
 ---
-name: sprint-forge
+name: core
 description: >
   Adaptive sprint workflow: deep analysis, evolving roadmap, one-at-a-time sprints,
   formal debt tracking, and re-entry prompts for context persistence.
@@ -118,7 +118,7 @@ This skill works for **any** project type, language, or framework.
 
 1. **Re-entry prompt** — If the user's message contains file paths (e.g. `/Users/.../ROADMAP.md`), extract `{output_kyro_dir}` from those paths. It's already there.
 2. **INIT (first time)** — Ask the user where to save documents. Store the chosen path in `README.md` and `RE-ENTRY-PROMPTS.md`. These are the only sources of truth.
-3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/sprint-forge/` in `{cwd}`, or ask the user directly.
+3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/kyro/scopes/` in `{cwd}`, or ask the user directly.
 
 No AGENTS.md. No branded blocks. The re-entry prompts and README carry the path across sessions.
 
@@ -223,20 +223,20 @@ The orchestrator is the single agent, handling all phases through specialized pr
 | Analysis protocol | Read-only codebase analysis | INIT mode — deep codebase exploration |
 | Review checklist | Task quality validation | SPRINT mode — validates each task before closure |
 | Debug protocol | Root cause investigation | SPRINT mode — invoked on task failure |
-| Full cycle coordination | Gate management and sprint lifecycle | /kyro-workflow:forge command — coordinates all phases with gates |
+| Full cycle coordination | Gate management and sprint lifecycle | /kyro:forge command — coordinates all phases with gates |
 
 ### Commands
 
 | Command | Maps To |
 |---------|---------|
-| `/kyro-workflow:forge` | Full cycle: INIT → SPRINT → Review → Close with validation gates |
-| `/kyro-workflow:status` | STATUS mode with sprint progress and debt summary |
-| `/kyro-workflow:wrap-up` | End-of-session closure ritual with quality check and context handoff |
+| `/kyro:forge` | Full cycle: INIT → SPRINT → Review → Close with validation gates |
+| `/kyro:status` | STATUS mode with sprint progress and debt summary |
+| `/kyro:wrap-up` | End-of-session closure ritual with quality check and context handoff |
 
 ### Built-In Checkpoints
 
 The orchestrator runs checkpoints at lifecycle moments. Key checkpoints:
-- **session_start** — loads learned rules from `.agents/sprint-forge/rules.md`
+- **session_start** — loads learned rules from `.agents/kyro/scopes/rules.md`
 - **post_edit_scan** — checks for debug artifacts after code edits
 - **task_complete** — runs review checklist
 - **drift_check** — detects possible scope drift when enabled
@@ -244,7 +244,7 @@ The orchestrator runs checkpoints at lifecycle moments. Key checkpoints:
 
 ### Per-Project Learning
 
-Corrections during sprint execution are captured as persistent rules in `.agents/sprint-forge/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the learner helper (`assets/helpers/learner.md`) for details.
+Corrections during sprint execution are captured as persistent rules in `.agents/kyro/scopes/rules.md`. These rules are loaded at session start and applied automatically in future sprints. See the learner helper (`assets/helpers/learner.md`) for details.
 
 ---
 

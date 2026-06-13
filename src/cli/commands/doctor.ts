@@ -1,9 +1,11 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { AGENT, COMMAND_NAMES, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT, WORKSPACE_ROOT } from '../constants';
+import { ARTIFACT_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
 import { readJsonFromPackage, readPackageText, workspaceFileExists } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
+import { getAdapterDefinition } from '../adapters/registry';
+import type { Agent } from '../types';
 import type { CheckResult } from '../types';
 
 export function doctor(): void {
@@ -27,7 +29,7 @@ function runDoctorChecks(): CheckResult[] {
     checkClaudePlugin(),
     checkProjectState(),
     checkWorkspaceCore(),
-    checkOpenCodeProjection(),
+    ...checkAdapterProjections(),
   ];
 }
 
@@ -51,7 +53,7 @@ function checkPackageVersionSync(): CheckResult {
 }
 
 function checkPackageAssets(): CheckResult {
-  const required = ['agents/orchestrator.md', 'commands/forge.md', 'commands/status.md', 'commands/wrap-up.md', 'skills/sprint-forge/SKILL.md', 'skills/qa-review/SKILL.md'];
+  const required = ['agents/orchestrator.md', 'commands/forge.md', 'commands/status.md', 'commands/wrap-up.md', 'skills/core/SKILL.md', 'skills/qa-review/SKILL.md'];
   const missing = required.filter((file) => !existsSync(resolve(PACKAGE_ROOT, file)));
   if (missing.length > 0) {
     return { status: 'fail', name: 'package assets', detail: `missing ${missing.join(', ')}` };
@@ -105,18 +107,22 @@ function checkWorkspaceCore(): CheckResult {
   return { status: 'pass', name: 'workspace core', detail: `${manifest.managedFiles.length} managed files present` };
 }
 
-function checkOpenCodeProjection(): CheckResult {
+function checkAdapterProjections(): CheckResult[] {
   const manifest = readManifest();
-  if (!manifest?.adapters.some((adapter) => adapter.agent === AGENT.OPENCODE)) {
-    return { status: 'warn', name: 'OpenCode adapter', detail: 'not installed in this workspace' };
-  }
-  const missing = COMMAND_NAMES
-    .map((command) => `${AGENT_SKILLS_ROOT}/kyro-${command}/SKILL.md`)
-    .filter((file) => !workspaceFileExists(file));
-  if (missing.length > 0) {
-    return { status: 'fail', name: 'OpenCode adapter', detail: `missing ${missing.join(', ')}`, remedy: 'Run kyro sync --agent opencode.' };
-  }
-  return { status: 'pass', name: 'OpenCode adapter', detail: 'projected Kyro command skills present' };
+  if (!manifest) return [];
+
+  return manifest.adapters.map((installedAdapter) => {
+    try {
+      return getAdapterDefinition(installedAdapter.agent as Agent).doctor(manifest);
+    } catch (error: unknown) {
+      return {
+        status: 'fail',
+        name: `${installedAdapter.agent} adapter`,
+        detail: errorMessage(error),
+        remedy: 'Run kyro sync or reinstall the adapter.',
+      };
+    }
+  });
 }
 
 function readYamlVersion(file: string): string {
