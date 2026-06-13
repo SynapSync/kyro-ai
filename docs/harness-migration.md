@@ -1,6 +1,6 @@
 # Harness Migration — Multi-Agent Runtime Direction
 
-Kyro is evolving from a markdown-heavy workflow into an installable harness for AI-assisted software delivery. The goal is not to abandon existing adapters. The goal is to make Kyro practical across Claude, Codex, OpenCode, Cursor, and generic agent environments with one consistent operating model.
+Kyro is evolving from a markdown-heavy workflow into an installable harness for AI-assisted software delivery. The goal is not to abandon existing adapters. The goal is to make Kyro practical across Claude, Codex, OpenCode, Cursor, and other AGENTS.md-compatible environments with one consistent operating model.
 
 ## Current Problem
 
@@ -38,7 +38,6 @@ Kyro should support multiple agent surfaces through adapter-specific packaging:
 | Codex | Project instructions and CLI-backed workflow commands |
 | OpenCode | Project-local context plus CLI-backed status, checks, and artifacts |
 | Cursor | Project rules plus CLI-backed workflow state |
-| Generic agents | Minimal `KYRO.md` bootstrap plus CLI/runtime commands |
 
 The stable contract across all adapters is:
 
@@ -65,7 +64,7 @@ Plan A does not implement the CLI runtime.
 
 Plan A does not replace the Claude plugin.
 
-Plan A does not redesign sprint-forge behavior.
+Plan A does not redesign core behavior.
 
 Plan A only prepares the repository so Track B can build the harness from a stable, tested baseline.
 
@@ -83,10 +82,14 @@ kyro uninstall
 
 Recommended first implementation order:
 
-1. `kyro install --agent opencode --scope workspace` for native command/skill projection
+1. `kyro install --agent opencode --scope workspace` and `kyro install --agent codex --scope workspace` for native command/skill projection
 2. `kyro doctor` for package/project health checks
 3. `kyro sync` for managed asset refresh
-4. adapter-specific install templates for Claude, Codex, OpenCode, Cursor, and generic agents
+4. adapter-specific install templates for Claude, Cursor, and additional concrete agent surfaces
 5. structured scoped `state.json` only when a scope is created or opened
 
 This keeps Kyro portable without forcing every agent to load the whole workflow into context.
+
+## Generic Adapter Decision
+
+Kyro intentionally does not ship a `generic` install adapter. The root `AGENTS.md` file is the cross-agent instruction standard; concrete adapters should install concrete command/skill projections for agents that support them.

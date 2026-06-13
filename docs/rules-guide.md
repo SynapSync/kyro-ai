@@ -1,6 +1,6 @@
 # Rules Guide -- Per-Project Learning System
 
-Kyro accumulates knowledge across sprints through a persistent rules file at `.agents/sprint-forge/rules.md`. Rules capture corrections, patterns, and estimation insights so that mistakes made once are never repeated.
+Kyro accumulates knowledge across sprints through a persistent rules file at `.agents/kyro/scopes/rules.md`. Rules capture corrections, patterns, and estimation insights so that mistakes made once are never repeated.
 
 ---
 
@@ -18,7 +18,7 @@ The learning flow moves from correction to persistent rule in four steps:
 3. User approves (or edits) the proposed rule
        |
        v
-4. Rule is appended to .agents/sprint-forge/rules.md
+4. Rule is appended to .agents/kyro/scopes/rules.md
 ```
 
 ### Detection
@@ -49,7 +49,7 @@ The user can:
 
 ### Storage
 
-Approved rules are appended to `.agents/sprint-forge/rules.md` and logged in the sprint's `LEARNED` section.
+Approved rules are appended to `.agents/kyro/scopes/rules.md` and logged in the sprint's `LEARNED` section.
 
 ---
 
@@ -111,7 +111,7 @@ Rules are organized into categories that correspond to different phases of sprin
 
 At the start of every session, the orchestrator startup checkpoint:
 
-1. Reads `.agents/sprint-forge/rules.md` (path configurable in `config.json`)
+1. Reads `.agents/kyro/scopes/rules.md` (path configurable in `config.json`)
 2. Parses all active rules
 3. Makes them available to the orchestrator for the session
 

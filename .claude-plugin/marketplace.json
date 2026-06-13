@@ -1,5 +1,5 @@
 {
-  "name": "kyro-workflow",
+  "name": "kyro-ai",
   "owner": {
     "name": "SynapSync",
     "email": "synapsync@proton.me"
@@ -9,14 +9,14 @@
   },
   "plugins": [
     {
-      "name": "kyro-workflow",
+      "name": "kyro-ai",
       "source": "./",
       "description": "Claude Code adapter for Kyro: one orchestrator agent, 3 slash commands, 2 skills, markdown artifacts, and formal debt tracking.",
       "author": {
         "name": "SynapSync"
       },
-      "homepage": "https://synapsync.dev/cognitives/kyro-workflow",
-      "repository": "https://github.com/SynapSync/kyro-workflow",
+      "homepage": "https://synapsync.dev/cognitives/kyro-ai",
+      "repository": "https://github.com/SynapSync/kyro-ai",
       "license": "Apache-2.0",
       "keywords": [
         "ai-agents",

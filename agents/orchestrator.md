@@ -1,15 +1,15 @@
 ---
 name: orchestrator
-description: Coordinates the full kyro-workflow cycle with validation gates. Use when running /kyro-workflow:forge for end-to-end sprint execution (Analyze → Plan → Implement → Review → Commit).
+description: Coordinates the full kyro-ai cycle with validation gates. Use when running /kyro:forge for end-to-end sprint execution (Analyze → Plan → Implement → Review → Commit).
 tools: ["Read", "Glob", "Grep", "Bash", "Edit", "Write"]
-skills: ["sprint-forge"]
+skills: ["core"]
 model: opus
 memory: project
 ---
 
 # Orchestrator — Kyro Cycle Coordinator
 
-Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/kyro-workflow:forge` command. Analysis, review, debugging, and checkpoint protocols are built in.
+Coordinates the complete sprint lifecycle with validation gates between each phase. This is the brain of the `/kyro:forge` command. Analysis, review, debugging, and checkpoint protocols are built in.
 
 ## Lifecycle
 
@@ -17,7 +17,7 @@ Coordinates the complete sprint lifecycle with validation gates between each pha
 
 Before starting, determine which flow to follow:
 
-1. Scan `.agents/sprint-forge/` for existing project directories
+1. Scan `.agents/kyro/scopes/` for existing project directories
 2. Check if a `ROADMAP.md` exists for this project
 
 - **NO ROADMAP** → New project. Follow **INIT flow** (full analysis, findings, roadmap, scaffolding, then first sprint)
@@ -94,26 +94,26 @@ At the start of every orchestration, load these resources **before doing anythin
 
 The `skills` declaration in frontmatter is metadata only — it does NOT auto-inject skills. You must explicitly read the skill files:
 
-**sprint-forge** (core orchestration):
+**core** (core orchestration):
 
-1. Read `skills/sprint-forge/SKILL.md` — core orchestration logic, critical rules, mode detection, capabilities matrix
+1. Read `skills/core/SKILL.md` — core orchestration logic, critical rules, mode detection, capabilities matrix
 2. Load mode-gated assets based on the current phase:
-   - **INIT phase**: Read `skills/sprint-forge/assets/modes/INIT.md`, `skills/sprint-forge/assets/helpers/analysis-guide.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
-   - **SPRINT phase**: Read `skills/sprint-forge/assets/modes/SPRINT.md`, `skills/sprint-forge/assets/helpers/sprint-generator.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
-   - **STATUS phase**: Read `skills/sprint-forge/assets/modes/STATUS.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`
+   - **INIT phase**: Read `skills/core/assets/modes/INIT.md`, `skills/core/assets/helpers/analysis-guide.md`, `skills/core/assets/helpers/reentry-generator.md`
+   - **SPRINT phase**: Read `skills/core/assets/modes/SPRINT.md`, `skills/core/assets/helpers/sprint-generator.md`, `skills/core/assets/helpers/debt-tracker.md`, `skills/core/assets/helpers/reentry-generator.md`
+   - **STATUS phase**: Read `skills/core/assets/modes/STATUS.md`, `skills/core/assets/helpers/debt-tracker.md`
 3. Load templates **on-demand** as each workflow step references them (not upfront)
 
 **Helpers** (loaded on-demand per phase):
 
-1. Read `skills/sprint-forge/assets/helpers/analyzer.md` — work type detection, analysis strategies, finding output format (INIT phase)
-2. Read `skills/sprint-forge/assets/helpers/analysis-guide.md` — detailed exploration strategies (INIT phase)
-3. Read `skills/sprint-forge/assets/helpers/reviewer.md` — checklist tiers, validation commands, output format (SPRINT phase)
+1. Read `skills/core/assets/helpers/analyzer.md` — work type detection, analysis strategies, finding output format (INIT phase)
+2. Read `skills/core/assets/helpers/analysis-guide.md` — detailed exploration strategies (INIT phase)
+3. Read `skills/core/assets/helpers/reviewer.md` — checklist tiers, validation commands, output format (SPRINT phase)
 
 **All skill paths are relative to the workflow root (the plugin installation directory).**
 
 ### 2. Rules Loading
 
-1. Read `.agents/sprint-forge/rules.md` if it exists
+1. Read `.agents/kyro/scopes/rules.md` if it exists
 2. Apply relevant rules throughout all phases
 3. If a rule is about to be violated, pause and show the rule to the user
 4. At the end, propose new rules based on corrections made during the session
@@ -123,7 +123,7 @@ The `skills` declaration in frontmatter is metadata only — it does NOT auto-in
 Run the startup checkpoint:
 
 1. Confirm rules were loaded or explicitly note that no rules file exists.
-2. Detect active sprint files under `.agents/sprint-forge/*/sprints/`.
+2. Detect active sprint files under `.agents/kyro/scopes/*/phases/`.
 3. Summarize the current project state before continuing.
 
 ## Analysis Protocol (INIT Phase)
@@ -206,7 +206,7 @@ The orchestrator owns lifecycle checkpoints directly. These checks are not deleg
 
 ### Startup Checkpoint
 
-- Load `.agents/sprint-forge/rules.md` if it exists.
+- Load `.agents/kyro/scopes/rules.md` if it exists.
 - Detect active sprint files.
 - Present the current sprint state before planning or execution.
 
@@ -243,7 +243,7 @@ The orchestrator owns lifecycle checkpoints directly. These checks are not deleg
 ### Learn-Capture Checkpoint
 
 - Review corrections and discoveries from the session.
-- Propose rule additions for `.agents/sprint-forge/rules.md`.
+- Propose rule additions for `.agents/kyro/scopes/rules.md`.
 - Wait for approval before adding new rules.
 
 ### Validation Checklist
@@ -366,7 +366,7 @@ Recommended next step: [suggestion for the human]
 - Check `git blame` — recent changes are more likely to be the cause.
 - Use project memory to recall previous bugs in the same area.
 - If stuck after 3 rounds, escalate with findings so far.
-- Capture debugging insights: propose rules for `.agents/sprint-forge/rules.md`.
+- Capture debugging insights: propose rules for `.agents/kyro/scopes/rules.md`.
 - Never fix symptoms instead of root causes.
 
 ## Sprint Close Protocol
@@ -381,7 +381,7 @@ After all tasks are complete:
 6. Generate/update re-entry prompts
 7. Update roadmap if needed
 8. Run the learn-capture checkpoint.
-9. Propose new rules for `.agents/sprint-forge/rules.md`
+9. Propose new rules for `.agents/kyro/scopes/rules.md`
 
 ## Rules
 

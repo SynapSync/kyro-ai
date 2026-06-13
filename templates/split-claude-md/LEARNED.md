@@ -1,6 +1,6 @@
 # LEARNED.md — Project-Specific Learnings
 
-This file is auto-populated by kyro-workflow during sprint retrospectives.
+This file is auto-populated by kyro-ai during sprint retrospectives.
 Do not edit manually unless correcting an error. New entries are appended
 by the learner helper after each sprint retrospective.
 

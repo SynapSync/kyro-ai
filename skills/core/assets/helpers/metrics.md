@@ -73,7 +73,7 @@ Score: 72/100 (Good)
 
 ## Calculation
 
-Read all sprint files in `{output_kyro_dir}/sprints/` and compute:
+Read all sprint files in `{output_kyro_dir}/phases/` and compute:
 
 1. Count tasks per sprint (total, completed, blocked, skipped, carry-over)
 2. Map debt items to source directories

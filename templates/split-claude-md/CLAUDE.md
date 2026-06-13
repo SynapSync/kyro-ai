@@ -4,9 +4,9 @@
 
 This project uses **Kyro** for structured sprint execution.
 
-- Workflow: `kyro-workflow` (installed via Claude Code adapter, generic markdown setup, or local path)
-- Sprint output: `.agents/sprint-forge/{project}/`
-- Learned rules: `.agents/sprint-forge/rules.md`
+- Workflow: `kyro-ai` (installed via Claude Code adapter, generic markdown setup, or local path)
+- Sprint output: `.agents/kyro/scopes/{project}/`
+- Learned rules: `.agents/kyro/scopes/rules.md`
 
 ## Agent Rules
 

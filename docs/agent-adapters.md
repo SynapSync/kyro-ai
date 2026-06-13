@@ -1,6 +1,6 @@
 # Agent Adapters
 
-Kyro is an agent-agnostic workflow kit. Native platform behavior depends on whether the host agent supports commands, project rules, skills, or plugin manifests. The portable interface is always the same: markdown instructions plus `.agents/sprint-forge/{scope}/` artifacts.
+Kyro is an agent-agnostic workflow kit. Native platform behavior depends on whether the host agent supports commands, project rules, skills, or plugin manifests. The portable interface is always the same: markdown instructions plus `.agents/kyro/scopes/{scope}/` artifacts.
 
 ---
 
@@ -11,10 +11,10 @@ Treat these files and directories as Kyro's public interface:
 | Interface | Purpose |
 |-----------|---------|
 | `agents/orchestrator.md` | Full workflow coordinator instructions |
-| `skills/sprint-forge/SKILL.md` | Sprint planning, execution, status, debt, and re-entry workflow |
+| `skills/core/SKILL.md` | Sprint planning, execution, status, debt, and re-entry workflow |
 | `skills/qa-review/SKILL.md` | Senior QA, architecture, security, and sprint alignment review |
 | `commands/*.md` | Native slash-command semantics where supported |
-| `.agents/sprint-forge/{scope}/` | Project roadmap, findings, sprints, handoffs, rules, and re-entry prompts |
+| `.agents/kyro/scopes/{scope}/` | Project roadmap, findings, phases, handoffs, rules, and re-entry prompts |
 
 Platforms without slash commands should invoke these equivalent intents:
 
@@ -31,11 +31,11 @@ Platforms without slash commands should invoke these equivalent intents:
 Copy or symlink Kyro into the target project:
 
 ```bash
-mkdir -p .skills .agents .agents/sprint-forge
+mkdir -p .skills .agents .agents/kyro/scopes
 
-cp -r /path/to/kyro-workflow/skills/sprint-forge .skills/
-cp -r /path/to/kyro-workflow/skills/qa-review .skills/
-cp /path/to/kyro-workflow/agents/orchestrator.md .agents/
+cp -r /path/to/kyro-ai/skills/core .skills/
+cp -r /path/to/kyro-ai/skills/qa-review .skills/
+cp /path/to/kyro-ai/agents/orchestrator.md .agents/
 ```
 
 Use this onboarding prompt for any agent:
@@ -45,11 +45,11 @@ Use Kyro as the workflow for this project.
 
 Read these files first:
 - .agents/orchestrator.md
-- .skills/sprint-forge/SKILL.md
+- .skills/core/SKILL.md
 - .skills/qa-review/SKILL.md
 
 Persist workflow artifacts under:
-- .agents/sprint-forge/{scope}/
+- .agents/kyro/scopes/{scope}/
 
 If native slash commands are unavailable:
 - forge = analyze/plan/execute/review/close
@@ -64,8 +64,8 @@ If native slash commands are unavailable:
 Claude Code has a native adapter through `.claude-plugin/`.
 
 ```bash
-/plugin marketplace add SynapSync/kyro-workflow
-/plugin install kyro-workflow@kyro-workflow
+/plugin marketplace add SynapSync/kyro-ai
+/plugin install kyro-ai@kyro-ai
 ```
 
 The Claude adapter registers commands, the orchestrator agent, and skills. It is the only native adapter included in this repository today.
@@ -78,9 +78,9 @@ Codex-style agents should use Kyro as project context:
 
 ```bash
 mkdir -p .skills .agents
-cp -r kyro-workflow/skills/sprint-forge .skills/
-cp -r kyro-workflow/skills/qa-review .skills/
-cp kyro-workflow/agents/orchestrator.md .agents/
+cp -r kyro-ai/skills/core .skills/
+cp -r kyro-ai/skills/qa-review .skills/
+cp kyro-ai/agents/orchestrator.md .agents/
 ```
 
 Prompt:
@@ -88,7 +88,7 @@ Prompt:
 ```text
 Read .agents/orchestrator.md and the Kyro skills in .skills/.
 Use the forge intent for this scope: {scope}.
-Persist outputs under .agents/sprint-forge/{scope}/.
+Persist outputs under .agents/kyro/scopes/{scope}/.
 ```
 
 Native command registration depends on the Codex environment. If slash commands are unavailable, use the manual intent names.
@@ -101,19 +101,19 @@ OpenCode usage is manual unless your environment supports project-level rule fil
 
 ```bash
 mkdir -p .skills .agents
-cp -r kyro-workflow/skills/sprint-forge .skills/
-cp -r kyro-workflow/skills/qa-review .skills/
-cp kyro-workflow/agents/orchestrator.md .agents/
+cp -r kyro-ai/skills/core .skills/
+cp -r kyro-ai/skills/qa-review .skills/
+cp kyro-ai/agents/orchestrator.md .agents/
 ```
 
 Reference the files in the AI panel:
 
 ```text
 @file .agents/orchestrator.md
-@file .skills/sprint-forge/SKILL.md
+@file .skills/core/SKILL.md
 @file .skills/qa-review/SKILL.md
 
-Run the status intent for .agents/sprint-forge/{scope}/.
+Run the status intent for .agents/kyro/scopes/{scope}/.
 ```
 
 ---
@@ -126,7 +126,7 @@ Recommended setup:
 
 1. Copy the Kyro files using the generic setup.
 2. Add a Cursor project rule that tells the agent to read `.agents/orchestrator.md`.
-3. Ask Cursor to persist sprint artifacts under `.agents/sprint-forge/{scope}/`.
+3. Ask Cursor to persist sprint artifacts under `.agents/kyro/scopes/{scope}/`.
 
 Cursor prompt:
 

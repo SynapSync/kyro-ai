@@ -4,14 +4,14 @@ Kyro provides 3 slash commands. Each command maps to one or more agents and skil
 
 ---
 
-## /kyro-workflow:forge
+## /kyro:forge
 
 **Full sprint cycle: Analyze, Plan, Implement, Review, Close.**
 
 ### Syntax
 
 ```
-/kyro-workflow:forge <project path or description>
+/kyro:forge <project path or description>
 ```
 
 ### Arguments
@@ -21,19 +21,19 @@ The argument describes what to analyze or work on. It can be a path, a module na
 ### Examples
 
 ```
-/kyro-workflow:forge analyze the authentication module
-/kyro-workflow:forge audit code quality in src/api/
-/kyro-workflow:forge refactor the persistence layer
-/kyro-workflow:forge add user profile feature
-/kyro-workflow:forge fix the login timeout bug
+/kyro:forge analyze the authentication module
+/kyro:forge audit code quality in src/api/
+/kyro:forge refactor the persistence layer
+/kyro:forge add user profile feature
+/kyro:forge fix the login timeout bug
 ```
 
 ### Phases and Gates
 
-The `/kyro-workflow:forge` command runs the complete lifecycle:
+The `/kyro:forge` command runs the complete lifecycle:
 
 ```
-[GATE 0: RULES]     Load learned rules from .agents/sprint-forge/rules.md
+[GATE 0: RULES]     Load learned rules from .agents/kyro/scopes/rules.md
         |
 [PHASE 1: ANALYZE]  Analysis phase investigates codebase (read-only)
         |
@@ -74,14 +74,14 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 
 ---
 
-## /kyro-workflow:status
+## /kyro:status
 
 **Project progress, sprint state, and technical debt summary.**
 
 ### Syntax
 
 ```
-/kyro-workflow:status [brief|full|debt]
+/kyro:status [brief|full|debt]
 ```
 
 ### Variants
@@ -95,9 +95,9 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 ### Examples
 
 ```
-/kyro-workflow:status                # Full report
-/kyro-workflow:status brief          # Quick progress check
-/kyro-workflow:status debt           # Focus on technical debt
+/kyro:status                # Full report
+/kyro:status brief          # Quick progress check
+/kyro:status debt           # Focus on technical debt
 ```
 
 ### Report Sections
@@ -135,4 +135,4 @@ Sprint 4: [title]
 The status command reads all files in the output directory:
 - `README.md` for project overview
 - `ROADMAP.md` for planned sprints
-- All `sprints/SPRINT-*.md` files for progress, debt, and retro data
+- All `phases/SPRINT-*.md` files for progress, debt, and retro data

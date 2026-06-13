@@ -3,7 +3,7 @@ description: Full sprint cycle — Analyze → Plan → Implement → Review →
 argument-hint: <project path or description>
 ---
 
-# /kyro-workflow:forge — Complete Kyro Cycle
+# /kyro:forge — Complete Kyro Cycle
 
 Execute the full sprint lifecycle with validation gates between each phase.
 
@@ -46,7 +46,7 @@ Check if a ROADMAP exists to choose between INIT and SPRINT flow.
 
 ### Learning Capture
 
-Review corrections and propose new rules for `.agents/sprint-forge/rules.md`.
+Review corrections and propose new rules for `.agents/kyro/scopes/rules.md`.
 
 ## Rules
 

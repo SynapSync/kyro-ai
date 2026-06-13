@@ -29,7 +29,7 @@ related:
 # Sprint {N} — {title}
 
 > Source: `findings/{finding_file}`
-> Previous Sprint: `sprints/{previous_sprint_file}` | None
+> Previous Sprint: `phases/{previous_sprint_file}` | None
 > Version Target: {version}
 > Type: {type}
 > Carry-over: {carry_over_count} items from previous sprint

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Captures corrections, patterns, and estimation insights as persistent rules stored in `.agents/sprint-forge/rules.md`. These rules are project-scoped and accumulated across sprints.
+Captures corrections, patterns, and estimation insights as persistent rules stored in `.agents/kyro/scopes/rules.md`. These rules are project-scoped and accumulated across sprints.
 
 ## Rule Format
 
@@ -43,13 +43,13 @@ Detected a pattern worth remembering:
 Save this rule? (yes/no/edit)
 ```
 
-3. On approval, append to `.agents/sprint-forge/rules.md`
+3. On approval, append to `.agents/kyro/scopes/rules.md`
 4. Log in the sprint's LEARNED section
 
 ## Rule Application
 
 At the start of every session:
-1. Load `.agents/sprint-forge/rules.md`
+1. Load `.agents/kyro/scopes/rules.md`
 2. Before generating sprint estimates, check estimation rules
 3. Before architecture decisions, check architecture rules
 4. If about to violate a rule, pause and show it (RuleViolation event)

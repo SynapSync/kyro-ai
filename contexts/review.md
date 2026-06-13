@@ -12,12 +12,12 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
 
 ## When Active
 
-- `/kyro-workflow:status` — project progress and debt summary
-- `/kyro-workflow:forge` Phase 4 (Review & Close)
+- `/kyro:status` — project progress and debt summary
+- `/kyro:forge` Phase 4 (Review & Close)
 
 ## Behavior
 
-### Status Assessment (`/kyro-workflow:status`)
+### Status Assessment (`/kyro:status`)
 
 1. Read the current sprint file and extract task statuses.
 2. Summarize progress:
@@ -41,7 +41,7 @@ Activated during status checks and retrospectives. This context puts Kyro in **a
    - **What went wrong** — blockers, underestimates, regressions
    - **Recommendations** — numbered list of improvements for Sprint N+1
    - **Estimation corrections** — adjusted buffers for task types
-   - **New learned rules** — proposed additions to `.agents/sprint-forge/rules.md`
+   - **New learned rules** — proposed additions to `.agents/kyro/scopes/rules.md`
 4. Update the debt table with any new items or status changes.
 
 ### Progress Analysis
@@ -60,7 +60,7 @@ Review outputs feed directly into next sprint planning:
 
 - Recommendations become the disposition table in Sprint N+1.
 - Estimation corrections update buffer percentages.
-- New rules are proposed for `.agents/sprint-forge/rules.md`.
+- New rules are proposed for `.agents/kyro/scopes/rules.md`.
 - Unresolved debt items carry forward with updated age.
 
 ## Constraints
@@ -73,7 +73,7 @@ Review outputs feed directly into next sprint planning:
 
 - **Primary agent**: orchestrator (using review checklist protocol)
 - Tools: `Read`, `Glob`, `Grep`, `Bash` (read-only commands only)
-- Helpers: `metrics`, `reviewer` (in `skills/sprint-forge/assets/helpers/`)
+- Helpers: `metrics`, `reviewer` (in `skills/core/assets/helpers/`)
 
 ## Output
 

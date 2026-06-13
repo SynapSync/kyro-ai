@@ -7,21 +7,21 @@ This directory packages Kyro for Claude Code. Kyro itself is a portable, markdow
 ### Via Marketplace
 
 ```bash
-/plugin marketplace add SynapSync/kyro-workflow
-/plugin install kyro-workflow@kyro-workflow
+/plugin marketplace add SynapSync/kyro-ai
+/plugin install kyro-ai@kyro-ai
 ```
 
 Or via CLI:
 
 ```bash
-claude plugin marketplace add SynapSync/kyro-workflow
-claude plugin install kyro-workflow@kyro-workflow
+claude plugin marketplace add SynapSync/kyro-ai
+claude plugin install kyro-ai@kyro-ai
 ```
 
 ### Local Install
 
 ```bash
-claude --plugin-dir /path/to/kyro-workflow
+claude --plugin-dir /path/to/kyro-ai
 ```
 
 ## Documentation

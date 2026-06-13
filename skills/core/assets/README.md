@@ -1,6 +1,6 @@
 # Kyro — Assets
 
-This directory contains the modular components of the `kyro-workflow` skill.
+This directory contains the modular components of the `kyro-ai` skill.
 
 ## Directory Structure
 

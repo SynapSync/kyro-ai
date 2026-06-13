@@ -12,7 +12,7 @@ Activated during project initialization and analysis phases. This context puts K
 
 ## When Active
 
-- `/kyro-workflow:forge` Phase 1 (Analyze)
+- `/kyro:forge` Phase 1 (Analyze)
 - Explicit user request to analyze or audit a project
 - First contact with a new codebase
 

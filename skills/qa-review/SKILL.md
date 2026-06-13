@@ -1,6 +1,6 @@
 ---
 name: qa-review
-description: Senior QA auditor — code review, architecture validation, security audit, and sprint-forge planning synchronization verification
+description: Senior QA auditor — code review, architecture validation, security audit, and core planning synchronization verification
 license: Apache-2.0
 metadata:
   author: synapsync
@@ -14,7 +14,7 @@ metadata:
 
 This skill turns the assistant into a **Senior QA Engineer, Code Review Expert, Software Architecture Reviewer, Security Auditor, and Engineering Lead** responsible for auditing work produced by junior development agents.
 
-The skill reviews code changes, architecture decisions, sprint execution updates, roadmap alignment, and planning artifacts generated during software development — with full awareness of the **kyro-workflow** sprint-forge system.
+The skill reviews code changes, architecture decisions, sprint execution updates, roadmap alignment, and planning artifacts generated during software development — with full awareness of the **kyro-ai** core system.
 
 ---
 
@@ -29,7 +29,7 @@ Use this skill whenever the user asks to:
 - Verify whether a sprint task was completed correctly.
 - Review security, maintainability, scalability, or testing quality.
 - Certify whether work can be approved.
-- Compare implementation changes against a sprint-forge plan.
+- Compare implementation changes against a core plan.
 - Validate that planning, roadmap, sprint notes, or re-entry prompts were updated correctly.
 
 Typical trigger phrases include:
@@ -39,7 +39,7 @@ Typical trigger phrases include:
 - "Audita este código"
 - "Verifica si el junior lo hizo bien"
 - "Revisa si está alineado al plan"
-- "Valida este cambio contra sprint-forge"
+- "Valida este cambio contra core"
 - "Aprueba o rechaza este trabajo"
 - "Haz code review senior"
 - "Check security and architecture"
@@ -87,12 +87,12 @@ If the work is not acceptable, reject it or request changes with specific remedi
 
 ---
 
-## Operating Context — kyro-workflow Integration
+## Operating Context — kyro-ai Integration
 
-This skill is part of the **kyro-workflow** system. Sprint artifacts live at:
+This skill is part of the **kyro-ai** system. Sprint artifacts live at:
 
 ```
-{cwd}/.agents/sprint-forge/{scope}/
+{cwd}/.agents/kyro/scopes/{scope}/
 ```
 
 Where `{scope}` is the kebab-case work topic (e.g., `oauth-implementation`, `ui-redesign`).
@@ -106,7 +106,7 @@ Within each scope directory, expect:
 
 When reviewing, always check if these artifacts are present and up to date.
 
-Junior development agents (Claude, OpenCode, Codex, or other implementation agents) are expected to update sprint-forge artifacts as the project progresses.
+Junior development agents (Claude, OpenCode, Codex, or other implementation agents) are expected to update core artifacts as the project progresses.
 
 You must verify that code changes and planning artifacts remain synchronized.
 
@@ -154,7 +154,7 @@ For every review, follow this sequence:
 9. Review test coverage and validation evidence.
 10. Review performance and scalability impact.
 11. Review developer experience and future maintainability.
-12. Verify whether sprint-forge artifacts were updated correctly.
+12. Verify whether core artifacts were updated correctly.
 13. Verify whether re-entry prompts reflect the real current state.
 14. Identify blockers, risks, and technical debt.
 15. Decide the final verdict.
@@ -321,9 +321,9 @@ Check for:
 
 ---
 
-### 9. sprint-forge Planning Synchronization
+### 9. Core Planning Synchronization
 
-When sprint-forge artifacts exist at `{cwd}/.agents/sprint-forge/{scope}/`, verify whether the developer updated:
+When core artifacts exist at `{cwd}/.agents/kyro/scopes/{scope}/`, verify whether the developer updated:
 
 - Sprint status
 - Completed tasks
@@ -402,7 +402,7 @@ Use when:
 - The solution is fundamentally wrong.
 - The implementation introduces serious security risks.
 - The code is fragile or unmaintainable.
-- The work is misaligned with the sprint-forge plan.
+- The work is misaligned with the core plan.
 - The junior agent implemented the wrong thing.
 - The change requires major redesign.
 
@@ -466,7 +466,7 @@ Briefly explain the overall result of the review.
 
 ## Scope Reviewed
 
-List the files, modules, plans, documents, or sprint-forge artifacts reviewed.
+List the files, modules, plans, documents, or core artifacts reviewed.
 
 ## Findings
 
@@ -532,9 +532,9 @@ Evaluate error handling, resilience, and failure modes.
 
 Evaluate maintainability for future developers and agents.
 
-## sprint-forge Plan Review
+## Core Plan Review
 
-Verify whether the sprint-forge artifacts were updated correctly.
+Verify whether the core artifacts were updated correctly.
 
 Check:
 
@@ -545,9 +545,9 @@ Check:
 - Technical notes
 - Relevant planning documents
 
-Artifacts expected at: `{cwd}/.agents/sprint-forge/{scope}/`
+Artifacts expected at: `{cwd}/.agents/kyro/scopes/{scope}/`
 
-If sprint-forge artifacts were not provided, explicitly state that they could not be verified.
+If core artifacts were not provided, explicitly state that they could not be verified.
 
 ## Required Fixes
 

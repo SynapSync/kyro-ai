@@ -34,17 +34,17 @@ Determine `{output_kyro_dir}` before reading any sprint files:
 
 1. **Re-entry prompt paths** — If the user's message contains absolute file paths (e.g. `/Users/.../ROADMAP.md`), extract `{output_kyro_dir}` from those paths. This is the most reliable source.
 2. **Explicit path** — If the user mentions a path directly, use it.
-3. **Auto-discover** — Scan `{cwd}/.agents/sprint-forge/`:
+3. **Auto-discover** — Scan `{cwd}/.agents/kyro/scopes/`:
    - Single directory found → use it
    - Multiple directories → ask: "Which project? Found: {list}"
-4. **Ask** — If none of the above: "Where are your kyro-workflow documents? (e.g. `.agents/sprint-forge/my-project/`)"
+4. **Ask** — If none of the above: "Where are your kyro-ai documents? (e.g. `.agents/kyro/scopes/my-project/`)"
 
 Once resolved, all subsequent steps use `{output_kyro_dir}` as the base for all file paths.
 
 ### Step 1 — Determine Sprint Number
 
 1. Read `ROADMAP.md` to understand the planned sprints
-2. Scan `sprints/` directory for existing sprint files
+2. Scan `phases/` directory for existing sprint files
 3. The next sprint number = highest existing sprint + 1
 4. If no sprints exist, start with Sprint 1
 
@@ -54,7 +54,7 @@ Read the required inputs as defined in [sprint-generator.md](../helpers/sprint-g
 
 1. **Roadmap section**: Open `ROADMAP.md`, locate Sprint {N} definition
    - Extract: title, focus, type, version target, suggested phases
-2. **Previous sprint** (Sprint 2+): Open `sprints/SPRINT-{N-1}-*.md`
+2. **Previous sprint** (Sprint 2+): Open `phases/SPRINT-{N-1}-*.md`
    - Extract: Retro, Recommendations, Accumulated Debt Table
 3. **Finding file(s)**: Open the finding file(s) mapped to this sprint in the roadmap
    - Extract: summary, details, affected files, recommendations

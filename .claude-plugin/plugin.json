@@ -1,13 +1,13 @@
 {
-  "name": "kyro-workflow",
+  "name": "kyro-ai",
   "version": "3.2.0",
   "description": "Claude Code adapter for Kyro, a portable sprint workflow kit for AI coding agents",
   "author": {
     "name": "SynapSync",
     "email": "synapsync@proton.me"
   },
-  "homepage": "https://synapsync.dev/cognitives/kyro-workflow",
-  "repository": "https://github.com/SynapSync/kyro-workflow",
+  "homepage": "https://synapsync.dev/cognitives/kyro-ai",
+  "repository": "https://github.com/SynapSync/kyro-ai",
   "license": "Apache-2.0",
   "keywords": [
     "ai-agents",
@@ -30,7 +30,7 @@
     "context-persistence"
   ],
   "skills": [
-    "./skills/sprint-forge",
+    "./skills/core",
     "./skills/qa-review"
   ],
   "agents": [

@@ -28,6 +28,7 @@ export interface KyroManifest {
   installedAt: string;
   installScope: InstallScope;
   managedFiles: string[];
+  managedBlocks: string[];
   adapters: KyroInstalledAdapter[];
 }
 
@@ -40,10 +41,11 @@ export interface CliOptions {
 }
 
 export interface OperationPlan {
-  action: 'write' | 'copy' | 'mkdir' | 'remove';
+  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'upsert-block' | 'remove-block';
   path: string;
   source?: string;
   content?: string;
+  blockName?: string;
 }
 
 export interface CheckResult {

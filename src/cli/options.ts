@@ -1,4 +1,5 @@
 import { AGENT, SCOPE } from './constants';
+import { getAdapterDefinition, getInstallableAdapters } from './adapters/registry';
 import type { Agent, CliOptions, InstallScope } from './types';
 
 export function parseOptions(args: string[]): CliOptions {
@@ -49,11 +50,10 @@ export function parseOptions(args: string[]): CliOptions {
 export function parseAgent(value: string): Agent {
   const normalized = value.toLowerCase();
   if (normalized === 'opencode') return AGENT.OPENCODE;
-  if (normalized === 'generic') return AGENT.GENERIC;
   if (normalized === 'claude' || normalized === 'claude-code') return AGENT.CLAUDE;
   if (normalized === 'codex') return AGENT.CODEX;
   if (normalized === 'cursor') return AGENT.CURSOR;
-  throw new Error(`Unsupported agent: ${value}. Supported now: opencode, generic. Planned: claude, codex, cursor.`);
+  throw new Error(`Unsupported agent: ${value}. Supported now: ${getInstallableAdapters().map((adapter) => adapter.agent).join(', ')}. Use root AGENTS.md for cross-agent instructions; no generic adapter is installed.`);
 }
 
 export function parseScope(value: string): InstallScope {
@@ -73,9 +73,9 @@ export function assertWorkspaceScope(scope: InstallScope): void {
 }
 
 export function assertInstallableAgents(agents: Agent[]): void {
-  const unsupported = agents.filter((agent) => agent !== AGENT.OPENCODE && agent !== AGENT.GENERIC);
+  const unsupported = agents.filter((agent) => getAdapterDefinition(agent).status !== 'implemented');
   if (unsupported.length > 0) {
-    throw new Error(`Agent adapter not implemented yet: ${unsupported.join(', ')}. Implemented now: opencode, generic. Claude plugin remains first-class through .claude-plugin/.`);
+    throw new Error(`Agent adapter not implemented yet: ${unsupported.join(', ')}. Implemented now: ${getInstallableAdapters().map((adapter) => adapter.agent).join(', ')}. Claude plugin remains first-class through .claude-plugin/.`);
   }
 }
 
