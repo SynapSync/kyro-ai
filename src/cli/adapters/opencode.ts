@@ -1,8 +1,7 @@
 import { AGENT, AGENT_SKILLS_ROOT, KYRO_ROOT } from '../constants';
-import { workspaceFileExists } from '../fs';
 import type { AdapterDefinition } from './registry-types';
-import type { CheckResult } from '../types';
 import { addCommandSkillProjection, buildCommandSkillManagedFiles } from './command-skills';
+import { checkCommandProjection } from './standard';
 
 export const openCodeAdapter: AdapterDefinition = {
   agent: AGENT.OPENCODE,
@@ -30,11 +29,3 @@ export const openCodeAdapter: AdapterDefinition = {
     return checkCommandProjection('OpenCode adapter');
   },
 };
-
-export function checkCommandProjection(name: string): CheckResult {
-  const missing = buildCommandSkillManagedFiles().filter((file) => !workspaceFileExists(file));
-  if (missing.length > 0) {
-    return { status: 'fail', name, detail: `missing ${missing.join(', ')}`, remedy: 'Run kyro sync.' };
-  }
-  return { status: 'pass', name, detail: 'projected Kyro command skills present' };
-}

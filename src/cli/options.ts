@@ -39,7 +39,7 @@ export function parseOptions(args: string[]): CliOptions {
   }
 
   return {
-    agents: uniqueAgents(agents.length > 0 ? agents : [AGENT.OPENCODE]),
+    agents: uniqueAgents(agents),
     scope,
     dryRun,
     yes,
@@ -49,6 +49,7 @@ export function parseOptions(args: string[]): CliOptions {
 
 export function parseAgent(value: string): Agent {
   const normalized = value.toLowerCase();
+  if (normalized === 'standard' || normalized === 'agents' || normalized === '.agents' || normalized === 'default') return AGENT.STANDARD;
   if (normalized === 'opencode') return AGENT.OPENCODE;
   if (normalized === 'claude' || normalized === 'claude-code') return AGENT.CLAUDE;
   if (normalized === 'codex') return AGENT.CODEX;

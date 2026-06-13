@@ -1,28 +1,28 @@
-import { KYRO_ROOT, KYRO_STATE_PATH } from '../constants';
+import { KYRO_STATE_PATH } from '../constants';
+import { getInstalledAdapterDefinitions } from '../adapters/registry';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope } from '../options';
-import { readManifest } from '../state';
+import { readProjectState } from '../state';
 import type { CliOptions, OperationPlan } from '../types';
 
 export function uninstall(options: CliOptions): void {
   assertWorkspaceScope(options.scope);
-  const manifest = readManifest();
-  if (!manifest) {
+  const state = readProjectState();
+  if (!state) {
     console.log('Kyro is not installed in this workspace. No changes made.');
     return;
   }
 
-  const plan: OperationPlan[] = (manifest.managedBlocks ?? [])
+  const nextState = { ...state, installedAdapters: [] };
+  const plan: OperationPlan[] = getInstalledAdapterDefinitions(state.installedAdapters.map((adapter) => adapter.agent))
+    .flatMap((adapter) => adapter.buildManagedBlocks())
     .map((blockRef) => {
       const [path, blockName] = blockRef.split('#');
       return { action: 'remove-block' as const, path, blockName };
     });
 
-  plan.push(...[...manifest.managedFiles]
-    .sort((a, b) => b.length - a.length)
-    .map((filePath) => ({ action: 'remove' as const, path: filePath })));
+  plan.push({ action: 'write', path: KYRO_STATE_PATH, content: `${JSON.stringify(nextState, null, 2)}\n` });
 
-  plan.push({ action: 'remove', path: KYRO_ROOT });
   printPlan('Uninstall plan', plan);
 
   if (options.dryRun) {
@@ -31,6 +31,6 @@ export function uninstall(options: CliOptions): void {
   }
 
   applyPlan(plan);
-  console.log('Kyro managed workspace files removed.');
-  console.log(`Note: ${KYRO_STATE_PATH} is preserved so scope history is not lost.`);
+  console.log('Kyro project bootstrap removed.');
+  console.log(`Note: ${KYRO_STATE_PATH}, scope artifacts, global runtime, and global command skills were preserved.`);
 }

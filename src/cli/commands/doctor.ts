@@ -1,12 +1,11 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ARTIFACT_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
-import { readJsonFromPackage, readPackageText, workspaceFileExists } from '../fs';
+import { managedPathExists, readJsonFromPackage, readPackageText, workspaceFileExists } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
 import { getAdapterDefinition } from '../adapters/registry';
-import type { Agent } from '../types';
-import type { CheckResult } from '../types';
+import type { Agent, CheckResult } from '../types';
 
 export function doctor(): void {
   const checks = runDoctorChecks();
@@ -28,7 +27,7 @@ function runDoctorChecks(): CheckResult[] {
     checkPackageAssets(),
     checkClaudePlugin(),
     checkProjectState(),
-    checkWorkspaceCore(),
+    checkGlobalRuntime(),
     ...checkAdapterProjections(),
   ];
 }
@@ -74,46 +73,53 @@ function checkProjectState(): CheckResult {
   if (!state) {
     return {
       status: 'warn',
-      name: 'workspace state',
+      name: 'project state',
       detail: `${KYRO_STATE_PATH} not found`,
-      remedy: 'Run kyro install --agent opencode --scope workspace.',
+      remedy: 'Run kyro install --scope workspace.',
     };
   }
-  if (state.schemaVersion !== 1 || state.artifactRoot !== ARTIFACT_ROOT || !Array.isArray(state.scopes)) {
-    return { status: 'fail', name: 'workspace state', detail: `${KYRO_STATE_PATH} has invalid shape` };
+  if (
+    state.schemaVersion !== 1
+    || state.artifactRoot !== ARTIFACT_ROOT
+    || !Array.isArray(state.scopes)
+    || typeof state.runtimeVersion !== 'string'
+    || typeof state.runtimePath !== 'string'
+  ) {
+    return { status: 'fail', name: 'project state', detail: `${KYRO_STATE_PATH} has invalid shape` };
   }
-  return { status: 'pass', name: 'workspace state', detail: `${KYRO_STATE_PATH} is valid` };
+  return { status: 'pass', name: 'project state', detail: `${KYRO_STATE_PATH} is valid` };
 }
 
-function checkWorkspaceCore(): CheckResult {
+function checkGlobalRuntime(): CheckResult {
   const manifest = readManifest();
   if (!manifest) {
     return {
       status: 'warn',
-      name: 'workspace core',
+      name: 'global runtime',
       detail: `${KYRO_MANIFEST_PATH} not found`,
       remedy: 'Run kyro install.',
     };
   }
-  const missing = manifest.managedFiles.filter((file) => !workspaceFileExists(file));
+  const missing = manifest.managedFiles.filter((file) => !managedPathExists(file));
   if (missing.length > 0) {
     return {
       status: 'fail',
-      name: 'workspace core',
+      name: 'global runtime',
       detail: `missing managed files: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '...' : ''}`,
       remedy: 'Run kyro sync.',
     };
   }
-  return { status: 'pass', name: 'workspace core', detail: `${manifest.managedFiles.length} managed files present` };
+  return { status: 'pass', name: 'global runtime', detail: `${manifest.managedFiles.length} managed files present` };
 }
 
 function checkAdapterProjections(): CheckResult[] {
+  const state = readProjectState();
   const manifest = readManifest();
-  if (!manifest) return [];
+  if (!state) return [];
 
-  return manifest.adapters.map((installedAdapter) => {
+  return state.installedAdapters.map((installedAdapter) => {
     try {
-      return getAdapterDefinition(installedAdapter.agent as Agent).doctor(manifest);
+      return getAdapterDefinition(installedAdapter.agent as Agent).doctor(manifest ? { ...manifest, adapters: state.installedAdapters } : null);
     } catch (error: unknown) {
       return {
         status: 'fail',

@@ -1,52 +1,84 @@
 # Kyro CLI
 
-Kyro includes a small CLI for installing workspace harness assets and checking health.
+Kyro includes a small CLI for installing workspace harness assets, projecting command skills, and checking package/workspace health.
 
 ## Commands
 
 ```bash
 kyro                    # Open the interactive TUI
-kyro install            # Install adapter assets, OpenCode workspace by default
+kyro install            # Install standard .agents assets by default
 kyro doctor             # Read-only package/workspace health check
 kyro sync               # Refresh managed workspace assets
-kyro uninstall          # Remove managed workspace assets, preserving Kyro project state
+kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
 
-`npx kyro-ai` also resolves to the same CLI entrypoint.
+`npx kyro-ai` resolves to the same CLI entrypoint.
 
 ## Install Scope
 
-The default install scope is `workspace`.
+The default install scope is `workspace`, but Kyro now separates global runtime from project state.
 
-Workspace install writes project-local files so the repository carries its Kyro harness configuration:
+Global runtime files are installed once per Kyro version:
 
 ```text
-.agents/
-├── kyro-ai/
-│   ├── sprint-forge/
-│   ├── commands/
-│   ├── skills/
-│   ├── KYRO.md
-│   └── manifest.json
-├── skills/
-│   ├── kyro-forge/SKILL.md
-│   ├── kyro-status/SKILL.md
-│   └── kyro-wrap-up/SKILL.md
-└── core/
-    └── kyro.json
+~/.agents/kyro/
+├── versions/
+│   └── {version}/
+│       ├── core/
+│       ├── commands/
+│       ├── skills/
+│       ├── KYRO.md
+│       └── manifest.json
+└── current -> versions/{version}
 ```
 
-## OpenCode Adapter
+Global command skills are installed for agent discovery:
 
-OpenCode and Codex are the workspace adapters implemented by the CLI:
+```text
+~/.agents/skills/
+├── kyro-forge/SKILL.md
+├── kyro-status/SKILL.md
+└── kyro-wrap-up/SKILL.md
+```
+
+The project keeps only state and artifacts:
+
+```text
+.agents/kyro/
+├── kyro.json
+└── scopes/
+    └── {scope}/
+        ├── state.json
+        ├── ROADMAP.md
+        └── phases/
+```
+
+## Adapters
+
+Implemented workspace adapters:
+
+| Adapter | Purpose |
+| --- | --- |
+| `standard` | Base `~/.agents/skills/kyro-*` command skill projection for compatible agents |
+| `opencode` | OpenCode adapter using the same projected Kyro command skills |
+| `codex` | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block |
+
+Default install uses `standard`:
 
 ```bash
-kyro install --agent opencode --scope workspace --dry-run
-kyro install --agent opencode --scope workspace --yes
-kyro install --agent codex --scope workspace --yes
+kyro install --scope workspace --dry-run
+kyro install --scope workspace --yes
 ```
 
-The adapters project Kyro workflows into `.agents/skills/` so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose.
+Agent-specific installs:
+
+```bash
+kyro install --agent opencode --scope workspace --yes
+kyro install --agent codex --scope workspace --yes
+kyro install --agent standard,opencode,codex --scope workspace --yes
+```
+
+The adapters project Kyro workflows into `~/.agents/skills/` so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose.
 
 Projected skills:
 
@@ -54,14 +86,14 @@ Projected skills:
 - `kyro-status`
 - `kyro-wrap-up`
 
-Each projected skill references the managed Kyro core in `.agents/kyro/internal/` instead of duplicating long workflow instructions.
+Each projected skill references the managed Kyro runtime in `~/.agents/kyro/current/` instead of duplicating long workflow instructions.
 
 ## State Model
 
-`kyro install` creates only global project state:
+`kyro install` creates only root project state:
 
 ```text
-.agents/kyro/scopes/kyro.json
+.agents/kyro/kyro.json
 ```
 
 It does not create scoped state. Scoped state is created later when a scope is created or opened by a future scope/forge workflow.
@@ -74,14 +106,28 @@ Initial state shape:
   "artifactRoot": ".agents/kyro/scopes",
   "scopes": [],
   "activeScope": null,
+  "runtimeVersion": "3.2.0",
+  "runtimePath": "~/.agents/kyro/current",
   "installedAdapters": []
 }
 ```
 
+## Sync Semantics
+
+`kyro sync` without `--agent` refreshes the adapters already recorded in `.agents/kyro/kyro.json`.
+
+It must not add the default `standard` adapter to an existing workspace unless the user explicitly passes it:
+
+```bash
+kyro sync
+kyro sync --agent standard --dry-run
+kyro sync --agent codex --dry-run
+```
+
 ## Claude Plugin Support
 
-The Claude plugin adapter remains first-class through `.claude-plugin/`. The CLI does not replace it; it complements Kyro's adapter story for agents that need workspace-installed commands, skills, root AGENTS.md managed blocks, and core assets.
+The Claude plugin adapter remains first-class through `.claude-plugin/`. The CLI does not replace it; it complements Kyro's adapter story for agents that need workspace-installed commands, skills, root `AGENTS.md` managed blocks, and core assets.
 
 ## Unsupported Generic Adapter
 
-Kyro does not provide `--agent generic`. Cross-agent instructions belong in the root `AGENTS.md` standard, and adapter installs should target concrete agent capabilities.
+Kyro does not provide `--agent generic`. Cross-agent instructions belong in root `AGENTS.md`, and adapter installs should target concrete agent capabilities.

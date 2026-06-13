@@ -18,6 +18,8 @@ export interface KyroProjectState {
   artifactRoot: string;
   scopes: string[];
   activeScope: string | null;
+  runtimeVersion: string;
+  runtimePath: string;
   installedAdapters: KyroInstalledAdapter[];
 }
 
@@ -41,7 +43,7 @@ export interface CliOptions {
 }
 
 export interface OperationPlan {
-  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'upsert-block' | 'remove-block';
+  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'upsert-block' | 'remove-block' | 'symlink';
   path: string;
   source?: string;
   content?: string;

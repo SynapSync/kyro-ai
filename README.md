@@ -71,39 +71,49 @@ If the host exposes slash commands, the equivalent public command namespace is:
 
 ---
 
-## Installed Workspace Layout
+## Installed Layout
 
-A workspace install writes Kyro into `.agents/`:
+Kyro separates global runtime from project state. Runtime files live in your user-level agents directory; project files keep only state and artifacts.
+
+Global runtime:
 
 ```text
-.agents/
+~/.agents/
 ├── kyro/
-│   ├── internal/
-│   │   ├── core/
-│   │   │   ├── agents/
-│   │   │   ├── config.json
-│   │   │   └── WORKFLOW.yaml
-│   │   ├── commands/
-│   │   ├── skills/
-│   │   │   ├── sprint-forge/
-│   │   │   └── qa-review/
-│   │   ├── KYRO.md
-│   │   ├── kyro.json
-│   │   └── manifest.json
-│   └── scopes/
-│       └── {scope}/
-│           ├── state.json
-│           ├── ROADMAP.md
-│           └── phases/
+│   ├── versions/
+│   │   └── {version}/
+│   │       ├── core/
+│   │       │   ├── agents/
+│   │       │   ├── config.json
+│   │       │   └── WORKFLOW.yaml
+│   │       ├── commands/
+│   │       ├── skills/
+│   │       │   ├── sprint-forge/
+│   │       │   └── qa-review/
+│   │       ├── KYRO.md
+│   │       └── manifest.json
+│   └── current -> versions/{version}
 └── skills/
     ├── kyro-forge/SKILL.md
     ├── kyro-status/SKILL.md
     └── kyro-wrap-up/SKILL.md
 ```
 
-Important invariant: `kyro install` creates the root project state at `.agents/kyro/internal/kyro.json`. It does **not** create `.agents/kyro/scopes/{scope}/state.json`; scoped state belongs to future scope/forge creation.
+Project state and artifacts:
 
----
+```text
+<project>/
+└── .agents/
+    └── kyro/
+        ├── kyro.json
+        └── scopes/
+            └── {scope}/
+                ├── state.json
+                ├── ROADMAP.md
+                └── phases/
+```
+
+Important invariant: `kyro install` creates the root project state at `.agents/kyro/kyro.json`. It does **not** create `.agents/kyro/scopes/{scope}/state.json`; scoped state belongs to future scope/forge creation.
 
 ## Who Invokes Whom
 
@@ -116,17 +126,17 @@ installs managed core + adapter projections
   ↓
 agent opens the project
   ↓
-agent discovers AGENTS.md and/or .agents/skills
+agent discovers AGENTS.md and/or ~/.agents/skills
   ↓
 user invokes kyro-forge / kyro-status / kyro-wrap-up
   ↓
-projected skill reads .agents/kyro/internal/commands/*.md
+projected skill reads ~/.agents/kyro/current/commands/*.md
   ↓
-orchestrator reads .agents/kyro/internal/core/agents/orchestrator.md
+orchestrator reads ~/.agents/kyro/current/core/agents/orchestrator.md
   ↓
 sprint-forge skill assets guide the workflow
   ↓
-artifacts are written under .agents/kyro/scopes/{scope}/
+artifacts are written under <project>/.agents/kyro/scopes/{scope}/
 ```
 
 The user should not have to explain the workflow in natural language. If an agent cannot discover the installed command skills, that agent needs a better adapter.
@@ -165,8 +175,8 @@ Supported install adapters today:
 
 | Adapter    | Status                            | What it installs                                                      |
 | ---------- | --------------------------------- | --------------------------------------------------------------------- |
-| `opencode` | Implemented                       | `.agents/skills/kyro-*` command skill projections                     |
-| `codex`    | Implemented                       | `.agents/skills/kyro-*` plus a managed Kyro block in root `AGENTS.md` |
+| `opencode` | Implemented                       | `~/.agents/skills/kyro-*` command skill projections                     |
+| `codex`    | Implemented                       | `~/.agents/skills/kyro-*` plus a managed Kyro block in root `AGENTS.md` |
 | `claude`   | Planned for CLI workspace install | Claude plugin remains first-class through `.claude-plugin/`           |
 | `cursor`   | Planned                           | Not installed by the CLI yet                                          |
 

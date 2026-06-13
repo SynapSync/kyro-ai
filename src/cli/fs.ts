@@ -5,15 +5,17 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { PACKAGE_ROOT, WORKSPACE_ROOT } from './constants';
 import type { OperationPlan } from './types';
 
 export function applyPlan(plan: OperationPlan[]): void {
   for (const operation of plan) {
-    const target = resolve(WORKSPACE_ROOT, operation.path);
+    const target = resolveManagedPath(operation.path);
     if (operation.action === 'mkdir') {
       mkdirSync(target, { recursive: true });
     } else if (operation.action === 'write') {
@@ -25,6 +27,11 @@ export function applyPlan(plan: OperationPlan[]): void {
       copyFileSync(resolve(PACKAGE_ROOT, operation.source), target);
     } else if (operation.action === 'remove') {
       rmSync(target, { recursive: true, force: true });
+    } else if (operation.action === 'symlink') {
+      if (!operation.source) throw new Error(`Symlink operation missing source for ${operation.path}`);
+      mkdirSync(dirname(target), { recursive: true });
+      rmSync(target, { recursive: true, force: true });
+      symlinkSync(resolveManagedPath(operation.source), target, 'dir');
     } else if (operation.action === 'upsert-block') {
       if (!operation.blockName) throw new Error(`Block operation missing blockName for ${operation.path}`);
       mkdirSync(dirname(target), { recursive: true });
@@ -82,7 +89,11 @@ export function readJsonFromPackage<T>(file: string): T {
 }
 
 export function readJsonFromWorkspace<T>(file: string): T | null {
-  const path = resolve(WORKSPACE_ROOT, file);
+  return readJsonFromManagedPath<T>(file);
+}
+
+export function readJsonFromManagedPath<T>(file: string): T | null {
+  const path = resolveManagedPath(file);
   if (!existsSync(path)) return null;
   return JSON.parse(readFileSync(path, 'utf-8')) as T;
 }
@@ -92,13 +103,24 @@ export function readPackageText(file: string): string {
 }
 
 export function workspaceFileExists(file: string): boolean {
-  return existsSync(resolve(WORKSPACE_ROOT, file));
+  return existsSync(resolveManagedPath(file));
+}
+
+export function managedPathExists(file: string): boolean {
+  return existsSync(resolveManagedPath(file));
+}
+
+export function resolveManagedPath(file: string): string {
+  if (file === '~') return homedir();
+  if (file.startsWith('~/')) return resolve(homedir(), file.slice(2));
+  return resolve(WORKSPACE_ROOT, file);
 }
 
 export function hasManagedBlock(file: string, blockName: string): boolean {
-  const path = resolve(WORKSPACE_ROOT, file);
+  const path = resolveManagedPath(file);
   if (!existsSync(path)) return false;
-  return readFileSync(path, 'utf-8').includes(startMarker(blockName)) && readFileSync(path, 'utf-8').includes(endMarker(blockName));
+  const text = readFileSync(path, 'utf-8');
+  return text.includes(startMarker(blockName)) && text.includes(endMarker(blockName));
 }
 
 function upsertManagedBlock(existing: string, blockName: string, content: string): string {

@@ -1,5 +1,5 @@
 import { KYRO_MANIFEST_PATH, KYRO_STATE_PATH } from './constants';
-import { readJsonFromWorkspace } from './fs';
+import { readJsonFromManagedPath, readJsonFromWorkspace } from './fs';
 import type { KyroManifest, KyroProjectState } from './types';
 
 export function readProjectState(): KyroProjectState | null {
@@ -7,5 +7,5 @@ export function readProjectState(): KyroProjectState | null {
 }
 
 export function readManifest(): KyroManifest | null {
-  return readJsonFromWorkspace<KyroManifest>(KYRO_MANIFEST_PATH);
+  return readJsonFromManagedPath<KyroManifest>(KYRO_MANIFEST_PATH);
 }
