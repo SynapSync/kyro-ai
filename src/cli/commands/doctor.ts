@@ -53,7 +53,7 @@ function checkPackageVersionSync(): CheckResult {
 }
 
 function checkPackageAssets(): CheckResult {
-  const required = ['agents/orchestrator.md', 'commands/forge.md', 'commands/status.md', 'commands/wrap-up.md', 'skills/core/SKILL.md', 'skills/qa-review/SKILL.md'];
+  const required = ['agents/orchestrator.md', 'commands/forge.md', 'commands/status.md', 'commands/wrap-up.md', 'skills/sprint-forge/SKILL.md', 'skills/qa-review/SKILL.md'];
   const missing = required.filter((file) => !existsSync(resolve(PACKAGE_ROOT, file)));
   if (missing.length > 0) {
     return { status: 'fail', name: 'package assets', detail: `missing ${missing.join(', ')}` };

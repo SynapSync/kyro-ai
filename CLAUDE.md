@@ -23,8 +23,8 @@ kyro-ai/
 │   ├── status.md     # /kyro:status — progress and debt summary
 │   └── wrap-up.md    # /kyro:wrap-up — session closure ritual
 ├── skills/           # 2 skills
-│   ├── core/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
-│   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, core verification
+│   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+│   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 ├── .claude-plugin/   # Claude Code adapter packaging
 │   ├── plugin.json   # Plugin manifest (version must match package.json)
 │   ├── marketplace.json # Marketplace listing metadata

@@ -23,7 +23,7 @@ Workspace install writes project-local files so the repository carries its Kyro 
 ```text
 .agents/
 ├── kyro-ai/
-│   ├── core/
+│   ├── sprint-forge/
 │   ├── commands/
 │   ├── skills/
 │   ├── KYRO.md

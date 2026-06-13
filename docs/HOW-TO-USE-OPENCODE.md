@@ -9,7 +9,7 @@ This guide describes manual Kyro usage with OpenCode-style agents. Native comman
 ```bash
 mkdir -p .skills .agents .agents/kyro/scopes
 
-cp -r kyro-ai/skills/core .skills/
+cp -r kyro-ai/skills/sprint-forge .skills/
 cp -r kyro-ai/skills/qa-review .skills/
 cp kyro-ai/agents/orchestrator.md .agents/
 ```
@@ -23,7 +23,7 @@ your-project/
 │   └── core/
 │       └── {scope}/
 ├── .skills/
-│   ├── core/
+│   ├── sprint-forge/
 │   └── qa-review/
 └── src/
 ```
@@ -37,7 +37,7 @@ Use Kyro for this project.
 
 Read:
 @file .agents/orchestrator.md
-@file .skills/core/SKILL.md
+@file .skills/sprint-forge/SKILL.md
 @file .skills/qa-review/SKILL.md
 
 Persist workflow artifacts under .agents/kyro/scopes/{scope}/.
@@ -55,7 +55,7 @@ If slash commands are unavailable, use:
 
 ```text
 @file .agents/orchestrator.md
-@file .skills/core/SKILL.md
+@file .skills/sprint-forge/SKILL.md
 
 Run the forge intent for {scope}.
 Create or update ROADMAP.md, findings, and the next sprint under
@@ -76,7 +76,7 @@ Return blockers first, then warnings, then approval status.
 
 ```text
 @file .agents/orchestrator.md
-@file .skills/core/SKILL.md
+@file .skills/sprint-forge/SKILL.md
 
 Run the wrap-up intent for {scope}.
 Update retro notes, debt status, re-entry prompts, and proposed learned rules.

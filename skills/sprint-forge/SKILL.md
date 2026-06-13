@@ -1,5 +1,5 @@
 ---
-name: core
+name: sprint-forge
 description: >
   Adaptive sprint workflow: deep analysis, evolving roadmap, one-at-a-time sprints,
   formal debt tracking, and re-entry prompts for context persistence.
@@ -212,7 +212,7 @@ This will: read all sprints, calculate metrics, display progress and accumulated
 
 ## Workflow Components
 
-Kyro operates as a workflow with one orchestrator agent, built-in checkpoints, and commands. The SKILL.md remains the core orchestration logic:
+Kyro operates as a workflow with one orchestrator agent, built-in checkpoints, and commands. The SKILL.md remains the sprint-forge orchestration logic:
 
 ### Agent
 

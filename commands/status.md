@@ -9,10 +9,10 @@ Report project progress, technical debt status, and next sprint preview from mar
 
 ## Execution
 
-> **IMPORTANT**: Before generating the report, read the core skill's STATUS mode:
-> 1. Read `skills/core/SKILL.md` — capabilities matrix, configuration resolution
-> 2. Read `skills/core/assets/modes/STATUS.md` — report workflow and format
-> 3. Read `skills/core/assets/helpers/debt-tracker.md` — debt table rules
+> **IMPORTANT**: Before generating the report, read the sprint-forge skill's STATUS mode:
+> 1. Read `skills/sprint-forge/SKILL.md` — capabilities matrix, configuration resolution
+> 2. Read `skills/sprint-forge/assets/modes/STATUS.md` — report workflow and format
+> 3. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` — debt table rules
 
 ## View: $ARGUMENTS
 
@@ -59,7 +59,7 @@ Sprint 4: [title from roadmap]
 
 ## Debt Management
 
-The `debt-*` variants provide direct debt lifecycle actions. Read `skills/core/assets/helpers/debt-tracker.md` before executing any of these.
+The `debt-*` variants provide direct debt lifecycle actions. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` before executing any of these.
 
 ### debt-add
 

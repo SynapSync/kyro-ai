@@ -20,8 +20,8 @@ agents:
   - orchestrator  # Full cycle coordination — analysis, review, debugging, and sprint execution
 
 skills:
-  - core      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
-  - qa-review         # Senior QA auditor — code review, architecture validation, security audit, core verification
+  - sprint-forge  # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+  - qa-review         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 
 artifacts:
   root: .agents/kyro/scopes/    # Rules and sprint documents (per-scope)

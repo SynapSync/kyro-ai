@@ -30,7 +30,7 @@
     "context-persistence"
   ],
   "skills": [
-    "./skills/core",
+    "./skills/sprint-forge",
     "./skills/qa-review"
   ],
   "agents": [

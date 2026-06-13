@@ -10,7 +10,7 @@ Structured 5-step checklist to close the current session cleanly. Ensures no wor
 ## Execution
 
 > **IMPORTANT**: Before running the closure ritual:
-> 1. Read `skills/core/assets/helpers/handoff.md` — context transfer format and checklist
+> 1. Read `skills/sprint-forge/assets/helpers/handoff.md` — context transfer format and checklist
 > 2. Run the orchestrator's session-end checkpoint — check uncommitted changes, sprint progress, and pending learnings
 
 ## Session Notes: $ARGUMENTS

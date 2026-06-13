@@ -11,7 +11,7 @@ Treat these files and directories as Kyro's public interface:
 | Interface | Purpose |
 |-----------|---------|
 | `agents/orchestrator.md` | Full workflow coordinator instructions |
-| `skills/core/SKILL.md` | Sprint planning, execution, status, debt, and re-entry workflow |
+| `skills/sprint-forge/SKILL.md` | Sprint planning, execution, status, debt, and re-entry workflow |
 | `skills/qa-review/SKILL.md` | Senior QA, architecture, security, and sprint alignment review |
 | `commands/*.md` | Native slash-command semantics where supported |
 | `.agents/kyro/scopes/{scope}/` | Project roadmap, findings, phases, handoffs, rules, and re-entry prompts |
@@ -33,7 +33,7 @@ Copy or symlink Kyro into the target project:
 ```bash
 mkdir -p .skills .agents .agents/kyro/scopes
 
-cp -r /path/to/kyro-ai/skills/core .skills/
+cp -r /path/to/kyro-ai/skills/sprint-forge .skills/
 cp -r /path/to/kyro-ai/skills/qa-review .skills/
 cp /path/to/kyro-ai/agents/orchestrator.md .agents/
 ```
@@ -45,7 +45,7 @@ Use Kyro as the workflow for this project.
 
 Read these files first:
 - .agents/orchestrator.md
-- .skills/core/SKILL.md
+- .skills/sprint-forge/SKILL.md
 - .skills/qa-review/SKILL.md
 
 Persist workflow artifacts under:
@@ -78,7 +78,7 @@ Codex-style agents should use Kyro as project context:
 
 ```bash
 mkdir -p .skills .agents
-cp -r kyro-ai/skills/core .skills/
+cp -r kyro-ai/skills/sprint-forge .skills/
 cp -r kyro-ai/skills/qa-review .skills/
 cp kyro-ai/agents/orchestrator.md .agents/
 ```
@@ -101,7 +101,7 @@ OpenCode usage is manual unless your environment supports project-level rule fil
 
 ```bash
 mkdir -p .skills .agents
-cp -r kyro-ai/skills/core .skills/
+cp -r kyro-ai/skills/sprint-forge .skills/
 cp -r kyro-ai/skills/qa-review .skills/
 cp kyro-ai/agents/orchestrator.md .agents/
 ```
@@ -110,7 +110,7 @@ Reference the files in the AI panel:
 
 ```text
 @file .agents/orchestrator.md
-@file .skills/core/SKILL.md
+@file .skills/sprint-forge/SKILL.md
 @file .skills/qa-review/SKILL.md
 
 Run the status intent for .agents/kyro/scopes/{scope}/.
