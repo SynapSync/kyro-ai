@@ -3,7 +3,7 @@
   "name": "qa-review",
   "type": "skill",
   "version": "1.0.0",
-  "description": "Senior QA auditor — code review, architecture validation, security audit, and core planning synchronization verification",
+  "description": "Senior QA auditor — code review, architecture validation, security audit, and sprint-forge planning synchronization verification",
   "author": {
     "name": "SynapSync",
     "url": "https://github.com/SynapSync",

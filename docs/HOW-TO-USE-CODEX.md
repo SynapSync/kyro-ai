@@ -9,7 +9,7 @@ This guide describes manual Kyro usage with Codex-style agents. Native command o
 ```bash
 mkdir -p .skills .agents .agents/kyro/scopes
 
-cp -r kyro-ai/skills/core .skills/
+cp -r kyro-ai/skills/sprint-forge .skills/
 cp -r kyro-ai/skills/qa-review .skills/
 cp kyro-ai/agents/orchestrator.md .agents/
 ```
@@ -23,7 +23,7 @@ Use Kyro for this project.
 
 Read:
 - .agents/orchestrator.md
-- .skills/core/SKILL.md
+- .skills/sprint-forge/SKILL.md
 - .skills/qa-review/SKILL.md
 
 Persist workflow artifacts under .agents/kyro/scopes/{scope}/.
@@ -54,7 +54,7 @@ Context:
 
 ```text
 @file .agents/orchestrator.md
-@file .skills/core/SKILL.md
+@file .skills/sprint-forge/SKILL.md
 @file .skills/qa-review/SKILL.md
 
 Run the forge intent for {scope}.
@@ -65,7 +65,7 @@ handoffs, and re-entry prompts.
 ### Status
 
 ```text
-@file .skills/core/SKILL.md
+@file .skills/sprint-forge/SKILL.md
 
 Run the status intent for .agents/kyro/scopes/{scope}/.
 Report sprint progress, open debt, aged debt, blockers, and next action.

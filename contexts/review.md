@@ -73,7 +73,7 @@ Review outputs feed directly into next sprint planning:
 
 - **Primary agent**: orchestrator (using review checklist protocol)
 - Tools: `Read`, `Glob`, `Grep`, `Bash` (read-only commands only)
-- Helpers: `metrics`, `reviewer` (in `skills/core/assets/helpers/`)
+- Helpers: `metrics`, `reviewer` (in `skills/sprint-forge/assets/helpers/`)
 
 ## Output
 

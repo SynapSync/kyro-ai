@@ -64,7 +64,7 @@ Plan A does not implement the CLI runtime.
 
 Plan A does not replace the Claude plugin.
 
-Plan A does not redesign core behavior.
+Plan A does not redesign sprint-forge behavior.
 
 Plan A only prepares the repository so Track B can build the harness from a stable, tested baseline.
 

@@ -44,7 +44,7 @@
   },
   "homepage": "https://synapsync.dev/cognitives/kyro-ai",
   "skills": [
-    "./skills/core",
+    "./skills/sprint-forge",
     "./skills/qa-review"
   ],
   "license": "Apache-2.0",

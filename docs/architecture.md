@@ -59,7 +59,7 @@ USER
   v
 ORCHESTRATOR
   |-- loads .agents/kyro/scopes/rules.md
-  |-- reads core skill assets
+  |-- reads sprint-forge skill assets
   |-- runs built-in checkpoints
   |
   v
@@ -127,7 +127,7 @@ The orchestrator runs checkpoints at lifecycle moments:
 Kyro v2.0 is a full workflow that replaces the v1.x single-skill approach.
 
 ```
-v1.x: User message -> core skill -> markdown artifacts
+v1.x: User message -> sprint-forge skill -> markdown artifacts
 
 v2.0: User command -> orchestrator
                     -> core / qa-review skills
@@ -153,7 +153,7 @@ v2.0: User command -> orchestrator
 |-----------|----------|
 | Commands | `commands/` |
 | Orchestrator | `agents/orchestrator.md` |
-| Sprint workflow skill | `skills/core/` |
+| Sprint workflow skill | `skills/sprint-forge/` |
 | QA review skill | `skills/qa-review/` |
-| Templates | `skills/core/assets/templates/` |
+| Templates | `skills/sprint-forge/assets/templates/` |
 | Rules | `.agents/kyro/scopes/rules.md` in the target project |

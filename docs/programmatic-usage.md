@@ -13,7 +13,7 @@ Kyro can be used with any LLM API by loading its markdown instructions into your
 
 ```pseudo
 orchestrator = read("agents/orchestrator.md")
-kyro_core = read("skills/core/SKILL.md")
+kyro_core = read("skills/sprint-forge/SKILL.md")
 qa_review = read("skills/qa-review/SKILL.md")
 
 system_prompt = join([
@@ -66,7 +66,7 @@ response = llm.generate({
 
 ```pseudo
 orchestrator = read("agents/orchestrator.md")
-kyro_core = read("skills/core/SKILL.md")
+kyro_core = read("skills/sprint-forge/SKILL.md")
 
 response = llm.generate({
   model: STRONG_PLANNING_MODEL,
@@ -97,7 +97,7 @@ Kyro does not require a specific provider or model family.
 
 - Use a high-capability model for implementation, debugging, and architecture decisions.
 - Use a faster/lower-cost model for read-only status reports or simple documentation review.
-- Keep model names out of Kyro's core artifacts unless you are recording which model modified a document.
+- Keep model names out of Kyro's sprint-forge artifacts unless you are recording which model modified a document.
 
 ---
 

@@ -50,7 +50,7 @@ git clone https://github.com/SynapSync/kyro-ai.git ~/kyro-ai
 cd your-project
 mkdir -p .agents .skills
 cp -R ~/kyro-ai/agents .agents/kyro
-cp -R ~/kyro-ai/skills/core .skills/core
+cp -R ~/kyro-ai/skills/sprint-forge .skills/sprint-forge
 cp -R ~/kyro-ai/skills/qa-review .skills/qa-review
 mkdir -p .agents/kyro/scopes
 ```
@@ -58,7 +58,7 @@ mkdir -p .agents/kyro/scopes
 Then expose these files as project context or rules in your agent:
 
 - `.agents/kyro/orchestrator.md`
-- `.skills/core/SKILL.md`
+- `.skills/sprint-forge/SKILL.md`
 - `.skills/qa-review/SKILL.md`
 - Kyro command intent files from `commands/*.md`, when your agent supports slash commands or reusable prompts
 

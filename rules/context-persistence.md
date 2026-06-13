@@ -34,7 +34,7 @@ Generate a handoff document when ending a session mid-sprint.
   - Any in-flight decisions or blockers
   - Modified files not yet committed
   - Active debt items relevant to current work
-- Use the handoff helper (`skills/core/assets/helpers/handoff.md`) to generate enriched handoffs with mental model context.
+- Use the handoff helper (`skills/sprint-forge/assets/helpers/handoff.md`) to generate enriched handoffs with mental model context.
 
 ## R-CP-04: Re-Entry Prompts Are Source of Truth
 
