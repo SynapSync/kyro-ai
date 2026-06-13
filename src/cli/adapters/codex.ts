@@ -1,7 +1,7 @@
 import { AGENT, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
 import { hasManagedBlock } from '../fs';
 import { addCommandSkillProjection, buildCommandSkillManagedFiles } from './command-skills';
-import { checkCommandProjection } from './opencode';
+import { checkCommandProjection } from './standard';
 import type { AdapterDefinition } from './registry-types';
 
 const AGENTS_PATH = 'AGENTS.md';

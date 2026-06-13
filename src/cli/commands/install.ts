@@ -1,15 +1,16 @@
 import { buildInstallPlan } from '../install-plan';
 import { applyPlan, printPlan } from '../fs';
 import { assertInstallableAgents, assertWorkspaceScope, uniqueAgents } from '../options';
-import { readManifest } from '../state';
-import { KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
+import { readProjectState } from '../state';
+import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
 import type { CliOptions } from '../types';
 
 export function install(options: CliOptions): void {
   assertWorkspaceScope(options.scope);
-  assertInstallableAgents(options.agents);
+  const agents = options.agents.length > 0 ? options.agents : [AGENT.STANDARD];
+  assertInstallableAgents(agents);
 
-  const plan = buildInstallPlan(options.agents, options.scope);
+  const plan = buildInstallPlan(agents, options.scope);
   printPlan('Install plan', plan);
 
   if (options.dryRun) {
@@ -18,18 +19,18 @@ export function install(options: CliOptions): void {
   }
 
   applyPlan(plan);
-  console.log(`Kyro installed for: ${options.agents.join(', ')}`);
+  console.log('Kyro has been installed.');
   console.log(`State: ${KYRO_STATE_PATH}`);
-  console.log(`Core: ${KYRO_ROOT}/`);
+  console.log(`Runtime: ${KYRO_ROOT}/`);
 }
 
 export function sync(options: CliOptions): void {
   assertWorkspaceScope(options.scope);
-  const manifest = readManifest();
-  if (!manifest) {
+  const state = readProjectState();
+  if (!state) {
     throw new Error('Kyro is not installed in this workspace. Run kyro install first.');
   }
-  const agents = options.agents.length > 0 ? options.agents : manifest.adapters.map((adapter) => adapter.agent);
+  const agents = options.agents.length > 0 ? options.agents : state.installedAdapters.map((adapter) => adapter.agent);
   assertInstallableAgents(agents);
   const unique = uniqueAgents(agents);
   const plan = buildInstallPlan(unique, SCOPE.WORKSPACE);

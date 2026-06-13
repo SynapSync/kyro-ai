@@ -1,6 +1,6 @@
 {
   "name": "kyro-ai",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Portable sprint workflow kit for AI coding agents, with markdown artifacts, adapter guides, and formal debt tracking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -40,7 +40,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/SynapSync/kyro-ai"
+    "url": "git+https://github.com/SynapSync/kyro-ai.git"
   },
   "homepage": "https://synapsync.dev/cognitives/kyro-ai",
   "skills": [

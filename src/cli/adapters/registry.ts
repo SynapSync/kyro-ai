@@ -2,6 +2,7 @@ import { AGENT } from '../constants';
 import type { Agent } from '../types';
 import { codexAdapter } from './codex';
 import { openCodeAdapter } from './opencode';
+import { standardAgentsAdapter } from './standard';
 import type { AdapterDefinition } from './registry-types';
 
 const plannedAdapter = (agent: Agent, displayName: string): AdapterDefinition => ({
@@ -16,7 +17,7 @@ const plannedAdapter = (agent: Agent, displayName: string): AdapterDefinition =>
     return [];
   },
   buildInstalledAdapter(scope, installedAt) {
-    return { agent, scope, installedAt, corePath: '.agents/kyro/internal' };
+    return { agent, scope, installedAt, corePath: '~/.agents/kyro/current' };
   },
   doctor() {
     return { status: 'warn', name: `${displayName} adapter`, detail: 'planned but not implemented yet' };
@@ -24,6 +25,7 @@ const plannedAdapter = (agent: Agent, displayName: string): AdapterDefinition =>
 });
 
 export const ADAPTERS: AdapterDefinition[] = [
+  standardAgentsAdapter,
   openCodeAdapter,
   codexAdapter,
   plannedAdapter(AGENT.CLAUDE, 'Claude plugin'),
