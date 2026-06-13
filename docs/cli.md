@@ -106,7 +106,7 @@ Initial state shape:
   "artifactRoot": ".agents/kyro/scopes",
   "scopes": [],
   "activeScope": null,
-  "runtimeVersion": "3.2.0",
+  "runtimeVersion": "3.2.1",
   "runtimePath": "~/.agents/kyro/current",
   "installedAdapters": []
 }
