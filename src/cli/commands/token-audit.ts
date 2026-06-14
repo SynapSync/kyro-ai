@@ -9,9 +9,22 @@ const TOKEN_BUDGET = {
   projectedSkillWords: 200,
   commandRouterWords: 500,
   modeFileWords: 900,
+  initModeWords: 500,
+  analysisHelperWords: 450,
+  roadmapTemplateWords: 450,
+  reentryTemplateWords: 350,
   startupTokens: 1500,
   statusBriefTokens: 2000,
+  initHappyPathTokens: 2000,
 } as const;
+
+const RISK_LEVEL = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+} as const;
+
+type RiskLevel = (typeof RISK_LEVEL)[keyof typeof RISK_LEVEL];
 
 interface WeightedFile {
   path: string;
@@ -19,14 +32,30 @@ interface WeightedFile {
   estimatedTokens: number;
 }
 
+interface SizingDecisionFixture {
+  recommendedSprintCount: number;
+  riskLevel: RiskLevel;
+  rationale: string;
+  splitTriggers: string[];
+  whyNotFewer: string;
+  whyNotMore: string;
+  sprintProofs: string[];
+}
+
 export function runTokenAuditChecks(): CheckResult[] {
   const checks: CheckResult[] = [];
   checks.push(...checkCommandRouters());
   checks.push(...checkModeFiles());
+  checks.push(checkInitModeBudget());
+  checks.push(...checkAnalysisHelperBudgets());
+  checks.push(checkTemplateBudget('skills/sprint-forge/assets/templates/ROADMAP.md', TOKEN_BUDGET.roadmapTemplateWords, 'ROADMAP template'));
+  checks.push(checkTemplateBudget('skills/sprint-forge/assets/templates/REENTRY-PROMPTS.md', TOKEN_BUDGET.reentryTemplateWords, 'REENTRY template'));
   checks.push(checkProjectedSkills());
   checks.push(checkAgentsBlockBudget());
   checks.push(checkStartupBudget());
   checks.push(checkStatusBriefBudget());
+  checks.push(checkInitHappyPathBudget());
+  checks.push(checkSizingDecisionFixture());
   checks.push(reportHeaviestFiles());
   return checks;
 }
@@ -49,6 +78,33 @@ function checkModeFiles(): CheckResult[] {
     }
     return pass('token budget: mode file', `${file} ${weighted.words}/${TOKEN_BUDGET.modeFileWords} words`);
   });
+}
+
+function checkInitModeBudget(): CheckResult {
+  const file = 'skills/sprint-forge/assets/modes/INIT.md';
+  const weighted = weightPackageFile(file);
+  if (weighted.words > TOKEN_BUDGET.initModeWords) {
+    return warn('token budget: INIT mode', `${file} has ${weighted.words} words`, 'Keep INIT as a router; move work-type guidance into analysis helpers.');
+  }
+  return pass('token budget: INIT mode', `${weighted.words}/${TOKEN_BUDGET.initModeWords} words`);
+}
+
+function checkAnalysisHelperBudgets(): CheckResult[] {
+  return listPackageFiles('skills/sprint-forge/assets/helpers/analysis', '.md').map((file) => {
+    const weighted = weightPackageFile(file);
+    if (weighted.words > TOKEN_BUDGET.analysisHelperWords) {
+      return warn('token budget: analysis helper', `${file} has ${weighted.words} words`, 'Keep each work-type helper focused on routing, findings, and sizing signals.');
+    }
+    return pass('token budget: analysis helper', `${file} ${weighted.words}/${TOKEN_BUDGET.analysisHelperWords} words`);
+  });
+}
+
+function checkTemplateBudget(file: string, budget: number, label: string): CheckResult {
+  const weighted = weightPackageFile(file);
+  if (weighted.words > budget) {
+    return warn(`token budget: ${label}`, `${file} has ${weighted.words} words`, 'Keep templates lean; avoid copying lifecycle rules already defined in modes/helpers.');
+  }
+  return pass(`token budget: ${label}`, `${weighted.words}/${budget} words`);
 }
 
 function checkProjectedSkills(): CheckResult {
@@ -83,7 +139,7 @@ function checkAgentsBlockBudget(): CheckResult {
 
 function checkStartupBudget(): CheckResult {
   const files = ['commands/forge.md', 'skills/sprint-forge/assets/modes/SPRINT.md'];
-  const total = files.map(weightPackageFile).reduce((sum, file) => sum + file.estimatedTokens, 0);
+  const total = sumEstimatedTokens(files.map(weightPackageFile));
   if (total > TOKEN_BUDGET.startupTokens) {
     return warn('token budget: startup path', `${total}/${TOKEN_BUDGET.startupTokens} estimated tokens`, 'Reduce forge router or sprint router startup instructions.');
   }
@@ -92,11 +148,95 @@ function checkStartupBudget(): CheckResult {
 
 function checkStatusBriefBudget(): CheckResult {
   const files = ['commands/status.md'];
-  const total = files.map(weightPackageFile).reduce((sum, file) => sum + file.estimatedTokens, 0);
+  const total = sumEstimatedTokens(files.map(weightPackageFile));
   if (total > TOKEN_BUDGET.statusBriefTokens) {
     return warn('token budget: status brief path', `${total}/${TOKEN_BUDGET.statusBriefTokens} estimated tokens`, 'Keep status brief summary-first.');
   }
   return pass('token budget: status brief path', `${total}/${TOKEN_BUDGET.statusBriefTokens} estimated tokens`);
+}
+
+function checkInitHappyPathBudget(): CheckResult {
+  const baseFiles = [
+    'commands/forge.md',
+    'skills/sprint-forge/assets/modes/INIT.md',
+    'skills/sprint-forge/assets/templates/ROADMAP.md',
+    'skills/sprint-forge/assets/templates/PROJECT-README.md',
+    'skills/sprint-forge/assets/templates/REENTRY-PROMPTS.md',
+  ].map(weightPackageFile);
+  const heaviestHelper = listPackageFiles('skills/sprint-forge/assets/helpers/analysis', '.md').map(weightPackageFile).sort((a, b) => b.estimatedTokens - a.estimatedTokens)[0];
+  const files = heaviestHelper ? [...baseFiles, heaviestHelper] : baseFiles;
+  const total = sumEstimatedTokens(files);
+  if (total > TOKEN_BUDGET.initHappyPathTokens) {
+    return warn('token budget: INIT happy path', `${total}/${TOKEN_BUDGET.initHappyPathTokens} estimated tokens`, 'Reduce INIT, routed analysis helper, or scoped templates.');
+  }
+  return pass('token budget: INIT happy path', `${total}/${TOKEN_BUDGET.initHappyPathTokens} estimated tokens`);
+}
+
+function checkSizingDecisionFixture(): CheckResult {
+  const file = 'skills/sprint-forge/assets/fixtures/subcommands-and-reports.sizingDecision.json';
+  const absolutePath = resolve(PACKAGE_ROOT, file);
+  if (!existsSync(absolutePath)) {
+    return fail('sizingDecision fixture', `${file} missing`, 'Add the subcommands-and-reports regression fixture.');
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(absolutePath, 'utf-8'));
+    if (!isSizingDecisionFixture(parsed)) {
+      return fail('sizingDecision fixture', `${file} has invalid shape`, 'Keep recommendedSprintCount, splitTriggers, whyNotFewer, whyNotMore, and sprintProofs consistent.');
+    }
+    const consistencyError = validateSizingDecision(parsed);
+    if (consistencyError) {
+      return fail('sizingDecision fixture', consistencyError, 'Fix the fixture so sprint boundaries are explicit and justified.');
+    }
+    return pass('sizingDecision fixture', `subcommands-and-reports validates ${parsed.recommendedSprintCount} justified sprints`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown parse error';
+    return fail('sizingDecision fixture', `${file}: ${message}`, 'Keep the fixture as valid JSON.');
+  }
+}
+
+function validateSizingDecision(decision: SizingDecisionFixture): string | null {
+  if (decision.recommendedSprintCount !== decision.sprintProofs.length) {
+    return `recommendedSprintCount=${decision.recommendedSprintCount} but sprintProofs.length=${decision.sprintProofs.length}`;
+  }
+  if (decision.recommendedSprintCount > 1 && decision.splitTriggers.length === 0) {
+    return 'multi-sprint sizing requires non-empty splitTriggers';
+  }
+  if (decision.whyNotFewer.trim().length === 0) {
+    return 'whyNotFewer must be non-empty';
+  }
+  if (decision.whyNotMore.trim().length === 0) {
+    return 'whyNotMore must be non-empty';
+  }
+  if (decision.sprintProofs.some((proof) => proof.trim().length === 0)) {
+    return 'every planned sprint needs a non-empty proof';
+  }
+  return null;
+}
+
+function isSizingDecisionFixture(value: unknown): value is SizingDecisionFixture {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.recommendedSprintCount === 'number' &&
+    isRiskLevel(value.riskLevel) &&
+    typeof value.rationale === 'string' &&
+    isStringArray(value.splitTriggers) &&
+    typeof value.whyNotFewer === 'string' &&
+    typeof value.whyNotMore === 'string' &&
+    isStringArray(value.sprintProofs)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isRiskLevel(value: unknown): value is RiskLevel {
+  return value === RISK_LEVEL.LOW || value === RISK_LEVEL.MEDIUM || value === RISK_LEVEL.HIGH;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 function reportHeaviestFiles(): CheckResult {
@@ -147,6 +287,10 @@ function estimateTokens(words: number): number {
   return Math.ceil(words * 1.33);
 }
 
+function sumEstimatedTokens(files: WeightedFile[]): number {
+  return files.reduce((sum, file) => sum + file.estimatedTokens, 0);
+}
+
 function formatWeightedList(files: WeightedFile[]): string {
   return files.map((file) => `${file.path}=${file.words}w/~${file.estimatedTokens}t`).join(', ');
 }
@@ -157,4 +301,8 @@ function pass(name: string, detail: string): CheckResult {
 
 function warn(name: string, detail: string, remedy: string): CheckResult {
   return { status: 'warn', name, detail, remedy };
+}
+
+function fail(name: string, detail: string, remedy: string): CheckResult {
+  return { status: 'fail', name, detail, remedy };
 }

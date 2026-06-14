@@ -98,15 +98,15 @@ The `skills` declaration in frontmatter is metadata only — it does NOT auto-in
 
 1. Read `skills/sprint-forge/SKILL.md` — sprint-forge orchestration logic, critical rules, mode detection, capabilities matrix
 2. Load mode-gated assets based on the current phase:
-   - **INIT phase**: Read `skills/sprint-forge/assets/modes/INIT.md`, `skills/sprint-forge/assets/helpers/analysis-guide.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
+   - **INIT phase**: Read `skills/sprint-forge/assets/modes/INIT.md`, then exactly one routed `skills/sprint-forge/assets/helpers/analysis/{workType}.md` helper
    - **SPRINT phase**: Read `skills/sprint-forge/assets/modes/SPRINT.md`, `skills/sprint-forge/assets/helpers/sprint-generator.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`, `skills/sprint-forge/assets/helpers/reentry-generator.md`
    - **STATUS phase**: Read `skills/sprint-forge/assets/modes/STATUS.md`, `skills/sprint-forge/assets/helpers/debt-tracker.md`
 3. Load templates **on-demand** as each workflow step references them (not upfront)
 
 **Helpers** (loaded on-demand per phase):
 
-1. Read `skills/sprint-forge/assets/helpers/analyzer.md` — work type detection, analysis strategies, finding output format (INIT phase)
-2. Read `skills/sprint-forge/assets/helpers/analysis-guide.md` — detailed exploration strategies (INIT phase)
+1. Read `skills/sprint-forge/assets/helpers/analyzer.md` — work type detection when INIT cannot classify the request cheaply
+2. Read one `skills/sprint-forge/assets/helpers/analysis/{workType}.md` helper — work-type analysis and sizing signals (INIT phase)
 3. Read `skills/sprint-forge/assets/helpers/reviewer.md` — checklist tiers, validation commands, output format (SPRINT phase)
 
 **All skill paths are relative to the workflow root (the plugin installation directory).**

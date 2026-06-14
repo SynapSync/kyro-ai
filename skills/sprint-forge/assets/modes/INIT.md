@@ -1,103 +1,72 @@
-# INIT Mode — Analysis, Roadmap & Scoped State
+# INIT Mode — Lean Analysis, Roadmap & Scoped State
 
-Use INIT when a scope has no Kyro roadmap yet. INIT creates human-readable evidence plus structured routing files so future commands do not reread everything.
+Use INIT when a scope has no Kyro roadmap. Optimize for justified sprint boundaries, not fewer sprints.
 
 ## Inputs
 
 - User request and current repository path.
 - `.agents/kyro/kyro.json` if present.
-- `../helpers/analysis-guide.md` for analysis strategy.
+- One work-type helper under `../helpers/analysis/` after routing.
 - Templates only when writing their artifact.
 
 ## Step 1 — Resolve scope
 
-Determine:
-
-| Field | Rule |
-|-------|------|
-| scope | Short kebab-case work topic, not the repo name. |
-| codebasePath | Usually current working directory. |
-| outputDir | Default `.agents/kyro/scopes/{scope}/`. |
-
-If scope or output directory is ambiguous, ask once. Then create the scoped directory structure.
+Determine `scope`, `codebasePath`, and `outputDir` (`.agents/kyro/scopes/{scope}/`). If scope or output directory is ambiguous, ask once. If the output directory exists, ask whether to resume or choose a different scope.
 
 ## Step 2 — Detect work type
 
-Classify the request as audit/refactor, feature, bugfix, new project, or tech debt. If unclear, ask before analysis.
+Classify as `feature`, `bugfix`, `audit`, `refactor`, `new-project`, or `tech-debt`. Load only the matching helper:
+
+```text
+../helpers/analysis/{workType}.md
+```
 
 ## Step 3 — Analyze
 
-Use project search/read tools to inspect only what the work type requires:
-
-- Audit/refactor: broad architecture and quality scan.
-- Feature: integration points and missing behavior.
-- Bugfix: reproduce, root cause, blast radius.
-- New project: requirements and comparable patterns.
-- Tech debt: debt indicators and cleanup targets.
-
-Let evidence determine findings. Do not force a fixed category list.
+Use project search/read tools only for the detected work type. Let evidence determine findings. Do not force category counts or split work by labels alone.
 
 ## Step 4 — Write findings
 
-Write each distinct finding to `{outputDir}/findings/NN-descriptive-slug.md`.
+Write each distinct finding to `{outputDir}/findings/NN-descriptive-slug.md` with summary, severity, affected files, details, recommendation, and validation.
 
-Each finding needs summary, severity, affected files, details, and recommendations. Use `analysis-guide.md` for the detailed format.
+## Step 5 — Decide sprint sizing
 
-## Step 5 — Write roadmap
-
-Load `../templates/ROADMAP.md` only now. Write `{outputDir}/ROADMAP.md` with:
-
-- project paths
-- finding-to-sprint map
-- sprint dependencies
-- sprint title/focus/type/version target
-- suggested phases
-- sprint summary table
-
-## Step 6 — Scaffold human artifacts
-
-Load templates only when writing:
-
-- `../templates/PROJECT-README.md` → `{outputDir}/README.md`
-- `../templates/REENTRY-PROMPTS.md` → `{outputDir}/RE-ENTRY-PROMPTS.md`
-
-Create `{outputDir}/phases/` empty. Sprints are generated later.
-
-## Step 7 — Write structured routing files
-
-Create:
-
-- `{outputDir}/state.json` from `../templates/state.json`
-- `{outputDir}/index.json` from `../templates/index.json`
-- `{outputDir}/ROADMAP.summary.json` from `../templates/ROADMAP.summary.json`
-
-Initial values:
+Before writing the roadmap, produce `sizingDecision`:
 
 ```json
 {
-  "status": "planning",
-  "activeSprint": null,
-  "currentPhase": "init",
-  "nextAction": "plan_sprint"
+  "recommendedSprintCount": 1,
+  "riskLevel": "low | medium | high",
+  "rationale": "...",
+  "splitTriggers": [],
+  "whyNotFewer": "...",
+  "whyNotMore": "...",
+  "sprintProofs": []
 }
 ```
 
-Update `.agents/kyro/kyro.json` so `scopes` includes this scope and `activeScope` points to it when appropriate.
+Consistency rules: count must match planned sprints; `sprintProofs.length` must match count; every sprint needs one proof; multi-sprint plans need non-empty `splitTriggers`; `whyNotFewer` and `whyNotMore` cannot be empty.
+
+## Step 6 — Write artifacts
+
+Load templates only when writing:
+
+- `../templates/ROADMAP.md` with paths, `sizingDecision`, dependency map, sprint summary, and sprint definitions.
+- `../templates/PROJECT-README.md` for scope overview.
+- `../templates/REENTRY-PROMPTS.md` for summary-first recovery.
+
+Create `{outputDir}/phases/` empty.
+
+## Step 7 — Write structured routing files
+
+Create `state.json`, `index.json`, and `ROADMAP.summary.json`. Include `sizingDecision` in `index.json` and `ROADMAP.summary.json`. Update `.agents/kyro/kyro.json` with the scope and activeScope when appropriate.
 
 ## Output
 
-Report:
-
-- scope
-- work type
-- number of findings
-- planned sprint count
-- files created
-- next action: run `kyro-forge` to plan Sprint 1
+Report scope, work type, finding count, sprint count, sizing rationale, files created, and next action: run `kyro-forge` to plan Sprint 1.
 
 ## Rules
 
 - `kyro install` never creates scoped `state.json`; INIT does.
 - Markdown is durable evidence; JSON is the fast routing index.
-- Do not load sprint templates, debt tracker, or execution modes during INIT.
-- If the output directory already exists, ask whether to resume or choose a different scope.
+- Do not load sprint templates, debt tracker, execution modes, or unrelated analysis helpers during INIT.

@@ -5,6 +5,15 @@
   "activeSprintSummary": null,
   "openDebtCount": 0,
   "nextTask": null,
+  "sizingDecision": {
+    "recommendedSprintCount": 0,
+    "riskLevel": "low",
+    "rationale": "{sizing_rationale}",
+    "splitTriggers": [],
+    "whyNotFewer": "{why_not_fewer}",
+    "whyNotMore": "{why_not_more}",
+    "sprintProofs": []
+  },
   "relevantArtifactPaths": {
     "roadmap": ".agents/kyro/scopes/{scope}/ROADMAP.md",
     "roadmapSummary": ".agents/kyro/scopes/{scope}/ROADMAP.summary.json",
