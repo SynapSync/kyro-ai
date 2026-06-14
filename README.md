@@ -290,8 +290,8 @@ npm pack --dry-run
 Release tags publish to npm through GitHub Actions when the tag matches `package.json.version`:
 
 ```bash
-git tag v3.2.1
-git push origin v3.2.1
+git tag v3.2.2
+git push origin v3.2.2
 ```
 
 The release workflow expects the repository secret `NPM_TOKEN`.
