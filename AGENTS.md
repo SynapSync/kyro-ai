@@ -7,21 +7,21 @@ Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based p
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up)
+User Command (/kyro:forge, /kyro:status, /kyro:wrap-up)
   └── Agent (orchestrator)
-        └── Skill (sprint-forge)
+        └── Skill (core)
 ```
 
 ## Directory Structure
 
 ```
-kyro-workflow/
+kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
 ├── commands/         # 3 slash commands
-│   ├── forge.md      # /kyro-workflow:forge — full cycle with gates
-│   ├── status.md     # /kyro-workflow:status — progress and debt summary
-│   └── wrap-up.md    # /kyro-workflow:wrap-up — session closure ritual
+│   ├── forge.md      # /kyro:forge — full cycle with gates
+│   ├── status.md     # /kyro:status — progress and debt summary
+│   └── wrap-up.md    # /kyro:wrap-up — session closure ritual
 ├── skills/           # 2 skills
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
@@ -38,8 +38,8 @@ kyro-workflow/
 
 ## Key Conventions
 
-- **Rules file**: `.agents/sprint-forge/rules.md` — persistent learned rules for this project
-- **Sprint output**: `{cwd}/.agents/sprint-forge/{scope}/` — per-scope sprint documents (where `{scope}` is the work topic, e.g., `oauth-implementation`, `ui-redesign`)
+- **Rules file**: `.agents/kyro/scopes/rules.md` — persistent learned rules for this project
+- **Sprint output**: `{cwd}/.agents/kyro/scopes/{scope}/` — per-scope sprint documents (where `{scope}` is the work topic, e.g., `oauth-implementation`, `ui-redesign`)
 - **Checkpoint-per-phase**: Sprint file saved after each phase completes
 - **Debt never disappears**: Items are only closed when explicitly resolved
 - **Gates require approval**: Never proceed past a validation gate without user confirmation

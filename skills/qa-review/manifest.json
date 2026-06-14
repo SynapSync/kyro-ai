@@ -16,7 +16,7 @@
     "qa",
     "security",
     "architecture",
-    "sprint-forge",
+    "core",
     "audit",
     "planning",
     "approval"
@@ -33,9 +33,9 @@
   "file": "SKILL.md",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SynapSync/kyro-workflow"
+    "url": "https://github.com/SynapSync/kyro-ai"
   },
-  "homepage": "https://github.com/SynapSync/kyro-workflow",
+  "homepage": "https://github.com/SynapSync/kyro-ai",
   "createdAt": "2026-05-10T00:00:00Z",
   "updatedAt": "2026-05-10T00:00:00Z"
 }

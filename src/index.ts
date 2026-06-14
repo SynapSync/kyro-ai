@@ -1,7 +1,7 @@
 export const KYRO_WORKFLOW = {
-  name: 'kyro-workflow',
+  name: 'kyro-ai',
   stateModel: 'markdown',
-  artifactRoot: '.agents/sprint-forge',
+  artifactRoot: '.agents/kyro/scopes',
   commands: ['forge', 'status', 'wrap-up'],
   agents: ['orchestrator'],
   skills: ['sprint-forge', 'qa-review']

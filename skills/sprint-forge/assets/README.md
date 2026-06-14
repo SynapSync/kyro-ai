@@ -1,31 +1,52 @@
 # Kyro — Assets
 
-This directory contains the modular components of the `kyro-workflow` skill.
+Kyro assets are designed for progressive disclosure: load the router first, then only the mode/helper/template needed for the current action.
 
-## Directory Structure
-
-### modes/ (3 files)
+## modes/
 
 | File | Description |
 |------|-------------|
-| [INIT.md](modes/INIT.md) | Analysis, roadmap creation, and vault scaffolding workflow |
-| [SPRINT.md](modes/SPRINT.md) | Sprint generation and execution workflow |
-| [STATUS.md](modes/STATUS.md) | Project progress reporting workflow |
+| [INIT.md](modes/INIT.md) | Lean analysis, justified sprint sizing, roadmap, scoped state, and summaries |
+| [SPRINT.md](modes/SPRINT.md) | Lightweight sprint router |
+| [plan-sprint.md](modes/plan-sprint.md) | Generate the next sprint |
+| [execute-task.md](modes/execute-task.md) | Execute active sprint tasks |
+| [review-task.md](modes/review-task.md) | Validate task or phase quality |
+| [close-sprint.md](modes/close-sprint.md) | Retro, debt, summaries, and re-entry closeout |
+| [recover.md](modes/recover.md) | Rebuild state/summaries after interruption |
+| [STATUS.md](modes/STATUS.md) | Summary-first progress reporting |
 
-### helpers/ (4 files)
-
-| File | Description |
-|------|-------------|
-| [analysis-guide.md](helpers/analysis-guide.md) | How to analyze different project types |
-| [debt-tracker.md](helpers/debt-tracker.md) | Rules for the accumulated debt table |
-| [sprint-generator.md](helpers/sprint-generator.md) | Algorithm for generating a sprint from inputs |
-| [reentry-generator.md](helpers/reentry-generator.md) | How to generate and update re-entry prompts |
-
-### templates/ (4 files)
+## helpers/
 
 | File | Description |
 |------|-------------|
-| [ROADMAP.md](templates/ROADMAP.md) | Adaptive roadmap template |
-| [SPRINT.md](templates/SPRINT.md) | Sprint document template |
-| [PROJECT-README.md](templates/PROJECT-README.md) | Project working directory README template |
-| [REENTRY-PROMPTS.md](templates/REENTRY-PROMPTS.md) | Re-entry prompts template |
+| [analysis/feature.md](helpers/analysis/feature.md) | Feature analysis and sizing signals |
+| [analysis/bugfix.md](helpers/analysis/bugfix.md) | Bugfix analysis and sizing signals |
+| [analysis/audit.md](helpers/analysis/audit.md) | Audit analysis and sizing signals |
+| [analysis/refactor.md](helpers/analysis/refactor.md) | Refactor analysis and sizing signals |
+| [analysis/new-project.md](helpers/analysis/new-project.md) | New project analysis and sizing signals |
+| [analysis/tech-debt.md](helpers/analysis/tech-debt.md) | Tech debt analysis and sizing signals |
+| [sprint-generator.md](helpers/sprint-generator.md) | Sprint generation algorithm |
+| [debt-tracker.md](helpers/debt-tracker.md) | Accumulated debt rules |
+| [reentry-generator.md](helpers/reentry-generator.md) | Re-entry prompt updates |
+| [reviewer.md](helpers/reviewer.md) | Review classification |
+| [handoff.md](helpers/handoff.md) | Session handoff format |
+
+## templates/
+
+| File | Description |
+|------|-------------|
+| [ROADMAP.md](templates/ROADMAP.md) | Human roadmap evidence with sizingDecision |
+| [SPRINT.md](templates/SPRINT.md) | Human sprint evidence |
+| [PROJECT-README.md](templates/PROJECT-README.md) | Scope README |
+| [REENTRY-PROMPTS.md](templates/REENTRY-PROMPTS.md) | Summary-first recovery prompts |
+| [state.json](templates/state.json) | Scoped routing state |
+| [index.json](templates/index.json) | Fast agent routing index |
+| [ROADMAP.summary.json](templates/ROADMAP.summary.json) | Roadmap summary cache |
+| [SPRINT.summary.json](templates/SPRINT.summary.json) | Sprint summary cache |
+| [DEBT.summary.json](templates/DEBT.summary.json) | Debt summary cache |
+
+## fixtures/
+
+| File | Description |
+|------|-------------|
+| [subcommands-and-reports.sizingDecision.json](fixtures/subcommands-and-reports.sizingDecision.json) | Regression fixture proving 3 justified sprints can be valid |

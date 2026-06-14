@@ -1,85 +1,29 @@
 ---
-description: End-of-session closure ritual with quality check and context handoff
+description: Route Kyro session closure with minimal context loading
 argument-hint: [session notes]
 ---
 
-# /kyro-workflow:wrap-up — Session Closure Ritual
+# /kyro:wrap-up — Router
 
-Structured 5-step checklist to close the current session cleanly. Ensures no work is lost, quality is maintained, learnings are captured, and the next session has full context.
+Close the current Kyro session without loading the full lifecycle.
 
-## Execution
+## Startup
 
-> **IMPORTANT**: Before running the closure ritual:
-> 1. Read `skills/sprint-forge/assets/helpers/handoff.md` — context transfer format and checklist
-> 2. Run the orchestrator's session-end checkpoint — check uncommitted changes, sprint progress, and pending learnings
+1. Read `.agents/kyro/kyro.json`.
+2. Resolve scope and read `.agents/kyro/scopes/{scope}/state.json` plus `index.json`.
+3. Read `skills/sprint-forge/assets/helpers/handoff.md`.
+4. Load `skills/sprint-forge/assets/modes/close-sprint.md` only when a sprint milestone or retro update is required.
 
-## Session Notes: $ARGUMENTS
+## Checklist
 
-### Step 1: Changes Audit
+1. Audit workspace changes with `git status`.
+2. Run configured quality checks if available.
+3. Capture session learnings and proposed rules.
+4. Update handoff/re-entry context.
+5. Refresh `state.json`, `index.json`, and changed `*.summary.json`.
 
-Check for uncommitted or unsaved work:
+## Rules
 
-1. Run `git status` — list modified, staged, and untracked files
-2. Run `git stash list` — check for stashed work
-3. If there are uncommitted changes:
-   - Ask: "Should I commit these changes before closing?"
-   - If yes, create a descriptive commit
-   - If no, document the uncommitted state in step 4
-
-### Step 2: Quality Check
-
-Run quality gates from `config.json`:
-
-1. **Lint**: Run the project's lint command (if configured)
-2. **Typecheck**: Run the project's typecheck command (if configured)
-3. **Tests**: Run related tests (if configured)
-4. Report results — if failures exist, ask whether to fix now or defer
-
-### Step 3: Learning Capture
-
-Prompt for learnings from this session:
-
-1. Review corrections made during the session — any patterns?
-2. Review unexpected discoveries — worth capturing?
-3. For each learning, format as:
-   ```
-   [LEARN] Category: One-line rule
-   ```
-4. Learnings are proposed for `.agents/sprint-forge/rules.md` and recorded in the sprint retro after approval
-
-### Step 4: Next Session Context
-
-Generate a context note for the next session:
-
-1. **What was being worked on**: Current task/sprint, files modified
-2. **What's done**: Tasks completed this session
-3. **What's next**: Remaining tasks, next priorities
-4. **Blockers**: Any unresolved issues or decisions needed
-5. If a sprint is active, update re-entry prompts with current state
-
-### Step 5: Session Summary
-
-Display session summary:
-
-1. Inspect sprint artifacts and git history for current progress:
-   - Tasks completed this session
-   - Learnings proposed or captured
-   - Commits created this session
-2. Display summary table:
-   ```
-   Session Summary
-   ───────────────────────
-   Duration:    {time}
-   Tasks:       {completed}/{total}
-   Learnings:   {count} captured
-   Commits:     {count} this session
-   Status:      {clean/uncommitted changes}
-   ```
-3. Confirm the handoff and re-entry prompts reflect the current state
-
-### Output
-
-After completing all 5 steps:
-1. Display the summary
-2. Confirm session is ready to close
-3. Suggest running `/kyro-workflow:forge` if a sprint milestone was reached and a retrospective is needed
+- Do not load roadmap or sprint Markdown unless summaries are missing or a closure update requires the source artifact.
+- Preserve global runtime and project state paths.
+- Ask before committing, deleting, or rewriting user-owned content.

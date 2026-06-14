@@ -1,204 +1,72 @@
-# INIT Mode — Analysis, Roadmap & Scaffolding
+# INIT Mode — Lean Analysis, Roadmap & Scoped State
 
-This mode performs deep analysis of a project, generates findings, creates an adaptive roadmap, scaffolds the working directory, and generates re-entry prompts.
+Use INIT when a scope has no Kyro roadmap. Optimize for justified sprint boundaries, not fewer sprints.
 
----
+## Inputs
 
-## When This Mode Activates
+- User request and current repository path.
+- `.agents/kyro/kyro.json` if present.
+- One work-type helper under `../helpers/analysis/` after routing.
+- Templates only when writing their artifact.
 
-| EN Signals | ES Signals |
-|-----------|-----------|
-| "analyze", "audit", "start project", "create roadmap", "analyze codebase" | "analiza", "audita", "inicia proyecto", "crea roadmap", "analiza el codebase" |
+## Step 1 — Resolve scope
 
----
+Determine `scope`, `codebasePath`, and `outputDir` (`.agents/kyro/scopes/{scope}/`). If scope or output directory is ambiguous, ask once. If the output directory exists, ask whether to resume or choose a different scope.
 
-## Prerequisites
+## Step 2 — Detect work type
 
-- Access to the codebase (local path or repository)
-- No previous kyro-workflow work for this project (if resuming, use SPRINT or STATUS mode)
+Classify as `feature`, `bugfix`, `audit`, `refactor`, `new-project`, or `tech-debt`. Load only the matching helper:
 
----
-
-## Workflow
-
-### Step 1 — Detect Work Type
-
-Determine the type of work from the user's request:
-
-| Work Type | Signals |
-|-----------|---------|
-| Audit / Refactor | "analyze", "audit", "refactor", "review the codebase" |
-| New Feature | "add feature", "implement", "build" |
-| Bugfix | "fix", "broken", "error", "regression" |
-| New Project | "start from scratch", "new project", "create project" |
-| Tech Debt | "clean up", "deprecated", "reduce debt", "missing tests" |
-
-**Reference**: See [analysis-guide.md](../helpers/analysis-guide.md) for detailed guidance per work type.
-
-If the work type is ambiguous, ask the user:
-
-> "Is this an audit/refactor, a new feature, a bugfix, a new project, or tech debt cleanup?"
-
-### Step 2 — Resolve Configuration
-
-Gather or detect the following configuration:
-
-| Config | How to Resolve |
-|--------|---------------|
-| **Scope** | Ask the user. A short kebab-case name for the work topic (e.g., `oauth-implementation`, `ui-redesign`, `q2-growth`). NOT the repo name — the repo is already `{cwd}`. |
-| **Codebase Path** | The absolute path to the codebase. Usually the current working directory. |
-| **Sprint Output Dir** | `{output_kyro_dir}/sprints/` (automatic, resolved below) |
-
-**Resolve `{output_kyro_dir}`** — ask the user:
-
-> "Where should I save kyro-workflow documents for **{scope}**?
->
-> 1. **Default** (Recommended) — `.agents/sprint-forge/{scope}/`
-> 2. **Custom path** — provide your preferred directory"
-
-Set `{output_kyro_dir}` based on the choice. This path will be embedded in `README.md` and `RE-ENTRY-PROMPTS.md` — those are the only sources of truth. No other persistence needed.
-
-Confirm with the user:
-
-> **Scope**: {scope}
-> **Codebase**: `{codebase_path}`
-> **Output**: `{output_kyro_dir}`
->
-> Proceed with this configuration?
-
-### Step 3 — Deep Analysis
-
-Perform thorough analysis based on the work type. This is the most critical step.
-
-**Strategy**:
-1. Use the **Explore agent** (Task tool with subagent_type=Explore) for broad codebase exploration
-2. Use **Glob** to find files by pattern
-3. Use **Grep** to search for specific patterns
-4. Use **Read** to examine specific files in detail
-
-**Analysis depth depends on work type**:
-- **Audit/Refactor**: Explore the entire codebase. Every directory, every major file. Identify all areas of concern.
-- **New Feature**: Focus on the integration points. Understand what exists and what gaps need filling.
-- **Bugfix**: Trace the bug path. Reproduce, identify root cause, assess blast radius.
-- **New Project**: Research requirements, comparable solutions, stack decisions.
-- **Tech Debt**: Scan for debt indicators across the codebase.
-
-**Reference**: See [analysis-guide.md](../helpers/analysis-guide.md) for the complete analysis strategy.
-
-**Key Principle**: The analysis determines the structure. Do NOT start with a fixed list of categories. Let the project tell you what matters.
-
-### Step 4 — Generate Findings
-
-Write each distinct finding as a separate file:
-
-**Location**: `{output_kyro_dir}/findings/`
-
-**Naming**: `NN-descriptive-slug.md` (e.g., `01-architecture-issues.md`)
-
-**Content per file**: YAML frontmatter properties (following the template in analysis-guide.md) + Summary, severity, details with code examples, affected files, recommendations.
-
-**Number of findings**: VARIABLE. Determined entirely by what the analysis reveals:
-- Small project: 2-4 findings
-- Medium refactor: 5-8 findings
-- Major audit: 10-20+ findings
-
-**Reference**: See [analysis-guide.md](../helpers/analysis-guide.md) → Step 3 for the finding file format.
-
-### Step 5 — Create Roadmap
-
-Using the [ROADMAP.md template](../templates/ROADMAP.md), create the adaptive roadmap:
-
-1. Fill in project paths (codebase, output dir, findings, sprints)
-2. Map each finding to a suggested sprint:
-   - Finding 01 → Sprint 1 (usually, but not always)
-   - Related findings may be grouped into a single sprint
-   - Large findings may be split across multiple sprints
-3. Define sprint dependencies (which sprints must complete before others)
-4. For each sprint, define:
-   - Title and focus
-   - Source finding file(s)
-   - Version target (if applicable)
-   - Type (audit/refactor/feature/bugfix/debt)
-   - Suggested phases (2-5 phases per sprint)
-5. Fill in the Sprint Summary table
-6. Write the dependency map
-
-**Location**: `{output_kyro_dir}/ROADMAP.md`
-
-### Step 6 — Scaffold Working Directory
-
-Create the full directory structure:
-
-```
-{output_kyro_dir}/
-├── README.md              ← From PROJECT-README.md template
-├── ROADMAP.md             ← Created in Step 5
-├── RE-ENTRY-PROMPTS.md    ← Created in Step 7
-├── findings/              ← Created in Step 4
-│   ├── 01-*.md
-│   ├── 02-*.md
-│   └── ...
-└── sprints/               ← Empty directory, sprints created later
+```text
+../helpers/analysis/{workType}.md
 ```
 
-**README.md**: Use the [PROJECT-README.md template](../templates/PROJECT-README.md). Fill in the frontmatter properties with actual values, then fill in:
-- Project name, type, date
-- Description of the work
-- All absolute paths
-- Baseline metrics (if applicable)
-- Initial sprint map from the roadmap
+## Step 3 — Analyze
 
-### Step 7 — Generate Re-entry Prompts
+Use project search/read tools only for the detected work type. Let evidence determine findings. Do not force category counts or split work by labels alone.
 
-Using the [reentry-generator.md](../helpers/reentry-generator.md) helper:
+## Step 4 — Write findings
 
-1. Use the [REENTRY-PROMPTS.md template](../templates/REENTRY-PROMPTS.md)
-2. Fill in all template variables with actual values:
-   - `{scope}`, `{codebase_path}`, `{output_kyro_dir}`
-   - `{current_sprint}` = 1 (no sprints yet)
-   - Sprint 1 finding file path
-3. Generate all 4 scenario prompts with real paths
-4. Write to `{output_kyro_dir}/RE-ENTRY-PROMPTS.md`
+Write each distinct finding to `{outputDir}/findings/NN-descriptive-slug.md` with summary, severity, affected files, details, recommendation, and validation.
 
-## Output Summary
+## Step 5 — Decide sprint sizing
 
-At the end of INIT, present a summary:
+Before writing the roadmap, produce `sizingDecision`:
 
-```
-## INIT Complete
-
-**Scope**: {scope}
-**Type**: {work_type}
-**Findings**: {N} files in findings/
-**Sprints Planned**: {M} sprints in roadmap
-**Files Created**:
-  - {output_kyro_dir}/README.md
-  - {output_kyro_dir}/ROADMAP.md
-  - {output_kyro_dir}/RE-ENTRY-PROMPTS.md
-  - {output_kyro_dir}/findings/01-{slug}.md
-  - {output_kyro_dir}/findings/02-{slug}.md
-  - ...
-
-**Next Step**: Generate Sprint 1 using `/kyro-workflow` or copy the re-entry prompt from RE-ENTRY-PROMPTS.md → Scenario 1.
+```json
+{
+  "recommendedSprintCount": 1,
+  "riskLevel": "low | medium | high",
+  "rationale": "...",
+  "splitTriggers": [],
+  "whyNotFewer": "...",
+  "whyNotMore": "...",
+  "sprintProofs": []
+}
 ```
 
----
+Consistency rules: count must match planned sprints; `sprintProofs.length` must match count; every sprint needs one proof; multi-sprint plans need non-empty `splitTriggers`; `whyNotFewer` and `whyNotMore` cannot be empty.
 
-## Error Handling
+## Step 6 — Write artifacts
 
-| Error | Action |
-|-------|--------|
-| Codebase path not found | Ask user for the correct path |
-| Output directory already exists | Ask user: overwrite, use different name, or resume |
-| No meaningful findings | Inform user — the codebase may be in good shape. Generate a minimal roadmap with maintenance sprints. |
-| Analysis scope too large | Break into phases. Analyze the most critical areas first, note others as "needs deeper analysis" finding. |
+Load templates only when writing:
 
----
+- `../templates/ROADMAP.md` with paths, `sizingDecision`, dependency map, sprint summary, and sprint definitions.
+- `../templates/PROJECT-README.md` for scope overview.
+- `../templates/REENTRY-PROMPTS.md` for summary-first recovery.
 
-## References
+Create `{outputDir}/phases/` empty.
 
-- [analysis-guide.md](../helpers/analysis-guide.md) — Analysis strategy per work type
-- [ROADMAP.md template](../templates/ROADMAP.md) — Roadmap structure
-- [PROJECT-README.md template](../templates/PROJECT-README.md) — Project README structure
-- [REENTRY-PROMPTS.md template](../templates/REENTRY-PROMPTS.md) — Re-entry prompts structure
-- [reentry-generator.md](../helpers/reentry-generator.md) — How to generate re-entry prompts
+## Step 7 — Write structured routing files
+
+Create `state.json`, `index.json`, and `ROADMAP.summary.json`. Include `sizingDecision` in `index.json` and `ROADMAP.summary.json`. Update `.agents/kyro/kyro.json` with the scope and activeScope when appropriate.
+
+## Output
+
+Report scope, work type, finding count, sprint count, sizing rationale, files created, and next action: run `kyro-forge` to plan Sprint 1.
+
+## Rules
+
+- `kyro install` never creates scoped `state.json`; INIT does.
+- Markdown is durable evidence; JSON is the fast routing index.
+- Do not load sprint templates, debt tracker, execution modes, or unrelated analysis helpers during INIT.

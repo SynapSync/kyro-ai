@@ -9,12 +9,12 @@ This document describes Kyro's Command > Agent > Skill workflow architecture and
 Kyro is organized in three layers:
 
 ```
-User Command (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up)
+User Command (/kyro:forge, /kyro:status, /kyro:wrap-up)
   |
   v
 Agent (orchestrator)
   |
-  +---> Skill (sprint-forge)
+  +---> Skill (core)
   |
   +---> Skill (qa-review)
 ```
@@ -25,9 +25,9 @@ Commands are the user-facing interface. Each command is defined as a markdown fi
 
 | Command | Primary Agent | Purpose |
 |---------|--------------|---------|
-| `/kyro-workflow:forge` | orchestrator | Full cycle: Analyze, Plan, Implement, Review, Close |
-| `/kyro-workflow:status` | orchestrator | Read-only project progress and debt summary |
-| `/kyro-workflow:wrap-up` | orchestrator | End-of-session closure ritual with quality check and context handoff |
+| `/kyro:forge` | orchestrator | Full cycle: Analyze, Plan, Implement, Review, Close |
+| `/kyro:status` | orchestrator | Read-only project progress and debt summary |
+| `/kyro:wrap-up` | orchestrator | End-of-session closure ritual with quality check and context handoff |
 
 ### Agent
 
@@ -43,7 +43,7 @@ Skills provide domain knowledge that the orchestrator consumes.
 
 | Skill | Knowledge Domain |
 |-------|-----------------|
-| `sprint-forge` | Core orchestration: modes, helpers, templates, gates, re-entry prompts |
+| `core` | Core orchestration: modes, helpers, templates, gates, re-entry prompts |
 | `qa-review` | Senior QA audit, architecture validation, security review, sprint alignment |
 
 ---
@@ -54,26 +54,26 @@ Skills provide domain knowledge that the orchestrator consumes.
 USER
   |
   v
-/kyro-workflow:forge
+/kyro:forge
   |
   v
 ORCHESTRATOR
-  |-- loads .agents/sprint-forge/rules.md
+  |-- loads .agents/kyro/scopes/rules.md
   |-- reads sprint-forge skill assets
   |-- runs built-in checkpoints
   |
   v
-.agents/sprint-forge/{scope}/
+.agents/kyro/scopes/{scope}/
   |-- findings/
-  |-- sprints/
+  |-- phases/
   |-- ROADMAP.md
   |-- README.md
   |-- RE-ENTRY-PROMPTS.md
 ```
 
-### Flow for `/kyro-workflow:forge`
+### Flow for `/kyro:forge`
 
-1. **Rules Loading** - Orchestrator reads `.agents/sprint-forge/rules.md` if present.
+1. **Rules Loading** - Orchestrator reads `.agents/kyro/scopes/rules.md` if present.
 2. **Analysis** - Orchestrator explores the codebase and creates finding files.
 3. **Gate 1** - User approves analysis.
 4. **Planning** - Orchestrator generates a sprint document with phases and tasks.
@@ -86,17 +86,22 @@ ORCHESTRATOR
 
 ## Artifact Layout
 
-Kyro stores workflow state in markdown files. This keeps the workflow portable across AI coding platforms, easy to review in git, and usable without a local service.
+Kyro stores durable evidence in markdown and routing state in small JSON files. Agents read JSON first to save context, then open Markdown only when evidence or mutation is required.
 
 ```
-.agents/sprint-forge/
+.agents/kyro/scopes/
 ├── rules.md
 └── {scope}/
     ├── README.md
+    ├── state.json
+    ├── index.json
     ├── ROADMAP.md
+    ├── ROADMAP.summary.json
     ├── RE-ENTRY-PROMPTS.md
     ├── findings/
-    ├── sprints/
+    ├── phases/
+    │   ├── SPRINT-N-*.md
+    │   └── SPRINT-N-*.summary.json
     └── handoffs/
 ```
 
@@ -130,7 +135,7 @@ Kyro v2.0 is a full workflow that replaces the v1.x single-skill approach.
 v1.x: User message -> sprint-forge skill -> markdown artifacts
 
 v2.0: User command -> orchestrator
-                    -> sprint-forge / qa-review skills
+                    -> core / qa-review skills
                     -> built-in checkpoints
                     -> markdown artifacts
 ```
@@ -139,11 +144,11 @@ v2.0: User command -> orchestrator
 |-----------|------|------|
 | Type | Single skill | Full workflow with commands, one agent, skills, and checkpoints |
 | Entry point | Text triggers | Slash commands |
-| Learning | Per-project retro only | Persistent rules in `.agents/sprint-forge/rules.md` |
+| Learning | Per-project retro only | Persistent rules in `.agents/kyro/scopes/rules.md` |
 | Agent | Skill-only execution | Orchestrator |
 | Quality gates | Basic | Per-task checklist + approval gates |
 | Context transfer | Re-entry prompts | Re-entry prompts + enriched handoffs |
-| State model | Markdown artifacts | Markdown artifacts |
+| State model | Markdown artifacts | Markdown evidence + JSON routing summaries |
 
 ---
 
@@ -156,4 +161,4 @@ v2.0: User command -> orchestrator
 | Sprint workflow skill | `skills/sprint-forge/` |
 | QA review skill | `skills/qa-review/` |
 | Templates | `skills/sprint-forge/assets/templates/` |
-| Rules | `.agents/sprint-forge/rules.md` in the target project |
+| Rules | `.agents/kyro/scopes/rules.md` in the target project |

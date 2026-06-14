@@ -1,14 +1,18 @@
 {
-  "name": "kyro-workflow",
-  "version": "3.2.0",
+  "name": "kyro-ai",
+  "version": "3.2.3",
   "description": "Portable sprint workflow kit for AI coding agents, with markdown artifacts, adapter guides, and formal debt tracking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "npm run clean && tsc",
+    "build": "npm run clean && tsc && npm run build:chmod",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run build"
+    "check:links": "node scripts/check-markdown-links.mjs",
+    "check:versions": "node scripts/check-versions.mjs",
+    "check": "npm run typecheck && npm run check:versions && npm run check:links",
+    "prepublishOnly": "npm run build",
+    "build:chmod": "node scripts/make-cli-executable.mjs"
   },
   "keywords": [
     "ai-agents",
@@ -36,9 +40,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/SynapSync/kyro-workflow"
+    "url": "git+https://github.com/SynapSync/kyro-ai.git"
   },
-  "homepage": "https://synapsync.dev/cognitives/kyro-workflow",
+  "homepage": "https://synapsync.dev/cognitives/kyro-ai",
   "skills": [
     "./skills/sprint-forge",
     "./skills/qa-review"
@@ -56,13 +60,19 @@
     "commands",
     "agents",
     "skills",
+    "scripts",
     "docs",
     "rules",
     "contexts",
     "templates",
     "config.json",
+    "WORKFLOW.yaml",
     ".claude-plugin",
     "settings.example.json",
     "README.md"
-  ]
+  ],
+  "bin": {
+    "kyro": "dist/cli.js",
+    "kyro-ai": "dist/cli.js"
+  }
 }

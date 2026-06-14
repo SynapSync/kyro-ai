@@ -1,17 +1,17 @@
 # Commands Reference
 
-Kyro provides 3 slash commands. Each command maps to one or more agents and skills that handle the actual work.
+Kyro provides 3 slash commands. Each command is now a thin router: it reads structured state first, then loads only the mode/helper/template required for the current action.
 
 ---
 
-## /kyro-workflow:forge
+## /kyro:forge
 
 **Full sprint cycle: Analyze, Plan, Implement, Review, Close.**
 
 ### Syntax
 
 ```
-/kyro-workflow:forge <project path or description>
+/kyro:forge <project path or description>
 ```
 
 ### Arguments
@@ -21,39 +21,27 @@ The argument describes what to analyze or work on. It can be a path, a module na
 ### Examples
 
 ```
-/kyro-workflow:forge analyze the authentication module
-/kyro-workflow:forge audit code quality in src/api/
-/kyro-workflow:forge refactor the persistence layer
-/kyro-workflow:forge add user profile feature
-/kyro-workflow:forge fix the login timeout bug
+/kyro:forge analyze the authentication module
+/kyro:forge audit code quality in src/api/
+/kyro:forge refactor the persistence layer
+/kyro:forge add user profile feature
+/kyro:forge fix the login timeout bug
 ```
 
-### Phases and Gates
+### Routing
 
-The `/kyro-workflow:forge` command runs the complete lifecycle:
+`/kyro:forge` starts with `.agents/kyro/kyro.json`, then scoped `state.json` and `index.json` when a scope exists. It routes to exactly one mode:
 
+```text
+no roadmap       -> INIT.md
+no active sprint -> plan-sprint.md
+pending tasks    -> execute-task.md
+validation       -> review-task.md
+closeout         -> close-sprint.md
+inconsistent     -> recover.md
 ```
-[GATE 0: RULES]     Load learned rules from .agents/sprint-forge/rules.md
-        |
-[PHASE 1: ANALYZE]  Analysis phase investigates codebase (read-only)
-        |
-   GATE 1            User approves analysis and plan direction
-        |
-[PHASE 2: PLAN]     Generate sprint with phases, tasks, and estimates
-        |
-   GATE 2            User approves sprint plan
-        |
-[PHASE 3: IMPLEMENT] Execute task by task
-   |-- After each task: Review step validates (BLOCKER/WARNING/SUGGESTION)
-   |-- On failure:      Debug protocol investigates root cause
-   |-- After each phase: Checkpoint saved to disk
-        |
-   GATE 3            User approves implementation
-        |
-[PHASE 4: REVIEW]   Full sprint review + retrospective
-        |
-[PHASE 5: CLOSE]    Debt update, re-entry prompts, rule proposals
-```
+
+Gates still apply at orchestrator-defined checkpoints, but the command file does not duplicate the full lifecycle.
 
 ### Gate Options
 
@@ -67,21 +55,22 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 
 ### Orchestrator Protocols
 
-- **Analysis protocol** -- Phase 1 (codebase exploration, read-only)
-- **Review checklist** -- Phase 3 (after each task)
-- **Debug protocol** -- Phase 3 (on task failure)
-- **orchestrator** -- coordinates the full cycle
+- **Command router** -- chooses the next mode from structured state
+- **Analysis protocol** -- INIT mode, read-only exploration
+- **Review checklist** -- review-task mode and closeout
+- **Debug protocol** -- execution failure recovery
+- **orchestrator** -- coordinates gates and phase transitions
 
 ---
 
-## /kyro-workflow:status
+## /kyro:status
 
 **Project progress, sprint state, and technical debt summary.**
 
 ### Syntax
 
 ```
-/kyro-workflow:status [brief|full|debt]
+/kyro:status [brief|full|debt]
 ```
 
 ### Variants
@@ -95,9 +84,9 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 ### Examples
 
 ```
-/kyro-workflow:status                # Full report
-/kyro-workflow:status brief          # Quick progress check
-/kyro-workflow:status debt           # Focus on technical debt
+/kyro:status                # Full report
+/kyro:status brief          # Quick progress check
+/kyro:status debt           # Focus on technical debt
 ```
 
 ### Report Sections
@@ -132,7 +121,8 @@ Sprint 4: [title]
 
 ### Data Sources
 
-The status command reads all files in the output directory:
-- `README.md` for project overview
-- `ROADMAP.md` for planned sprints
-- All `sprints/SPRINT-*.md` files for progress, debt, and retro data
+The status command reads summaries first:
+- `.agents/kyro/kyro.json` for project state
+- `{scope}/state.json` and `{scope}/index.json` for routing
+- `ROADMAP.summary.json`, `SPRINT-*.summary.json`, and `DEBT.summary.json` for metrics
+- Markdown files only when summaries are missing or a full report needs evidence

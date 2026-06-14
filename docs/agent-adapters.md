@@ -1,152 +1,74 @@
 # Agent Adapters
 
-Kyro is an agent-agnostic workflow kit. Native platform behavior depends on whether the host agent supports commands, project rules, skills, or plugin manifests. The portable interface is always the same: markdown instructions plus `.agents/sprint-forge/{scope}/` artifacts.
+Kyro's adapter contract is: global runtime, global command skills, local project state. Agents should invoke Kyro through command-like skills or slash commands, not by loading the full workflow manually.
 
----
-
-## Stable Interface
-
-Treat these files and directories as Kyro's public interface:
+## Stable interface
 
 | Interface | Purpose |
 |-----------|---------|
-| `agents/orchestrator.md` | Full workflow coordinator instructions |
-| `skills/sprint-forge/SKILL.md` | Sprint planning, execution, status, debt, and re-entry workflow |
-| `skills/qa-review/SKILL.md` | Senior QA, architecture, security, and sprint alignment review |
-| `commands/*.md` | Native slash-command semantics where supported |
-| `.agents/sprint-forge/{scope}/` | Project roadmap, findings, sprints, handoffs, rules, and re-entry prompts |
+| `~/.agents/kyro/current/commands/*.md` | Thin command routers |
+| `~/.agents/kyro/current/skills/sprint-forge/` | Lazy-loaded workflow modes, helpers, templates |
+| `~/.agents/skills/kyro-*` | Global command skills discovered by compatible agents |
+| `.agents/kyro/kyro.json` | Project-level Kyro state |
+| `.agents/kyro/scopes/{scope}/` | Scope artifacts, state, summaries, roadmap, sprints |
+| root `AGENTS.md` | Small Codex/cross-agent bootstrap when the Codex adapter is installed |
 
-Platforms without slash commands should invoke these equivalent intents:
-
-| Intent | Equivalent request |
-|--------|--------------------|
-| `forge` | Analyze, plan, execute, review, and close the sprint |
-| `status` | Read artifacts and report project progress/debt |
-| `wrap-up` | Close the session and update re-entry prompts |
-
----
-
-## Generic Setup
-
-Copy or symlink Kyro into the target project:
+## Install adapters
 
 ```bash
-mkdir -p .skills .agents .agents/sprint-forge
-
-cp -r /path/to/kyro-workflow/skills/sprint-forge .skills/
-cp -r /path/to/kyro-workflow/skills/qa-review .skills/
-cp /path/to/kyro-workflow/agents/orchestrator.md .agents/
+npx kyro-ai install --scope workspace --yes
+npx kyro-ai install --agent opencode --scope workspace --yes
+npx kyro-ai install --agent codex --scope workspace --yes
 ```
 
-Use this onboarding prompt for any agent:
+Implemented adapters:
 
-```text
-Use Kyro as the workflow for this project.
+| Adapter | Behavior |
+|---------|----------|
+| `standard` | Installs global `kyro-*` command skills for compatible agents. |
+| `opencode` | Uses the same global command skill projection. |
+| `codex` | Adds global command skills plus a small Kyro block in root `AGENTS.md`. |
 
-Read these files first:
-- .agents/orchestrator.md
-- .skills/sprint-forge/SKILL.md
-- .skills/qa-review/SKILL.md
+There is intentionally no generic adapter. Root `AGENTS.md` is the standard cross-agent bootstrap.
 
-Persist workflow artifacts under:
-- .agents/sprint-forge/{scope}/
+## Command intents
 
-If native slash commands are unavailable:
-- forge = analyze/plan/execute/review/close
-- status = read artifacts and report progress/debt
-- wrap-up = close session and update re-entry prompts
-```
+| Intent | Command skill | Slash namespace |
+|--------|---------------|-----------------|
+| forge | `kyro-forge` | `/kyro:forge` |
+| status | `kyro-status` | `/kyro:status` |
+| wrap-up | `kyro-wrap-up` | `/kyro:wrap-up` |
 
----
+Each skill loads its command router first. The router then names the exact mode/helper/template needed for the current step.
 
-## Claude Code Adapter
+## Codex
 
-Claude Code has a native adapter through `.claude-plugin/`.
+Use:
 
 ```bash
-/plugin marketplace add SynapSync/kyro-workflow
-/plugin install kyro-workflow@kyro-workflow
+npx kyro-ai install --agent codex --scope workspace --yes
 ```
 
-The Claude adapter registers commands, the orchestrator agent, and skills. It is the only native adapter included in this repository today.
+Codex reads the managed root `AGENTS.md` block, discovers `~/.agents/skills/kyro-*`, and follows the router-first workflow.
 
----
+## OpenCode
 
-## Codex Adapter
-
-Codex-style agents should use Kyro as project context:
+Use:
 
 ```bash
-mkdir -p .skills .agents
-cp -r kyro-workflow/skills/sprint-forge .skills/
-cp -r kyro-workflow/skills/qa-review .skills/
-cp kyro-workflow/agents/orchestrator.md .agents/
+npx kyro-ai install --agent opencode --scope workspace --yes
 ```
 
-Prompt:
+OpenCode should invoke `kyro-forge`, `kyro-status`, and `kyro-wrap-up` from global skills. It should not copy Kyro core into the project.
 
-```text
-Read .agents/orchestrator.md and the Kyro skills in .skills/.
-Use the forge intent for this scope: {scope}.
-Persist outputs under .agents/sprint-forge/{scope}/.
-```
+## Claude
 
-Native command registration depends on the Codex environment. If slash commands are unavailable, use the manual intent names.
+Claude plugin support remains first-class through `.claude-plugin/`. The CLI adapter path complements the plugin; it does not retire it.
 
----
+## Cursor
 
-## OpenCode Adapter
+Cursor adapter automation is planned. Until then, use the standard install and root `AGENTS.md`/global skills if your Cursor setup can read them.
 
-OpenCode usage is manual unless your environment supports project-level rule files.
+## Compatibility rule
 
-```bash
-mkdir -p .skills .agents
-cp -r kyro-workflow/skills/sprint-forge .skills/
-cp -r kyro-workflow/skills/qa-review .skills/
-cp kyro-workflow/agents/orchestrator.md .agents/
-```
-
-Reference the files in the AI panel:
-
-```text
-@file .agents/orchestrator.md
-@file .skills/sprint-forge/SKILL.md
-@file .skills/qa-review/SKILL.md
-
-Run the status intent for .agents/sprint-forge/{scope}/.
-```
-
----
-
-## Cursor Adapter
-
-Cursor can use Kyro through project rules and referenced files.
-
-Recommended setup:
-
-1. Copy the Kyro files using the generic setup.
-2. Add a Cursor project rule that tells the agent to read `.agents/orchestrator.md`.
-3. Ask Cursor to persist sprint artifacts under `.agents/sprint-forge/{scope}/`.
-
-Cursor prompt:
-
-```text
-Use Kyro for this task. Read .agents/orchestrator.md and the skills under .skills/.
-Run the forge intent for {scope}. Do not create a custom planning format.
-```
-
----
-
-## Model Guidance
-
-Kyro does not route or enforce model selection.
-
-- Use the strongest available model for implementation, debugging, and architecture decisions.
-- Lighter/faster models are acceptable for read-only analysis, status reports, and documentation review.
-- When the platform supports model overrides, choose per task rather than encoding model names into Kyro artifacts.
-
----
-
-## Compatibility Rule
-
-Do not add platform-specific behavior to the core workflow unless the behavior works through markdown artifacts or is isolated in an adapter-specific directory.
+Keep platform-specific behavior in adapters. The core workflow must remain portable through command routers, scoped state, summaries, and Markdown artifacts.

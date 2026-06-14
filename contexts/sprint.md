@@ -12,7 +12,7 @@ Activated during sprint implementation. This context puts Kyro in **active execu
 
 ## When Active
 
-- `/kyro-workflow:forge` Phase 3 (Implement)
+- `/kyro:forge` Phase 3 (Implement)
 - Resuming a sprint from a checkpoint
 
 ## Behavior

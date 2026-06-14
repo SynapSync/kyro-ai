@@ -1,92 +1,34 @@
 ---
-description: Show project status, sprint progress, and technical debt summary
+description: Route Kyro status and debt reports from structured summaries first
 argument-hint: [brief|full|debt|debt-add|debt-resolve|debt-escalate]
 ---
 
-# /kyro-workflow:status — Project Status
+# /kyro:status — Router
 
-Report project progress, technical debt status, and next sprint preview from markdown artifacts.
+Report Kyro progress without loading all sprint Markdown by default.
 
-## Execution
+## Startup
 
-> **IMPORTANT**: Before generating the report, read the sprint-forge skill's STATUS mode:
-> 1. Read `skills/sprint-forge/SKILL.md` — capabilities matrix, configuration resolution
-> 2. Read `skills/sprint-forge/assets/modes/STATUS.md` — report workflow and format
-> 3. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` — debt table rules
+1. Read `.agents/kyro/kyro.json`.
+2. Resolve scope from `$ARGUMENTS`, `activeScope`, or `.agents/kyro/scopes/`.
+3. Read `.agents/kyro/scopes/{scope}/state.json` and `index.json` first.
+4. Prefer `ROADMAP.summary.json`, `SPRINT-*.summary.json`, and `DEBT.summary.json` when present. Use `sizingDecision` from summaries to explain sprint count without opening roadmap Markdown.
 
-## View: $ARGUMENTS
+## Route
 
-### Standard Report
+| Request | Load next |
+|---------|-----------|
+| `brief` or empty | Summaries only; include sprint count rationale from `sizingDecision`; open Markdown only for missing critical fields. |
+| `full` | `skills/sprint-forge/assets/modes/STATUS.md`, then summaries, then Markdown fallbacks. |
+| `debt` | `skills/sprint-forge/assets/helpers/debt-tracker.md` plus debt summary/table. |
+| `debt-add`, `debt-resolve`, `debt-escalate` | `debt-tracker.md`, then update Markdown and summaries. |
 
-1. **Locate output directory** — resolve `{output_kyro_dir}`
-2. **Read project state** — README, ROADMAP, all sprint files
-3. **Summarize state** and generate report:
+## Missing summaries
 
-```text
-══════════════════════════════════════
-KYRO — Project Status
-══════════════════════════════════════
+If a summary file is missing, fall back to the Markdown source, produce the requested report, and mention that `kyro doctor --tokens` will report the missing optimization.
 
-## Sprint Progress
-Sprint 1: ██████████ 10/10 (100%) ✓ Complete
-Sprint 2: ████████░░  8/10 ( 80%) ✓ Complete
-Sprint 3: ███████░░░  7/10 ( 70%) ~ In Progress
-Sprint 4: ░░░░░░░░░░  0/10 (  0%)   Planned
+## Rules
 
-## Technical Debt
-- Open: 4
-- In progress: 1
-- Aged: 2
-- Critical: 1
-
-## Roadmap Health
-- Sprints completed: 2/5
-- Roadmap adaptations: 1 (Sprint 3 scope reduced)
-- Carry-over tasks: 3
-
-## Next Sprint Preview
-Sprint 4: [title from roadmap]
-- Suggested phases: [count]
-- Carry-over tasks: [count]
-- Critical debt items due: [count]
-```
-
-### Variants
-
-- **brief** — Sprint progress + next sprint preview only
-- **full** — Complete report with all sections
-- **debt** — Focus on technical debt table and aged items
-
-## Debt Management
-
-The `debt-*` variants provide direct debt lifecycle actions. Read `skills/sprint-forge/assets/helpers/debt-tracker.md` before executing any of these.
-
-### debt-add
-
-Add a new debt item:
-
-```
-/kyro-workflow:status debt-add "Missing error boundary in dashboard" --origin "Sprint 3 retro" --target "Sprint 4"
-```
-
-### debt-resolve
-
-Mark a debt item as resolved:
-
-```
-/kyro-workflow:status debt-resolve 3 --sprint "Sprint 3"
-```
-
-### debt-escalate
-
-Flag aged debt items (open >3 sprints) and prompt for triage:
-- Should this become a dedicated sprint?
-- Should the priority be increased?
-- Is this still relevant or can it be closed as N/A?
-
-### Debt Rules
-
-- Debt items are never deleted — only their status changes
-- Every sprint inherits the full debt table from the previous sprint
-- Items open for >3 sprints should be escalated during status review
-- New debt discovered during execution gets added with origin "Sprint N phase"
+- Do not read every sprint file for `brief` when summaries exist.
+- Never delete debt items; only update status fields.
+- Keep `index.json` aligned with any status or debt mutation.

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "scope": "{scope}",
+  "status": "planned",
+  "summary": "{roadmap_summary}",
+  "plannedSprintCount": 0,
+  "completedSprintCount": 0,
+  "adaptationCount": 0,
+  "sizingDecision": {
+    "recommendedSprintCount": 0,
+    "riskLevel": "low",
+    "rationale": "{sizing_rationale}",
+    "splitTriggers": [],
+    "whyNotFewer": "{why_not_fewer}",
+    "whyNotMore": "{why_not_more}",
+    "sprintProofs": []
+  },
+  "nextRecommendedAction": "plan_sprint",
+  "openDecisions": [],
+  "relevantArtifactPaths": [
+    ".agents/kyro/scopes/{scope}/ROADMAP.md"
+  ],
+  "lastUpdated": "{date}"
+}

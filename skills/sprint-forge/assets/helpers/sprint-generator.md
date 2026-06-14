@@ -11,7 +11,7 @@ Every sprint generation requires these inputs:
 | Input | Source | Required |
 |-------|--------|----------|
 | Roadmap sprint section | `ROADMAP.md` → Sprint {N} definition | Yes |
-| Previous sprint | `sprints/SPRINT-{N-1}-*.md` → Retro, Recommendations, Debt table | Yes (except Sprint 1) |
+| Previous sprint | `phases/SPRINT-{N-1}-*.md` → Retro, Recommendations, Debt table | Yes (except Sprint 1) |
 | Finding file(s) | `findings/{NN}-*.md` → corresponding to this sprint's focus | Yes |
 | User overrides | Direct user instructions (priority changes, scope adjustments) | No |
 

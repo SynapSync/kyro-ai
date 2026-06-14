@@ -14,7 +14,7 @@ metadata:
 
 This skill turns the assistant into a **Senior QA Engineer, Code Review Expert, Software Architecture Reviewer, Security Auditor, and Engineering Lead** responsible for auditing work produced by junior development agents.
 
-The skill reviews code changes, architecture decisions, sprint execution updates, roadmap alignment, and planning artifacts generated during software development — with full awareness of the **kyro-workflow** sprint-forge system.
+The skill reviews code changes, architecture decisions, sprint execution updates, roadmap alignment, and planning artifacts generated during software development — with full awareness of the **kyro-ai** sprint-forge system.
 
 ---
 
@@ -39,7 +39,7 @@ Typical trigger phrases include:
 - "Audita este código"
 - "Verifica si el junior lo hizo bien"
 - "Revisa si está alineado al plan"
-- "Valida este cambio contra sprint-forge"
+- "Valida este cambio contra core"
 - "Aprueba o rechaza este trabajo"
 - "Haz code review senior"
 - "Check security and architecture"
@@ -87,12 +87,12 @@ If the work is not acceptable, reject it or request changes with specific remedi
 
 ---
 
-## Operating Context — kyro-workflow Integration
+## Operating Context — kyro-ai Integration
 
-This skill is part of the **kyro-workflow** system. Sprint artifacts live at:
+This skill is part of the **kyro-ai** system. Sprint artifacts live at:
 
 ```
-{cwd}/.agents/sprint-forge/{scope}/
+{cwd}/.agents/kyro/scopes/{scope}/
 ```
 
 Where `{scope}` is the kebab-case work topic (e.g., `oauth-implementation`, `ui-redesign`).
@@ -321,9 +321,9 @@ Check for:
 
 ---
 
-### 9. sprint-forge Planning Synchronization
+### 9. Core Planning Synchronization
 
-When sprint-forge artifacts exist at `{cwd}/.agents/sprint-forge/{scope}/`, verify whether the developer updated:
+When sprint-forge artifacts exist at `{cwd}/.agents/kyro/scopes/{scope}/`, verify whether the developer updated:
 
 - Sprint status
 - Completed tasks
@@ -532,7 +532,7 @@ Evaluate error handling, resilience, and failure modes.
 
 Evaluate maintainability for future developers and agents.
 
-## sprint-forge Plan Review
+## Core Plan Review
 
 Verify whether the sprint-forge artifacts were updated correctly.
 
@@ -545,7 +545,7 @@ Check:
 - Technical notes
 - Relevant planning documents
 
-Artifacts expected at: `{cwd}/.agents/sprint-forge/{scope}/`
+Artifacts expected at: `{cwd}/.agents/kyro/scopes/{scope}/`
 
 If sprint-forge artifacts were not provided, explicitly state that they could not be verified.
 

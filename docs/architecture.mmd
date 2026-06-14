@@ -1,13 +1,13 @@
 flowchart TD
     USER["User command"]
-    FORGE["/kyro-workflow:forge"]
-    STATUS["/kyro-workflow:status"]
-    WRAP["/kyro-workflow:wrap-up"]
+    FORGE["/kyro:forge"]
+    STATUS["/kyro:status"]
+    WRAP["/kyro:wrap-up"]
     ORCH["orchestrator agent"]
     SPRINT["sprint-forge skill"]
     QA["qa-review skill"]
-    RULES[".agents/sprint-forge/rules.md"]
-    SCOPE[".agents/sprint-forge/{scope}/ markdown artifacts"]
+    RULES[".agents/kyro/scopes/rules.md"]
+    SCOPE[".agents/kyro/scopes/{scope}/ markdown artifacts"]
 
     USER --> FORGE
     USER --> STATUS

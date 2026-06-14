@@ -1,6 +1,6 @@
 {
   "rules": {
-    "path": ".agents/sprint-forge/rules.md",
+    "path": ".agents/kyro/scopes/rules.md",
     "auto_load": true,
     "require_approval": true
   },

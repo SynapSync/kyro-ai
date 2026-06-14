@@ -66,14 +66,14 @@ Score: 72/100 (Good)
 
 ## Data Sources
 
-- Sprint files: task counts, completion status, retro data
-- Debt tables: accumulated across all sprints
-- Roadmap: planned vs actual sprint scope
+- Sprint summaries first: task counts, completion status, retro highlights
+- Debt summary or latest debt table: accumulated debt state
+- Roadmap summary first, roadmap Markdown when summary is missing
 - Rules file: estimation adjustment rules
 
 ## Calculation
 
-Read all sprint files in `{output_kyro_dir}/sprints/` and compute:
+Read `index.json` and available `*.summary.json` files first. Open sprint Markdown only for missing fields, then compute:
 
 1. Count tasks per sprint (total, completed, blocked, skipped, carry-over)
 2. Map debt items to source directories

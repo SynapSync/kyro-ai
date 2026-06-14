@@ -1,6 +1,6 @@
-name: kyro-workflow
+name: kyro-ai
 type: workflow
-version: "3.2.0"
+version: "3.2.3"
 description: >
   Portable sprint workflow kit for AI coding agents, with markdown artifacts,
   adapter guides, adaptive per-project learning, and formal validation gates.
@@ -20,11 +20,11 @@ agents:
   - orchestrator  # Full cycle coordination — analysis, review, debugging, and sprint execution
 
 skills:
-  - sprint-forge      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+  - sprint-forge  # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
   - qa-review         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 
 artifacts:
-  root: .agents/sprint-forge/    # Rules and sprint documents (per-scope)
+  root: .agents/kyro/scopes/    # Rules and sprint documents (per-scope)
 
 philosophy:
   - "Learn from every sprint, apply in the next"

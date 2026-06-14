@@ -16,11 +16,11 @@ Kyro uses one agent: the **orchestrator**. It coordinates the sprint lifecycle a
 
 **File:** `agents/orchestrator.md`
 
-The orchestrator coordinates the complete sprint lifecycle. It is the brain of `/kyro-workflow:forge`, manages gates, executes protocols, runs checkpoints, and handles sprint close.
+The orchestrator coordinates the complete sprint lifecycle. It is the brain of `/kyro:forge`, manages gates, executes protocols, runs checkpoints, and handles sprint close.
 
 ### When Triggered
 
-- `/kyro-workflow:forge` command.
+- `/kyro:forge` command.
 - Any workflow task requiring coordinated analysis, planning, implementation, or review.
 
 ### Tools
@@ -140,7 +140,7 @@ After all tasks are complete:
 6. Generate or update re-entry prompts.
 7. Update roadmap if execution changed the plan.
 8. Run the learn-capture checkpoint.
-9. Propose new rules for `.agents/sprint-forge/rules.md`.
+9. Propose new rules for `.agents/kyro/scopes/rules.md`.
 
 ---
 

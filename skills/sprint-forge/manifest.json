@@ -35,9 +35,9 @@
   "file": "SKILL.md",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SynapSync/kyro-workflow"
+    "url": "https://github.com/SynapSync/kyro-ai"
   },
-  "homepage": "https://github.com/SynapSync/kyro-workflow",
+  "homepage": "https://github.com/SynapSync/kyro-ai",
   "assets": {
     "modes": 3,
     "helpers": 4,
@@ -57,7 +57,7 @@
       "version": "2.0.0",
       "date": "2026-03-08",
       "changes": [
-        "Evolve from standalone skill to full workflow with one orchestrator agent, built-in checkpoints, slash commands (/kyro-workflow:forge, /kyro-workflow:status, /kyro-workflow:wrap-up), and per-project learning via persistent rules"
+        "Evolve from standalone skill to full workflow with one orchestrator agent, built-in checkpoints, slash commands (/kyro:forge, /kyro:status, /kyro:wrap-up), and per-project learning via persistent rules"
       ]
     },
     {
@@ -121,7 +121,7 @@
       "date": "2026-02-18",
       "changes": [
         "Replaced staging pattern with interactive path resolution — ask once before first write",
-        "Option 1: {cwd}/.agents/sprint-forge/{project-name}/ (default)",
+        "Option 1: {cwd}/.agents/kyro/scopes/{project-name}/ (default)",
         "Option 2: {user-root}/kyro/{project-name}/ (custom)",
         "Removed post-production delivery steps from INIT and SPRINT modes",
         "Added Step 0 to SPRINT and STATUS for locating {output_kyro_dir} in future sessions"
