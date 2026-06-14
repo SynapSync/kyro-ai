@@ -8,6 +8,7 @@ export function parseOptions(args: string[]): CliOptions {
   let dryRun = false;
   let yes = false;
   let help = false;
+  let tokens = false;
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -17,6 +18,8 @@ export function parseOptions(args: string[]): CliOptions {
       yes = true;
     } else if (arg === '--help' || arg === '-h') {
       help = true;
+    } else if (arg === '--tokens') {
+      tokens = true;
     } else if (arg === '--agent' || arg === '--agents') {
       const value = args[i + 1];
       if (!value) throw new Error(`${arg} requires a value`);
@@ -44,6 +47,7 @@ export function parseOptions(args: string[]): CliOptions {
     dryRun,
     yes,
     help,
+    tokens,
   };
 }
 

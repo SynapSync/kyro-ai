@@ -26,7 +26,7 @@ export function getCommandSkillPath(command: KyroCommandName): string {
 function buildCommandSkill(command: KyroCommandName): string {
   const title = command === 'wrap-up' ? 'Kyro Wrap-Up' : `Kyro ${capitalize(command)}`;
   const description = getCommandDescription(command);
-  return `---\nname: kyro-${command}\ndescription: ${description}\nlicense: Apache-2.0\nmetadata:\n  author: synapsync\n  version: "1.0"\n  scope: [root]\n---\n\n# ${title}\n\nUse this skill when the user invokes the Kyro ${command} workflow.\n\n## Execution\n\n1. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`.\n2. Read required core assets from \`${KYRO_ROOT}/\` only when the command asks for them.\n3. Persist Kyro workflow artifacts under \`${ARTIFACT_ROOT}/{scope}/\`.\n4. Do not ask the user to describe this command in natural language; this skill is the command projection for agents that discover \`.agents/skills/\`.\n\n## Source of Truth\n\nThe managed Kyro core lives in \`${KYRO_ROOT}/\`. Do not duplicate lifecycle logic in this projected skill.\n`;
+  return `---\nname: kyro-${command}\ndescription: ${description}\nlicense: Apache-2.0\nmetadata:\n  author: synapsync\n  version: "1.0"\n  scope: [root]\n---\n\n# ${title}\n\nCommand stub. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`, then load only the files that router requests.\n\nRuntime: \`${KYRO_ROOT}/\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nDo not ask the user to restate this workflow in natural language.\n`;
 }
 
 function getCommandDescription(command: KyroCommandName): string {

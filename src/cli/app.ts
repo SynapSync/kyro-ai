@@ -35,7 +35,7 @@ export async function runCli(): Promise<void> {
       install(options);
       break;
     case 'doctor':
-      doctor();
+      doctor(options);
       break;
     case 'sync':
       sync(options);

@@ -1,145 +1,63 @@
-# STATUS Mode — Project Progress Report
+# STATUS Mode — Summary-First Project Report
 
-This mode reads all project artifacts and generates a comprehensive progress report.
+This mode reports progress from structured summaries first. Markdown is the fallback evidence, not the default startup context.
 
----
+## Inputs
 
-## When This Mode Activates
+1. Read `.agents/kyro/kyro.json`.
+2. Resolve scope and read `.agents/kyro/scopes/{scope}/state.json`.
+3. Read `.agents/kyro/scopes/{scope}/index.json`.
+4. Read summary files listed in `index.json`:
+   - `ROADMAP.summary.json`
+   - active or latest `SPRINT-*.summary.json`
+   - `DEBT.summary.json` when present
+5. Open Markdown only for missing summary fields, `full` reports, or debt mutations.
 
-| EN Signals | ES Signals |
-|-----------|-----------|
-| "project status", "progress", "progress report", "technical debt", "how's the project going" | "estado del proyecto", "progreso", "reporte de progreso", "deuda técnica", "cómo va el proyecto" |
+## Report variants
 
----
+| Variant | Context policy |
+|---------|----------------|
+| `brief` or empty | Summaries only unless a required field is missing. |
+| `full` | Summaries first, then selected Markdown evidence. |
+| `debt` | Debt summary first, then latest debt table if needed. |
+| `debt-*` | Load `../helpers/debt-tracker.md`, mutate source Markdown, refresh summaries. |
 
-## Prerequisites
+## Metrics
 
-- INIT mode must have been run (README.md, ROADMAP.md, and at least one finding file exist)
-- At least one sprint should exist for meaningful metrics (but STATUS works even with zero sprints)
+Compute from summaries when available:
 
----
+| Metric | Source |
+|--------|--------|
+| Planned/completed sprints | roadmap summary + sprint summaries |
+| Task counts | sprint summaries |
+| Blocked/carry-over tasks | sprint summaries |
+| Open/resolved/deferred debt | debt summary or latest sprint summary |
+| Roadmap adaptations | roadmap summary |
+| Next action | `state.json.nextAction` and `index.json.nextTask` |
 
-## Workflow
+## Missing summaries
 
-### Step 0 — Locate Output Directory
+If a summary is missing:
 
-Before reading any files, determine `{output_kyro_dir}`:
+1. Open the corresponding Markdown source.
+2. Complete the report.
+3. Warn that this scope needs summary refresh.
+4. If mutating debt/status, write the missing summary before finishing.
 
-1. If the user's request includes an explicit path, use it
-2. Otherwise, check `{cwd}/.agents/kyro/scopes/` — if a single project directory exists, use it
-3. If multiple directories exist, ask: "Which project? Found: {list}"
-4. If none found, ask: "Where are your kyro-ai documents? (e.g. `.agents/kyro/scopes/my-project/`)"
+## Output
 
-### Step 1 — Read Project State
+For `brief`, show only:
 
-Read the following files:
+- scope and status
+- active sprint / next action
+- task progress
+- open debt count
+- next recommended command
 
-1. `{output_kyro_dir}/README.md` — Project overview and paths
-2. `{output_kyro_dir}/ROADMAP.md` — Planned sprints, dependencies, execution rules
-3. All sprint files in `{output_kyro_dir}/phases/` — Progress, debt, retros
+For `full`, include roadmap health, sprint table, debt trend, and re-entry pointer.
 
-### Step 2 — Calculate Metrics
+## Rules
 
-From the roadmap and sprint files, compute:
-
-| Metric | How to Calculate |
-|--------|-----------------|
-| **Total Planned Sprints** | Count sprints defined in ROADMAP.md |
-| **Completed Sprints** | Count sprint files with all DoD items checked |
-| **In-Progress Sprints** | Sprint files with some tasks done but DoD incomplete |
-| **Remaining Sprints** | Total - Completed - In-Progress |
-| **Total Tasks** | Sum of all tasks across all generated sprint files |
-| **Completed Tasks** | Sum of `[x]` tasks |
-| **Blocked Tasks** | Sum of `[!]` tasks |
-| **Skipped Tasks** | Sum of `[-]` tasks |
-| **Open Debt Items** | Count debt items with status `open` or `in-progress` in latest sprint |
-| **Resolved Debt Items** | Count debt items with status `resolved` in latest sprint |
-| **Deferred Debt Items** | Count debt items with status `deferred` in latest sprint |
-| **Emergent Phases** | Count of emergent phases added across all sprints |
-
-### Step 3 — Generate Report
-
-Output the report directly to the console (do NOT write to a file):
-
-```
-# {scope} — Status Report
-
-> Generated: {date}
-> Codebase: `{codebase_path}`
-> Working Dir: `{output_kyro_dir}`
-
----
-
-## Progress Overview
-
-| Metric | Value |
-|--------|-------|
-| Sprints | {completed}/{total} completed ({percentage}%) |
-| Tasks | {done}/{total} completed, {blocked} blocked, {skipped} skipped |
-| Debt | {open} open, {resolved} resolved, {deferred} deferred |
-| Emergent Phases | {count} added during execution |
-
----
-
-## Sprint Progress
-
-| Sprint | Status | Tasks | Key Deliverables |
-|--------|--------|-------|-----------------|
-| Sprint 1 | completed | 12/12 | Architecture cleanup |
-| Sprint 2 | completed | 10/14 | API surface audit |
-| Sprint 3 | in-progress | 3/8 | Component quality |
-| Sprint 4 | pending | — | Testing infrastructure |
-
----
-
-## Accumulated Technical Debt
-
-{Copy the debt table from the latest sprint file}
-
-**Debt Trend**: {Is open count growing or shrinking?}
-**Oldest Open Item**: {Item that has been open the longest}
-
----
-
-## Roadmap Health
-
-- **Adaptations Made**: {Number of times the roadmap was modified}
-- **Original Sprint Count**: {From initial INIT}
-- **Current Sprint Count**: {After adaptations}
-- **Sprints Added**: {count}
-- **Sprints Removed**: {count}
-- **Assessment**: {Is the roadmap still serving the project well?}
-
----
-
-## Next Sprint Preview
-
-**Sprint {N}**: {title}
-- Focus: {focus}
-- Source: `findings/{finding_file}`
-- Dependencies: {which sprints must complete first}
-- Carry-over: {count} recommendations from Sprint {N-1}
-
----
-
-## Re-entry Prompt
-
-{The appropriate re-entry prompt for the next action — usually Scenario 2 or 3 from RE-ENTRY-PROMPTS.md}
-```
-
----
-
-## Edge Cases
-
-| Situation | Handling |
-|-----------|---------|
-| No sprints generated yet | Show INIT results only (findings count, roadmap overview). Suggest generating Sprint 1. |
-| All sprints complete | Show final metrics. Highlight any remaining open debt. Suggest project closure or maintenance phase. |
-| Sprint in progress | Show current sprint progress. Highlight blocked tasks. Suggest resuming execution. |
-| No debt items | Note that no technical debt has been logged. This could mean the project is clean or debt isn't being tracked. |
-
----
-
-## References
-
-- [debt-tracker.md](../helpers/debt-tracker.md) — Debt table format and reporting rules
+- Do not read every sprint Markdown file when summaries exist.
+- Debt items are never deleted.
+- Keep `index.json` aligned with any report mutation.

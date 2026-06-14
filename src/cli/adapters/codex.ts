@@ -1,4 +1,4 @@
-import { AGENT, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
+import { AGENT, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, KYRO_ROOT } from '../constants';
 import { hasManagedBlock } from '../fs';
 import { addCommandSkillProjection, buildCommandSkillManagedFiles } from './command-skills';
 import { checkCommandProjection } from './standard';
@@ -50,5 +50,5 @@ export const codexAdapter: AdapterDefinition = {
 };
 
 function buildAgentsBlock(): string {
-  return `## Kyro AI\n\nKyro is installed in this workspace.\n\n### Rules\n\n- Prefer installed Kyro command skills from \`${AGENT_SKILLS_ROOT}/\` when invoking Kyro workflows.\n- Read command definitions from \`${KYRO_COMMANDS_ROOT}/\` only when a Kyro command skill asks for them.\n- Persist workflow artifacts under \`${ARTIFACT_ROOT}/{scope}/\`.\n- Do not ask users to describe Kyro workflows in natural language when an installed command or skill exists.\n- Preserve all non-Kyro content in this AGENTS.md file. Kyro owns only this marked block.\n\n### Core\n\nThe managed Kyro core lives in \`${KYRO_ROOT}/\`.\n`;
+  return `## Kyro AI\n\nUse installed Kyro command skills: \`kyro-forge\`, \`kyro-status\`, \`kyro-wrap-up\`.\n\nRuntime: \`${KYRO_ROOT}/\`\nProject state: \`.agents/kyro/kyro.json\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\nSkills: \`${AGENT_SKILLS_ROOT}/kyro-*\`\n\nLoad command routers only when a Kyro skill is invoked. Do not load full Kyro docs unless the router asks for them. Preserve non-Kyro content; Kyro owns only this marked block.\n`;
 }

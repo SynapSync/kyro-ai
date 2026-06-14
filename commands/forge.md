@@ -1,55 +1,33 @@
 ---
-description: Full sprint cycle — Analyze → Plan → Implement → Review → Commit
-argument-hint: <project path or description>
+description: Route the Kyro forge workflow with progressive disclosure
+argument-hint: <scope or request>
 ---
 
-# /kyro:forge — Complete Kyro Cycle
+# /kyro:forge — Router
 
-Execute the full sprint lifecycle with validation gates between each phase.
+Use this command to continue Kyro work without loading the whole workflow upfront.
 
-## Execution
+## Startup
 
-> **IMPORTANT**: This command delegates to the `orchestrator` agent.
-> Do not execute phases directly — the orchestrator handles all delegation,
-> skill loading, and validation gates.
->
-> **The orchestrator is the single source of truth for the lifecycle.**
-> See `agents/orchestrator.md` for the full detailed protocol.
+1. Read `.agents/kyro/kyro.json` if it exists.
+2. Resolve the active scope from `$ARGUMENTS`, `activeScope`, or the only directory under `.agents/kyro/scopes/`.
+3. For a resolved scope, read `.agents/kyro/scopes/{scope}/state.json` first, then `.agents/kyro/scopes/{scope}/index.json` if present.
+4. Do not read ROADMAP, sprint Markdown, templates, or helper files until the selected route requires them.
 
-## Target: $ARGUMENTS
+## Route
 
-## Lifecycle Summary (Gates Contract)
-
-The orchestrator follows this sequence. Approval gates are enforced at the orchestrator-defined checkpoints.
-
-### Phase 0: Detect Project State
-
-Check if a ROADMAP exists to choose between INIT and SPRINT flow.
-
-### INIT Flow (no ROADMAP)
-
-- **Phase 1**: Analyze (INIT mode) — codebase exploration, findings, roadmap creation
-  - GATE 1: Approve INIT summary
-- **Phase 2**: First Sprint — generate Sprint 1 from roadmap
-  - GATE 2: Approve sprint plan
-
-### SPRINT Flow (ROADMAP exists)
-
-- **Phase 3**: Generate Next Sprint — read roadmap, retro, and debt; build sprint
-  - GATE 3: Approve sprint plan
-
-### Both Flows Converge
-
-- **Phase 4**: Implement — task by task execution with review and debug protocols
-  - GATE 4: Approve implementation
-- **Phase 5**: Review & Close — quality gates, retro, debt update, rule proposals
-
-### Learning Capture
-
-Review corrections and propose new rules for `.agents/kyro/scopes/rules.md`.
+| Condition | Load next |
+|-----------|-----------|
+| No project state | Create or validate `.agents/kyro/kyro.json`, then continue routing. |
+| No scope or no roadmap | `skills/sprint-forge/assets/modes/INIT.md` |
+| Roadmap exists and no active sprint | `skills/sprint-forge/assets/modes/plan-sprint.md` |
+| Active sprint has pending tasks | `skills/sprint-forge/assets/modes/execute-task.md` |
+| Active sprint needs quality validation | `skills/sprint-forge/assets/modes/review-task.md` |
+| Sprint/session is ready to close | `skills/sprint-forge/assets/modes/close-sprint.md` |
+| State is inconsistent or interrupted | `skills/sprint-forge/assets/modes/recover.md` |
 
 ## Rules
 
-- Never skip phases or gates. The sequence is non-negotiable.
-- Never proceed past a gate without explicit user approval.
-- See `agents/orchestrator.md` for full gate protocol, checkpoints, validation, and failure recovery.
+- Load only the routed mode plus the helpers named by that mode.
+- Enforce orchestrator gates from `agents/orchestrator.md` only at gate moments.
+- Update `state.json`, `index.json`, and relevant `*.summary.json` after each phase checkpoint.

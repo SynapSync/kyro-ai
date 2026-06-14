@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "scope": "{scope}",
+  "status": "planning",
+  "activeSprint": null,
+  "currentPhase": "init",
+  "nextAction": "plan_sprint",
+  "roadmapPath": ".agents/kyro/scopes/{scope}/ROADMAP.md",
+  "sprintsPath": ".agents/kyro/scopes/{scope}/phases",
+  "lastUpdated": "{date}"
+}

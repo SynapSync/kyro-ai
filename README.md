@@ -194,19 +194,16 @@ Kyro has three stable workflow intents:
 | Status  | `kyro-status` / `/kyro:status`   | Report project progress, roadmap health, and technical debt     |
 | Wrap-up | `kyro-wrap-up` / `/kyro:wrap-up` | Close a session, update handoff context, and preserve learnings |
 
-Forge follows this lifecycle:
+Forge is routed progressively:
 
 ```text
-Detect project state
-  → analyze codebase or scope
-  → build/update roadmap
-  → generate the next sprint
-  → implement task by task
-  → review quality and debt
-  → write retro, handoff, and re-entry context
+read kyro.json/state.json/index.json
+  → choose INIT, plan, execute, review, close, or recover
+  → load only the selected mode/helper/template
+  → update Markdown evidence plus JSON summaries
 ```
 
-Kyro is intentionally sprint-by-sprint. It should not pre-generate a huge static plan and pretend reality will follow it.
+Kyro is intentionally sprint-by-sprint and summary-first. It should not pre-load every roadmap, sprint, helper, and template just to decide the next action.
 
 ---
 

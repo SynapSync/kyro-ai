@@ -86,17 +86,22 @@ ORCHESTRATOR
 
 ## Artifact Layout
 
-Kyro stores workflow state in markdown files. This keeps the workflow portable across AI coding platforms, easy to review in git, and usable without a local service.
+Kyro stores durable evidence in markdown and routing state in small JSON files. Agents read JSON first to save context, then open Markdown only when evidence or mutation is required.
 
 ```
 .agents/kyro/scopes/
 ├── rules.md
 └── {scope}/
     ├── README.md
+    ├── state.json
+    ├── index.json
     ├── ROADMAP.md
+    ├── ROADMAP.summary.json
     ├── RE-ENTRY-PROMPTS.md
     ├── findings/
     ├── phases/
+    │   ├── SPRINT-N-*.md
+    │   └── SPRINT-N-*.summary.json
     └── handoffs/
 ```
 
@@ -143,7 +148,7 @@ v2.0: User command -> orchestrator
 | Agent | Skill-only execution | Orchestrator |
 | Quality gates | Basic | Per-task checklist + approval gates |
 | Context transfer | Re-entry prompts | Re-entry prompts + enriched handoffs |
-| State model | Markdown artifacts | Markdown artifacts |
+| State model | Markdown artifacts | Markdown evidence + JSON routing summaries |
 
 ---
 
