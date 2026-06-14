@@ -12,13 +12,13 @@ Report Kyro progress without loading all sprint Markdown by default.
 1. Read `.agents/kyro/kyro.json`.
 2. Resolve scope from `$ARGUMENTS`, `activeScope`, or `.agents/kyro/scopes/`.
 3. Read `.agents/kyro/scopes/{scope}/state.json` and `index.json` first.
-4. Prefer `ROADMAP.summary.json`, `SPRINT-*.summary.json`, and `DEBT.summary.json` when present.
+4. Prefer `ROADMAP.summary.json`, `SPRINT-*.summary.json`, and `DEBT.summary.json` when present. Use `sizingDecision` from summaries to explain sprint count without opening roadmap Markdown.
 
 ## Route
 
 | Request | Load next |
 |---------|-----------|
-| `brief` or empty | Summaries only; open Markdown only for missing critical fields. |
+| `brief` or empty | Summaries only; include sprint count rationale from `sizingDecision`; open Markdown only for missing critical fields. |
 | `full` | `skills/sprint-forge/assets/modes/STATUS.md`, then summaries, then Markdown fallbacks. |
 | `debt` | `skills/sprint-forge/assets/helpers/debt-tracker.md` plus debt summary/table. |
 | `debt-add`, `debt-resolve`, `debt-escalate` | `debt-tracker.md`, then update Markdown and summaries. |

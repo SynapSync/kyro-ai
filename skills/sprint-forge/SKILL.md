@@ -149,9 +149,9 @@ After detecting the mode, read ONLY the assets listed for that mode. Do NOT read
 
 | Mode | Read These Assets | Do NOT Read |
 |------|-------------------|-------------|
-| **INIT** | `INIT.md`, `analysis-guide.md`, `reentry-generator.md` | SPRINT.md, STATUS.md, sprint-generator.md, debt-tracker.md |
+| **INIT** | `INIT.md`, then one routed `helpers/analysis/{workType}.md` helper | SPRINT.md, STATUS.md, sprint-generator.md, debt-tracker.md, unrelated analysis helpers |
 | **SPRINT** | `SPRINT.md`, then exactly one routed mode: `plan-sprint.md`, `execute-task.md`, `review-task.md`, `close-sprint.md`, or `recover.md` | INIT.md, STATUS.md, unrelated modes/helpers/templates |
-| **STATUS** | `STATUS.md`, `debt-tracker.md` | INIT.md, SPRINT.md, analysis-guide.md, sprint-generator.md, reentry-generator.md, all templates |
+| **STATUS** | `STATUS.md`, `debt-tracker.md` | INIT.md, SPRINT.md, analysis helpers, sprint-generator.md, reentry-generator.md, all templates |
 
 **On-demand assets**: Templates are loaded as each workflow step references them, not upfront.
 

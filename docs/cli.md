@@ -126,9 +126,14 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - projected command skill <= 200 words
 - command router <= 500 words
 - mode file <= 900 words
-- startup/status brief paths stay under their estimated token budgets
+- INIT mode <= 500 words
+- each analysis helper <= 450 words
+- ROADMAP template <= 450 words
+- REENTRY template <= 350 words
+- startup, status brief, and INIT happy paths stay under their estimated token budgets
+- `sizingDecision` regression fixture stays internally consistent
 
-Warnings mean Kyro still works, but the harness is becoming expensive to load.
+Warnings mean Kyro still works, but the harness is becoming expensive to load. Failing sizing checks mean INIT can no longer prove its sprint boundaries.
 
 ## Sync Semantics
 

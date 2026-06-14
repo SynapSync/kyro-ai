@@ -1,0 +1,17 @@
+{
+  "recommendedSprintCount": 3,
+  "riskLevel": "medium",
+  "rationale": "The work has a dependency chain: CLI subcommands first, metadata reading second, removal reporting third.",
+  "splitTriggers": [
+    "public CLI behavior change",
+    "shared metadata reader dependency",
+    "cleanup reporting depends on metadata reading"
+  ],
+  "whyNotFewer": "Combining all changes would mix CLI refactor, metadata parsing, formatting, and reporting behavior in one review unit.",
+  "whyNotMore": "No additional subsystem boundaries or migrations were found.",
+  "sprintProofs": [
+    "Sprint 1 proves CLI subcommand architecture without changing metadata behavior.",
+    "Sprint 2 proves metadata reading and formatting independently.",
+    "Sprint 3 proves cleanup reporting built on metadata reading."
+  ]
+}

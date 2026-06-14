@@ -27,45 +27,16 @@ related:
 > Created: {date}
 > Codebase: `{codebase_path}`
 
----
+This directory stores Kyro artifacts for `{scope}`. Use structured summaries first; open Markdown only when a router needs durable evidence.
 
-## What Is This
+## Quick Resume
 
-This directory contains the working artifacts for {description_of_work}. It is managed by the `kyro-ai` skill and follows an adaptive sprint workflow.
+1. Read `state.json`.
+2. Read `index.json`.
+3. Read `ROADMAP.summary.json`.
+4. Run `kyro-forge`, `kyro-status`, or `kyro-wrap-up`.
 
----
-
-## For AI Agents — Mandatory Reading Order
-
-If you are an AI agent resuming work on this project, read these files in order:
-
-1. **This README** — You are here. Understand the project structure.
-2. **ROADMAP.md** — The adaptive roadmap with all planned sprints and execution rules.
-3. **Last completed sprint** — The most recent sprint file in `phases/`. Read its retro, recommendations, and debt table.
-4. **RE-ENTRY-PROMPTS.md** — Pre-written prompts for common actions. Copy the appropriate one.
-
----
-
-## Directory Structure
-
-```
-{output_kyro_dir}/
-├── README.md              ← This file
-├── ROADMAP.md             ← Adaptive roadmap (living document)
-├── RE-ENTRY-PROMPTS.md    ← Context recovery prompts
-├── findings/              ← Analysis findings (one file per area)
-│   ├── 01-{slug}.md
-│   ├── 02-{slug}.md
-│   └── ...
-└── phases/               ← Sprint documents (generated one at a time)
-    ├── SPRINT-1-{slug}.md
-    ├── SPRINT-2-{slug}.md
-    └── ...
-```
-
----
-
-## Absolute Paths
+## Paths
 
 | Resource | Path |
 |----------|------|
@@ -74,34 +45,19 @@ If you are an AI agent resuming work on this project, read these files in order:
 | Findings | `{output_kyro_dir}/findings/` |
 | Sprints | `{output_kyro_dir}/phases/` |
 | Roadmap | `{output_kyro_dir}/ROADMAP.md` |
-| Re-entry Prompts | `{output_kyro_dir}/RE-ENTRY-PROMPTS.md` |
+| Re-entry | `{output_kyro_dir}/RE-ENTRY-PROMPTS.md` |
 
----
-
-## Sprint System Rules
-
-1. Sprints are generated **one at a time** — never pre-generated
-2. Each sprint feeds from the previous sprint's retro and recommendations
-3. The accumulated debt table passes from sprint to sprint, never losing items
-4. The roadmap adapts based on what execution reveals
-5. Re-entry prompts are updated after each sprint for context persistence
-
----
-
-## Current State — Baseline
-
-<!-- Filled during INIT with baseline metrics -->
+## Current State
 
 | Metric | Value |
 |--------|-------|
-| {metric_name} | {metric_value} |
-
----
+| Work type | {work_type} |
+| Planned sprints | {planned_sprint_count} |
+| Active sprint | {active_sprint} |
+| Next action | {next_action} |
 
 ## Sprint Map
 
-<!-- Updated as sprints are completed -->
-
-| Sprint | Status | Focus | Key Deliverables |
-|--------|--------|-------|-----------------|
-| 1 | {status} | {focus} | {deliverables} |
+| Sprint | Status | Focus | Proof |
+|--------|--------|-------|-------|
+| 1 | {status} | {focus} | {sprint_proof} |
