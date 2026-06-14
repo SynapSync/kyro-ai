@@ -38,7 +38,7 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task
 
 This skill uses a modular assets architecture. Detailed workflows, helpers, and templates are in the [assets/](assets/) directory:
 
-- **[assets/modes/](assets/modes/)** — INIT, SPRINT, and STATUS mode workflows
+- **[assets/modes/](assets/modes/)** — lightweight routers plus focused INIT, planning, execution, review, close, recover, and STATUS workflows
 - **[assets/helpers/](assets/helpers/)** — Analysis guide, debt tracker, sprint generator, re-entry generator
 - **[assets/templates/](assets/templates/)** — Roadmap, sprint, project README, and re-entry prompt templates
 
@@ -54,7 +54,7 @@ Kyro is an **adaptive sprint workflow** skill designed for iterative project exe
 - **Generates sprints one at a time** — each sprint feeds from the previous one's retro, recommendations, and accumulated debt
 - **Tracks debt formally** — an accumulated debt table that persists across sprints and never loses items
 - **Adapts the roadmap** — the plan evolves based on what execution reveals
-- **Persists context** — re-entry prompts allow a new agent (or new session) to recover full context
+- **Persists context cheaply** — `state.json`, `index.json`, summaries, and re-entry prompts let new agents recover without rereading every Markdown file
 
 This skill works for **any** project type, language, or framework.
 
@@ -88,7 +88,7 @@ This skill works for **any** project type, language, or framework.
 
 > **RULE 7 — CONTEXT PERSISTENCE**
 >
-> After INIT and after each executed sprint, re-entry prompts are updated. These prompts allow any agent in any session to recover full project context and continue seamlessly.
+> After INIT and after each executed sprint, update `state.json`, `index.json`, relevant `*.summary.json`, and re-entry prompts. Agents read structured state before opening long Markdown evidence.
 
 ---
 
@@ -100,6 +100,7 @@ This skill works for **any** project type, language, or framework.
 | Create vault structure | Yes | No | No |
 | Generate roadmap | Yes | No | No |
 | Generate/update re-entry prompts | Yes | Yes | No |
+| Update state/index/summaries | Yes | Yes | Yes |
 | Generate sprint | No | Yes | No |
 | Execute sprint tasks | No | Yes | No |
 | Write/modify code | No | Yes | No |
@@ -120,7 +121,7 @@ This skill works for **any** project type, language, or framework.
 2. **INIT (first time)** — Ask the user where to save documents. Store the chosen path in `README.md` and `RE-ENTRY-PROMPTS.md`. These are the only sources of truth.
 3. **SPRINT/STATUS without re-entry prompt** — Auto-discover by scanning `.agents/kyro/scopes/` in `{cwd}`, or ask the user directly.
 
-No AGENTS.md. No branded blocks. The re-entry prompts and README carry the path across sessions.
+The project state lives in `.agents/kyro/kyro.json`; scoped state lives in `.agents/kyro/scopes/{scope}/state.json` and `index.json`. Re-entry prompts and README remain human handoff aids, not startup requirements.
 
 ### Frontmatter Properties
 
@@ -149,7 +150,7 @@ After detecting the mode, read ONLY the assets listed for that mode. Do NOT read
 | Mode | Read These Assets | Do NOT Read |
 |------|-------------------|-------------|
 | **INIT** | `INIT.md`, `analysis-guide.md`, `reentry-generator.md` | SPRINT.md, STATUS.md, sprint-generator.md, debt-tracker.md |
-| **SPRINT** | `SPRINT.md`, `sprint-generator.md`, `debt-tracker.md`, `reentry-generator.md` | INIT.md, STATUS.md, analysis-guide.md |
+| **SPRINT** | `SPRINT.md`, then exactly one routed mode: `plan-sprint.md`, `execute-task.md`, `review-task.md`, `close-sprint.md`, or `recover.md` | INIT.md, STATUS.md, unrelated modes/helpers/templates |
 | **STATUS** | `STATUS.md`, `debt-tracker.md` | INIT.md, SPRINT.md, analysis-guide.md, sprint-generator.md, reentry-generator.md, all templates |
 
 **On-demand assets**: Templates are loaded as each workflow step references them, not upfront.
@@ -184,9 +185,9 @@ Or to generate and immediately execute:
 Generate and execute the next sprint.
 ```
 
-This will: read the roadmap and previous sprint, build the disposition table, generate phases, and optionally execute task by task.
+This will: read structured state first, route to planning or execution, and load only the mode/helper files needed for the current step.
 
-**Full workflow:** See [assets/modes/SPRINT.md](assets/modes/SPRINT.md)
+**Router:** See [assets/modes/SPRINT.md](assets/modes/SPRINT.md)
 
 ### STATUS Mode
 
@@ -196,7 +197,7 @@ Use to check project progress:
 Show me the project status and technical debt.
 ```
 
-This will: read all sprints, calculate metrics, display progress and accumulated debt.
+This will: read summaries first, calculate metrics, and open Markdown only when summaries are missing or a full report requires evidence.
 
 **Full workflow:** See [assets/modes/STATUS.md](assets/modes/STATUS.md)
 

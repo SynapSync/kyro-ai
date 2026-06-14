@@ -1,82 +1,50 @@
 # Codex Adapter Guide
 
-This guide describes manual Kyro usage with Codex-style agents. Native command or skill registration depends on the specific Codex environment; Kyro compatibility comes from referencing portable markdown files.
-
----
+Codex should use the installed Kyro command skills and root `AGENTS.md` bootstrap. Do not load the whole runtime manually.
 
 ## Setup
 
 ```bash
-mkdir -p .skills .agents .agents/kyro/scopes
-
-cp -r kyro-ai/skills/sprint-forge .skills/
-cp -r kyro-ai/skills/qa-review .skills/
-cp kyro-ai/agents/orchestrator.md .agents/
+npx kyro-ai install --agent codex --scope workspace --yes
 ```
 
----
+This installs:
 
-## Onboarding Prompt
+- global runtime: `~/.agents/kyro/current/`
+- global command skills: `~/.agents/skills/kyro-*`
+- project state: `.agents/kyro/kyro.json`
+- a small Kyro managed block in root `AGENTS.md`
+
+## Usage
+
+Invoke the command-like skills:
+
+- `kyro-forge` — route analyze/plan/execute/review/close
+- `kyro-status` — summary-first progress and debt report
+- `kyro-wrap-up` — close session and refresh handoff context
+
+The skills read command routers from `~/.agents/kyro/current/commands/` and then load only the routed mode/helper/template.
+
+## Artifacts
+
+Persist scope artifacts under:
 
 ```text
-Use Kyro for this project.
-
-Read:
-- .agents/orchestrator.md
-- .skills/sprint-forge/SKILL.md
-- .skills/qa-review/SKILL.md
-
-Persist workflow artifacts under .agents/kyro/scopes/{scope}/.
-If slash commands are unavailable, use these intents:
-- forge = analyze/plan/execute/review/close
-- status = read artifacts and report progress/debt
-- wrap-up = close the session and update re-entry prompts
+.agents/kyro/scopes/{scope}/
+├── state.json
+├── index.json
+├── ROADMAP.md
+├── ROADMAP.summary.json
+└── phases/
+    ├── SPRINT-N-*.md
+    └── SPRINT-N-*.summary.json
 ```
 
----
+Markdown is human evidence. JSON files are the fast routing index.
 
-## Common Flows
+## Verify
 
-### Review
-
-```text
-@file .skills/qa-review/SKILL.md
-
-Review this change and return APPROVED, APPROVED WITH NOTES,
-CHANGES REQUIRED, or REJECTED.
-
-Context:
-- Scope: {scope}
-- Sprint artifacts: .agents/kyro/scopes/{scope}/
+```bash
+kyro doctor
+kyro doctor --tokens
 ```
-
-### Forge
-
-```text
-@file .agents/orchestrator.md
-@file .skills/sprint-forge/SKILL.md
-@file .skills/qa-review/SKILL.md
-
-Run the forge intent for {scope}.
-Use .agents/kyro/scopes/{scope}/ for findings, roadmap, phases,
-handoffs, and re-entry prompts.
-```
-
-### Status
-
-```text
-@file .skills/sprint-forge/SKILL.md
-
-Run the status intent for .agents/kyro/scopes/{scope}/.
-Report sprint progress, open debt, aged debt, blockers, and next action.
-```
-
----
-
-## Limitations
-
-- Codex environments may not register Kyro slash commands automatically.
-- Artifact persistence depends on the agent writing files correctly.
-- Learned rules work through `.agents/kyro/scopes/rules.md`, not through a runtime service.
-
-For generic setup and Cursor/OpenCode notes, see [Agent Adapters](agent-adapters.md).

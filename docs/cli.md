@@ -8,6 +8,7 @@ Kyro includes a small CLI for installing workspace harness assets, projecting co
 kyro                    # Open the interactive TUI
 kyro install            # Install standard .agents assets by default
 kyro doctor             # Read-only package/workspace health check
+kyro doctor --tokens    # Audit context/token budgets
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
@@ -49,8 +50,12 @@ The project keeps only state and artifacts:
 └── scopes/
     └── {scope}/
         ├── state.json
+        ├── index.json
         ├── ROADMAP.md
+        ├── ROADMAP.summary.json
         └── phases/
+            ├── SPRINT-N-*.md
+            └── SPRINT-N-*.summary.json
 ```
 
 ## Adapters
@@ -96,7 +101,7 @@ Each projected skill references the managed Kyro runtime in `~/.agents/kyro/curr
 .agents/kyro/kyro.json
 ```
 
-It does not create scoped state. Scoped state is created later when a scope is created or opened by a future scope/forge workflow.
+It does not create scoped state. Scoped state, indexes, and summaries are created later when a scope is created or opened by forge/INIT.
 
 Initial state shape:
 
@@ -111,6 +116,19 @@ Initial state shape:
   "installedAdapters": []
 }
 ```
+
+
+## Token Audit
+
+Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
+
+- AGENTS Kyro block <= 150 words
+- projected command skill <= 200 words
+- command router <= 500 words
+- mode file <= 900 words
+- startup/status brief paths stay under their estimated token budgets
+
+Warnings mean Kyro still works, but the harness is becoming expensive to load.
 
 ## Sync Semantics
 

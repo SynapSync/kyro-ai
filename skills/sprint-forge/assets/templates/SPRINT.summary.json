@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scope": "{scope}",
+  "sprint": "SPRINT-{N}",
+  "status": "planned",
+  "completedTasks": 0,
+  "blockedTasks": 0,
+  "carryOverTasks": 0,
+  "nextRecommendedAction": "execute_task",
+  "nextTask": "{task_id}",
+  "openDecisions": [],
+  "filesTouched": [],
+  "debtDeltas": [],
+  "sourceMarkdown": ".agents/kyro/scopes/{scope}/phases/SPRINT-{N}-{slug}.md",
+  "lastUpdated": "{date}"
+}

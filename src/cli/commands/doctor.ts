@@ -5,10 +5,11 @@ import { managedPathExists, readJsonFromPackage, readPackageText, workspaceFileE
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
 import { getAdapterDefinition } from '../adapters/registry';
-import type { Agent, CheckResult } from '../types';
+import { runTokenAuditChecks } from './token-audit';
+import type { Agent, CheckResult, CliOptions } from '../types';
 
-export function doctor(): void {
-  const checks = runDoctorChecks();
+export function doctor(options?: Pick<CliOptions, 'tokens'>): void {
+  const checks = runDoctorChecks(options?.tokens ?? false);
   let failed = false;
 
   for (const check of checks) {
@@ -21,8 +22,8 @@ export function doctor(): void {
   if (failed) process.exit(1);
 }
 
-function runDoctorChecks(): CheckResult[] {
-  return [
+function runDoctorChecks(includeTokenAudit: boolean): CheckResult[] {
+  const checks = [
     checkPackageVersionSync(),
     checkPackageAssets(),
     checkClaudePlugin(),
@@ -30,6 +31,9 @@ function runDoctorChecks(): CheckResult[] {
     checkGlobalRuntime(),
     ...checkAdapterProjections(),
   ];
+
+  if (includeTokenAudit) checks.push(...runTokenAuditChecks());
+  return checks;
 }
 
 function checkPackageVersionSync(): CheckResult {

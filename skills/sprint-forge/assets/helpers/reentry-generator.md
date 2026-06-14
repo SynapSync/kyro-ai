@@ -22,10 +22,10 @@ Each re-entry prompt covers a specific scenario:
 
 | # | Scenario | When to Use | Key Context Needed |
 |---|----------|-------------|-------------------|
-| 1 | First Sprint | After INIT, before any sprint | README, ROADMAP, findings |
-| 2 | Sprint N (next) | After completing Sprint N-1 | README, ROADMAP, last sprint (retro + recommendations + debt), next finding |
-| 3 | Execute Sprint | Sprint generated but not executed | README, ROADMAP, current sprint file |
-| 4 | Status | Any time, for progress report | README, ROADMAP, all sprint files |
+| 1 | First Sprint | After INIT, before any sprint | state.json, index.json, roadmap summary, selected findings |
+| 2 | Sprint N (next) | After completing Sprint N-1 | state.json, index.json, last sprint summary, roadmap summary |
+| 3 | Execute Sprint | Sprint generated but not executed | state.json, index.json, current sprint summary |
+| 4 | Status | Any time, for progress report | state.json, index.json, summaries; Markdown only as fallback |
 
 ---
 

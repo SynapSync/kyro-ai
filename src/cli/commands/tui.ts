@@ -15,11 +15,11 @@ export async function runTui(): Promise<void> {
     console.log('5) Exit');
     const answer = await rl.question('Select an option: ');
     if (answer.trim() === '1') {
-      install({ agents: [AGENT.STANDARD], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false });
+      install({ agents: [AGENT.STANDARD], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false, tokens: false });
     } else if (answer.trim() === '2') {
-      install({ agents: [AGENT.OPENCODE], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false });
+      install({ agents: [AGENT.OPENCODE], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false, tokens: false });
     } else if (answer.trim() === '3') {
-      install({ agents: [AGENT.CODEX], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false });
+      install({ agents: [AGENT.CODEX], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false, tokens: false });
     } else if (answer.trim() === '4') {
       doctor();
     } else {

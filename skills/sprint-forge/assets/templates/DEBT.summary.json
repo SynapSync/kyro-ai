@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "scope": "{scope}",
+  "open": 0,
+  "inProgress": 0,
+  "resolved": 0,
+  "deferred": 0,
+  "critical": 0,
+  "oldestOpenItem": null,
+  "sourceMarkdown": null,
+  "lastUpdated": "{date}"
+}

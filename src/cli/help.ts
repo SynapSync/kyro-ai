@@ -11,6 +11,8 @@ export function printHelp(): void {
 export function printCommandHelp(command: string): void {
   if (command === 'install') {
     console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--dry-run] [--yes]');
+  } else if (command === 'doctor') {
+    console.log('Usage: kyro doctor [--tokens]');
   } else if (command === 'sync') {
     console.log('Usage: kyro sync [--agent standard|opencode|codex] [--dry-run]');
   } else if (command === 'uninstall') {

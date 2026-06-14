@@ -40,6 +40,7 @@ export interface CliOptions {
   dryRun: boolean;
   yes: boolean;
   help: boolean;
+  tokens: boolean;
 }
 
 export interface OperationPlan {
