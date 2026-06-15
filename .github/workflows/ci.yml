@@ -51,9 +51,23 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-  publish:
+  create_tag:
     needs: validate
     if: github.event_name == 'push' && needs.validate.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create and push tag
+        run: |
+          git tag ${{ needs.validate.outputs.version_tag }}
+          git push origin ${{ needs.validate.outputs.version_tag }}
+
+  publish:
+    needs: create_tag
     runs-on: ubuntu-latest
     permissions:
       id-token: write
