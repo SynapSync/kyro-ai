@@ -70,6 +70,7 @@ jobs:
     needs: create_tag
     runs-on: ubuntu-latest
     permissions:
+      contents: write
       id-token: write
 
     steps:
@@ -89,6 +90,12 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Rollback tag on failure
+        if: failure()
+        run: |
+          git push --delete origin ${{ needs.validate.outputs.version_tag }} 2>/dev/null || true
+          git tag -d ${{ needs.validate.outputs.version_tag }} 2>/dev/null || true
 
   create_release:
     needs: publish
