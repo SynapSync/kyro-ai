@@ -8,41 +8,85 @@ on:
     branches: [main]
 
 jobs:
-  build-and-test:
+  validate:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18, 20, 22]
+    outputs:
+      version_tag: ${{ steps.version.outputs.tag }}
+      exists: ${{ steps.check.outputs.exists }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run package checks
-        run: npm run check
-
-      - name: Build TypeScript
-        run: npm run build
-
-      - name: Run token budget audit
-        run: npm run check:tokens
-
-      - name: Run workspace artifact audit
-        run: npm run check:artifacts
-
-      - name: Run artifact integrity fixtures
-        run: npm run check:artifact-fixtures
-
-      - name: Verify build artifacts
+      - name: Validate
         run: |
-          test -f dist/index.js
-          echo "Build artifacts verified"
+          npm run check
+          npm run build
+          npm run check:tokens
+          npm run check:artifacts
+          npm run check:artifact-fixtures
+          npm pack --dry-run
+
+      - name: Read version
+        id: version
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Check if release already exists
+        if: github.event_name == 'push'
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: validate
+    if: github.event_name == 'push' && needs.validate.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  create_release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.version_tag }}
+          generate_release_notes: true
