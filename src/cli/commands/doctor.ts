@@ -1,15 +1,16 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ARTIFACT_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
-import { managedPathExists, readJsonFromPackage, readPackageText, workspaceFileExists } from '../fs';
+import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
 import { getAdapterDefinition } from '../adapters/registry';
 import { runTokenAuditChecks } from './token-audit';
+import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
 
-export function doctor(options?: Pick<CliOptions, 'tokens'>): void {
-  const checks = runDoctorChecks(options?.tokens ?? false);
+export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'kyroScope'>): void {
+  const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.kyroScope ?? null);
   let failed = false;
 
   for (const check of checks) {
@@ -22,7 +23,7 @@ export function doctor(options?: Pick<CliOptions, 'tokens'>): void {
   if (failed) process.exit(1);
 }
 
-function runDoctorChecks(includeTokenAudit: boolean): CheckResult[] {
+function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, kyroScope: string | null): CheckResult[] {
   const checks = [
     checkPackageVersionSync(),
     checkPackageAssets(),
@@ -33,6 +34,7 @@ function runDoctorChecks(includeTokenAudit: boolean): CheckResult[] {
   ];
 
   if (includeTokenAudit) checks.push(...runTokenAuditChecks());
+  if (includeArtifactAudit) checks.push(...runArtifactAuditChecks({ kyroScope }));
   return checks;
 }
 

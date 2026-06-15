@@ -135,6 +135,34 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 
 Warnings mean Kyro still works, but the harness is becoming expensive to load. Failing sizing checks mean INIT can no longer prove its sprint boundaries.
 
+
+## Artifact Integrity
+
+Use `kyro doctor --artifacts` to validate the project knowledge contract:
+
+```bash
+kyro doctor --artifacts
+kyro doctor --tokens --artifacts
+kyro doctor --artifacts --kyro-scope auth-refactor
+```
+
+The audit validates project state, scoped `state.json`, `index.json`, roadmap/sprint summaries, source Markdown references, stale summaries, and active sprint pointers. Missing summaries warn; invalid JSON and broken state references fail.
+
+Repair JSON summaries from Markdown without rewriting Markdown:
+
+```bash
+kyro repair --kyro-scope auth-refactor --dry-run
+kyro repair --kyro-scope auth-refactor --yes
+```
+
+Scope lifecycle helpers:
+
+```bash
+kyro scope list
+kyro scope inspect auth-refactor
+kyro scope set-active auth-refactor
+```
+
 ## Sync Semantics
 
 `kyro sync` without `--agent` refreshes the adapters already recorded in `.agents/kyro/kyro.json`.

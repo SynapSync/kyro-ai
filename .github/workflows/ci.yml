@@ -32,6 +32,15 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
+      - name: Run token budget audit
+        run: npm run check:tokens
+
+      - name: Run workspace artifact audit
+        run: npm run check:artifacts
+
+      - name: Run artifact integrity fixtures
+        run: npm run check:artifact-fixtures
+
       - name: Verify build artifacts
         run: |
           test -f dist/index.js

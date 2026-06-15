@@ -166,7 +166,7 @@ Common usage:
 
 ```bash
 kyro install --agent opencode,codex --scope workspace --yes
-kyro doctor
+kyro doctor --tokens --artifacts
 kyro sync --agent codex --dry-run
 kyro uninstall --dry-run
 ```
@@ -183,6 +183,19 @@ Supported install adapters today:
 There is intentionally no `generic` adapter. Cross-agent instructions belong in root `AGENTS.md`; install adapters should target concrete agent capabilities.
 
 ---
+
+
+## Artifact Integrity
+
+Kyro treats the repo as the system of record. Validate and repair the knowledge contract with:
+
+```bash
+kyro doctor --artifacts
+kyro repair --kyro-scope <scope> --yes
+kyro scope inspect <scope>
+```
+
+`repair` only rebuilds JSON routing/summaries from existing Markdown evidence; it does not rewrite user-authored Markdown.
 
 ## Core Workflow
 

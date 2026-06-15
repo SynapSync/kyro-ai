@@ -41,6 +41,8 @@ export interface CliOptions {
   yes: boolean;
   help: boolean;
   tokens: boolean;
+  artifacts: boolean;
+  kyroScope: string | null;
 }
 
 export interface OperationPlan {

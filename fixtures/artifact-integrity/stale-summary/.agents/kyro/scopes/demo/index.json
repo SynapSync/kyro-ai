@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "scope": "demo",
+  "roadmapSummary": "Demo roadmap",
+  "activeSprintSummary": ".agents/kyro/scopes/demo/phases/SPRINT-001-demo.summary.json",
+  "openDebtCount": 1,
+  "nextTask": "T1.2",
+  "relevantArtifactPaths": {
+    "roadmap": ".agents/kyro/scopes/demo/ROADMAP.md",
+    "roadmapSummary": ".agents/kyro/scopes/demo/ROADMAP.summary.json",
+    "sprints": ".agents/kyro/scopes/demo/phases",
+    "reentry": ".agents/kyro/scopes/demo/RE-ENTRY-PROMPTS.md"
+  },
+  "lastUpdated": "2026-06-14T00:00:00.000Z"
+}

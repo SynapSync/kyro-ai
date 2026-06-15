@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "scope": "demo",
+  "status": "planned",
+  "summary": "Demo roadmap",
+  "plannedSprintCount": 1,
+  "completedSprintCount": 0,
+  "adaptationCount": 0,
+  "nextRecommendedAction": "execute_task",
+  "openDecisions": [],
+  "relevantArtifactPaths": [
+    ".agents/kyro/scopes/demo/ROADMAP.md"
+  ],
+  "lastUpdated": "2026-06-14T00:00:00.000Z"
+}

@@ -1,6 +1,8 @@
 import { doctor } from './commands/doctor';
 import { install, sync } from './commands/install';
 import { runTui } from './commands/tui';
+import { repair } from './commands/repair';
+import { runScopeCommand } from './commands/scope';
 import { uninstall } from './commands/uninstall';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
@@ -23,6 +25,11 @@ export async function runCli(): Promise<void> {
     return;
   }
 
+  if (command === 'scope') {
+    runScopeCommand(args);
+    return;
+  }
+
   const options = parseOptions(args);
 
   if (options.help) {
@@ -36,6 +43,9 @@ export async function runCli(): Promise<void> {
       break;
     case 'doctor':
       doctor(options);
+      break;
+    case 'repair':
+      await repair(options);
       break;
     case 'sync':
       sync(options);
