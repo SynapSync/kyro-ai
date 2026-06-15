@@ -5,11 +5,11 @@ on:
     branches: [main]
 
 jobs:
-  release:
+  validate:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
+    outputs:
+      version_tag: ${{ steps.version.outputs.tag }}
+      exists: ${{ steps.check.outputs.exists }}
 
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: npm ci
@@ -48,15 +47,42 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+  publish:
+    needs: validate
+    if: needs.validate.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Publish to npm
-        if: steps.check.outputs.exists == 'false'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  create_release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Create GitHub Release
-        if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ needs.validate.outputs.version_tag }}
           generate_release_notes: true
