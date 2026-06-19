@@ -313,6 +313,7 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
   const { install, sync } = require(join(repo, 'dist/cli/commands/install.js'));
   const { uninstall } = require(join(repo, 'dist/cli/commands/uninstall.js'));
+  const { doctor } = require(join(repo, 'dist/cli/commands/doctor.js'));
   const opencode = parseAgent('opencode');
   const home = join(installDir, '.home');
   const settingsPath = join(home, '.config', 'opencode', 'opencode.json');
@@ -397,6 +398,10 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   }
   assert(!existsSync(join(home, '.config', 'opencode', 'commands', 'kyro')), 'opencode purge: empty command namespace still present');
   assert(existsSync(join(home, '.config', 'opencode')), 'opencode purge: shared OpenCode config directory should remain');
+
+  const doctorAfterPurgeOutput = captureLogs(() => doctor(cliOptions({ adapters: true })));
+  assert(doctorAfterPurgeOutput.includes('[PASS] global runtime'), 'opencode purge doctor: global runtime should remain valid after purging adapter assets');
+  assert(!doctorAfterPurgeOutput.includes('[FAIL]'), 'opencode purge doctor: should not fail after purging adapter assets');
 });
 
 withWorkspace('kyro-pipeline-rollback-', (cwd) => {

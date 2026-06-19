@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ARTIFACT_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
+import { ARTIFACT_ROOT, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
 import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
@@ -107,7 +107,8 @@ function checkGlobalRuntime(): CheckResult {
       remedy: 'Run kyro install.',
     };
   }
-  const missing = manifest.managedFiles.filter((file) => !managedPathExists(file));
+  const runtimeFiles = manifest.managedFiles.filter((file) => file.startsWith(`${KYRO_GLOBAL_ROOT}/`));
+  const missing = runtimeFiles.filter((file) => !managedPathExists(file));
   if (missing.length > 0) {
     return {
       status: 'fail',
@@ -116,7 +117,7 @@ function checkGlobalRuntime(): CheckResult {
       remedy: 'Run kyro sync.',
     };
   }
-  return { status: 'pass', name: 'global runtime', detail: `${manifest.managedFiles.length} managed files present` };
+  return { status: 'pass', name: 'global runtime', detail: `${runtimeFiles.length} runtime files present` };
 }
 
 function checkAdapterProjections(): CheckResult[] {
