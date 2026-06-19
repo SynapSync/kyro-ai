@@ -69,6 +69,7 @@ function cliOptions(overrides = {}) {
     kyroScope: null,
     json: false,
     purgeAdapterAssets: false,
+    prune: false,
     ...overrides,
   };
 }
@@ -445,6 +446,41 @@ withWorkspace('kyro-adapter-doctor-', () => {
   assert(output.includes('status=planned'), 'doctor --adapters: missing planned status');
   assert(output.includes('capabilities=command-skills'), 'doctor --adapters: missing command-skills capability');
   assert(output.includes('workspace-agents-block'), 'doctor --adapters: missing workspace AGENTS block capability');
+});
+
+withWorkspace('kyro-sync-drift-', (cwd) => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install, sync } = require(join(repo, 'dist/cli/commands/install.js'));
+  const { readPackageVersion } = require(join(repo, 'dist/cli/help.js'));
+  const codex = parseAgent('codex');
+  const home = join(cwd, '.home');
+
+  captureLogs(() => install(cliOptions({ agents: [codex] })));
+
+  const version = readPackageVersion();
+  const versionDir = join(home, '.agents', 'kyro', 'versions', version);
+  assert(existsSync(versionDir), 'sync-drift: version dir should exist after install');
+
+  const staleDir = join(home, '.agents', 'kyro', 'versions', '0.0.0');
+  mkdirSync(staleDir, { recursive: true });
+  writeFileSync(join(staleDir, 'stale.txt'), 'stale', 'utf-8');
+
+  const syncOutput = captureLogs(() => sync(cliOptions({ agents: [codex] })));
+  assert(syncOutput.includes('Drift analysis:'), 'sync-drift: missing drift report');
+  assert(syncOutput.includes('Stale runtime versions'), 'sync-drift: missing stale versions in drift');
+  assert(syncOutput.includes('Tip: run with --prune'), 'sync-drift: missing --prune tip');
+  assert(existsSync(staleDir), 'sync-drift: stale dir should still exist without --prune');
+
+  const staleDir2 = join(home, '.agents', 'kyro', 'versions', '0.0.1');
+  mkdirSync(staleDir2, { recursive: true });
+  writeFileSync(join(staleDir2, 'stale.txt'), 'stale', 'utf-8');
+
+  const pruneOutput = captureLogs(() => sync(cliOptions({ agents: [codex], prune: true })));
+  assert(pruneOutput.includes('Prune plan:'), 'sync-prune: missing prune plan');
+  assert(pruneOutput.includes('remove'), 'sync-prune: prune plan should include remove operations');
+  assert(!existsSync(staleDir), 'sync-prune: stale dir 0.0.0 should be removed');
+  assert(!existsSync(staleDir2), 'sync-prune: stale dir 0.0.1 should be removed');
+  assert(existsSync(versionDir), 'sync-prune: current version dir should be preserved');
 });
 
 withWorkspace('kyro-adapter-detect-', () => {

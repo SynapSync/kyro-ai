@@ -46,6 +46,7 @@ export interface CliOptions {
   kyroScope: string | null;
   json: boolean;
   purgeAdapterAssets: boolean;
+  prune: boolean;
 }
 
 export interface OperationPlan {

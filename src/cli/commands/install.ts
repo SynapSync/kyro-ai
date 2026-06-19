@@ -5,6 +5,8 @@ import { readProjectState } from '../state';
 import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
 import type { CliOptions } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
+import { analyzeDrift, buildPrunePlan, hasDrift, printDriftReport, printPrunePlan } from '../drift';
+import { readPackageVersion } from '../help';
 
 export function install(options: CliOptions): void {
   assertWorkspaceScope(options.scope);
@@ -35,9 +37,25 @@ export function sync(options: CliOptions): void {
   const agents = options.agents.length > 0 ? options.agents : state.installedAdapters.map((adapter) => adapter.agent);
   const unique = uniqueAgents(agents);
   runAdapterPreflight('sync', unique);
+
+  const currentVersion = readPackageVersion();
+  const drift = analyzeDrift(unique, currentVersion);
+
   const plan = buildInstallPlan(unique, SCOPE.WORKSPACE);
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
   printPlan('Sync plan', plan);
+
+  if (hasDrift(drift)) {
+    printDriftReport(drift);
+    if (options.prune) {
+      const prunePlan = buildPrunePlan(drift);
+      printPrunePlan(prunePlan);
+      plan.push(...prunePlan);
+    } else {
+      console.log('  Tip: run with --prune to clean stale versions and orphaned files.');
+    }
+  }
+
   if (options.dryRun) {
     console.log('Dry run complete. No files changed.');
     return;

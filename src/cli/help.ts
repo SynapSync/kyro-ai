@@ -26,6 +26,7 @@ Options:
   --adapters                   Include adapter inventory for doctor
   --json                       Print machine-readable output where supported
   --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
+  --prune                      Clean stale runtime versions and orphaned managed files (sync only)
   --dry-run                    Preview changes
   --yes, -y                    Skip confirmation prompts where available
   --help, -h                   Show help
@@ -52,7 +53,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'scope') {
     console.log('Usage: kyro scope list | inspect <scope> | set-active <scope>');
   } else if (command === 'sync') {
-    console.log('Usage: kyro sync [--agent standard|opencode|codex] [--dry-run]');
+    console.log('Usage: kyro sync [--agent standard|opencode|codex] [--prune] [--dry-run]');
   } else if (command === 'uninstall') {
     console.log('Usage: kyro uninstall [--purge-adapter-assets] [--dry-run] [--yes]');
   } else {
