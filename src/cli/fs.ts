@@ -1,50 +1,17 @@
 import {
-  copyFileSync,
   existsSync,
-  mkdirSync,
   readdirSync,
   readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { PACKAGE_ROOT, WORKSPACE_ROOT } from './constants';
+import { hasManagedBlockContent } from './injectors/managed-block';
+import { applyOperationPlan } from './pipeline/operation-steps';
 import type { OperationPlan } from './types';
 
 export function applyPlan(plan: OperationPlan[]): void {
-  for (const operation of plan) {
-    const target = resolveManagedPath(operation.path);
-    if (operation.action === 'mkdir') {
-      mkdirSync(target, { recursive: true });
-    } else if (operation.action === 'write') {
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, operation.content ?? '', 'utf-8');
-    } else if (operation.action === 'copy') {
-      if (!operation.source) throw new Error(`Copy operation missing source for ${operation.path}`);
-      mkdirSync(dirname(target), { recursive: true });
-      copyFileSync(resolve(PACKAGE_ROOT, operation.source), target);
-    } else if (operation.action === 'remove') {
-      rmSync(target, { recursive: true, force: true });
-    } else if (operation.action === 'symlink') {
-      if (!operation.source) throw new Error(`Symlink operation missing source for ${operation.path}`);
-      mkdirSync(dirname(target), { recursive: true });
-      rmSync(target, { recursive: true, force: true });
-      symlinkSync(resolveManagedPath(operation.source), target, 'dir');
-    } else if (operation.action === 'upsert-block') {
-      if (!operation.blockName) throw new Error(`Block operation missing blockName for ${operation.path}`);
-      mkdirSync(dirname(target), { recursive: true });
-      const existing = existsSync(target) ? readFileSync(target, 'utf-8') : '';
-      writeFileSync(target, upsertManagedBlock(existing, operation.blockName, operation.content ?? ''), 'utf-8');
-    } else if (operation.action === 'remove-block') {
-      if (!operation.blockName) throw new Error(`Block operation missing blockName for ${operation.path}`);
-      if (existsSync(target)) {
-        const existing = readFileSync(target, 'utf-8');
-        writeFileSync(target, removeManagedBlock(existing, operation.blockName), 'utf-8');
-      }
-    }
-  }
+  applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath });
 }
 
 export function printPlan(title: string, plan: OperationPlan[]): void {
@@ -52,7 +19,8 @@ export function printPlan(title: string, plan: OperationPlan[]): void {
   for (const operation of plan) {
     const source = operation.source ? ` <= ${operation.source}` : '';
     const block = operation.blockName ? ` # ${operation.blockName}` : '';
-    console.log(`- ${operation.action} ${operation.path}${block}${source}`);
+    const jsonPath = operation.jsonPath ? ` # ${operation.jsonPath}` : '';
+    console.log(`- ${operation.action} ${operation.path}${block}${jsonPath}${source}`);
   }
 }
 
@@ -120,39 +88,5 @@ export function hasManagedBlock(file: string, blockName: string): boolean {
   const path = resolveManagedPath(file);
   if (!existsSync(path)) return false;
   const text = readFileSync(path, 'utf-8');
-  return text.includes(startMarker(blockName)) && text.includes(endMarker(blockName));
-}
-
-function upsertManagedBlock(existing: string, blockName: string, content: string): string {
-  const block = formatManagedBlock(blockName, content);
-  const pattern = managedBlockPattern(blockName);
-  if (pattern.test(existing)) {
-    return existing.replace(pattern, block);
-  }
-  const separator = existing.trim().length === 0 ? '' : '\n\n';
-  return `${existing.trimEnd()}${separator}${block}\n`;
-}
-
-function removeManagedBlock(existing: string, blockName: string): string {
-  return existing.replace(managedBlockPattern(blockName), '').trimEnd() + '\n';
-}
-
-function formatManagedBlock(blockName: string, content: string): string {
-  return `${startMarker(blockName)}\n${content.trim()}\n${endMarker(blockName)}`;
-}
-
-function managedBlockPattern(blockName: string): RegExp {
-  return new RegExp(`${escapeRegExp(startMarker(blockName))}[\\s\\S]*?${escapeRegExp(endMarker(blockName))}\\n?`, 'm');
-}
-
-function startMarker(blockName: string): string {
-  return `<!-- kyro-ai:${blockName}:start -->`;
-}
-
-function endMarker(blockName: string): string {
-  return `<!-- kyro-ai:${blockName}:end -->`;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return hasManagedBlockContent(text, blockName);
 }

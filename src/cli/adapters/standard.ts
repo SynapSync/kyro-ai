@@ -3,12 +3,37 @@ import { workspaceFileExists } from '../fs';
 import type { AdapterDefinition } from './registry-types';
 import type { CheckResult } from '../types';
 import { addCommandSkillProjection, buildCommandSkillManagedFiles } from './command-skills';
+import { detectFromPaths } from './detection';
 
 export const standardAgentsAdapter: AdapterDefinition = {
   agent: AGENT.STANDARD,
   displayName: 'Standard .agents',
   status: 'implemented',
+  capabilities() {
+    return ['command-skills'];
+  },
+  paths(homeDir) {
+    return {
+      globalConfigDir: `${homeDir}/.agents`,
+      skillsDir: `${homeDir}/.agents/skills`,
+    };
+  },
+  detect(context) {
+    const paths = this.paths(context.homeDir);
+    const result = detectFromPaths(AGENT.STANDARD, null, paths, context, 'standard .agents compatibility adapter');
+    return {
+      ...result,
+      detail: `config=${result.configPath ?? 'none'}; binary=none; compatibility=always-available`,
+    };
+  },
+  systemPromptStrategy() {
+    return 'none';
+  },
+  mcpStrategy() {
+    return 'none';
+  },
   buildProjection: addCommandSkillProjection,
+  buildRemoval() {},
   buildManagedFiles: buildCommandSkillManagedFiles,
   buildManagedBlocks() {
     return [];

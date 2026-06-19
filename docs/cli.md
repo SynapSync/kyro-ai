@@ -65,7 +65,7 @@ Implemented workspace adapters:
 | Adapter | Purpose |
 | --- | --- |
 | `standard` | Base `~/.agents/skills/kyro-*` command skill projection for compatible agents |
-| `opencode` | OpenCode adapter using the same projected Kyro command skills |
+| `opencode` | Native OpenCode skills, commands under `~/.config/opencode/commands/kyro/`, and `agent.kyro-orchestrator` in `opencode.json` |
 | `codex` | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block |
 
 Default install uses `standard`:
@@ -83,7 +83,7 @@ kyro install --agent codex --scope workspace --yes
 kyro install --agent standard,opencode,codex --scope workspace --yes
 ```
 
-The adapters project Kyro workflows into `~/.agents/skills/` so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose.
+The adapters project Kyro workflows into concrete agent entrypoints so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose. `standard` and `codex` use `~/.agents/skills/`; OpenCode uses its native config tree and preserves non-Kyro `opencode.json` keys.
 
 Projected skills:
 
@@ -92,6 +92,24 @@ Projected skills:
 - `kyro-wrap-up`
 
 Each projected skill references the managed Kyro runtime in `~/.agents/kyro/current/` instead of duplicating long workflow instructions.
+
+## Uninstall
+
+Default uninstall removes project bootstraps and adapter overlays, but preserves adapter entrypoint files:
+
+```bash
+kyro uninstall --yes
+```
+
+To remove adapter-owned entrypoint files as well:
+
+```bash
+kyro uninstall --purge-adapter-assets --yes
+```
+
+Purge removes only files declared by the installed adapter, then removes Kyro-owned directories if they are empty. Shared config files such as `~/.config/opencode/opencode.json` are preserved; Kyro removes only its owned overlay key.
+
+The uninstall output includes a summary with overlay, purged file, and empty-directory counts.
 
 ## State Model
 

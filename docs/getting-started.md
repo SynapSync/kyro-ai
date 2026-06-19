@@ -46,6 +46,14 @@ Global command skills:
 └── kyro-wrap-up/SKILL.md
 ```
 
+OpenCode installs equivalent native entrypoints:
+
+```text
+~/.config/opencode/
+├── commands/kyro/
+└── skills/kyro-*/
+```
+
 Project state:
 
 ```text

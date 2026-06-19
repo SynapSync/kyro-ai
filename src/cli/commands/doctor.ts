@@ -8,7 +8,6 @@ import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { runTokenAuditChecks } from './token-audit';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
-import type { AdapterDefinition } from '../adapters/registry-types';
 
 export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'kyroScope'>): void {
   const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.kyroScope ?? null);
@@ -143,11 +142,16 @@ function checkAdapterInventory(): CheckResult[] {
   return ADAPTERS.map((adapter) => {
     const managedFiles = adapter.buildManagedFiles();
     const managedBlocks = adapter.buildManagedBlocks();
-    const capabilities = adapterCapabilities(adapter);
+    const capabilities = adapter.capabilities();
+    const paths = adapter.paths('~');
+    const nativePaths = Object.values(paths).filter(Boolean).length;
     const detail = [
       `status=${adapter.status}`,
       `managedFiles=${managedFiles.length}`,
       `managedBlocks=${managedBlocks.length}`,
+      `nativePaths=${nativePaths}`,
+      `systemPromptStrategy=${adapter.systemPromptStrategy()}`,
+      `mcpStrategy=${adapter.mcpStrategy()}`,
       `capabilities=${capabilities.length > 0 ? capabilities.join(',') : 'none'}`,
     ].join('; ');
 
@@ -157,13 +161,6 @@ function checkAdapterInventory(): CheckResult[] {
 
     return { status: 'pass', name: `adapter inventory: ${adapter.agent}`, detail };
   });
-}
-
-function adapterCapabilities(adapter: AdapterDefinition): string[] {
-  const capabilities: string[] = [];
-  if (adapter.buildManagedFiles().length > 0) capabilities.push('command-skills');
-  if (adapter.buildManagedBlocks().some((block) => block.startsWith('AGENTS.md#'))) capabilities.push('workspace-agents-block');
-  return capabilities;
 }
 
 function readYamlVersion(file: string): string {
