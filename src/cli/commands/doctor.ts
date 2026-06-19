@@ -4,13 +4,14 @@ import { ARTIFACT_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from
 import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
-import { getAdapterDefinition } from '../adapters/registry';
+import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { runTokenAuditChecks } from './token-audit';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
+import type { AdapterDefinition } from '../adapters/registry-types';
 
-export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'kyroScope'>): void {
-  const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.kyroScope ?? null);
+export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'kyroScope'>): void {
+  const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.kyroScope ?? null);
   let failed = false;
 
   for (const check of checks) {
@@ -23,7 +24,7 @@ export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'kyro
   if (failed) process.exit(1);
 }
 
-function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, kyroScope: string | null): CheckResult[] {
+function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, kyroScope: string | null): CheckResult[] {
   const checks = [
     checkPackageVersionSync(),
     checkPackageAssets(),
@@ -35,6 +36,7 @@ function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boole
 
   if (includeTokenAudit) checks.push(...runTokenAuditChecks());
   if (includeArtifactAudit) checks.push(...runArtifactAuditChecks({ kyroScope }));
+  if (includeAdapterInventory) checks.push(...checkAdapterInventory());
   return checks;
 }
 
@@ -135,6 +137,33 @@ function checkAdapterProjections(): CheckResult[] {
       };
     }
   });
+}
+
+function checkAdapterInventory(): CheckResult[] {
+  return ADAPTERS.map((adapter) => {
+    const managedFiles = adapter.buildManagedFiles();
+    const managedBlocks = adapter.buildManagedBlocks();
+    const capabilities = adapterCapabilities(adapter);
+    const detail = [
+      `status=${adapter.status}`,
+      `managedFiles=${managedFiles.length}`,
+      `managedBlocks=${managedBlocks.length}`,
+      `capabilities=${capabilities.length > 0 ? capabilities.join(',') : 'none'}`,
+    ].join('; ');
+
+    if (adapter.status === 'planned') {
+      return { status: 'warn', name: `adapter inventory: ${adapter.agent}`, detail };
+    }
+
+    return { status: 'pass', name: `adapter inventory: ${adapter.agent}`, detail };
+  });
+}
+
+function adapterCapabilities(adapter: AdapterDefinition): string[] {
+  const capabilities: string[] = [];
+  if (adapter.buildManagedFiles().length > 0) capabilities.push('command-skills');
+  if (adapter.buildManagedBlocks().some((block) => block.startsWith('AGENTS.md#'))) capabilities.push('workspace-agents-block');
+  return capabilities;
 }
 
 function readYamlVersion(file: string): string {

@@ -15,7 +15,8 @@
     "build:chmod": "node scripts/make-cli-executable.mjs",
     "check:tokens": "node dist/cli.js doctor --tokens",
     "check:artifacts": "node dist/cli.js doctor --artifacts",
-    "check:artifact-fixtures": "node scripts/check-artifact-fixtures.mjs"
+    "check:artifact-fixtures": "node scripts/check-artifact-fixtures.mjs",
+    "check:adapters": "node scripts/check-adapter-fixtures.mjs"
   },
   "keywords": [
     "ai-agents",

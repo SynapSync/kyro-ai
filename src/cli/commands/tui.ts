@@ -3,6 +3,7 @@ import { stdin as input, stdout as output } from 'node:process';
 import { AGENT, SCOPE } from '../constants';
 import { doctor } from './doctor';
 import { install } from './install';
+import type { Agent, CliOptions } from '../types';
 
 export async function runTui(): Promise<void> {
   const rl = createInterface({ input, output });
@@ -15,11 +16,11 @@ export async function runTui(): Promise<void> {
     console.log('5) Exit');
     const answer = await rl.question('Select an option: ');
     if (answer.trim() === '1') {
-      install({ agents: [AGENT.STANDARD], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false, tokens: false, artifacts: false, kyroScope: null });
+      install(tuiInstallOptions(AGENT.STANDARD));
     } else if (answer.trim() === '2') {
-      install({ agents: [AGENT.OPENCODE], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false, tokens: false, artifacts: false, kyroScope: null });
+      install(tuiInstallOptions(AGENT.OPENCODE));
     } else if (answer.trim() === '3') {
-      install({ agents: [AGENT.CODEX], scope: SCOPE.WORKSPACE, dryRun: false, yes: true, help: false, tokens: false, artifacts: false, kyroScope: null });
+      install(tuiInstallOptions(AGENT.CODEX));
     } else if (answer.trim() === '4') {
       doctor();
     } else {
@@ -28,4 +29,18 @@ export async function runTui(): Promise<void> {
   } finally {
     rl.close();
   }
+}
+
+function tuiInstallOptions(agent: Agent): CliOptions {
+  return {
+    agents: [agent],
+    scope: SCOPE.WORKSPACE,
+    dryRun: false,
+    yes: true,
+    help: false,
+    tokens: false,
+    artifacts: false,
+    adapters: false,
+    kyroScope: null,
+  };
 }

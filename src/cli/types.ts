@@ -42,6 +42,7 @@ export interface CliOptions {
   help: boolean;
   tokens: boolean;
   artifacts: boolean;
+  adapters: boolean;
   kyroScope: string | null;
 }
 

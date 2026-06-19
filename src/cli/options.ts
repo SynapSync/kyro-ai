@@ -10,6 +10,7 @@ export function parseOptions(args: string[]): CliOptions {
   let help = false;
   let tokens = false;
   let artifacts = false;
+  let adapters = false;
   let kyroScope: string | null = null;
 
   for (let i = 0; i < args.length; i += 1) {
@@ -24,6 +25,8 @@ export function parseOptions(args: string[]): CliOptions {
       tokens = true;
     } else if (arg === '--artifacts') {
       artifacts = true;
+    } else if (arg === '--adapters') {
+      adapters = true;
     } else if (arg === '--kyro-scope') {
       const value = args[i + 1];
       if (!value) throw new Error('--kyro-scope requires a value');
@@ -60,6 +63,7 @@ export function parseOptions(args: string[]): CliOptions {
     help,
     tokens,
     artifacts,
+    adapters,
     kyroScope,
   };
 }

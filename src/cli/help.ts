@@ -22,6 +22,7 @@ Options:
   --kyro-scope <scope>         Select Kyro artifact scope
   --tokens                     Include token/context budget audit for doctor
   --artifacts                  Include Kyro artifact integrity audit for doctor
+  --adapters                   Include adapter inventory for doctor
   --dry-run                    Preview changes
   --yes, -y                    Skip confirmation prompts where available
   --help, -h                   Show help
@@ -39,7 +40,7 @@ export function printCommandHelp(command: string): void {
   if (command === 'install') {
     console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--dry-run] [--yes]');
   } else if (command === 'doctor') {
-    console.log('Usage: kyro doctor [--tokens] [--artifacts] [--kyro-scope <scope>]');
+    console.log('Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--kyro-scope <scope>]');
   } else if (command === 'repair') {
     console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]');
   } else if (command === 'scope') {
