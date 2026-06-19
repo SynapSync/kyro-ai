@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.agents/kyro/
 .DS_Store
 *.db
 *.db-journal
