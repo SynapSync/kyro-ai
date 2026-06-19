@@ -5,7 +5,7 @@ import { readProjectState } from '../state';
 import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
 import type { CliOptions } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
-import { analyzeDrift, buildPrunePlan, hasDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
+import { analyzeDrift, buildPrunePlan, hasDrift, hasPrunableDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
 import { readPackageVersion } from '../help';
 
 export function install(options: CliOptions): void {
@@ -48,9 +48,13 @@ export function sync(options: CliOptions): void {
     printDriftReport(drift);
     if (options.prune) {
       const prunePlan = buildPrunePlan(drift);
-      printPrunePlan(prunePlan);
-      plan.push(...prunePlan);
-    } else {
+      if (prunePlan.length > 0) {
+        printPrunePlan(prunePlan);
+        plan.push(...prunePlan);
+      } else {
+        console.log('  No prunable drift found. Shared config was preserved.');
+      }
+    } else if (hasPrunableDrift(drift)) {
       console.log('  Tip: run with --prune to clean stale versions and orphaned files.');
     }
   }

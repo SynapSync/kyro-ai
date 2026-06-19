@@ -537,6 +537,41 @@ withWorkspace('kyro-sync-drift-', (cwd) => {
   }
 });
 
+withWorkspace('kyro-sync-shared-config-only-', (cwd) => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install, sync } = require(join(repo, 'dist/cli/commands/install.js'));
+  const { readPackageVersion } = require(join(repo, 'dist/cli/help.js'));
+  const codex = parseAgent('codex');
+  const home = join(cwd, '.home');
+
+  captureLogs(() => install(cliOptions({ agents: [codex] })));
+
+  const versionDir = join(home, '.agents', 'kyro', 'versions', readPackageVersion());
+  const sharedOpenCodeConfig = join(home, '.config', 'opencode', 'opencode.json');
+  mkdirSync(join(home, '.config', 'opencode'), { recursive: true });
+  writeFileSync(sharedOpenCodeConfig, '{ "model": "user/model" }\n', 'utf-8');
+
+  const manifestPath = join(versionDir, 'manifest.json');
+  const oldManifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  oldManifest.managedFiles.push('~/.config/opencode/opencode.json');
+  writeFileSync(manifestPath, `${JSON.stringify(oldManifest, null, 2)}\n`, 'utf-8');
+
+  const syncOutput = captureLogs(() => sync(cliOptions({ agents: [codex] })));
+  assert(syncOutput.includes('Shared config preserved'), 'sync-shared-config-only: missing preserved shared config report');
+  assert(syncOutput.includes('~/.config/opencode/opencode.json'), 'sync-shared-config-only: shared opencode config should be reported as preserved');
+  assert(!syncOutput.includes('Tip: run with --prune'), 'sync-shared-config-only: should not suggest prune when nothing is prunable');
+  assert(existsSync(sharedOpenCodeConfig), 'sync-shared-config-only: shared opencode config should remain');
+
+  const oldManifestBeforePrune = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  oldManifestBeforePrune.managedFiles.push('~/.config/opencode/opencode.json');
+  writeFileSync(manifestPath, `${JSON.stringify(oldManifestBeforePrune, null, 2)}\n`, 'utf-8');
+
+  const pruneDryRunOutput = captureLogs(() => sync(cliOptions({ agents: [codex], prune: true, dryRun: true })));
+  assert(pruneDryRunOutput.includes('No prunable drift found. Shared config was preserved.'), 'sync-shared-config-only prune dry-run: should explain that no files are prunable');
+  assert(!pruneDryRunOutput.includes('Prune plan:'), 'sync-shared-config-only prune dry-run: should not print an empty prune plan');
+  assert(existsSync(sharedOpenCodeConfig), 'sync-shared-config-only prune dry-run: shared opencode config should remain');
+});
+
 withWorkspace('kyro-adapter-detect-', () => {
   const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
   const { detect } = require(join(repo, 'dist/cli/commands/detect.js'));

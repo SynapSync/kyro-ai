@@ -41,6 +41,10 @@ export function hasDrift(report: DriftReport): boolean {
   return report.staleVersions.length > 0 || report.orphanedFiles.length > 0 || report.preservedSharedConfig.length > 0;
 }
 
+export function hasPrunableDrift(report: DriftReport): boolean {
+  return report.staleVersions.length > 0 || report.orphanedFiles.length > 0;
+}
+
 export function printDriftReport(report: DriftReport): void {
   if (!hasDrift(report)) return;
 
