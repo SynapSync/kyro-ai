@@ -5,7 +5,7 @@ import { readProjectState } from '../state';
 import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
 import type { CliOptions } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
-import { analyzeDrift, buildPrunePlan, hasDrift, printDriftReport, printPrunePlan } from '../drift';
+import { analyzeDrift, buildPrunePlan, hasDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
 import { readPackageVersion } from '../help';
 
 export function install(options: CliOptions): void {
@@ -39,9 +39,8 @@ export function sync(options: CliOptions): void {
   runAdapterPreflight('sync', unique);
 
   const currentVersion = readPackageVersion();
-  const drift = analyzeDrift(unique, currentVersion);
-
   const plan = buildInstallPlan(unique, SCOPE.WORKSPACE);
+  const drift = analyzeDrift(currentVersion, managedFilesFromInstallPlan(plan));
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
   printPlan('Sync plan', plan);
 

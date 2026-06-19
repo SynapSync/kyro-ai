@@ -193,6 +193,34 @@ kyro sync --agent standard --dry-run
 kyro sync --agent codex --dry-run
 ```
 
+### Drift And Prune
+
+`kyro sync` reports drift when old manifests point to stale runtime versions or obsolete Kyro-owned adapter entrypoint files.
+
+Use prune to clean drift during sync:
+
+```bash
+kyro sync --prune
+```
+
+`--prune` may remove:
+
+- stale runtime version directories under `~/.agents/kyro/versions/`, except the current package version.
+- obsolete Kyro-owned adapter entrypoint files previously declared by old manifests:
+  - `~/.agents/skills/kyro-*`
+  - `~/.config/opencode/skills/kyro-*`
+  - `~/.config/opencode/commands/kyro/*`
+
+`--prune` preserves:
+
+- current runtime files declared by the new manifest.
+- project state, scopes, roadmap files, sprint files, and summaries under `.agents/kyro/scopes/`.
+- shared agent config files such as `~/.config/opencode/opencode.json`.
+
+If an old manifest lists shared config, sync reports it under `Shared config preserved` instead of pruning it.
+
+`--prune` is different from `kyro uninstall --purge-adapter-assets`. Prune cleans sync drift by comparing old manifests against the current install plan. Purge removes adapter entrypoint files during uninstall for adapters recorded in the installed project state. Neither mode removes shared user config.
+
 ## Claude Plugin Support
 
 The Claude plugin adapter remains first-class through `.claude-plugin/`. The CLI does not replace it; it complements Kyro's adapter story for agents that need workspace-installed commands, skills, root `AGENTS.md` managed blocks, and core assets.

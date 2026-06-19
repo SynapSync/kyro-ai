@@ -1,15 +1,15 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { GLOBAL_AGENTS_ROOT, getKyroRuntimeRoot, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH } from './constants';
-import { getInstalledAdapterDefinitions } from './adapters/registry';
-import { managedPathExists, resolveManagedPath } from './fs';
+import { KYRO_GLOBAL_ROOT } from './constants';
+import { resolveManagedPath } from './fs';
 import { readManifest } from './state';
-import type { Agent, KyroManifest, OperationPlan } from './types';
+import type { KyroManifest, OperationPlan } from './types';
 
 export interface DriftReport {
   currentVersion: string;
   staleVersions: StaleVersion[];
   orphanedFiles: string[];
+  preservedSharedConfig: string[];
 }
 
 export interface StaleVersion {
@@ -17,16 +17,28 @@ export interface StaleVersion {
   path: string;
 }
 
-export function analyzeDrift(agents: Agent[], currentVersion: string): DriftReport {
+export function analyzeDrift(currentVersion: string, currentManagedFiles: string[]): DriftReport {
   const oldManifest = readManifest();
   const staleVersions = detectStaleVersions(currentVersion);
-  const orphanedFiles = oldManifest ? detectOrphanedFiles(oldManifest, agents) : [];
+  const orphaned = oldManifest ? detectOrphanedFiles(oldManifest, currentManagedFiles) : { prunable: [], preservedSharedConfig: [] };
 
-  return { currentVersion, staleVersions, orphanedFiles };
+  return {
+    currentVersion,
+    staleVersions,
+    orphanedFiles: orphaned.prunable,
+    preservedSharedConfig: orphaned.preservedSharedConfig,
+  };
+}
+
+export function managedFilesFromInstallPlan(plan: OperationPlan[]): string[] {
+  const manifestWrite = plan.find((operation) => operation.action === 'write' && operation.path.includes('/manifest.json') && operation.content);
+  if (!manifestWrite?.content) return [];
+  const manifest = JSON.parse(manifestWrite.content) as KyroManifest;
+  return manifest.managedFiles;
 }
 
 export function hasDrift(report: DriftReport): boolean {
-  return report.staleVersions.length > 0 || report.orphanedFiles.length > 0;
+  return report.staleVersions.length > 0 || report.orphanedFiles.length > 0 || report.preservedSharedConfig.length > 0;
 }
 
 export function printDriftReport(report: DriftReport): void {
@@ -46,6 +58,15 @@ export function printDriftReport(report: DriftReport): void {
     }
     if (report.orphanedFiles.length > 5) {
       console.log(`    ... and ${report.orphanedFiles.length - 5} more`);
+    }
+  }
+  if (report.preservedSharedConfig.length > 0) {
+    console.log(`  Shared config preserved: ${report.preservedSharedConfig.length} file(s) listed by old manifests but not pruned`);
+    for (const file of report.preservedSharedConfig.slice(0, 5)) {
+      console.log(`    - ${file}`);
+    }
+    if (report.preservedSharedConfig.length > 5) {
+      console.log(`    ... and ${report.preservedSharedConfig.length - 5} more`);
     }
   }
 }
@@ -100,18 +121,29 @@ function detectStaleVersions(currentVersion: string): StaleVersion[] {
   })).sort((a, b) => b.version.localeCompare(a.version));
 }
 
-function detectOrphanedFiles(oldManifest: KyroManifest, agents: Agent[]): string[] {
-  const currentManaged = getCurrentManagedFiles(agents);
-  const currentSet = new Set(currentManaged);
+function detectOrphanedFiles(oldManifest: KyroManifest, currentManagedFiles: string[]): { prunable: string[]; preservedSharedConfig: string[] } {
+  const currentSet = new Set(currentManagedFiles);
+  const prunable: string[] = [];
+  const preservedSharedConfig: string[] = [];
 
-  return oldManifest.managedFiles.filter((file) => !currentSet.has(file));
+  for (const file of oldManifest.managedFiles) {
+    if (currentSet.has(file)) continue;
+    if (isPrunableOrphanFile(file)) {
+      prunable.push(file);
+    } else if (isSharedConfigFile(file)) {
+      preservedSharedConfig.push(file);
+    }
+  }
+
+  return { prunable, preservedSharedConfig };
 }
 
-function getCurrentManagedFiles(agents: Agent[]): string[] {
-  const files: string[] = [];
-  for (const adapter of getInstalledAdapterDefinitions(agents)) {
-    files.push(...adapter.buildManagedFiles());
-    files.push(...adapter.buildManagedBlocks().map((block) => block.split('#')[0]));
-  }
-  return [...new Set(files)].sort();
+function isPrunableOrphanFile(file: string): boolean {
+  return file.startsWith('~/.agents/skills/kyro-')
+    || file.startsWith('~/.config/opencode/skills/kyro-')
+    || file.startsWith('~/.config/opencode/commands/kyro/');
+}
+
+function isSharedConfigFile(file: string): boolean {
+  return file === '~/.config/opencode/opencode.json';
 }

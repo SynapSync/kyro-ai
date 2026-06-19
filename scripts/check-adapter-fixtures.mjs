@@ -370,6 +370,18 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   assert(!existsSync(join(home, '.agents', 'skills', 'kyro-forge', 'SKILL.md')), 'opencode install: should not install standard global skill projection');
 
   captureLogs(() => install(cliOptions({ agents: [opencode] })));
+  const purgeDryRunOutput = captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true, dryRun: true })));
+  assert(purgeDryRunOutput.includes('purgeAdapterAssets=yes'), 'opencode purge dry-run: summary should report purge enabled');
+  assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/skills/kyro-forge/SKILL.md'), 'opencode purge dry-run: plan should include native skill removal');
+  assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/commands/kyro/forge.md'), 'opencode purge dry-run: plan should include native command removal');
+  assert(purgeDryRunOutput.includes('Dry run complete. No files changed.'), 'opencode purge dry-run: should report no file changes');
+  settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+  assert(settings.agent['kyro-orchestrator'], 'opencode purge dry-run: Kyro orchestrator overlay should remain');
+  for (const command of ['forge', 'status', 'wrap-up']) {
+    assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode purge dry-run: native skill ${command} should remain`);
+    assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode purge dry-run: native command ${command} should remain`);
+  }
+
   const purgeOutput = captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true })));
   assert(purgeOutput.includes('purgeAdapterAssets=yes'), 'opencode purge: summary should report purge enabled');
   assert(purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/commands/kyro'), 'opencode purge: plan should clean command namespace directory');
@@ -461,6 +473,18 @@ withWorkspace('kyro-sync-drift-', (cwd) => {
   const versionDir = join(home, '.agents', 'kyro', 'versions', version);
   assert(existsSync(versionDir), 'sync-drift: version dir should exist after install');
 
+  const obsoleteSkill = join(home, '.agents', 'skills', 'kyro-obsolete-fixture', 'SKILL.md');
+  const sharedOpenCodeConfig = join(home, '.config', 'opencode', 'opencode.json');
+  mkdirSync(join(home, '.agents', 'skills', 'kyro-obsolete-fixture'), { recursive: true });
+  mkdirSync(join(home, '.config', 'opencode'), { recursive: true });
+  writeFileSync(obsoleteSkill, 'legacy', 'utf-8');
+  writeFileSync(sharedOpenCodeConfig, '{ "model": "user/model" }\n', 'utf-8');
+
+  const manifestPath = join(versionDir, 'manifest.json');
+  const oldManifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  oldManifest.managedFiles.push('~/.agents/skills/kyro-obsolete-fixture/SKILL.md', '~/.config/opencode/opencode.json');
+  writeFileSync(manifestPath, `${JSON.stringify(oldManifest, null, 2)}\n`, 'utf-8');
+
   const staleDir = join(home, '.agents', 'kyro', 'versions', '0.0.0');
   mkdirSync(staleDir, { recursive: true });
   writeFileSync(join(staleDir, 'stale.txt'), 'stale', 'utf-8');
@@ -468,19 +492,49 @@ withWorkspace('kyro-sync-drift-', (cwd) => {
   const syncOutput = captureLogs(() => sync(cliOptions({ agents: [codex] })));
   assert(syncOutput.includes('Drift analysis:'), 'sync-drift: missing drift report');
   assert(syncOutput.includes('Stale runtime versions'), 'sync-drift: missing stale versions in drift');
+  assert(syncOutput.includes('Orphaned managed files'), 'sync-drift: missing orphaned files in drift');
+  assert(syncOutput.includes('~/.agents/skills/kyro-obsolete-fixture/SKILL.md'), 'sync-drift: missing obsolete adapter skill in drift');
+  assert(syncOutput.includes('Shared config preserved'), 'sync-drift: missing preserved shared config report');
+  assert(syncOutput.includes('~/.config/opencode/opencode.json'), 'sync-drift: shared opencode config should be reported as preserved');
   assert(syncOutput.includes('Tip: run with --prune'), 'sync-drift: missing --prune tip');
   assert(existsSync(staleDir), 'sync-drift: stale dir should still exist without --prune');
+  assert(existsSync(obsoleteSkill), 'sync-drift: obsolete skill should still exist without --prune');
+  assert(existsSync(sharedOpenCodeConfig), 'sync-drift: shared opencode config should still exist without --prune');
+
+  const oldManifestBeforePrune = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  oldManifestBeforePrune.managedFiles.push('~/.agents/skills/kyro-obsolete-fixture/SKILL.md', '~/.config/opencode/opencode.json');
+  writeFileSync(manifestPath, `${JSON.stringify(oldManifestBeforePrune, null, 2)}\n`, 'utf-8');
 
   const staleDir2 = join(home, '.agents', 'kyro', 'versions', '0.0.1');
   mkdirSync(staleDir2, { recursive: true });
   writeFileSync(join(staleDir2, 'stale.txt'), 'stale', 'utf-8');
 
+  const pruneDryRunOutput = captureLogs(() => sync(cliOptions({ agents: [codex], prune: true, dryRun: true })));
+  assert(pruneDryRunOutput.includes('Prune plan:'), 'sync-prune dry-run: missing prune plan');
+  assert(pruneDryRunOutput.includes('Dry run complete. No files changed.'), 'sync-prune dry-run: should report no file changes');
+  assert(pruneDryRunOutput.includes('~/.agents/skills/kyro-obsolete-fixture/SKILL.md'), 'sync-prune dry-run: prune plan should include obsolete adapter skill');
+  assert(pruneDryRunOutput.includes('Shared config preserved'), 'sync-prune dry-run: preserved shared config should still be reported');
+  assert(!pruneDryRunOutput.includes('- remove ~/.config/opencode/opencode.json'), 'sync-prune dry-run: prune plan should not remove shared opencode config');
+  assert(existsSync(staleDir), 'sync-prune dry-run: stale dir 0.0.0 should remain');
+  assert(existsSync(staleDir2), 'sync-prune dry-run: stale dir 0.0.1 should remain');
+  assert(existsSync(obsoleteSkill), 'sync-prune dry-run: obsolete skill should remain');
+  assert(existsSync(sharedOpenCodeConfig), 'sync-prune dry-run: shared opencode config should remain');
+
   const pruneOutput = captureLogs(() => sync(cliOptions({ agents: [codex], prune: true })));
   assert(pruneOutput.includes('Prune plan:'), 'sync-prune: missing prune plan');
   assert(pruneOutput.includes('remove'), 'sync-prune: prune plan should include remove operations');
+  assert(pruneOutput.includes('~/.agents/skills/kyro-obsolete-fixture/SKILL.md'), 'sync-prune: prune plan should include obsolete adapter skill');
+  assert(pruneOutput.includes('Shared config preserved'), 'sync-prune: preserved shared config should still be reported');
+  assert(pruneOutput.includes('~/.config/opencode/opencode.json'), 'sync-prune: shared opencode config should be reported as preserved');
+  assert(!pruneOutput.includes('- remove ~/.config/opencode/opencode.json'), 'sync-prune: prune plan should not remove shared opencode config');
   assert(!existsSync(staleDir), 'sync-prune: stale dir 0.0.0 should be removed');
   assert(!existsSync(staleDir2), 'sync-prune: stale dir 0.0.1 should be removed');
+  assert(!existsSync(obsoleteSkill), 'sync-prune: obsolete adapter skill should be removed');
+  assert(existsSync(sharedOpenCodeConfig), 'sync-prune: shared opencode config should be preserved');
   assert(existsSync(versionDir), 'sync-prune: current version dir should be preserved');
+  for (const runtimeFile of ['manifest.json', 'KYRO.md', 'commands/forge.md', 'skills/sprint-forge/SKILL.md', 'core/WORKFLOW.yaml']) {
+    assert(existsSync(join(versionDir, runtimeFile)), `sync-prune: current runtime file ${runtimeFile} should be preserved`);
+  }
 });
 
 withWorkspace('kyro-adapter-detect-', () => {
