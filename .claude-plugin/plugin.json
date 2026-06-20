@@ -1,6 +1,10 @@
 {
   "name": "kyro-ai",
+<<<<<<< HEAD
   "version": "3.4.1",
+=======
+  "version": "3.4.2",
+>>>>>>> 23266f0 (perf(kyro): reduce runtime context cost)
   "description": "Claude Code adapter for Kyro, a portable sprint workflow kit for AI coding agents",
   "author": {
     "name": "SynapSync",
