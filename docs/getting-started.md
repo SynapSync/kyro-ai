@@ -84,7 +84,7 @@ Kyro routes progressively:
 2. resolve or create scope
 3. read scoped `state.json` and `index.json` if present
 4. load only the required mode: INIT, plan, execute, review, close, or recover
-5. update Markdown evidence plus JSON summaries
+5. record compact task evidence during execution, then update Markdown evidence plus JSON summaries at sprint close
 
 ## Scope output
 

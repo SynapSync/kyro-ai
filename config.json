@@ -10,7 +10,8 @@
   },
   "sprint": {
     "max_tasks_per_sprint": 10,
-    "checkpoint_per_phase": true,
+    "write_policy": "task-events-phase-state-sprint-materialization",
+    "materialize_on_sprint_close": true,
     "require_retro": true,
     "debt_aged_threshold_sprints": 3
   }

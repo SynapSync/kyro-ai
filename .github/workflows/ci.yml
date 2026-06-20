@@ -30,6 +30,7 @@ jobs:
         run: |
           npm run check
           npm run build
+          npm run check:adapters
           npm run check:tokens
           npm run check:artifacts
           npm run check:artifact-fixtures

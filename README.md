@@ -311,6 +311,27 @@ The release workflow expects the repository secret `NPM_TOKEN`.
 
 ---
 
+## Generated Artifacts and Release Process
+
+`dist/` is a generated artifact built from `src/` by `npm run build`. It must stay in sync with source, so releases cannot pack stale generated output.
+
+Before committing or releasing:
+
+```bash
+npm run check      # includes check:dist
+npm run build
+npm run check:adapters
+npm pack --dry-run
+```
+
+- `npm run check:dist` proves the committed `dist/` matches a fresh build.
+- `npm run check:adapters` validates adapter projections against the built runtime.
+- `npm pack --dry-run` simulates the published tarball only after the gates above pass.
+
+See [`docs/release-checklist.md`](docs/release-checklist.md) for the full maintainer checklist and CI gate ordering.
+
+---
+
 ## Documentation
 
 | Guide                                            | Description                                              |

@@ -23,5 +23,6 @@ This file is the lightweight index for sprint work. Do not load the full sprint 
 
 - One sprint at a time.
 - Previous retro, recommendations, and debt feed the next sprint.
-- Checkpoint after each phase, not every task.
+- Task completion writes compact evidence; phase close updates compact routing state.
+- Full Markdown, summary, roadmap, re-entry, debt, and rules updates happen at sprint close.
 - Markdown remains evidence; JSON summaries are the routing index.

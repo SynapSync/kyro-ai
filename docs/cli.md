@@ -15,6 +15,48 @@ kyro uninstall          # Remove managed workspace assets, preserving scope arti
 
 `npx kyro-ai` resolves to the same CLI entrypoint.
 
+## Maintenance Scripts
+
+Kyro provides npm scripts for validating generated artifacts and adapter behavior. These are used both locally and in CI.
+
+### `npm run check:dist`
+
+Proves that the committed `dist/` matches a fresh build from current `src/`.
+
+```bash
+npm run check:dist
+```
+
+The script builds `dist/` into a temporary directory and compares it byte-for-byte with the existing `dist/`. It exits `0` when fresh and `1` when stale, printing the list of differing, missing, or extra files.
+
+Run this after any source change that affects generated output, and always run it before committing or packing.
+
+### `npm run check:adapters`
+
+Runs adapter fixture validation against the built runtime.
+
+```bash
+npm run check:adapters
+```
+
+This exercises adapter detection, install plans, preflight, doctor output, JSON merge, managed block, and pipeline rollback behavior. It must pass before a release can be packed.
+
+### Release gate ordering
+
+The full release validation sequence is:
+
+```bash
+npm run check        # includes check:dist
+npm run build
+npm run check:adapters
+npm run check:tokens
+npm run check:artifacts
+npm run check:artifact-fixtures
+npm pack --dry-run
+```
+
+See [`docs/release-checklist.md`](release-checklist.md) for the maintainer-facing checklist and policy.
+
 ## Install Scope
 
 The default install scope is `workspace`, but Kyro now separates global runtime from project state.

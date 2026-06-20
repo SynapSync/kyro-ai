@@ -1,6 +1,6 @@
 # Close Sprint Mode
 
-Close a sprint or session by updating only the artifacts required for handoff and learning.
+Close a sprint or session by materializing compact execution evidence into durable documentation.
 
 ## Inputs
 
@@ -13,7 +13,7 @@ Close a sprint or session by updating only the artifacts required for handoff an
 ## Workflow
 
 1. Run the pre-close quality checkpoint.
-2. Consolidate findings from planned and emergent phases.
+2. Consolidate findings from planned and emergent phases, including compact task events.
 3. Fill retro: went well, did not go well, surprises, new debt.
 4. Write recommendations for Sprint N+1.
 5. Update accumulated debt statuses and new debt rows.
@@ -27,3 +27,4 @@ Close a sprint or session by updating only the artifacts required for handoff an
 - Retro must be honest and specific.
 - Re-entry context must point to the next action.
 - Markdown is the durable evidence; summaries are the routing cache.
+- This is the only normal sprint phase that refreshes full summaries, re-entry prompts, roadmap changes, debt summary, and learned rules.

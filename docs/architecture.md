@@ -78,9 +78,9 @@ ORCHESTRATOR
 3. **Gate 1** - User approves analysis.
 4. **Planning** - Orchestrator generates a sprint document with phases and tasks.
 5. **Gate 2** - User approves the plan.
-6. **Implementation** - Orchestrator executes tasks, runs review checks, and checkpoints after each phase.
+6. **Implementation** - Orchestrator executes tasks, runs review checks, and records compact task evidence.
 7. **Gate 3** - User approves implementation.
-8. **Review and Close** - Orchestrator runs retro, updates debt tables in markdown, proposes rules, and updates re-entry prompts.
+8. **Review and Close** - Orchestrator materializes sprint evidence, runs retro, updates debt tables in markdown, refreshes summaries, proposes rules, and updates re-entry prompts.
 
 ---
 
@@ -121,7 +121,7 @@ The orchestrator runs checkpoints at lifecycle moments:
 | pre-phase | Validate state before a phase starts |
 | rule check | Verify relevant learned rules |
 | post-edit scan | Detect debug artifacts and likely secrets |
-| task complete | Verify task status and checkpoint state |
+| task complete | Verify task status and record compact evidence |
 | pre-commit | Run configured quality gates |
 | learn capture | Propose new rules from corrections |
 

@@ -30,4 +30,8 @@ Use this command to continue Kyro work without loading the whole workflow upfron
 
 - Load only the routed mode plus the helpers named by that mode.
 - Enforce orchestrator gates from `agents/orchestrator.md` only at gate moments.
-- Update `state.json`, `index.json`, and relevant `*.summary.json` after each phase checkpoint.
+- Follow the Write Policy from the routed mode:
+  - task close writes only a minimal append-only event;
+  - phase close updates compact routing state only;
+  - sprint close materializes Markdown evidence, summaries, re-entry prompts, debt, and rules.
+- Do not refresh roadmap, re-entry prompts, debt summary, or learned rules during normal task execution.

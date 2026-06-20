@@ -54,7 +54,7 @@ Kyro is an **adaptive sprint workflow** skill designed for iterative project exe
 - **Generates sprints one at a time** — each sprint feeds from the previous one's retro, recommendations, and accumulated debt
 - **Tracks debt formally** — an accumulated debt table that persists across sprints and never loses items
 - **Adapts the roadmap** — the plan evolves based on what execution reveals
-- **Persists context cheaply** — `state.json`, `index.json`, summaries, and re-entry prompts let new agents recover without rereading every Markdown file
+- **Persists context cheaply** — compact task events plus `state.json`, `index.json`, summaries, and re-entry prompts let new agents recover without rereading every Markdown file
 
 This skill works for **any** project type, language, or framework.
 
@@ -86,9 +86,9 @@ This skill works for **any** project type, language, or framework.
 >
 > This skill works for any language, framework, or project type. It does not assume Flutter, React, Dart, or any specific technology. The analysis determines the structure.
 
-> **RULE 7 — CONTEXT PERSISTENCE**
+> **RULE 7 — LEAN CONTEXT PERSISTENCE**
 >
-> After INIT and after each executed sprint, update `state.json`, `index.json`, relevant `*.summary.json`, and re-entry prompts. Agents read structured state before opening long Markdown evidence.
+> During task execution, write compact task events and minimal routing state only. After INIT and sprint close, update `state.json`, `index.json`, relevant `*.summary.json`, and re-entry prompts. Agents read structured state before opening long Markdown evidence.
 
 ---
 
@@ -99,8 +99,8 @@ This skill works for **any** project type, language, or framework.
 | Analyze codebase/project | Yes | No | No |
 | Create vault structure | Yes | No | No |
 | Generate roadmap | Yes | No | No |
-| Generate/update re-entry prompts | Yes | Yes | No |
-| Update state/index/summaries | Yes | Yes | Yes |
+| Generate/update re-entry prompts | Yes | Sprint close only | No |
+| Update state/index/summaries | Yes | Compact during execution, full at close | Yes |
 | Generate sprint | No | Yes | No |
 | Execute sprint tasks | No | Yes | No |
 | Write/modify code | No | Yes | No |
@@ -239,7 +239,7 @@ The orchestrator is the single agent, handling all phases through specialized pr
 The orchestrator runs checkpoints at lifecycle moments. Key checkpoints:
 - **session_start** — loads learned rules from `.agents/kyro/scopes/rules.md`
 - **post_edit_scan** — checks for debug artifacts after code edits
-- **task_complete** — runs review checklist
+- **task_complete** — runs review checklist and records compact evidence
 - **drift_check** — detects possible scope drift when enabled
 - **rule_check** — checks relevant learned rules before task execution
 

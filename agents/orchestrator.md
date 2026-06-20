@@ -52,7 +52,7 @@ Before starting, determine which flow to follow:
                      ├── Task by task execution
                      ├── Reviewer validates each task
                      ├── Debug on failure
-                     └── Checkpoint per phase
+                     └── Lean checkpoint policy
                    GATE: Approve implementation
                           ↓
                    Phase 5: Review & Close
@@ -184,6 +184,19 @@ Analyzed: [date]
 - Be thorough but efficient — prioritize areas that affect sprint planning.
 - Flag uncertainties explicitly. A false "all clear" wastes more time than a noted concern.
 
+## Write Policy
+
+Kyro optimizes for low-context execution. Durable documentation is materialized at sprint close, not rewritten during every task.
+
+| Moment | Write only |
+|--------|------------|
+| Task close | Append one compact event to the sprint evidence log or the sprint file's execution notes: task id, status, validation evidence, changed files, blockers, and debt deltas. |
+| Phase close | Update the active sprint file with phase status and refresh only compact routing fields in `state.json` and `index.json`. |
+| Sprint close | Consolidate sprint Markdown, retro, accumulated debt, summaries, re-entry prompts, roadmap changes, and learned rules. |
+| Wrap-up | Generate handoff context and refresh changed summaries/re-entry context. |
+
+Do not refresh roadmap, re-entry prompts, debt summary, or learned rules during normal task execution. If a session is interrupted mid-task, recover from git diff, the task definition, and the latest compact event.
+
 ## Task Execution Protocol
 
 During Phase 4 (Implement), for each task:
@@ -198,7 +211,8 @@ During Phase 4 (Implement), for each task:
 8. If failure protocol resolves → re-run validation.
 9. If failure protocol escalates → mark task as blocked, move to next.
 10. Run the task-complete checkpoint.
-11. Write checkpoint to sprint file after each phase completes.
+11. Record only the minimal task-close event.
+12. At phase close, write phase status and compact routing state.
 
 ## Checkpoint Protocol
 
@@ -230,8 +244,8 @@ The orchestrator owns lifecycle checkpoints directly. These checks are not deleg
 
 ### Task-Complete Checkpoint
 
-- Verify the task is marked complete in the sprint file.
-- Verify checkpoint content was written for the completed phase.
+- Verify the task has a minimal completion event or blocker event.
+- Verify validation evidence is recorded compactly.
 - Record remaining tasks and any new debt in the sprint file.
 
 ### Pre-Commit Checkpoint
@@ -380,8 +394,9 @@ After all tasks are complete:
 5. Update frontmatter (status, dates, agents)
 6. Generate/update re-entry prompts
 7. Update roadmap if needed
-8. Run the learn-capture checkpoint.
-9. Propose new rules for `.agents/kyro/scopes/rules.md`
+8. Refresh `state.json`, `index.json`, sprint summary, and debt summary.
+9. Run the learn-capture checkpoint.
+10. Propose new rules for `.agents/kyro/scopes/rules.md`
 
 ## Rules
 

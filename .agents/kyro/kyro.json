@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "artifactRoot": ".agents/kyro/scopes",
+  "scopes": [
+    "00-p0-reproducibility-and-ci"
+  ],
+  "activeScope": "00-p0-reproducibility-and-ci",
+  "runtimeVersion": "3.4.1",
+  "runtimePath": "~/.agents/kyro/current",
+  "installedAdapters": [
+    {
+      "agent": "standard",
+      "scope": "workspace",
+      "installedAt": "2026-06-20T01:23:47.723Z",
+      "corePath": "~/.agents/kyro/current",
+      "commandsPath": "~/.agents/skills",
+      "skillsPath": "~/.agents/skills"
+    }
+  ]
+}
