@@ -1,10 +1,6 @@
 name: kyro-ai
 type: workflow
-<<<<<<< HEAD
-version: "3.4.1"
-=======
 version: "3.4.2"
->>>>>>> 23266f0 (perf(kyro): reduce runtime context cost)
 description: >
   Portable sprint workflow kit for AI coding agents, with markdown artifacts,
   adapter guides, adaptive per-project learning, and formal validation gates.
