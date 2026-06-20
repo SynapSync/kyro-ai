@@ -101,6 +101,22 @@ export interface DebtSummary {
   lastUpdated: string;
 }
 
+export interface RuleIndex {
+  schemaVersion: 1;
+  rules: RuleIndexEntry[];
+  sourceMarkdown: string;
+  lastUpdated: string;
+}
+
+export interface RuleIndexEntry {
+  id: string;
+  category: string;
+  tags: string[];
+  affectedModes: string[];
+  summary: string;
+  sourceLocation: string;
+}
+
 export function validateProjectStateShape(value: unknown, path: string): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
@@ -187,6 +203,51 @@ export function validateSprintSummary(value: unknown, path: string): ValidationI
   return issues;
 }
 
+
+export function validateRuleIndex(value: unknown, path: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
+  requireLiteral(value, 'schemaVersion', 1, path, issues);
+  if (!Array.isArray(value.rules)) {
+    issues.push({ path, field: 'rules', message: 'must be an array' });
+  } else {
+    value.rules.forEach((entry, index) => validateRuleIndexEntry(entry, path, `rules[${index}]`, issues));
+  }
+  requireString(value, 'sourceMarkdown', path, issues);
+  requireString(value, 'lastUpdated', path, issues);
+  return issues;
+}
+
+export function validateExecutionEvent(value: unknown, path: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
+  requireString(value, 'timestamp', path, issues);
+  requireString(value, 'scope', path, issues);
+  requireString(value, 'sprint', path, issues);
+  requireString(value, 'phase', path, issues);
+  requireString(value, 'task', path, issues);
+  requireString(value, 'status', path, issues);
+  requireStringArray(value, 'changedFiles', path, issues);
+  if (!Array.isArray(value.validation)) issues.push({ path, field: 'validation', message: 'must be an array' });
+  if (!Array.isArray(value.blockers)) issues.push({ path, field: 'blockers', message: 'must be an array' });
+  if (!Array.isArray(value.debtDeltas)) issues.push({ path, field: 'debtDeltas', message: 'must be an array' });
+  requireString(value, 'notes', path, issues);
+  return issues;
+}
+
+function validateRuleIndexEntry(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object' });
+    return;
+  }
+  requireString(value, 'id', path, issues, `${prefix}.id`);
+  requireString(value, 'category', path, issues, `${prefix}.category`);
+  requireStringArrayField(value, 'tags', path, issues, `${prefix}.tags`);
+  requireStringArrayField(value, 'affectedModes', path, issues, `${prefix}.affectedModes`);
+  requireString(value, 'summary', path, issues, `${prefix}.summary`);
+  requireString(value, 'sourceLocation', path, issues, `${prefix}.sourceLocation`);
+}
+
 export function validateDebtSummary(value: unknown, path: string): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
@@ -232,8 +293,12 @@ function requireNumber(record: Record<string, unknown>, key: string, path: strin
 }
 
 function requireStringArray(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[]): void {
+  requireStringArrayField(record, key, path, issues, key);
+}
+
+function requireStringArrayField(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field: string): void {
   if (!Array.isArray(record[key]) || !record[key].every((item) => typeof item === 'string')) {
-    issues.push({ path, field: key, message: 'must be an array of strings' });
+    issues.push({ path, field, message: 'must be an array of strings' });
   }
 }
 

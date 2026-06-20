@@ -4,23 +4,24 @@ Close a sprint or session by materializing compact execution evidence into durab
 
 ## Inputs
 
-1. Read `state.json`, `index.json`, and active sprint summary.
-2. Open active sprint Markdown for retro, findings consolidation, debt, and Definition of Done.
-3. Read `../helpers/debt-tracker.md` before changing debt rows.
-4. Read `../helpers/reentry-generator.md` only before updating re-entry prompts.
-5. Load roadmap Markdown only if execution changed future sprint sequencing.
+1. Read `state.json`, `index.json`, active sprint summary, and `events.ndjson` if present.
+2. Read summary files before opening Markdown.
+3. Open active sprint Markdown only when materializing retro, findings, debt, or Definition of Done.
+4. Read `../helpers/debt-tracker.md` before changing debt rows.
+5. Read `../helpers/reentry-generator.md` only before updating re-entry prompts.
+6. Load roadmap Markdown only if execution changed future sprint sequencing.
 
 ## Workflow
 
 1. Run the pre-close quality checkpoint.
-2. Consolidate findings from planned and emergent phases, including compact task events.
+2. Consolidate findings from planned and emergent phases using compact task events first.
 3. Fill retro: went well, did not go well, surprises, new debt.
 4. Write recommendations for Sprint N+1.
 5. Update accumulated debt statuses and new debt rows.
 6. Verify Definition of Done.
 7. Update re-entry prompts and roadmap only when needed.
 8. Refresh `state.json`, `index.json`, active sprint summary, and debt summary.
-9. Propose learned rules for `.agents/kyro/scopes/rules.md`.
+9. Propose learned rules and refresh `rules.index.json` when `rules.md` changes.
 
 ## Rules
 

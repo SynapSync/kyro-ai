@@ -18,7 +18,7 @@ Report Kyro progress without loading all sprint Markdown by default.
 
 | Request | Load next |
 |---------|-----------|
-| `brief` or empty | Summaries only; include sprint count rationale from `sizingDecision`; open Markdown only for missing critical fields. |
+| `brief` or empty | Summaries only; include sprint count rationale from `sizingDecision`; never open sprint Markdown when summaries exist. |
 | `full` | `skills/sprint-forge/assets/modes/STATUS.md`, then summaries, then Markdown fallbacks. |
 | `debt` | `skills/sprint-forge/assets/helpers/debt-tracker.md` plus debt summary/table. |
 | `debt-add`, `debt-resolve`, `debt-escalate` | `debt-tracker.md`, then update Markdown and summaries. |
@@ -29,6 +29,6 @@ If a summary file is missing, fall back to the Markdown source, produce the requ
 
 ## Rules
 
-- Do not read every sprint file for `brief` when summaries exist.
+- Do not read sprint Markdown for `brief` when summaries exist.
 - Never delete debt items; only update status fields.
 - Keep `index.json` aligned with any status or debt mutation.

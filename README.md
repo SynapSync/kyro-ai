@@ -107,9 +107,14 @@ Project state and artifacts:
     └── kyro/
         ├── kyro.json
         └── scopes/
+            ├── rules.md
+            ├── rules.index.json
             └── {scope}/
                 ├── state.json
+                ├── index.json
+                ├── events.ndjson
                 ├── ROADMAP.md
+                ├── ROADMAP.summary.json
                 └── phases/
 ```
 
@@ -331,6 +336,11 @@ npm pack --dry-run
 See [`docs/release-checklist.md`](docs/release-checklist.md) for the full maintainer checklist and CI gate ordering.
 
 ---
+
+
+## Cost Model
+
+Kyro uses lean runtime loading: command router → structured state → one routed mode → only required helpers. During execution it records compact `events.ndjson` evidence and materializes full Markdown, summaries, debt, rules, and re-entry prompts at sprint close. See [docs/cost-model.md](docs/cost-model.md).
 
 ## Documentation
 

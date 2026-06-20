@@ -104,7 +104,7 @@ After INIT, a scope looks like:
     └── SPRINT-N-*.summary.json
 ```
 
-Markdown is the human-readable evidence. JSON files are the fast routing cache used to save tokens.
+Markdown is the human-readable evidence. JSON files are the fast routing cache, and `events.ndjson` records compact task evidence during execution.
 
 ## Verify
 
@@ -113,7 +113,7 @@ kyro doctor
 kyro doctor --tokens
 ```
 
-`doctor --tokens` warns when command routers, projected skills, mode files, or AGENTS.md bootstrap instructions become too heavy.
+`doctor --tokens` audits realistic Kyro runtime paths and fails forbidden eager helper loading or over-budget paths.
 
 ## Next steps
 

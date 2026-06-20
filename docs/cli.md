@@ -190,7 +190,8 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - each analysis helper <= 450 words
 - ROADMAP template <= 450 words
 - REENTRY template <= 350 words
-- startup, status brief, and INIT happy paths stay under their estimated token budgets
+- startup, status brief, INIT happy path, and realistic forge/status/wrap-up runtime paths stay under estimated token budgets
+- forbidden eager helper combinations fail the audit
 - `sizingDecision` regression fixture stays internally consistent
 
 Warnings mean Kyro still works, but the harness is becoming expensive to load. Failing sizing checks mean INIT can no longer prove its sprint boundaries.
@@ -206,7 +207,7 @@ kyro doctor --tokens --artifacts
 kyro doctor --artifacts --kyro-scope auth-refactor
 ```
 
-The audit validates project state, scoped `state.json`, `index.json`, roadmap/sprint summaries, source Markdown references, stale summaries, and active sprint pointers. Missing summaries warn; invalid JSON and broken state references fail.
+The audit validates project state, scoped `state.json`, `index.json`, optional `events.ndjson`, optional `rules.index.json`, roadmap/sprint summaries, source Markdown references, stale summaries, and active sprint pointers. Missing summaries warn; invalid JSON and broken state references fail.
 
 Repair JSON summaries from Markdown without rewriting Markdown:
 

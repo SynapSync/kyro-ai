@@ -11,7 +11,7 @@ Use this command to continue Kyro work without loading the whole workflow upfron
 
 1. Read `.agents/kyro/kyro.json` if it exists.
 2. Resolve the active scope from `$ARGUMENTS`, `activeScope`, or the only directory under `.agents/kyro/scopes/`.
-3. For a resolved scope, read `.agents/kyro/scopes/{scope}/state.json` first, then `.agents/kyro/scopes/{scope}/index.json` if present.
+3. For a resolved scope, read `state.json`, `index.json`, and `.agents/kyro/scopes/rules.index.json` if present.
 4. Do not read ROADMAP, sprint Markdown, templates, or helper files until the selected route requires them.
 
 ## Route
@@ -28,7 +28,7 @@ Use this command to continue Kyro work without loading the whole workflow upfron
 
 ## Rules
 
-- Load only the routed mode plus the helpers named by that mode.
+- Load only the routed mode plus the helpers named by that mode; never preload sprint/debt/re-entry helpers.
 - Enforce orchestrator gates from `agents/orchestrator.md` only at gate moments.
 - Follow the Write Policy from the routed mode:
   - task close writes only a minimal append-only event;

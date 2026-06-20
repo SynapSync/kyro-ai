@@ -90,3 +90,7 @@ Before context compaction, save compact sprint state:
 - Points to the active sprint and re-entry prompt paths
 
 This gives the agent (and user) a chance to save state before context is compressed.
+
+## Cost model details
+
+See [Cost Model](cost-model.md) for audited runtime paths, write policy, and rules index behavior.

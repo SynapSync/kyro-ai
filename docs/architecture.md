@@ -58,7 +58,7 @@ USER
   |
   v
 ORCHESTRATOR
-  |-- loads .agents/kyro/scopes/rules.md
+  |-- loads .agents/kyro/scopes/rules.index.json
   |-- reads sprint-forge skill assets
   |-- runs built-in checkpoints
   |
@@ -86,11 +86,12 @@ ORCHESTRATOR
 
 ## Artifact Layout
 
-Kyro stores durable evidence in markdown and routing state in small JSON files. Agents read JSON first to save context, then open Markdown only when evidence or mutation is required.
+Kyro stores durable evidence in markdown and routing state in small JSON/NDJSON files. Agents read JSON first to save context, then open Markdown only when evidence or mutation is required. See [Cost Model](cost-model.md).
 
 ```
 .agents/kyro/scopes/
 ├── rules.md
+├── rules.index.json
 └── {scope}/
     ├── README.md
     ├── state.json
@@ -98,6 +99,7 @@ Kyro stores durable evidence in markdown and routing state in small JSON files. 
     ├── ROADMAP.md
     ├── ROADMAP.summary.json
     ├── RE-ENTRY-PROMPTS.md
+    ├── events.ndjson
     ├── findings/
     ├── phases/
     │   ├── SPRINT-N-*.md

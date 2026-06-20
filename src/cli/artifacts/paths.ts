@@ -24,6 +24,18 @@ export function debtSummaryPath(scope: string): string {
   return `${scopeRoot(scope)}/DEBT.summary.json`;
 }
 
+export function eventsPath(scope: string): string {
+  return `${scopeRoot(scope)}/events.ndjson`;
+}
+
+export function rulesPath(): string {
+  return `${ARTIFACT_ROOT}/rules.md`;
+}
+
+export function rulesIndexPath(): string {
+  return `${ARTIFACT_ROOT}/rules.index.json`;
+}
+
 export function phasesPath(scope: string): string {
   return `${scopeRoot(scope)}/phases`;
 }

@@ -3,14 +3,16 @@ import { basename } from 'node:path';
 import { ARTIFACT_ROOT, KYRO_STATE_PATH } from '../constants';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
-import { debtSummaryPath, phasesPath, roadmapPath, roadmapSummaryPath, scopeIndexPath, scopeRoot, scopeStatePath } from '../artifacts/paths';
+import { debtSummaryPath, eventsPath, phasesPath, roadmapPath, roadmapSummaryPath, rulesIndexPath, rulesPath, scopeIndexPath, scopeRoot, scopeStatePath } from '../artifacts/paths';
 import {
   asProjectState,
   asScopeIndex,
   asScopeState,
   validateDebtSummary,
   validateProjectStateShape,
+  validateExecutionEvent,
   validateRoadmapSummary,
+  validateRuleIndex,
   validateScopeIndex,
   validateScopeState,
   validateSprintSummary,
@@ -48,6 +50,8 @@ export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResu
   const projectState = asProjectState(projectStateRead.value);
   if (!projectState) return checks;
 
+  checks.push(...checkRulesIndex());
+
   const scopeNames = resolveScopeNames(projectState.scopes, projectState.activeScope, options.kyroScope);
   if (scopeNames.length === 0) {
     checks.push(warn('artifact scopes', 'no scopes found', 'Run kyro-forge/INIT to create the first scope.'));
@@ -77,6 +81,60 @@ export function listScopeNames(): string[] {
   return [...names].sort();
 }
 
+
+function checkRulesIndex(): CheckResult[] {
+  const checks: CheckResult[] = [];
+  const rules = rulesPath();
+  const index = rulesIndexPath();
+  const rulesAbsolute = resolveManagedPath(rules);
+  const indexAbsolute = resolveManagedPath(index);
+  if (!existsSync(rulesAbsolute)) return checks;
+
+  const words = countWords(readFileSync(rulesAbsolute, 'utf-8'));
+  if (!existsSync(indexAbsolute)) {
+    if (words > 200) {
+      checks.push(warn('artifact rules index', `${index} missing for ${words} rule words`, 'Create rules.index.json so startup can avoid loading the full rules ledger.'));
+    } else {
+      checks.push(pass('artifact rules index', `${index} optional for ${words} rule words`));
+    }
+    return checks;
+  }
+
+  const value = readAndValidate(index, validateRuleIndex, 'rules.index.json', checks, 'Run kyro repair or regenerate the rules index from rules.md.');
+  if (value && isStale(rules, index)) {
+    checks.push(warn('artifact rules index', `${index} is older than rules.md`, 'Refresh rules.index.json from rules.md.'));
+  }
+  return checks;
+}
+
+function checkExecutionEvents(scope: string): CheckResult[] {
+  const checks: CheckResult[] = [];
+  const path = eventsPath(scope);
+  const absolute = resolveManagedPath(path);
+  if (!existsSync(absolute)) return checks;
+  const lines = readFileSync(absolute, 'utf-8').split(/\r?\n/).filter((line) => line.trim().length > 0);
+  for (const [index, line] of lines.entries()) {
+    try {
+      const parsed: unknown = JSON.parse(line);
+      const issues = validateExecutionEvent(parsed, `${path}:${index + 1}`);
+      if (issues.length > 0) {
+        checks.push(fail(`artifact events:${scope}`, formatIssues(issues), 'Fix the invalid execution event line or rebuild from sprint Markdown.'));
+        return checks;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      checks.push(fail(`artifact events:${scope}`, `${path}:${index + 1}: ${message}`, 'Keep events.ndjson as one valid JSON object per line.'));
+      return checks;
+    }
+  }
+  checks.push(pass(`artifact events:${scope}`, `${path} has ${lines.length} valid events`));
+  return checks;
+}
+
+function countWords(text: string): number {
+  return text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length;
+}
+
 function checkScope(scope: string): CheckResult[] {
   const checks: CheckResult[] = [];
   const root = scopeRoot(scope);
@@ -89,6 +147,7 @@ function checkScope(scope: string): CheckResult[] {
   checks.push(...checkSummaries(scope, context));
   checks.push(...checkStateReferences(scope, context));
   checks.push(...checkIndexReferences(scope, context));
+  checks.push(...checkExecutionEvents(scope));
   return checks;
 }
 
