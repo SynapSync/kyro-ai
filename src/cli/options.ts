@@ -12,6 +12,7 @@ export function parseOptions(args: string[]): CliOptions {
   let artifacts = false;
   let adapters = false;
   let kyroScope: string | null = null;
+  let task: string | null = null;
   let json = false;
   let purgeAdapterAssets = false;
   let prune = false;
@@ -43,6 +44,16 @@ export function parseOptions(args: string[]): CliOptions {
       i += 1;
     } else if (arg.startsWith('--kyro-scope=')) {
       kyroScope = arg.slice('--kyro-scope='.length);
+    } else if (arg === '--task') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        task = '';
+      } else {
+        task = value;
+        i += 1;
+      }
+    } else if (arg.startsWith('--task=')) {
+      task = arg.slice('--task='.length);
     } else if (arg === '--agent' || arg === '--agents') {
       const value = args[i + 1];
       if (!value) throw new Error(`${arg} requires a value`);
@@ -74,6 +85,7 @@ export function parseOptions(args: string[]): CliOptions {
     artifacts,
     adapters,
     kyroScope,
+    task,
     json,
     purgeAdapterAssets,
     prune,

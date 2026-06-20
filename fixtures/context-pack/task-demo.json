@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "packMode": "task",
+  "scope": "demo",
+  "status": "active",
+  "currentPhase": "sprint",
+  "nextAction": "execute_task",
+  "activeSprint": "SPRINT-001-demo",
+  "roadmapSummary": "Demo roadmap",
+  "activeSprintSummary": ".agents/kyro/scopes/demo/phases/SPRINT-001-demo.summary.json",
+  "nextTask": "T1.2",
+  "openDebtCount": 1,
+  "relevantArtifactPaths": {
+    "roadmap": ".agents/kyro/scopes/demo/ROADMAP.md",
+    "roadmapSummary": ".agents/kyro/scopes/demo/ROADMAP.summary.json",
+    "sprints": ".agents/kyro/scopes/demo/phases",
+    "reentry": ".agents/kyro/scopes/demo/RE-ENTRY-PROMPTS.md"
+  },
+  "taskId": "T1.2",
+  "taskDescription": "Pending task",
+  "taskFiles": [
+    "src/pending.ts",
+    "src/other.ts"
+  ],
+  "taskVerification": "Pending task verification criteria",
+  "sourceMarkdown": ".agents/kyro/scopes/demo/phases/SPRINT-001-demo.md",
+  "sprintSummaryPath": ".agents/kyro/scopes/demo/phases/SPRINT-001-demo.summary.json",
+  "evidencePaths": [
+    ".agents/kyro/scopes/demo/phases/SPRINT-001-demo.summary.json"
+  ],
+  "rules": [
+    {
+      "id": "execute-1",
+      "category": "Execution",
+      "summary": "Task execution rule for fixtures."
+    },
+    {
+      "id": "review-1",
+      "category": "Review",
+      "summary": "Task review rule for fixtures."
+    }
+  ],
+  "warnings": [],
+  "budgetClass": "execute",
+  "reasoningTier": "standard",
+  "maxContextTokens": 2500,
+  "budgetGuidance": "Use for implementation and task execution. Load task packs, run concrete validation, and avoid broad exploration.",
+  "estimatedTokens": "number"
+}

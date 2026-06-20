@@ -1,0 +1,22 @@
+{
+  "brief": {
+    "maxContextTokens": 1500,
+    "reasoningTier": "light",
+    "guidance": "Use for status checks, scope routing, and summary-first resume. Prefer context-pack over opening Markdown."
+  },
+  "execute": {
+    "maxContextTokens": 2500,
+    "reasoningTier": "standard",
+    "guidance": "Use for implementation and task execution. Load task packs, run concrete validation, and avoid broad exploration."
+  },
+  "review": {
+    "maxContextTokens": 2500,
+    "reasoningTier": "standard",
+    "guidance": "Use for review and certification. Favor evidence, checks, and regression fixtures over new feature work."
+  },
+  "close": {
+    "maxContextTokens": 3200,
+    "reasoningTier": "deep",
+    "guidance": "Use for sprint close, retro, and wrap-up materialization. Quality gates matter more than speed."
+  }
+}

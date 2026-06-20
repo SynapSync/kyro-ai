@@ -25,3 +25,11 @@
 7. **Refresh all summaries (`state.json`, `index.json`, sprint summary, roadmap summary, debt summary, re-entry prompts) at close.** Markdown is the durable evidence; summaries are the routing cache.
 8. **Update `index.json`'s `nextTask` to be a verbatim substring of the active sprint Markdown.** The artifact doctor validates this consistency, including backticks and bold formatting.
 9. **When closing the final sprint in a roadmap, set the scope `status` to `completed` and `nextAction` to `wrap_up`.** Mark the roadmap summary and re-entry prompts as completed as well.
+
+## Context Pack and Token Cost
+
+12. **Prefer `kyro context-pack` over manual file selection** at session start, after compaction, or when resuming a scope. Use scope packs for routing; use `--task <id>` for execution.
+13. **Pass `--json` explicitly in fixture checkers** that validate context-pack output. Do not assume JSON mode from help text alone.
+14. **Do not run `kyro repair` after sprint close** to refresh summaries. It can corrupt `state.json` and compact routing fields; restore artifacts manually from sprint Markdown and events.
+15. **Budget manifest entries must stay provider-neutral.** No model IDs (`gpt-`, `claude-`, `gemini-`) in `config.json` `budgetClasses`; enforce with `npm run check:budget-manifest`.
+16. **Bare `--task` fallback requires `index.nextTask` in `T{n}.{m}` form.** Prose nextTask values need an explicit `--task <id>` until D1 mapping is implemented.

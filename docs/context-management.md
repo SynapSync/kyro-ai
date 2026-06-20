@@ -55,6 +55,27 @@ This triggers compaction at 50% context usage instead of the default. Useful for
 
 ---
 
+## Context Pack Command
+
+Use `kyro context-pack` to load the minimum routing context for a scope without opening long Markdown files:
+
+```bash
+kyro context-pack --kyro-scope <scope>
+kyro context-pack --kyro-scope <scope> --json
+kyro context-pack --kyro-scope <scope> --task <id>
+kyro context-pack --kyro-scope <scope> --task
+```
+
+Scope packs read `state.json`, `index.json`, `ROADMAP.summary.json`, and `rules.index.json`. Task packs add parsed task details from the active sprint Markdown, filter rules to `execute-task` and `review-task`, and list evidence paths without embedding event payloads or retro sections.
+
+Each pack includes budget routing from `config.json` `budgetClasses`: `budgetClass`, `reasoningTier`, `maxContextTokens`, and `budgetGuidance`. Selection follows `nextAction` and pack mode — for example, `execute_task` maps to the `execute` class.
+
+Prefer scope packs at session start. Prefer task packs when executing a specific sprint task. Use bare `--task` to default to `index.json` `nextTask`.
+
+If `--kyro-scope` is omitted, the command uses `activeScope` from `.agents/kyro/kyro.json`.
+
+---
+
 ## Re-entry Prompts
 
 Re-entry prompts are Kyro's primary defense against context loss between sprints. They are updated at INIT, sprint close, and wrap-up — not after every task.

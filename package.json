@@ -1,6 +1,6 @@
 {
   "name": "kyro-ai",
-  "version": "3.4.2",
+  "version": "3.4.3",
   "description": "Portable sprint workflow kit for AI coding agents, with markdown artifacts, adapter guides, and formal debt tracking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,12 +11,14 @@
     "check:links": "node scripts/check-markdown-links.mjs",
     "check:versions": "node scripts/check-versions.mjs",
     "check:dist": "node scripts/check-dist-freshness.mjs",
-    "check": "npm run typecheck && npm run check:versions && npm run check:links && npm run check:dist",
+    "check": "npm run typecheck && npm run check:versions && npm run check:links && npm run check:dist && npm run check:budget-manifest",
+    "check:budget-manifest": "node scripts/check-budget-manifest.mjs",
     "prepublishOnly": "npm run build && npm run check:dist && npm run check:adapters",
     "build:chmod": "node scripts/make-cli-executable.mjs",
     "check:tokens": "node dist/cli.js doctor --tokens",
     "check:artifacts": "node dist/cli.js doctor --artifacts",
     "check:artifact-fixtures": "node scripts/check-artifact-fixtures.mjs",
+    "check:context-pack": "node scripts/check-context-pack-fixtures.mjs",
     "check:adapters": "node scripts/check-adapter-fixtures.mjs"
   },
   "keywords": [

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "scope": "01-token-cost-optimization",
+  "status": "completed",
+  "summary": "Implement deterministic context-pack generation, task-specific context selection, context budget regression fixtures, and provider-neutral budget/model routing for Kyro.",
+  "plannedSprintCount": 3,
+  "completedSprintCount": 3,
+  "adaptationCount": 0,
+  "sizingDecision": {
+    "recommendedSprintCount": 3,
+    "riskLevel": "medium",
+    "rationale": "The remaining cost work adds a new public CLI surface, task-specific context selection, regression fixtures, and a separate model/budget routing contract. Splitting keeps the public command foundation, task-pack behavior, and budget-routing policy independently reviewable.",
+    "splitTriggers": [
+      "New public CLI command and options need isolated integration tests.",
+      "Task-specific context packs depend on the base context-pack contract and need separate fixtures.",
+      "Model/budget routing affects product policy and documentation independently from context-pack mechanics."
+    ],
+    "whyNotFewer": "Two sprints would mix CLI command plumbing, task-specific extraction, fixture budgets, and model routing policy into large review units with unclear rollback boundaries.",
+    "whyNotMore": "Four or more sprints would add orchestration overhead without a new dependency boundary; docs and model routing can be completed together after context-pack fixtures exist.",
+    "sprintProofs": [
+      "Sprint 1 is independently provable when `kyro context-pack --kyro-scope <scope>` emits a bounded summary-first package for existing scopes with tests.",
+      "Sprint 2 is independently provable when `--task <id>` context packs include only task-relevant details, rules, and validation criteria with budget regression fixtures.",
+      "Sprint 3 is independently provable when budget/model routing is encoded in config/types/docs and validated without provider-specific model names."
+    ]
+  },
+  "nextRecommendedAction": "wrap_up",
+  "openDecisions": [],
+  "relevantArtifactPaths": [
+    ".agents/kyro/scopes/01-token-cost-optimization/ROADMAP.md",
+    ".agents/kyro/scopes/01-token-cost-optimization/findings/01-context-pack-command-foundation.md",
+    ".agents/kyro/scopes/01-token-cost-optimization/findings/02-task-specific-context-selection.md",
+    ".agents/kyro/scopes/01-token-cost-optimization/findings/03-context-pack-token-regression-fixtures.md",
+    ".agents/kyro/scopes/01-token-cost-optimization/findings/04-model-budget-routing-manifest.md"
+  ],
+  "lastUpdated": "2026-06-20T23:00:00.000Z"
+}

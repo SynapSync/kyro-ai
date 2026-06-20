@@ -44,10 +44,25 @@ export interface CliOptions {
   artifacts: boolean;
   adapters: boolean;
   kyroScope: string | null;
+  task: string | null;
   json: boolean;
   purgeAdapterAssets: boolean;
   prune: boolean;
 }
+
+export type ContextPackMode = 'scope' | 'task';
+
+export type BudgetClassId = 'brief' | 'execute' | 'review' | 'close';
+
+export type ReasoningTier = 'light' | 'standard' | 'deep';
+
+export interface BudgetClassDefinition {
+  maxContextTokens: number;
+  reasoningTier: ReasoningTier;
+  guidance: string;
+}
+
+export type BudgetManifest = Record<BudgetClassId, BudgetClassDefinition>;
 
 export interface OperationPlan {
   action: 'write' | 'copy' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'symlink' | 'merge-json' | 'remove-json-key';
@@ -63,4 +78,46 @@ export interface CheckResult {
   name: string;
   detail: string;
   remedy?: string;
+}
+
+export interface ContextPackRuleSummary {
+  id: string;
+  category: string;
+  summary: string;
+}
+
+export interface ContextPackArtifactPaths {
+  roadmap: string;
+  roadmapSummary: string;
+  sprints: string;
+  reentry: string;
+}
+
+export interface ContextPackOutput {
+  schemaVersion: 1;
+  packMode: ContextPackMode;
+  scope: string;
+  status: string | null;
+  currentPhase: string | null;
+  nextAction: string | null;
+  activeSprint: string | null;
+  roadmapSummary: string | null;
+  activeSprintSummary: string | null;
+  nextTask: string | null;
+  openDebtCount: number | null;
+  relevantArtifactPaths: ContextPackArtifactPaths | null;
+  taskId: string | null;
+  taskDescription: string | null;
+  taskFiles: string[];
+  taskVerification: string | null;
+  sourceMarkdown: string | null;
+  sprintSummaryPath: string | null;
+  evidencePaths: string[];
+  rules: ContextPackRuleSummary[];
+  warnings: string[];
+  estimatedTokens: number;
+  budgetClass: BudgetClassId;
+  reasoningTier: ReasoningTier;
+  maxContextTokens: number;
+  budgetGuidance: string;
 }
