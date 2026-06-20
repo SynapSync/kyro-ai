@@ -3,6 +3,7 @@ import { detect } from './commands/detect';
 import { install, sync } from './commands/install';
 import { runTui } from './commands/tui';
 import { repair } from './commands/repair';
+import { contextPack } from './commands/context-pack';
 import { runScopeCommand } from './commands/scope';
 import { uninstall } from './commands/uninstall';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
@@ -28,6 +29,16 @@ export async function runCli(): Promise<void> {
 
   if (command === 'scope') {
     runScopeCommand(args);
+    return;
+  }
+
+  if (command === 'context-pack') {
+    const options = parseOptions(args);
+    if (options.help) {
+      printCommandHelp(command);
+      return;
+    }
+    contextPack(options);
     return;
   }
 

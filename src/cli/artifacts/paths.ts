@@ -40,6 +40,14 @@ export function phasesPath(scope: string): string {
   return `${scopeRoot(scope)}/phases`;
 }
 
+export function sprintMarkdownPath(scope: string, sprint: string): string {
+  return `${phasesPath(scope)}/${sprint}.md`;
+}
+
+export function sprintSummaryPath(scope: string, sprint: string): string {
+  return `${phasesPath(scope)}/${sprint}.summary.json`;
+}
+
 export function projectStatePath(): string {
   return KYRO_STATE_PATH;
 }

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "scope": "01-token-cost-optimization",
+  "status": "completed",
+  "activeSprint": null,
+  "currentPhase": "closed",
+  "nextAction": "wrap_up",
+  "roadmapPath": ".agents/kyro/scopes/01-token-cost-optimization/ROADMAP.md",
+  "sprintsPath": ".agents/kyro/scopes/01-token-cost-optimization/phases",
+  "lastUpdated": "2026-06-20T23:00:00.000Z"
+}

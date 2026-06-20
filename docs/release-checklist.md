@@ -28,6 +28,8 @@ npm run check:adapters
 npm run check:tokens
 npm run check:artifacts
 npm run check:artifact-fixtures
+npm run check:context-pack
+npm run check:budget-manifest
 
 # 5. Simulate packaging with fresh, validated output
 npm pack --dry-run
@@ -52,6 +54,8 @@ npm run check:adapters
 npm run check:tokens
 npm run check:artifacts
 npm run check:artifact-fixtures
+npm run check:context-pack
+npm run check:budget-manifest
 npm pack --dry-run
 ```
 

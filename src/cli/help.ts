@@ -13,6 +13,7 @@ Usage:
   kyro detect                  Detect local agent adapters
   kyro doctor                  Check package/workspace health
   kyro repair [options]        Repair scoped JSON artifacts from Markdown
+  kyro context-pack [options]  Emit a summary-first context package for a scope
   kyro scope <subcommand>      List, inspect, or set active Kyro scopes
   kyro sync [options]          Refresh managed workspace assets
   kyro uninstall [options]     Remove managed workspace assets
@@ -37,6 +38,7 @@ Examples:
   kyro detect --json
   kyro doctor --tokens --artifacts
   kyro repair --kyro-scope auth-refactor --dry-run
+  kyro context-pack --kyro-scope 01-token-cost-optimization --json
   kyro scope list
 `);
 }
@@ -50,6 +52,8 @@ export function printCommandHelp(command: string): void {
     console.log('Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--kyro-scope <scope>]');
   } else if (command === 'repair') {
     console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]');
+  } else if (command === 'context-pack') {
+    console.log('Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--json]');
   } else if (command === 'scope') {
     console.log('Usage: kyro scope list | inspect <scope> | set-active <scope>');
   } else if (command === 'sync') {

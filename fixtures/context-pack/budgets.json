@@ -1,0 +1,6 @@
+{
+  "scopePackMaxEstimatedTokens": 120,
+  "taskPackMaxEstimatedTokens": 100,
+  "expectedBudgetClass": "execute",
+  "expectedReasoningTier": "standard"
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "scope": "01-token-cost-optimization",
+  "sprint": "SPRINT-002-task-specific-packs-and-budget-fixtures",
+  "status": "completed",
+  "completedTasks": 13,
+  "blockedTasks": 0,
+  "carryOverTasks": 0,
+  "nextRecommendedAction": "plan_sprint",
+  "nextTask": "Plan Sprint 3: Budget routing manifest.",
+  "openDecisions": [
+    "Decide release version bump (3.4.3 vs 3.5.0) when packaging context-pack task mode."
+  ],
+  "filesTouched": [
+    "src/cli/artifacts/task-parser.ts",
+    "src/cli/artifacts/paths.ts",
+    "src/cli/commands/context-pack.ts",
+    "src/cli/options.ts",
+    "src/cli/types.ts",
+    "src/cli/help.ts",
+    "src/cli/commands/tui.ts",
+    "scripts/check-context-pack-fixtures.mjs",
+    "fixtures/context-pack/task-demo.json",
+    "fixtures/context-pack/budgets.json",
+    "fixtures/context-pack/valid-demo.json",
+    "fixtures/artifact-integrity/valid/.agents/kyro/scopes/demo/phases/SPRINT-001-demo.md",
+    "fixtures/artifact-integrity/valid/.agents/kyro/scopes/rules.index.json",
+    "docs/cli.md",
+    "docs/context-management.md",
+    "docs/release-checklist.md",
+    "dist/**"
+  ],
+  "debtDeltas": [],
+  "sourceMarkdown": ".agents/kyro/scopes/01-token-cost-optimization/phases/SPRINT-002-task-specific-packs-and-budget-fixtures.md",
+  "lastUpdated": "2026-06-20T20:00:00.000Z"
+}

@@ -45,6 +45,33 @@ This keeps work recoverable without rewriting large artifacts after every task.
 
 Startup reads `rules.index.json`, not full `rules.md`. Open `rules.md` only when a matching rule may apply, the user asks for rules, or sprint close proposes new rules.
 
+## Budget Classes
+
+`config.json` defines provider-neutral budget classes. They describe how much context to load and how deep to reason — without naming provider-specific models.
+
+| Class | Max context tokens | Reasoning tier | Typical use |
+|-------|-------------------|----------------|-------------|
+| `brief` | 1,500 | light | Status, routing, summary-first resume |
+| `execute` | 2,500 | standard | Implementation and task execution |
+| `review` | 2,500 | standard | Review, certification, regression checks |
+| `close` | 3,200 | deep | Sprint close, retro, wrap-up materialization |
+
+`kyro context-pack` selects a class from pack mode and `state.json` `nextAction`:
+
+- `plan_sprint` or `status` → `brief`
+- task pack or `execute_task` → `execute`
+- `review_task` → `review`
+- `close_sprint` or `wrap_up` → `close`
+
+The selected class appears in context-pack output as `budgetClass`, `reasoningTier`, `maxContextTokens`, and `budgetGuidance`.
+
+Fixture validation:
+
+```bash
+npm run check:budget-manifest
+npm run check:context-pack
+```
+
 ## Quality Boundary
 
 Kyro is not less rigorous. It moves rigor to the correct lifecycle boundary: compact evidence during execution, full documentation and learning at sprint close.

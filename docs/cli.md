@@ -9,6 +9,7 @@ kyro                    # Open the interactive TUI
 kyro install            # Install standard .agents assets by default
 kyro doctor             # Read-only package/workspace health check
 kyro doctor --tokens    # Audit context/token budgets
+kyro context-pack       # Emit a summary-first context package for a Kyro scope
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
@@ -52,6 +53,7 @@ npm run check:adapters
 npm run check:tokens
 npm run check:artifacts
 npm run check:artifact-fixtures
+npm run check:context-pack
 npm pack --dry-run
 ```
 
@@ -196,6 +198,36 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 
 Warnings mean Kyro still works, but the harness is becoming expensive to load. Failing sizing checks mean INIT can no longer prove its sprint boundaries.
 
+
+## Context Pack
+
+Use `kyro context-pack` when an agent needs the minimal routing context for a scope without opening full Markdown files:
+
+```bash
+kyro context-pack --kyro-scope 01-token-cost-optimization
+kyro context-pack --kyro-scope 01-token-cost-optimization --json
+kyro context-pack --kyro-scope 01-token-cost-optimization --task T1.1
+kyro context-pack --kyro-scope 01-token-cost-optimization --task
+```
+
+Use `--task` alone to default to `index.json` `nextTask` during active sprint execution.
+
+The command reads structured artifacts first:
+
+- `state.json`
+- `index.json`
+- `ROADMAP.summary.json`
+- `rules.index.json`
+
+It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, warnings, budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
+
+Prefer `context-pack` over manual file selection at session start, after compaction, or when resuming a scope through summary-first routing.
+
+Fixture validation:
+
+```bash
+npm run check:context-pack
+```
 
 ## Artifact Integrity
 

@@ -11,7 +11,7 @@
     {
       "name": "kyro-ai",
       "source": "./",
-      "description": "Claude Code adapter for Kyro: one orchestrator agent, 3 slash commands, 2 skills, markdown artifacts, and formal debt tracking.",
+      "description": "Claude Code adapter for Kyro: one orchestrator agent, 3 slash commands, 2 skills, markdown artifacts, formal debt tracking, plus a runtime context-pack CLI for summary-first scope resume and provider-neutral budget routing.",
       "author": {
         "name": "SynapSync"
       },

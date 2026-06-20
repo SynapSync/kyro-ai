@@ -6,6 +6,8 @@ Kyro provides 3 slash commands. Each command is now a thin router: it reads stru
 
 Kyro command paths are audited by `kyro doctor --tokens`. Brief status never opens sprint Markdown when summaries exist; forge execution never loads planning, debt, or re-entry helpers by default; closeout is the normal materialization point for full documentation.
 
+For scope resume outside slash commands, use `kyro context-pack --kyro-scope <scope>` to emit the same summary-first routing bundle that agents would otherwise assemble manually.
+
 ---
 
 ## /kyro:forge

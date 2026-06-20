@@ -2,36 +2,140 @@
   "schemaVersion": 1,
   "rules": [
     {
-      "id": "runtime-001",
-      "category": "generated-runtime",
-      "tags": ["dist", "build", "runtime-parity"],
+      "id": "generated-runtime-1",
+      "category": "Generated Runtime",
+      "tags": ["build", "dist", "runtime-parity"],
       "affectedModes": ["execute-task", "close-sprint"],
-      "summary": "Rebuild and verify dist before claiming runtime parity.",
-      "sourceLocation": ".agents/kyro/scopes/rules.md#generated-runtime"
+      "summary": "Always rebuild dist/ from src/ before claiming runtime parity; generated runtime can lag even when core checks pass.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
     },
     {
-      "id": "ci-001",
-      "category": "checks-and-ci",
-      "tags": ["check", "tokens", "adapters", "ci"],
-      "affectedModes": ["review-task", "close-sprint", "status"],
-      "summary": "Treat known adapter-block token warnings as pre-existing unless the sprint changes that adapter, and run package checks before close.",
-      "sourceLocation": ".agents/kyro/scopes/rules.md#checks-and-ci"
+      "id": "generated-runtime-2",
+      "category": "Generated Runtime",
+      "tags": ["build", "cli", "verification"],
+      "affectedModes": ["execute-task", "close-sprint"],
+      "summary": "Verify generated CLI behavior with direct commands after npm run build; do not rely only on build exit code.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
     },
     {
-      "id": "docs-001",
-      "category": "documentation",
-      "tags": ["docs", "release", "links"],
-      "affectedModes": ["execute-task", "review-task", "close-sprint"],
-      "summary": "Keep release docs aligned with actual scripts and run link checks after docs changes.",
-      "sourceLocation": ".agents/kyro/scopes/rules.md#documentation"
+      "id": "generated-runtime-3",
+      "category": "Generated Runtime",
+      "tags": ["build", "dist", "git"],
+      "affectedModes": ["execute-task", "review-task"],
+      "summary": "dist/ is .gitignored; do not use git diff --stat dist for review evidence.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
     },
     {
-      "id": "closure-001",
-      "category": "sprint-closure",
-      "tags": ["state", "index", "summaries", "wrap-up"],
-      "affectedModes": ["close-sprint", "recover", "wrap-up"],
-      "summary": "Close sprints and final roadmaps by updating state, index, summaries, and wrap-up routing consistently.",
-      "sourceLocation": ".agents/kyro/scopes/rules.md#sprint-closure"
+      "id": "checks-ci-4",
+      "category": "Checks and CI",
+      "tags": ["doctor", "tokens", "adapters"],
+      "affectedModes": ["execute-task", "close-sprint"],
+      "summary": "npm run check:tokens may report pre-existing adapter-block warnings for agents not installed; classify as non-blocking unless that adapter is installed.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "checks-ci-5",
+      "category": "Checks and CI",
+      "tags": ["ci", "package-checks", "gates"],
+      "affectedModes": ["close-sprint"],
+      "summary": "Package checks (npm run check, npm run check:tokens, npm pack --dry-run) must pass or have documented pre-existing warnings before a sprint closes.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "documentation-9",
+      "category": "Documentation",
+      "tags": ["docs", "release-checklist", "sync"],
+      "affectedModes": ["execute-task", "close-sprint"],
+      "summary": "Keep release docs and checklists in sync with actual scripts when package.json, CI, or validation commands change.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "documentation-10",
+      "category": "Documentation",
+      "tags": ["docs", "links", "validation"],
+      "affectedModes": ["execute-task", "close-sprint"],
+      "summary": "Run npm run check:links after any documentation change that adds or moves links.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "documentation-11",
+      "category": "Documentation",
+      "tags": ["docs", "commands", "accuracy"],
+      "affectedModes": ["execute-task"],
+      "summary": "Reference real commands in documentation, not prose approximations; copy exact package.json script names into checklists.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "sprint-closure-6",
+      "category": "Sprint Closure",
+      "tags": ["state", "close-sprint", "planning"],
+      "affectedModes": ["close-sprint"],
+      "summary": "Close a sprint by setting state.json activeSprint to null and nextAction to plan_sprint; never jump to the next sprint before it is generated.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "sprint-closure-7",
+      "category": "Sprint Closure",
+      "tags": ["summaries", "close-sprint"],
+      "affectedModes": ["close-sprint"],
+      "summary": "Refresh all summaries (state.json, index.json, sprint summary, roadmap summary, debt summary, re-entry prompts) at sprint close.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "sprint-closure-8",
+      "category": "Sprint Closure",
+      "tags": ["index", "next-task", "consistency"],
+      "affectedModes": ["close-sprint"],
+      "summary": "Update index.json nextTask to be a verbatim substring of the active sprint Markdown; artifact doctor validates this consistency.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "sprint-closure-12",
+      "category": "Sprint Closure",
+      "tags": ["state", "completed", "wrap-up"],
+      "affectedModes": ["close-sprint", "wrap-up"],
+      "summary": "When closing the final sprint in a roadmap, set scope status to completed and nextAction to wrap_up; mark roadmap summary and re-entry prompts as completed.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "context-pack-12",
+      "category": "Context Pack and Token Cost",
+      "tags": ["context-pack", "resume", "routing"],
+      "affectedModes": ["execute-task", "status", "wrap-up"],
+      "summary": "Prefer kyro context-pack over manual file selection at session start, after compaction, or when resuming a scope.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "context-pack-13",
+      "category": "Context Pack and Token Cost",
+      "tags": ["context-pack", "fixtures", "json"],
+      "affectedModes": ["execute-task", "review-task"],
+      "summary": "Pass --json explicitly in fixture checkers that validate context-pack output.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "context-pack-14",
+      "category": "Context Pack and Token Cost",
+      "tags": ["repair", "close-sprint", "artifacts"],
+      "affectedModes": ["close-sprint", "wrap-up"],
+      "summary": "Do not run kyro repair after sprint close; it can corrupt state.json and summaries.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "context-pack-15",
+      "category": "Context Pack and Token Cost",
+      "tags": ["budget", "manifest", "provider-neutral"],
+      "affectedModes": ["execute-task", "close-sprint"],
+      "summary": "Budget manifest entries must stay provider-neutral; enforce with npm run check:budget-manifest.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
+    },
+    {
+      "id": "context-pack-16",
+      "category": "Context Pack and Token Cost",
+      "tags": ["context-pack", "task", "nextTask"],
+      "affectedModes": ["execute-task"],
+      "summary": "Bare --task fallback requires index.nextTask in T{n}.{m} form; prose nextTask needs explicit --task <id>.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md"
     }
   ],
   "sourceMarkdown": ".agents/kyro/scopes/rules.md",

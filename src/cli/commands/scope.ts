@@ -5,7 +5,8 @@ import { scopeIndexPath, scopeStatePath } from '../artifacts/paths';
 import { asScopeIndex, asScopeState } from '../artifacts/schema';
 import { resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
-import { inspectScope, listScopeNames } from './artifact-doctor';
+import { inspectScope } from './artifact-doctor';
+import { listScopeNames } from '../artifacts/scopes';
 import type { KyroProjectState } from '../types';
 
 export function runScopeCommand(args: string[]): void {
