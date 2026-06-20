@@ -2,6 +2,8 @@
 
 This folder turns the June 19, 2026 strategic audit into an execution-ready backlog. It is intentionally organized by theme so each backlog can become a focused implementation plan or sprint.
 
+**Last validated:** 2026-06-20 against commit `23266f0` and published npm version `kyro-ai@3.4.2`. The P0 reproducibility scope is complete, and the token-cost backlog is partially complete after the lean runtime refactor. Remaining backlog items are still useful, but this folder now distinguishes completed work from pending work.
+
 ## Quick path
 
 1. Read `00-technical-audit.md` for the full technical audit baseline.
@@ -28,8 +30,8 @@ This audit covers the local checkout at:
 /Users/rperaza/joicodev/projects/synapsync/kyro/kyro-ai
 ```
 
-Evidence was gathered from the repository structure, CLI source, generated `dist/`, command/skill markdown, docs, scripts, package metadata, CI workflow, and local validation commands.
+Evidence was gathered from the repository structure, CLI source, generated `dist/`, command/skill markdown, docs, scripts, package metadata, CI workflow, npm registry state, and local validation commands. Latest validation passed `npm run check`, `npm run check:tokens`, `npm run check:adapters`, `npm run check:artifact-fixtures`, and `npm run check:artifacts`.
 
 ## Key decision
 
-Do not add a vector database or autonomous agent layer yet. Kyro should first strengthen the deterministic harness: reproducible builds, artifact schemas, context packs, summary refresh, document ownership, validation, and observability.
+Do not add a vector database or autonomous agent layer yet. Kyro has already strengthened reproducible builds, adapter validation, lean runtime loading, token budgets, `rules.index.json`, and compact event evidence support. The next deterministic harness work is artifact schema export, context packs, summary refresh, document ownership, validation commands, and observability reports.

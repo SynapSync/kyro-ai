@@ -12,7 +12,7 @@ Preferred default for evaluation: Mintlify, because it is strong for developer-f
 
 Start this backlog only when these are true:
 
-- P0 reproducibility/CI work is complete.
+- P0 reproducibility/CI work is complete. **Done as of 2026-06-20.**
 - Artifact schemas and validation contracts are documented.
 - Context-pack, summary refresh, and docs-index direction is stable.
 - Adapter support matrix is current and validated.

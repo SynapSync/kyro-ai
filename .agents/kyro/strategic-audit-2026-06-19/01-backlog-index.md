@@ -1,14 +1,14 @@
 # Strategic Audit Backlog Index
 
-This backlog turns each audit theme into executable technical work. Start with P0 reproducibility before investing in context, memory, retrieval, or observability. A harness that cannot reproduce its own runtime is not ready for smarter automation.
+This backlog turns each audit theme into executable technical work. It was revalidated on 2026-06-20 after P0 reproducibility and the lean runtime cost refactor. The original P0 foundation is complete; continue with the remaining validation, context, documentation, and observability work.
 
 ## Recommended execution order
 
 | Order | Backlog | Why first | Priority |
 |-------|---------|-----------|----------|
-| 1 | `backlogs/00-p0-reproducibility-and-ci.md` | Fix runtime/source trust before any other work | P0 |
-| 2 | `backlogs/06-reliability-validation.md` | Establish schemas and validation contracts | P1 |
-| 3 | `backlogs/01-token-cost-optimization.md` | Make context cheaper and measurable | P1 |
+| 1 | `backlogs/00-p0-reproducibility-and-ci.md` | Completed foundation; keep as historical baseline and release guard | DONE |
+| 2 | `backlogs/01-token-cost-optimization.md` | Partially complete; continue with context packs and model routing after lean runtime refactor | P1 |
+| 3 | `backlogs/06-reliability-validation.md` | Establish exported schemas and validation contracts | P1 |
 | 4 | `backlogs/02-context-memory-architecture.md` | Structure what agents need to remember and retrieve | P1 |
 | 5 | `backlogs/03-markdown-documentation-contract.md` | Prevent docs/artifacts from drifting | P1 |
 | 6 | `backlogs/04-agent-harness-hooks-commands.md` | Add deterministic hooks and commands | P1 |
