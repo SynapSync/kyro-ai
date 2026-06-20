@@ -11,7 +11,7 @@ This mode reports progress from structured summaries first. Markdown is the fall
    - `ROADMAP.summary.json`
    - active or latest `SPRINT-*.summary.json`
    - `DEBT.summary.json` when present
-5. Open Markdown only for missing summary fields, `full` reports, or debt mutations.
+5. Open Markdown only for missing summary fields, explicit `full` evidence, or debt mutations; `brief` never opens sprint Markdown when summaries exist.
 
 ## Report variants
 
@@ -58,6 +58,6 @@ For `full`, include roadmap health, sprint table, debt trend, and re-entry point
 
 ## Rules
 
-- Do not read every sprint Markdown file when summaries exist.
+- Do not read sprint Markdown for `brief` when summaries exist.
 - Debt items are never deleted.
 - Keep `index.json` aligned with any report mutation.

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
+  "name": "ad3c-cycle",
+  "type": "skill",
+  "version": "1.0.0",
+  "description": "Per-task implementation micro-cycle: Analyze, Develop, Certify, Correct, Close",
+  "author": {
+    "name": "SynapSync",
+    "url": "https://github.com/SynapSync",
+    "email": "hello@synapsync.dev"
+  },
+  "license": "Apache-2.0",
+  "category": "workflow",
+  "tags": [
+    "implementation",
+    "task-cycle",
+    "quality-gate",
+    "verification",
+    "workflow",
+    "methodology",
+    "execution",
+    "certification"
+  ],
+  "providers": [
+    "claude",
+    "openai",
+    "cursor",
+    "windsurf",
+    "copilot",
+    "gemini",
+    "codex"
+  ],
+  "file": "SKILL.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SynapSync/skills-registry"
+  },
+  "homepage": "https://synapsync.dev/cognitives/ad3c-cycle",
+  "createdAt": "2026-06-18T00:00:00Z",
+  "updatedAt": "2026-06-18T00:00:00Z",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2026-06-18",
+      "changes": [
+        "Initial release: per-task micro-cycle with Analyze, Develop, Certify, Correct, and Close phases",
+        "Language-agnostic QA checklists for TypeScript, Python, Go, Rust, shell, JSON, and YAML",
+        "Correction loop with 3-iteration escalation rule",
+        "Evidence format for task tracking integration",
+        "Relaxation rules for trivial changes, mechanical refactors, and spikes"
+      ]
+    }
+  ]
+}

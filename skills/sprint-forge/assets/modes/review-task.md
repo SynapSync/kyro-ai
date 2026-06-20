@@ -16,7 +16,7 @@ Validate completed Kyro work without loading unrelated lifecycle context.
 3. Classify findings as critical, warning, or suggestion.
 4. Block completion on critical issues.
 5. Record warnings and suggestions in the sprint evidence or retro queue.
-6. Refresh summaries after status changes.
+6. Record the review result as compact task evidence. Refresh summaries only at sprint close or explicit status/debt mutation.
 
 ## Rules
 

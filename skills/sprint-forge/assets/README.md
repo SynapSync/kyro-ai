@@ -31,6 +31,10 @@ Kyro assets are designed for progressive disclosure: load the router first, then
 | [reviewer.md](helpers/reviewer.md) | Review classification |
 | [handoff.md](helpers/handoff.md) | Session handoff format |
 
+## protocols/
+
+Protocol files are lazy-loaded only when a routed mode needs expanded detail: analysis, validation, debug, and gates.
+
 ## templates/
 
 | File | Description |
@@ -44,6 +48,8 @@ Kyro assets are designed for progressive disclosure: load the router first, then
 | [ROADMAP.summary.json](templates/ROADMAP.summary.json) | Roadmap summary cache |
 | [SPRINT.summary.json](templates/SPRINT.summary.json) | Sprint summary cache |
 | [DEBT.summary.json](templates/DEBT.summary.json) | Debt summary cache |
+| [rules.index.json](templates/rules.index.json) | Compact learned-rules index |
+| [events.ndjson.example](templates/events.ndjson.example) | Compact execution event shape |
 
 ## fixtures/
 

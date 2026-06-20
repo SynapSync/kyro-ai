@@ -16,6 +16,13 @@ const TOKEN_BUDGET = {
   startupTokens: 1500,
   statusBriefTokens: 2000,
   initHappyPathTokens: 2000,
+  orchestratorWords: 800,
+  sprintForgeSkillWords: 800,
+  runtimeStatusBriefTokens: 1500,
+  runtimeForgeExecuteTokens: 2500,
+  runtimeForgePlanTokens: 3000,
+  runtimeForgeCloseTokens: 3200,
+  runtimeForgeInitTokens: 3500,
 } as const;
 
 const RISK_LEVEL = {
@@ -32,6 +39,14 @@ interface WeightedFile {
   estimatedTokens: number;
 }
 
+interface RuntimePathDefinition {
+  name: string;
+  budget: number;
+  files: string[];
+  projectedSkill?: 'forge' | 'status' | 'wrap-up';
+  forbiddenFiles?: string[];
+}
+
 interface SizingDecisionFixture {
   recommendedSprintCount: number;
   riskLevel: RiskLevel;
@@ -45,6 +60,8 @@ interface SizingDecisionFixture {
 export function runTokenAuditChecks(): CheckResult[] {
   const checks: CheckResult[] = [];
   checks.push(...checkCommandRouters());
+  checks.push(checkRuntimeAssetBudget('agents/orchestrator.md', TOKEN_BUDGET.orchestratorWords, 'orchestrator agent'));
+  checks.push(checkRuntimeAssetBudget('skills/sprint-forge/SKILL.md', TOKEN_BUDGET.sprintForgeSkillWords, 'sprint-forge skill'));
   checks.push(...checkModeFiles());
   checks.push(checkInitModeBudget());
   checks.push(...checkAnalysisHelperBudgets());
@@ -55,6 +72,8 @@ export function runTokenAuditChecks(): CheckResult[] {
   checks.push(checkStartupBudget());
   checks.push(checkStatusBriefBudget());
   checks.push(checkInitHappyPathBudget());
+  checks.push(...checkRuntimePathBudgets());
+  checks.push(...checkForbiddenRuntimeLoading());
   checks.push(checkSizingDecisionFixture());
   checks.push(reportHeaviestFiles());
   return checks;
@@ -103,6 +122,14 @@ function checkTemplateBudget(file: string, budget: number, label: string): Check
   const weighted = weightPackageFile(file);
   if (weighted.words > budget) {
     return warn(`token budget: ${label}`, `${file} has ${weighted.words} words`, 'Keep templates lean; avoid copying lifecycle rules already defined in modes/helpers.');
+  }
+  return pass(`token budget: ${label}`, `${weighted.words}/${budget} words`);
+}
+
+function checkRuntimeAssetBudget(file: string, budget: number, label: string): CheckResult {
+  const weighted = weightPackageFile(file);
+  if (weighted.words > budget) {
+    return fail(`token budget: ${label}`, `${file} has ${weighted.words}/${budget} words`, 'Keep eager runtime assets slim; move detail into lazy-loaded protocols or docs.');
   }
   return pass(`token budget: ${label}`, `${weighted.words}/${budget} words`);
 }
@@ -170,6 +197,126 @@ function checkInitHappyPathBudget(): CheckResult {
     return warn('token budget: INIT happy path', `${total}/${TOKEN_BUDGET.initHappyPathTokens} estimated tokens`, 'Reduce INIT, routed analysis helper, or scoped templates.');
   }
   return pass('token budget: INIT happy path', `${total}/${TOKEN_BUDGET.initHappyPathTokens} estimated tokens`);
+}
+
+
+function checkRuntimePathBudgets(): CheckResult[] {
+  return runtimePathDefinitions().map((definition) => {
+    const weightedFiles = definition.files.map(weightPackageFile);
+    if (definition.projectedSkill) weightedFiles.unshift(weightProjectedCommandSkill(definition.projectedSkill));
+    const total = sumEstimatedTokens(weightedFiles);
+    const detail = `${total}/${definition.budget} estimated tokens (${formatWeightedList(weightedFiles)})`;
+    if (total > definition.budget) {
+      return fail(`token budget: ${definition.name}`, detail, 'Reduce eager runtime files or route helpers later.');
+    }
+    return pass(`token budget: ${definition.name}`, detail);
+  });
+}
+
+function checkForbiddenRuntimeLoading(): CheckResult[] {
+  const checks: CheckResult[] = [];
+  for (const definition of runtimePathDefinitions()) {
+    const loaded = new Set(definition.files);
+    const forbiddenLoaded = (definition.forbiddenFiles ?? []).filter((file) => loaded.has(file));
+    if (forbiddenLoaded.length > 0) {
+      checks.push(fail(`runtime loading: ${definition.name}`, `loads forbidden helpers: ${forbiddenLoaded.join(', ')}`, 'Route to exactly one mode and only its named helpers.'));
+    } else {
+      checks.push(pass(`runtime loading: ${definition.name}`, 'no forbidden helpers loaded'));
+    }
+  }
+
+  const orchestrator = readFileSync(resolve(PACKAGE_ROOT, 'agents/orchestrator.md'), 'utf-8');
+  const eagerSprintHelperPattern = /SPRINT phase[^\n]*(sprint-generator|debt-tracker|reentry-generator)/i;
+  if (eagerSprintHelperPattern.test(orchestrator)) {
+    checks.push(fail('runtime loading: orchestrator sprint route', 'SPRINT phase eagerly references heavy helpers', 'Keep SPRINT routing to SPRINT.md plus exactly one routed mode.'));
+  } else {
+    checks.push(pass('runtime loading: orchestrator sprint route', 'SPRINT route is mode-only'));
+  }
+
+  const kyroRuntimeFiles = listPackageFiles('skills/sprint-forge', '.md');
+  if (kyroRuntimeFiles.some((file) => /ad3c-cycle\.md$/i.test(file))) {
+    checks.push(fail('runtime loading: AD3C workflow', 'sprint-forge still packages ad3c-cycle.md', 'Remove AD3C from Kyro runtime while preserving standalone skills.'));
+  } else {
+    checks.push(pass('runtime loading: AD3C workflow', 'AD3C absent from Kyro runtime paths'));
+  }
+  return checks;
+}
+
+function runtimePathDefinitions(): RuntimePathDefinition[] {
+  const commonForge = ['commands/forge.md', 'agents/orchestrator.md', 'skills/sprint-forge/SKILL.md'];
+  const commonSprintForbidden = [
+    'skills/sprint-forge/assets/helpers/sprint-generator.md',
+    'skills/sprint-forge/assets/helpers/debt-tracker.md',
+    'skills/sprint-forge/assets/helpers/reentry-generator.md',
+  ];
+  return [
+    {
+      name: 'runtime path: kyro-forge:init',
+      budget: TOKEN_BUDGET.runtimeForgeInitTokens,
+      projectedSkill: 'forge',
+      files: [...commonForge, 'skills/sprint-forge/assets/modes/INIT.md', heaviestAnalysisHelperPath()].filter(isString),
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md'],
+    },
+    {
+      name: 'runtime path: kyro-forge:plan',
+      budget: TOKEN_BUDGET.runtimeForgePlanTokens,
+      projectedSkill: 'forge',
+      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/plan-sprint.md', 'skills/sprint-forge/assets/helpers/sprint-generator.md'],
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/reentry-generator.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
+    },
+    {
+      name: 'runtime path: kyro-forge:execute',
+      budget: TOKEN_BUDGET.runtimeForgeExecuteTokens,
+      projectedSkill: 'forge',
+      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/execute-task.md'],
+      forbiddenFiles: commonSprintForbidden,
+    },
+    {
+      name: 'runtime path: kyro-forge:review',
+      budget: TOKEN_BUDGET.runtimeForgeExecuteTokens,
+      projectedSkill: 'forge',
+      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/review-task.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/reentry-generator.md'],
+    },
+    {
+      name: 'runtime path: kyro-forge:close',
+      budget: TOKEN_BUDGET.runtimeForgeCloseTokens,
+      projectedSkill: 'forge',
+      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/close-sprint.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md', 'skills/sprint-forge/assets/helpers/reentry-generator.md'],
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md'],
+    },
+    {
+      name: 'runtime path: kyro-status:brief',
+      budget: TOKEN_BUDGET.runtimeStatusBriefTokens,
+      projectedSkill: 'status',
+      files: ['commands/status.md', 'agents/orchestrator.md'],
+      forbiddenFiles: ['skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/helpers/sprint-generator.md'],
+    },
+    {
+      name: 'runtime path: kyro-wrap-up',
+      budget: TOKEN_BUDGET.runtimeForgeCloseTokens,
+      projectedSkill: 'wrap-up',
+      files: ['commands/wrap-up.md', 'agents/orchestrator.md', 'skills/sprint-forge/SKILL.md', 'skills/sprint-forge/assets/helpers/handoff.md'],
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md'],
+    },
+  ];
+}
+
+function heaviestAnalysisHelperPath(): string | null {
+  const helper = listPackageFiles('skills/sprint-forge/assets/helpers/analysis', '.md').map(weightPackageFile).sort((a, b) => b.estimatedTokens - a.estimatedTokens)[0];
+  return helper?.path ?? null;
+}
+
+function weightProjectedCommandSkill(command: 'forge' | 'status' | 'wrap-up'): WeightedFile {
+  const managedPath = `${AGENT_SKILLS_ROOT}/kyro-${command}/SKILL.md`;
+  if (existsSync(resolveManagedPath(managedPath))) return weightManagedFile(managedPath);
+  const title = command === 'wrap-up' ? 'Kyro Wrap-Up' : `Kyro ${command}`;
+  const text = `---\nname: kyro-${command}\ndescription: Kyro command stub\n---\n# ${title}\nRead the Kyro command router, then load only the files requested by that router. Do not ask the user to restate the workflow.`;
+  return buildWeightedFile(`projected:${command}`, text);
+}
+
+function isString(value: string | null): value is string {
+  return typeof value === 'string';
 }
 
 function checkSizingDecisionFixture(): CheckResult {

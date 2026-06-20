@@ -107,9 +107,14 @@ Project state and artifacts:
     └── kyro/
         ├── kyro.json
         └── scopes/
+            ├── rules.md
+            ├── rules.index.json
             └── {scope}/
                 ├── state.json
+                ├── index.json
+                ├── events.ndjson
                 ├── ROADMAP.md
+                ├── ROADMAP.summary.json
                 └── phases/
 ```
 
@@ -310,6 +315,32 @@ git push origin v3.2.2
 The release workflow expects the repository secret `NPM_TOKEN`.
 
 ---
+
+## Generated Artifacts and Release Process
+
+`dist/` is a generated artifact built from `src/` by `npm run build`. It must stay in sync with source, so releases cannot pack stale generated output.
+
+Before committing or releasing:
+
+```bash
+npm run check      # includes check:dist
+npm run build
+npm run check:adapters
+npm pack --dry-run
+```
+
+- `npm run check:dist` proves the committed `dist/` matches a fresh build.
+- `npm run check:adapters` validates adapter projections against the built runtime.
+- `npm pack --dry-run` simulates the published tarball only after the gates above pass.
+
+See [`docs/release-checklist.md`](docs/release-checklist.md) for the full maintainer checklist and CI gate ordering.
+
+---
+
+
+## Cost Model
+
+Kyro uses lean runtime loading: command router → structured state → one routed mode → only required helpers. During execution it records compact `events.ndjson` evidence and materializes full Markdown, summaries, debt, rules, and re-entry prompts at sprint close. See [docs/cost-model.md](docs/cost-model.md).
 
 ## Documentation
 

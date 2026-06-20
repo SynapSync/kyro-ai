@@ -30,7 +30,7 @@ Kyro is designed with natural compact points:
 
 | Point | Why it's safe |
 |-------|---------------|
-| **Between phases** | Phase checkpoint saves all progress to the sprint file |
+| **Between phases** | Compact routing state and task events capture enough progress to resume |
 | **After INIT analysis** | Findings are written to files — context can be rebuilt from them |
 | **After sprint generation** | Sprint document captures everything needed for execution |
 | **Between sprints** | Re-entry prompts capture full project state |
@@ -57,7 +57,7 @@ This triggers compaction at 50% context usage instead of the default. Useful for
 
 ## Re-entry Prompts
 
-Re-entry prompts are Kyro's primary defense against context loss. After each sprint execution, re-entry prompts are updated with:
+Re-entry prompts are Kyro's primary defense against context loss between sprints. They are updated at INIT, sprint close, and wrap-up — not after every task.
 
 - Current sprint number and status
 - File paths for all project artifacts
@@ -75,7 +75,7 @@ If compaction happens mid-session, a new agent can use the re-entry prompt to re
 
 3. **Use lighter models for read-only exploration** — The analysis phase reads many files. A lighter model can reduce cost when the task is status, inventory, or summarization. Use the strongest available model for implementation, debugging, and architecture decisions.
 
-4. **Checkpoint aggressively** — Kyro checkpoints after each phase. This means progress survives compaction.
+4. **Checkpoint leanly** — Kyro records compact task evidence during execution and materializes full documentation at sprint close.
 
 5. **Avoid loading unnecessary skills** — Each loaded skill adds to the context. Only invoke skills when needed.
 
@@ -83,10 +83,14 @@ If compaction happens mid-session, a new agent can use the re-entry prompt to re
 
 ## Pre-Compaction Checkpoint
 
-Before context compaction, save the current sprint state and update re-entry prompts:
+Before context compaction, save compact sprint state:
 
 - Logs a warning that compaction is about to happen
-- Checks for active sprint and reminds about re-entry prompts
-- Points to the re-entry prompts file path
+- Checks for active sprint and latest compact task evidence
+- Points to the active sprint and re-entry prompt paths
 
 This gives the agent (and user) a chance to save state before context is compressed.
+
+## Cost model details
+
+See [Cost Model](cost-model.md) for audited runtime paths, write policy, and rules index behavior.

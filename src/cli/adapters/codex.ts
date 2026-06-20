@@ -3,6 +3,7 @@ import { hasManagedBlock } from '../fs';
 import { addCommandSkillProjection, buildCommandSkillManagedFiles } from './command-skills';
 import { checkCommandProjection } from './standard';
 import type { AdapterDefinition } from './registry-types';
+import { detectFromPaths } from './detection';
 
 const AGENTS_PATH = 'AGENTS.md';
 const KYRO_AGENTS_BLOCK = 'agents-md';
@@ -11,6 +12,26 @@ export const codexAdapter: AdapterDefinition = {
   agent: AGENT.CODEX,
   displayName: 'Codex',
   status: 'implemented',
+  capabilities() {
+    return ['command-skills', 'workspace-agents-block', 'filesystem-detect', 'system-prompt', 'mcp'];
+  },
+  paths(homeDir) {
+    return {
+      globalConfigDir: `${homeDir}/.codex`,
+      systemPromptPath: `${homeDir}/.codex/AGENTS.md`,
+      skillsDir: `${homeDir}/.codex/skills`,
+      mcpConfigPath: `${homeDir}/.codex/config.toml`,
+    };
+  },
+  detect(context) {
+    return detectFromPaths(AGENT.CODEX, 'codex', this.paths(context.homeDir), context, 'Codex adapter');
+  },
+  systemPromptStrategy() {
+    return 'managed-block';
+  },
+  mcpStrategy() {
+    return 'toml-file';
+  },
   buildProjection(plan) {
     addCommandSkillProjection(plan);
     plan.push({
@@ -19,6 +40,9 @@ export const codexAdapter: AdapterDefinition = {
       blockName: KYRO_AGENTS_BLOCK,
       content: buildAgentsBlock(),
     });
+  },
+  buildRemoval(plan) {
+    plan.push({ action: 'remove-block', path: AGENTS_PATH, blockName: KYRO_AGENTS_BLOCK });
   },
   buildManagedFiles() {
     return buildCommandSkillManagedFiles();

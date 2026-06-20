@@ -2,9 +2,13 @@ import { AGENT_SKILLS_ROOT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_ROOT, KY
 import type { KyroCommandName, OperationPlan } from '../types';
 
 export function addCommandSkillProjection(plan: OperationPlan[]): void {
+  addCommandSkillProjectionToRoot(plan, AGENT_SKILLS_ROOT);
+}
+
+export function addCommandSkillProjectionToRoot(plan: OperationPlan[], skillsRoot: string): void {
   for (const command of COMMAND_NAMES) {
-    const path = getCommandSkillPath(command);
-    if (plan.some((operation) => operation.action === 'write' && operation.path === path)) {
+    const path = getCommandSkillPathForRoot(command, skillsRoot);
+    if (plan.some((operation) => operation.path === path)) {
       continue;
     }
     plan.push({
@@ -16,11 +20,19 @@ export function addCommandSkillProjection(plan: OperationPlan[]): void {
 }
 
 export function buildCommandSkillManagedFiles(): string[] {
-  return COMMAND_NAMES.map((command) => getCommandSkillPath(command));
+  return buildCommandSkillManagedFilesForRoot(AGENT_SKILLS_ROOT);
+}
+
+export function buildCommandSkillManagedFilesForRoot(skillsRoot: string): string[] {
+  return COMMAND_NAMES.map((command) => getCommandSkillPathForRoot(command, skillsRoot));
 }
 
 export function getCommandSkillPath(command: KyroCommandName): string {
-  return `${AGENT_SKILLS_ROOT}/kyro-${command}/SKILL.md`;
+  return getCommandSkillPathForRoot(command, AGENT_SKILLS_ROOT);
+}
+
+export function getCommandSkillPathForRoot(command: KyroCommandName, skillsRoot: string): string {
+  return `${skillsRoot}/kyro-${command}/SKILL.md`;
 }
 
 function buildCommandSkill(command: KyroCommandName): string {

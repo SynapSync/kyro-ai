@@ -10,7 +10,11 @@ export function parseOptions(args: string[]): CliOptions {
   let help = false;
   let tokens = false;
   let artifacts = false;
+  let adapters = false;
   let kyroScope: string | null = null;
+  let json = false;
+  let purgeAdapterAssets = false;
+  let prune = false;
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -24,6 +28,14 @@ export function parseOptions(args: string[]): CliOptions {
       tokens = true;
     } else if (arg === '--artifacts') {
       artifacts = true;
+    } else if (arg === '--adapters') {
+      adapters = true;
+    } else if (arg === '--json') {
+      json = true;
+    } else if (arg === '--purge-adapter-assets') {
+      purgeAdapterAssets = true;
+    } else if (arg === '--prune') {
+      prune = true;
     } else if (arg === '--kyro-scope') {
       const value = args[i + 1];
       if (!value) throw new Error('--kyro-scope requires a value');
@@ -60,7 +72,11 @@ export function parseOptions(args: string[]): CliOptions {
     help,
     tokens,
     artifacts,
+    adapters,
     kyroScope,
+    json,
+    purgeAdapterAssets,
+    prune,
   };
 }
 

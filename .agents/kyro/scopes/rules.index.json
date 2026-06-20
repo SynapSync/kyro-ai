@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "runtime-001",
+      "category": "generated-runtime",
+      "tags": ["dist", "build", "runtime-parity"],
+      "affectedModes": ["execute-task", "close-sprint"],
+      "summary": "Rebuild and verify dist before claiming runtime parity.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md#generated-runtime"
+    },
+    {
+      "id": "ci-001",
+      "category": "checks-and-ci",
+      "tags": ["check", "tokens", "adapters", "ci"],
+      "affectedModes": ["review-task", "close-sprint", "status"],
+      "summary": "Treat known adapter-block token warnings as pre-existing unless the sprint changes that adapter, and run package checks before close.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md#checks-and-ci"
+    },
+    {
+      "id": "docs-001",
+      "category": "documentation",
+      "tags": ["docs", "release", "links"],
+      "affectedModes": ["execute-task", "review-task", "close-sprint"],
+      "summary": "Keep release docs aligned with actual scripts and run link checks after docs changes.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md#documentation"
+    },
+    {
+      "id": "closure-001",
+      "category": "sprint-closure",
+      "tags": ["state", "index", "summaries", "wrap-up"],
+      "affectedModes": ["close-sprint", "recover", "wrap-up"],
+      "summary": "Close sprints and final roadmaps by updating state, index, summaries, and wrap-up routing consistently.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md#sprint-closure"
+    }
+  ],
+  "sourceMarkdown": ".agents/kyro/scopes/rules.md",
+  "lastUpdated": "2026-06-20"
+}

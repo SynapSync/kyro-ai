@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, rmSync, utimesSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -30,6 +30,36 @@ assertDoctor('valid', 0, '[PASS] artifact state.json');
 assertDoctor('missing-summary', 0, '[WARN] artifact ROADMAP.summary.json');
 assertDoctor('invalid-state', 1, '[FAIL] artifact state.json');
 assertDoctor('active-sprint-missing', 1, 'activeSprint not found');
+
+
+const eventsDir = mkdtempSync(join(tmpdir(), 'kyro-events-'));
+cpSync(join(fixtures, 'valid'), eventsDir, { recursive: true });
+writeFileSync(
+  join(eventsDir, '.agents/kyro/scopes/demo/events.ndjson'),
+  `${JSON.stringify({
+    timestamp: '2026-06-20T00:00:00.000Z',
+    scope: 'demo',
+    sprint: 'SPRINT-001-demo',
+    phase: 'Phase 1',
+    task: 'T1.1',
+    status: 'completed',
+    changedFiles: ['src/example.ts'],
+    validation: ['npm run check'],
+    blockers: [],
+    debtDeltas: [],
+    notes: 'Fixture event proving compact execution evidence remains optional and valid.',
+  })}
+`,
+  'utf-8',
+);
+const events = run(eventsDir, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+const eventsOutput = `${events.stdout}
+${events.stderr}`;
+assert(events.status === 0, `events: expected exit 0
+${eventsOutput}`);
+assert(eventsOutput.includes('events.ndjson has 1 valid events'), `events: expected valid events check
+${eventsOutput}`);
+rmSync(eventsDir, { recursive: true, force: true });
 
 const staleDir = mkdtempSync(join(tmpdir(), 'kyro-stale-'));
 cpSync(join(fixtures, 'stale-summary'), staleDir, { recursive: true });

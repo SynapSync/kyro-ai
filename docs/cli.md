@@ -15,6 +15,48 @@ kyro uninstall          # Remove managed workspace assets, preserving scope arti
 
 `npx kyro-ai` resolves to the same CLI entrypoint.
 
+## Maintenance Scripts
+
+Kyro provides npm scripts for validating generated artifacts and adapter behavior. These are used both locally and in CI.
+
+### `npm run check:dist`
+
+Proves that the committed `dist/` matches a fresh build from current `src/`.
+
+```bash
+npm run check:dist
+```
+
+The script builds `dist/` into a temporary directory and compares it byte-for-byte with the existing `dist/`. It exits `0` when fresh and `1` when stale, printing the list of differing, missing, or extra files.
+
+Run this after any source change that affects generated output, and always run it before committing or packing.
+
+### `npm run check:adapters`
+
+Runs adapter fixture validation against the built runtime.
+
+```bash
+npm run check:adapters
+```
+
+This exercises adapter detection, install plans, preflight, doctor output, JSON merge, managed block, and pipeline rollback behavior. It must pass before a release can be packed.
+
+### Release gate ordering
+
+The full release validation sequence is:
+
+```bash
+npm run check        # includes check:dist
+npm run build
+npm run check:adapters
+npm run check:tokens
+npm run check:artifacts
+npm run check:artifact-fixtures
+npm pack --dry-run
+```
+
+See [`docs/release-checklist.md`](release-checklist.md) for the maintainer-facing checklist and policy.
+
 ## Install Scope
 
 The default install scope is `workspace`, but Kyro now separates global runtime from project state.
@@ -65,7 +107,7 @@ Implemented workspace adapters:
 | Adapter | Purpose |
 | --- | --- |
 | `standard` | Base `~/.agents/skills/kyro-*` command skill projection for compatible agents |
-| `opencode` | OpenCode adapter using the same projected Kyro command skills |
+| `opencode` | Native OpenCode skills, commands under `~/.config/opencode/commands/kyro/`, and `agent.kyro-orchestrator` in `opencode.json` |
 | `codex` | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block |
 
 Default install uses `standard`:
@@ -83,7 +125,7 @@ kyro install --agent codex --scope workspace --yes
 kyro install --agent standard,opencode,codex --scope workspace --yes
 ```
 
-The adapters project Kyro workflows into `~/.agents/skills/` so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose.
+The adapters project Kyro workflows into concrete agent entrypoints so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose. `standard` and `codex` use `~/.agents/skills/`; OpenCode uses its native config tree and preserves non-Kyro `opencode.json` keys.
 
 Projected skills:
 
@@ -92,6 +134,24 @@ Projected skills:
 - `kyro-wrap-up`
 
 Each projected skill references the managed Kyro runtime in `~/.agents/kyro/current/` instead of duplicating long workflow instructions.
+
+## Uninstall
+
+Default uninstall removes project bootstraps and adapter overlays, but preserves adapter entrypoint files:
+
+```bash
+kyro uninstall --yes
+```
+
+To remove adapter-owned entrypoint files as well:
+
+```bash
+kyro uninstall --purge-adapter-assets --yes
+```
+
+Purge removes only files declared by the installed adapter, then removes Kyro-owned directories if they are empty. Shared config files such as `~/.config/opencode/opencode.json` are preserved; Kyro removes only its owned overlay key.
+
+The uninstall output includes a summary with overlay, purged file, and empty-directory counts.
 
 ## State Model
 
@@ -130,7 +190,8 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - each analysis helper <= 450 words
 - ROADMAP template <= 450 words
 - REENTRY template <= 350 words
-- startup, status brief, and INIT happy paths stay under their estimated token budgets
+- startup, status brief, INIT happy path, and realistic forge/status/wrap-up runtime paths stay under estimated token budgets
+- forbidden eager helper combinations fail the audit
 - `sizingDecision` regression fixture stays internally consistent
 
 Warnings mean Kyro still works, but the harness is becoming expensive to load. Failing sizing checks mean INIT can no longer prove its sprint boundaries.
@@ -146,7 +207,7 @@ kyro doctor --tokens --artifacts
 kyro doctor --artifacts --kyro-scope auth-refactor
 ```
 
-The audit validates project state, scoped `state.json`, `index.json`, roadmap/sprint summaries, source Markdown references, stale summaries, and active sprint pointers. Missing summaries warn; invalid JSON and broken state references fail.
+The audit validates project state, scoped `state.json`, `index.json`, optional `events.ndjson`, optional `rules.index.json`, roadmap/sprint summaries, source Markdown references, stale summaries, and active sprint pointers. Missing summaries warn; invalid JSON and broken state references fail.
 
 Repair JSON summaries from Markdown without rewriting Markdown:
 
@@ -174,6 +235,34 @@ kyro sync
 kyro sync --agent standard --dry-run
 kyro sync --agent codex --dry-run
 ```
+
+### Drift And Prune
+
+`kyro sync` reports drift when old manifests point to stale runtime versions or obsolete Kyro-owned adapter entrypoint files.
+
+Use prune to clean drift during sync:
+
+```bash
+kyro sync --prune
+```
+
+`--prune` may remove:
+
+- stale runtime version directories under `~/.agents/kyro/versions/`, except the current package version.
+- obsolete Kyro-owned adapter entrypoint files previously declared by old manifests:
+  - `~/.agents/skills/kyro-*`
+  - `~/.config/opencode/skills/kyro-*`
+  - `~/.config/opencode/commands/kyro/*`
+
+`--prune` preserves:
+
+- current runtime files declared by the new manifest.
+- project state, scopes, roadmap files, sprint files, and summaries under `.agents/kyro/scopes/`.
+- shared agent config files such as `~/.config/opencode/opencode.json`.
+
+If an old manifest lists shared config, sync reports it under `Shared config preserved` instead of pruning it.
+
+`--prune` is different from `kyro uninstall --purge-adapter-assets`. Prune cleans sync drift by comparing old manifests against the current install plan. Purge removes adapter entrypoint files during uninstall for adapters recorded in the installed project state. Neither mode removes shared user config.
 
 ## Claude Plugin Support
 

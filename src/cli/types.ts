@@ -42,15 +42,20 @@ export interface CliOptions {
   help: boolean;
   tokens: boolean;
   artifacts: boolean;
+  adapters: boolean;
   kyroScope: string | null;
+  json: boolean;
+  purgeAdapterAssets: boolean;
+  prune: boolean;
 }
 
 export interface OperationPlan {
-  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'upsert-block' | 'remove-block' | 'symlink';
+  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'symlink' | 'merge-json' | 'remove-json-key';
   path: string;
   source?: string;
   content?: string;
   blockName?: string;
+  jsonPath?: string;
 }
 
 export interface CheckResult {

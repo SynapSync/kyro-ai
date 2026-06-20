@@ -46,6 +46,14 @@ Global command skills:
 └── kyro-wrap-up/SKILL.md
 ```
 
+OpenCode installs equivalent native entrypoints:
+
+```text
+~/.config/opencode/
+├── commands/kyro/
+└── skills/kyro-*/
+```
+
 Project state:
 
 ```text
@@ -76,7 +84,7 @@ Kyro routes progressively:
 2. resolve or create scope
 3. read scoped `state.json` and `index.json` if present
 4. load only the required mode: INIT, plan, execute, review, close, or recover
-5. update Markdown evidence plus JSON summaries
+5. record compact task evidence during execution, then update Markdown evidence plus JSON summaries at sprint close
 
 ## Scope output
 
@@ -96,7 +104,7 @@ After INIT, a scope looks like:
     └── SPRINT-N-*.summary.json
 ```
 
-Markdown is the human-readable evidence. JSON files are the fast routing cache used to save tokens.
+Markdown is the human-readable evidence. JSON files are the fast routing cache, and `events.ndjson` records compact task evidence during execution.
 
 ## Verify
 
@@ -105,7 +113,7 @@ kyro doctor
 kyro doctor --tokens
 ```
 
-`doctor --tokens` warns when command routers, projected skills, mode files, or AGENTS.md bootstrap instructions become too heavy.
+`doctor --tokens` audits realistic Kyro runtime paths and fails forbidden eager helper loading or over-budget paths.
 
 ## Next steps
 

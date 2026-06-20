@@ -50,7 +50,7 @@ During analysis, the orchestrator must not edit files.
 
 ### Review Checklist
 
-Used after each task completion during sprint execution.
+Used after each task completion during sprint execution. The review result is recorded as compact evidence; full sprint documentation is refreshed at sprint close.
 
 **BLOCKER**
 
@@ -98,7 +98,7 @@ The orchestrator owns checkpoints directly. They are not delegated to a separate
 | pre-phase | Before each phase | Validate rules, sprint file, and worktree state |
 | rule check | Before task execution | Detect likely violations of learned rules |
 | post-edit scan | After edits | Search changed files for debug artifacts and secrets |
-| task complete | After task validation | Verify task status, checkpoint, remaining work, and new debt |
+| task complete | After task validation | Verify task status and record compact evidence, remaining work, and new debt |
 | pre-commit | Before commit | Run quality gates and final post-edit scan |
 | learn capture | Sprint close | Propose new rules from corrections and discoveries |
 
@@ -137,10 +137,11 @@ After all tasks are complete:
 3. Fill the retrospective.
 4. Update accumulated technical debt in markdown.
 5. Update frontmatter.
-6. Generate or update re-entry prompts.
-7. Update roadmap if execution changed the plan.
-8. Run the learn-capture checkpoint.
-9. Propose new rules for `.agents/kyro/scopes/rules.md`.
+6. Refresh summaries from compact execution evidence.
+7. Generate or update re-entry prompts.
+8. Update roadmap if execution changed the plan.
+9. Run the learn-capture checkpoint.
+10. Propose new rules for `.agents/kyro/scopes/rules.md`.
 
 ---
 

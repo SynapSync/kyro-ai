@@ -86,7 +86,7 @@ Your host application is responsible for persistence:
 
 - Write findings to `.agents/kyro/scopes/{scope}/findings/`.
 - Write sprint documents to `.agents/kyro/scopes/{scope}/phases/`.
-- Keep `ROADMAP.md`, `RE-ENTRY-PROMPTS.md`, and `rules.md` in sync.
+- Keep `ROADMAP.md`, `RE-ENTRY-PROMPTS.md`, and `rules.md` in sync at sprint close or wrap-up, not during normal task execution.
 - Run verification commands outside the model when possible.
 
 ---

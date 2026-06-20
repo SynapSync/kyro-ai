@@ -2,6 +2,10 @@
 
 Kyro provides 3 slash commands. Each command is now a thin router: it reads structured state first, then loads only the mode/helper/template required for the current action.
 
+## Cost-Aware Routing
+
+Kyro command paths are audited by `kyro doctor --tokens`. Brief status never opens sprint Markdown when summaries exist; forge execution never loads planning, debt, or re-entry helpers by default; closeout is the normal materialization point for full documentation.
+
 ---
 
 ## /kyro:forge

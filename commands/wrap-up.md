@@ -19,11 +19,11 @@ Close the current Kyro session without loading the full lifecycle.
 1. Audit workspace changes with `git status`.
 2. Run configured quality checks if available.
 3. Capture session learnings and proposed rules.
-4. Update handoff/re-entry context.
+4. Update handoff/re-entry context only for the final session state.
 5. Refresh `state.json`, `index.json`, and changed `*.summary.json`.
 
 ## Rules
 
-- Do not load roadmap or sprint Markdown unless summaries are missing or a closure update requires the source artifact.
+- Do not load roadmap or sprint Markdown unless summaries, `events.ndjson`, or a closure update require the source artifact.
 - Preserve global runtime and project state paths.
 - Ask before committing, deleting, or rewriting user-owned content.

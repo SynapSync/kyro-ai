@@ -10,6 +10,7 @@ export function printHelp(): void {
 Usage:
   kyro                         Open interactive TUI
   kyro install                 Install Kyro standard .agents assets
+  kyro detect                  Detect local agent adapters
   kyro doctor                  Check package/workspace health
   kyro repair [options]        Repair scoped JSON artifacts from Markdown
   kyro scope <subcommand>      List, inspect, or set active Kyro scopes
@@ -22,6 +23,10 @@ Options:
   --kyro-scope <scope>         Select Kyro artifact scope
   --tokens                     Include token/context budget audit for doctor
   --artifacts                  Include Kyro artifact integrity audit for doctor
+  --adapters                   Include adapter inventory for doctor
+  --json                       Print machine-readable output where supported
+  --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
+  --prune                      Clean stale runtime versions and orphaned managed files (sync only)
   --dry-run                    Preview changes
   --yes, -y                    Skip confirmation prompts where available
   --help, -h                   Show help
@@ -29,6 +34,7 @@ Options:
 
 Examples:
   kyro install --scope workspace --dry-run
+  kyro detect --json
   kyro doctor --tokens --artifacts
   kyro repair --kyro-scope auth-refactor --dry-run
   kyro scope list
@@ -38,16 +44,18 @@ Examples:
 export function printCommandHelp(command: string): void {
   if (command === 'install') {
     console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--dry-run] [--yes]');
+  } else if (command === 'detect') {
+    console.log('Usage: kyro detect [--agent standard|opencode|codex|claude|cursor] [--json]');
   } else if (command === 'doctor') {
-    console.log('Usage: kyro doctor [--tokens] [--artifacts] [--kyro-scope <scope>]');
+    console.log('Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--kyro-scope <scope>]');
   } else if (command === 'repair') {
     console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]');
   } else if (command === 'scope') {
     console.log('Usage: kyro scope list | inspect <scope> | set-active <scope>');
   } else if (command === 'sync') {
-    console.log('Usage: kyro sync [--agent standard|opencode|codex] [--dry-run]');
+    console.log('Usage: kyro sync [--agent standard|opencode|codex] [--prune] [--dry-run]');
   } else if (command === 'uninstall') {
-    console.log('Usage: kyro uninstall [--dry-run] [--yes]');
+    console.log('Usage: kyro uninstall [--purge-adapter-assets] [--dry-run] [--yes]');
   } else {
     printHelp();
   }

@@ -1,16 +1,16 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ARTIFACT_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
+import { ARTIFACT_ROOT, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
 import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
-import { getAdapterDefinition } from '../adapters/registry';
+import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { runTokenAuditChecks } from './token-audit';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
 
-export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'kyroScope'>): void {
-  const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.kyroScope ?? null);
+export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'kyroScope'>): void {
+  const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.kyroScope ?? null);
   let failed = false;
 
   for (const check of checks) {
@@ -23,7 +23,7 @@ export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'kyro
   if (failed) process.exit(1);
 }
 
-function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, kyroScope: string | null): CheckResult[] {
+function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, kyroScope: string | null): CheckResult[] {
   const checks = [
     checkPackageVersionSync(),
     checkPackageAssets(),
@@ -35,6 +35,7 @@ function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boole
 
   if (includeTokenAudit) checks.push(...runTokenAuditChecks());
   if (includeArtifactAudit) checks.push(...runArtifactAuditChecks({ kyroScope }));
+  if (includeAdapterInventory) checks.push(...checkAdapterInventory());
   return checks;
 }
 
@@ -106,7 +107,8 @@ function checkGlobalRuntime(): CheckResult {
       remedy: 'Run kyro install.',
     };
   }
-  const missing = manifest.managedFiles.filter((file) => !managedPathExists(file));
+  const runtimeFiles = manifest.managedFiles.filter((file) => file.startsWith(`${KYRO_GLOBAL_ROOT}/`));
+  const missing = runtimeFiles.filter((file) => !managedPathExists(file));
   if (missing.length > 0) {
     return {
       status: 'fail',
@@ -115,7 +117,7 @@ function checkGlobalRuntime(): CheckResult {
       remedy: 'Run kyro sync.',
     };
   }
-  return { status: 'pass', name: 'global runtime', detail: `${manifest.managedFiles.length} managed files present` };
+  return { status: 'pass', name: 'global runtime', detail: `${runtimeFiles.length} runtime files present` };
 }
 
 function checkAdapterProjections(): CheckResult[] {
@@ -134,6 +136,31 @@ function checkAdapterProjections(): CheckResult[] {
         remedy: 'Run kyro sync or reinstall the adapter.',
       };
     }
+  });
+}
+
+function checkAdapterInventory(): CheckResult[] {
+  return ADAPTERS.map((adapter) => {
+    const managedFiles = adapter.buildManagedFiles();
+    const managedBlocks = adapter.buildManagedBlocks();
+    const capabilities = adapter.capabilities();
+    const paths = adapter.paths('~');
+    const nativePaths = Object.values(paths).filter(Boolean).length;
+    const detail = [
+      `status=${adapter.status}`,
+      `managedFiles=${managedFiles.length}`,
+      `managedBlocks=${managedBlocks.length}`,
+      `nativePaths=${nativePaths}`,
+      `systemPromptStrategy=${adapter.systemPromptStrategy()}`,
+      `mcpStrategy=${adapter.mcpStrategy()}`,
+      `capabilities=${capabilities.length > 0 ? capabilities.join(',') : 'none'}`,
+    ].join('; ');
+
+    if (adapter.status === 'planned') {
+      return { status: 'warn', name: `adapter inventory: ${adapter.agent}`, detail };
+    }
+
+    return { status: 'pass', name: `adapter inventory: ${adapter.agent}`, detail };
   });
 }
 

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "rule-001",
+      "category": "process",
+      "tags": ["example"],
+      "affectedModes": ["execute-task"],
+      "summary": "Short rule summary used for startup routing.",
+      "sourceLocation": ".agents/kyro/scopes/rules.md#rule-001"
+    }
+  ],
+  "sourceMarkdown": ".agents/kyro/scopes/rules.md",
+  "lastUpdated": "{date}"
+}

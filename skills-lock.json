@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "ad3c-cycle": {
+      "source": "SynapSync/skills-registry",
+      "sourceType": "github",
+      "skillPath": "cognitives/skills/workflow/ad3c-cycle/SKILL.md",
+      "computedHash": "4c45724ffe51beffc57608247062ac074558cb8979ee900b617aa7893e223ed8"
+    }
+  }
+}
