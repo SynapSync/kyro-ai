@@ -37,19 +37,15 @@ Protocol files are lazy-loaded only when a routed mode needs expanded detail: an
 
 ## templates/
 
+v4 installs exactly these. The two JSON files are the agent-facing source of truth; the markdown is a write-only human archive.
+
 | File | Description |
 |------|-------------|
-| [ROADMAP.md](templates/ROADMAP.md) | Human roadmap evidence with sizingDecision |
-| [SPRINT.md](templates/SPRINT.md) | Human sprint evidence |
-| [PROJECT-README.md](templates/PROJECT-README.md) | Scope README |
-| [REENTRY-PROMPTS.md](templates/REENTRY-PROMPTS.md) | Summary-first recovery prompts |
-| [state.json](templates/state.json) | Scoped routing state |
-| [index.json](templates/index.json) | Fast agent routing index |
-| [ROADMAP.summary.json](templates/ROADMAP.summary.json) | Roadmap summary cache |
-| [SPRINT.summary.json](templates/SPRINT.summary.json) | Sprint summary cache |
-| [DEBT.summary.json](templates/DEBT.summary.json) | Debt summary cache |
-| [rules.index.json](templates/rules.index.json) | Compact learned-rules index |
-| [events.ndjson.example](templates/events.ndjson.example) | Compact execution event shape |
+| [sprint.json](templates/sprint.json) | Single source of truth per scope (objective, conventions, roadmap, ledger, activeSprint, debt, handoff) |
+| [kyro.json](templates/kyro.json) | Global registry: scopes list and activeScope |
+| [archive-sprint.md](templates/archive-sprint.md) | Human-readable narrative written when a sprint closes |
+
+Deprecated v3 templates (state.json, index.json, ROADMAP.summary.json, DEBT.summary.json, rules.index.json, events.ndjson) have been moved to [old-to-delete/](templates/old-to-delete/) and must not be used. Run `kyro migrate` to upgrade v3 scopes.
 
 ## fixtures/
 
