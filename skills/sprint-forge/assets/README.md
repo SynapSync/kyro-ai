@@ -6,14 +6,14 @@ Kyro assets are designed for progressive disclosure: load the router first, then
 
 | File | Description |
 |------|-------------|
-| [INIT.md](modes/INIT.md) | Lean analysis, justified sprint sizing, roadmap, scoped state, and summaries |
-| [SPRINT.md](modes/SPRINT.md) | Lightweight sprint router |
-| [plan-sprint.md](modes/plan-sprint.md) | Generate the next sprint |
-| [execute-task.md](modes/execute-task.md) | Execute active sprint tasks |
-| [review-task.md](modes/review-task.md) | Validate task or phase quality |
-| [close-sprint.md](modes/close-sprint.md) | Retro, debt, summaries, and re-entry closeout |
-| [recover.md](modes/recover.md) | Rebuild state/summaries after interruption |
-| [STATUS.md](modes/STATUS.md) | Summary-first progress reporting |
+| [INIT.md](modes/INIT.md) | Scope analysis, sprint sizing, and `sprint.json` bootstrap |
+| [SPRINT.md](modes/SPRINT.md) | Router on `handoff.nextAction` |
+| [plan-sprint.md](modes/plan-sprint.md) | Generate the next sprint into `activeSprint` |
+| [execute-task.md](modes/execute-task.md) | Execute active sprint tasks, record evidence |
+| [review-task.md](modes/review-task.md) | Validate task quality, record verdict |
+| [close-sprint.md](modes/close-sprint.md) | Snapshot, ledger entry, retro, debt, conventions |
+| [recover.md](modes/recover.md) | Rebuild `sprint.json` from archive snapshots |
+| [STATUS.md](modes/STATUS.md) | Progress report from `sprint.json` |
 
 ## helpers/
 
@@ -25,11 +25,13 @@ Kyro assets are designed for progressive disclosure: load the router first, then
 | [analysis/refactor.md](helpers/analysis/refactor.md) | Refactor analysis and sizing signals |
 | [analysis/new-project.md](helpers/analysis/new-project.md) | New project analysis and sizing signals |
 | [analysis/tech-debt.md](helpers/analysis/tech-debt.md) | Tech debt analysis and sizing signals |
-| [sprint-generator.md](helpers/sprint-generator.md) | Sprint generation algorithm |
-| [debt-tracker.md](helpers/debt-tracker.md) | Accumulated debt rules |
-| [reentry-generator.md](helpers/reentry-generator.md) | Re-entry prompt updates |
+| [sprint-generator.md](helpers/sprint-generator.md) | Builds the `activeSprint` object |
+| [debt-tracker.md](helpers/debt-tracker.md) | Accumulated debt rules (`sprint.json.debt[]`) |
+| [learner.md](helpers/learner.md) | Learned rules into `sprint.json.conventions[]` |
+| [analyzer.md](helpers/analyzer.md) | Scope analysis support |
+| [metrics.md](helpers/metrics.md) | Velocity & debt analytics from `sprint.json` |
 | [reviewer.md](helpers/reviewer.md) | Review classification |
-| [handoff.md](helpers/handoff.md) | Session handoff format |
+| [handoff.md](helpers/handoff.md) | Resume context in `sprint.json.handoff` |
 
 ## protocols/
 

@@ -5,33 +5,29 @@ argument-hint: <scope or request>
 
 # /kyro:forge — Router
 
-Use this command to continue Kyro work without loading the whole workflow upfront.
+Continue Kyro work without loading the whole workflow upfront.
 
 ## Startup
 
 1. Read `.agents/kyro/kyro.json` if it exists.
-2. Resolve the active scope from `$ARGUMENTS`, `activeScope`, or the only directory under `.agents/kyro/scopes/`.
-3. For a resolved scope, read `state.json`, `index.json`, and `.agents/kyro/scopes/rules.index.json` if present.
-4. Do not read ROADMAP, sprint Markdown, templates, or helper files until the selected route requires them.
+2. Resolve the active scope from `$ARGUMENTS`, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
+3. Read the scope's `sprint.json` (single source of truth). Do not open archive Markdown, findings, templates, or helpers until the route requires them.
 
-## Route
+## Route (on `sprint.json.handoff.nextAction`)
 
 | Condition | Load next |
 |-----------|-----------|
-| No project state | Create or validate `.agents/kyro/kyro.json`, then continue routing. |
-| No scope or no roadmap | `skills/sprint-forge/assets/modes/INIT.md` |
-| Roadmap exists and no active sprint | `skills/sprint-forge/assets/modes/plan-sprint.md` |
-| Active sprint has pending tasks | `skills/sprint-forge/assets/modes/execute-task.md` |
-| Active sprint needs quality validation | `skills/sprint-forge/assets/modes/review-task.md` |
-| Sprint/session is ready to close | `skills/sprint-forge/assets/modes/close-sprint.md` |
-| State is inconsistent or interrupted | `skills/sprint-forge/assets/modes/recover.md` |
+| No `kyro.json` | Create or validate `.agents/kyro/kyro.json`, then continue routing. |
+| No `sprint.json` for the scope | `skills/sprint-forge/assets/modes/INIT.md` |
+| `nextAction: "plan_sprint"` | `skills/sprint-forge/assets/modes/plan-sprint.md` |
+| `nextAction: "execute_task"` | `skills/sprint-forge/assets/modes/execute-task.md` |
+| `nextAction: "review_task"` | `skills/sprint-forge/assets/modes/review-task.md` |
+| `nextAction: "close_sprint"` or `"wrap_up"` | `skills/sprint-forge/assets/modes/close-sprint.md` |
+| `sprint.json` missing/unparseable or inconsistent | `skills/sprint-forge/assets/modes/recover.md` |
 
 ## Rules
 
-- Load only the routed mode plus the helpers named by that mode; never preload sprint/debt/re-entry helpers.
+- Load only the routed mode plus the helpers it names; never preload sprint/debt/learner helpers.
 - Enforce orchestrator gates from `agents/orchestrator.md` only at gate moments.
-- Follow the Write Policy from the routed mode:
-  - task close writes only a minimal append-only event;
-  - phase close updates compact routing state only;
-  - sprint close materializes Markdown evidence, summaries, re-entry prompts, debt, and rules.
-- Do not refresh roadmap, re-entry prompts, debt summary, or learned rules during normal task execution.
+- Every write to `sprint.json` follows the Artifact Write Contract in `skills/sprint-forge/SKILL.md` (read → parse → mutate → overwrite whole file → re-parse).
+- Do not create v3 artifacts. The only writes are `sprint.json`, `kyro.json`, and write-only `archive/` files at close.

@@ -1,34 +1,29 @@
 ---
-description: Route Kyro status and debt reports from structured summaries first
+description: Report Kyro progress and debt from sprint.json
 argument-hint: [brief|full|debt|debt-add|debt-resolve|debt-escalate]
 ---
 
 # /kyro:status — Router
 
-Report Kyro progress without loading all sprint Markdown by default.
+Report Kyro progress from the single source of truth.
 
 ## Startup
 
 1. Read `.agents/kyro/kyro.json`.
-2. Resolve scope from `$ARGUMENTS`, `activeScope`, or `.agents/kyro/scopes/`.
-3. Read `.agents/kyro/scopes/{scope}/state.json` and `index.json` first.
-4. Prefer `ROADMAP.summary.json`, `SPRINT-*.summary.json`, and `DEBT.summary.json` when present. Use `sizingDecision` from summaries to explain sprint count without opening roadmap Markdown.
+2. Resolve scope from `$ARGUMENTS`, `kyro.json.activeScope`, or `.agents/kyro/scopes/`.
+3. Read the scope's `sprint.json`. Everything needed for a report — `roadmap`, `ledger[]`, `activeSprint`, `debt[]`, `conventions[]`, `handoff` — is in that one file.
 
 ## Route
 
 | Request | Load next |
 |---------|-----------|
-| `brief` or empty | Summaries only; include sprint count rationale from `sizingDecision`; never open sprint Markdown when summaries exist. |
-| `full` | `skills/sprint-forge/assets/modes/STATUS.md`, then summaries, then Markdown fallbacks. |
-| `debt` | `skills/sprint-forge/assets/helpers/debt-tracker.md` plus debt summary/table. |
-| `debt-add`, `debt-resolve`, `debt-escalate` | `debt-tracker.md`, then update Markdown and summaries. |
-
-## Missing summaries
-
-If a summary file is missing, fall back to the Markdown source, produce the requested report, and mention that `kyro doctor --tokens` will report the missing optimization.
+| `brief` or empty | Report directly from `sprint.json`; no extra files. |
+| `full` | `skills/sprint-forge/assets/modes/STATUS.md` for the detailed report shape. |
+| `debt` | Report `debt[]` from `sprint.json`; load `skills/sprint-forge/assets/helpers/debt-tracker.md` only to explain status semantics. |
+| `debt-add`, `debt-resolve`, `debt-escalate` | `skills/sprint-forge/assets/helpers/debt-tracker.md`, then mutate `sprint.json.debt[]` via the Artifact Write Contract. |
 
 ## Rules
 
-- Do not read sprint Markdown for `brief` when summaries exist.
-- Never delete debt items; only update status fields.
-- Keep `index.json` aligned with any status or debt mutation.
+- A status report is read-only unless an explicit `debt-*` mutation is requested.
+- Debt items are never deleted; only their `status` changes.
+- Debt mutations follow the Artifact Write Contract in `skills/sprint-forge/SKILL.md`.

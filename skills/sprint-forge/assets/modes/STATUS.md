@@ -1,63 +1,37 @@
-# STATUS Mode — Summary-First Project Report
+# STATUS Mode — Project Report from sprint.json
 
-This mode reports progress from structured summaries first. Markdown is the fallback evidence, not the default startup context.
+Report progress from the single source of truth. One read, no summaries.
 
 ## Inputs
 
 1. Read `.agents/kyro/kyro.json`.
-2. Resolve scope and read `.agents/kyro/scopes/{scope}/state.json`.
-3. Read `.agents/kyro/scopes/{scope}/index.json`.
-4. Read summary files listed in `index.json`:
-   - `ROADMAP.summary.json`
-   - active or latest `SPRINT-*.summary.json`
-   - `DEBT.summary.json` when present
-5. Open Markdown only for missing summary fields, explicit `full` evidence, or debt mutations; `brief` never opens sprint Markdown when summaries exist.
+2. Resolve scope and read `.agents/kyro/scopes/{scope}/sprint.json`. Everything is in that one file.
 
 ## Report variants
 
-| Variant | Context policy |
-|---------|----------------|
-| `brief` or empty | Summaries only unless a required field is missing. |
-| `full` | Summaries first, then selected Markdown evidence. |
-| `debt` | Debt summary first, then latest debt table if needed. |
-| `debt-*` | Load `../helpers/debt-tracker.md`, mutate source Markdown, refresh summaries. |
+| Variant | Content |
+|---------|---------|
+| `brief` or empty | scope + status, active sprint + next action (`handoff`), task progress, open debt count, next recommended command. |
+| `full` | roadmap health, sprint table (from `roadmap` + `ledger[]`), debt trend (`debt[]`), recommendations from the latest `ledger[]` entry. |
+| `debt` | `debt[]` grouped by status; oldest open item; critical count. |
+| `debt-*` | Load `../helpers/debt-tracker.md`, then mutate `sprint.json.debt[]` via the Artifact Write Contract. |
 
-## Metrics
-
-Compute from summaries when available:
+## Metrics (all computed from sprint.json)
 
 | Metric | Source |
 |--------|--------|
-| Planned/completed sprints | roadmap summary + sprint summaries |
-| Task counts | sprint summaries |
-| Blocked/carry-over tasks | sprint summaries |
-| Open/resolved/deferred debt | debt summary or latest sprint summary |
-| Roadmap adaptations | roadmap summary |
-| Next action | `state.json.nextAction` and `index.json.nextTask` |
-
-## Missing summaries
-
-If a summary is missing:
-
-1. Open the corresponding Markdown source.
-2. Complete the report.
-3. Warn that this scope needs summary refresh.
-4. If mutating debt/status, write the missing summary before finishing.
+| Planned / closed sprints | `roadmap.sprints` + `ledger[]` |
+| Task counts (total/done/blocked/carry-over) | `activeSprint.phases[].tasks` |
+| Open / in_progress / resolved / deferred debt | `debt[]` |
+| Next action | `handoff.nextAction` + `handoff.nextTaskId` |
 
 ## Output
 
-For `brief`, show only:
-
-- scope and status
-- active sprint / next action
-- task progress
-- open debt count
-- next recommended command
-
-For `full`, include roadmap health, sprint table, debt trend, and re-entry pointer.
+- `brief`: scope, status, active sprint, next action, task progress, open debt count, next command.
+- `full`: add roadmap health, sprint table, debt trend, and the resume note from `handoff.note`.
 
 ## Rules
 
-- Do not read sprint Markdown for `brief` when summaries exist.
-- Debt items are never deleted.
-- Keep `index.json` aligned with any report mutation.
+- A report is read-only unless an explicit `debt-*` mutation is requested.
+- Debt items are never deleted; only `status` changes.
+- No summaries, no `index.json`, no v3 artifacts — one read of `sprint.json`.

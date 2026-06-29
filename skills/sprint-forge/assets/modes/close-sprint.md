@@ -1,31 +1,47 @@
 # Close Sprint Mode
 
-Close a sprint or session by materializing compact execution evidence into durable documentation.
+Close a sprint by snapshotting it verbatim, recording a one-line ledger entry, then clearing `activeSprint`. Zero loss: the full structured record is preserved in the archive snapshot.
+
+All `sprint.json` mutations use the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse).
 
 ## Inputs
 
-1. Read `state.json`, `index.json`, active sprint summary, and `events.ndjson` if present.
-2. Read summary files before opening Markdown.
-3. Open active sprint Markdown only when materializing retro, findings, debt, or Definition of Done.
-4. Read `../helpers/debt-tracker.md` before changing debt rows.
-5. Read `../helpers/reentry-generator.md` only before updating re-entry prompts.
-6. Load roadmap Markdown only if execution changed future sprint sequencing.
+1. Read `.agents/kyro/scopes/{scope}/sprint.json`. The complete sprint detail is in `activeSprint` (phases → tasks with `evidence` and `verdict`).
+2. Read `../helpers/debt-tracker.md` before changing `debt[]`.
+3. Read `../helpers/learner.md` before extracting `conventions[]`.
 
 ## Workflow
 
-1. Run the pre-close quality checkpoint.
-2. Consolidate findings from planned and emergent phases using compact task events first.
-3. Fill retro: went well, did not go well, surprises, new debt.
-4. Write recommendations for Sprint N+1.
-5. Update accumulated debt statuses and new debt rows.
-6. Verify Definition of Done.
-7. Update re-entry prompts and roadmap only when needed.
-8. Refresh `state.json`, `index.json`, active sprint summary, and debt summary.
-9. Propose learned rules and refresh `rules.index.json` when `rules.md` changes.
+1. Run the pre-close quality checkpoint. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason).
+
+### 1b. Snapshot the sprint as JSON (verbatim, zero-loss)
+
+Before touching anything, write the entire `activeSprint` object verbatim to `archive/sprint-{NNN}-{slug}.json` (zero-padded number, e.g. `sprint-002-modal-decouple.json`). This is a fresh write-only file — never re-read by agents. It preserves 100% of the structured record (descriptions, context, acceptance_criteria, evidence, full verdicts incl. checked_criteria, timestamps, emergentTasks) regardless of how lean the narrative `.md` is.
+
+2. Render the human narrative to `archive/sprint-{NNN}-{slug}.md` using `../templates/archive-sprint.md` (objective, definitionOfDone, phases→tasks, learnings, resolved debt, recommendations for Sprint N+1).
+3. Fill the retro reasoning: went well, did not go well, surprises, new debt. Capture recommendations for Sprint N+1 (carried in the ledger entry).
+4. Extract learned rules as `conventions[]` objects via `../helpers/learner.md` — each `{ id, rule, tags, addedSprint }`, e.g. `{ "id": "test-1", "rule": "...", "tags": ["testing"], "addedSprint": 2 }`. Append to `sprint.json.conventions[]`.
+5. Update `debt[]` via `../helpers/debt-tracker.md`: mark resolved items `resolved`, defer with reason, add new debt objects.
+
+### 6. Close out (one safe-write to sprint.json)
+
+In a single in-memory mutation:
+
+- Append a `ledger[]` entry: `{ n, slug, outcome, closedAt, archive: "archive/sprint-NNN-slug.md", snapshot: "archive/sprint-NNN-slug.json", recommendations: [...] }`.
+- Set `previousSprint` to a compact summary of the sprint just closed.
+- Set `activeSprint: null`.
+- Update `roadmap.sprints[N-1].state` to `closed`.
+- Set `handoff.nextAction`: `"plan_sprint"` if more sprints remain, else `"wrap_up"`; `handoff.nextTaskId: null`; update `handoff.note` and `handoff.lastUpdated`.
+
+Then overwrite the whole file and re-parse to confirm validity.
+
+### 7. Update kyro.json scope status
+
+If this was the last sprint, set the scope's `status` to `"completed"` in `kyro.json.scopes[]` (object form `{ id, title, status }`), via the Artifact Write Contract.
 
 ## Rules
 
-- Retro must be honest and specific.
-- Re-entry context must point to the next action.
-- Markdown is the durable evidence; summaries are the routing cache.
-- This is the only normal sprint phase that refreshes full summaries, re-entry prompts, roadmap changes, debt summary, and learned rules.
+- The JSON snapshot is the complete record; the `.md` is the readable narrative; the `ledger[]` entry is the one-line index.
+- Retro must be honest and specific. Recommendations must point to concrete next actions.
+- Debt is never deleted; resolved debt appears in the archive and is dropped from `debt[]` only after it is recorded there.
+- Never create `state.json`, `index.json`, `events.ndjson`, summaries, `RE-ENTRY-PROMPTS.md`, or `phases/`.

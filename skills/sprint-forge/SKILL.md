@@ -1,12 +1,12 @@
 ---
 name: sprint-forge
 description: >
-  Adaptive sprint workflow with lean context loading, compact execution evidence,
-  formal debt tracking, and sprint-close materialization.
+  Adaptive sprint workflow with a single source of truth per scope (sprint.json),
+  lean context loading, formal debt tracking, and zero-loss sprint-close archival.
 license: Apache-2.0
 metadata:
   author: synapsync
-  version: "2.0"
+  version: "4.0"
   scope: [root]
   auto_invoke:
     - "Analyze project or codebase"
@@ -26,44 +26,58 @@ metadata:
 allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task
 ---
 
-# Kyro Sprint Forge — Runtime Contract
+# Kyro Sprint Forge — Runtime Contract (v4)
 
-Kyro runs adaptive sprint work without loading the whole workflow upfront. Commands route from structured state first, then load exactly one mode and only its named helpers/templates.
+One scope = one `sprint.json`. Agents read `kyro.json` (global registry) and the scope's `sprint.json`, then route on `handoff.nextAction`. There are no other agent-facing files.
 
 ## Core Invariants
 
-1. Generate one sprint at a time; never pre-generate the roadmap's future sprint files.
-2. Previous retro, recommendations, and debt feed the next sprint.
-3. Roadmap phases are guidance; add emergent phases only when they block the sprint objective or prevent hidden debt.
-4. Debt never disappears; close debt only by explicit resolution.
-5. During execution, write compact task events and minimal routing state only.
-6. At sprint close, materialize Markdown evidence, summaries, debt, re-entry prompts, roadmap updates, and rule proposals.
-7. Read summaries before Markdown; Markdown is opened only for missing evidence or mutation.
+1. `sprint.json` is the single source of truth. Two reads to start (`kyro.json` + `sprint.json`), one file to update per action.
+2. Route on `sprint.json.handoff.nextAction` — never infer state from file presence.
+3. Generate one sprint at a time; never pre-generate future sprints.
+4. Tasks are self-contained: every task carries `description`, `files_to_touch`, `context`, `acceptance_criteria`.
+5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
+6. At sprint close, snapshot the sprint verbatim to `archive/`, then clear `activeSprint` — the closed sprint becomes one `ledger[]` entry.
+7. Findings and archives are write-only human evidence; agents never re-read them to route.
 
-## Mode Loading
+## Artifact Write Contract (MANDATORY)
 
-| Mode | Load | Do not load |
-|------|------|-------------|
-| INIT | `modes/INIT.md` + one `helpers/analysis/{workType}.md` | SPRINT, STATUS, sprint/debt/re-entry helpers |
-| Plan sprint | `modes/SPRINT.md`, `modes/plan-sprint.md`, then `helpers/sprint-generator.md` | execution/review/close helpers |
-| Execute task | `modes/SPRINT.md`, `modes/execute-task.md` | sprint-generator, debt-tracker, reentry-generator |
-| Review task | `modes/SPRINT.md`, `modes/review-task.md`, `helpers/reviewer.md` | sprint-generator, reentry-generator |
-| Close sprint | `modes/SPRINT.md`, `modes/close-sprint.md`, debt/re-entry helpers as needed | INIT and planning helpers |
-| STATUS | `modes/STATUS.md` | INIT, SPRINT, templates, sprint-generator |
+Every mutation of `sprint.json` or `kyro.json` MUST be a **safe write**:
+
+> Read the whole file → `JSON.parse` to an in-memory object → mutate the object → serialize → overwrite the entire file in one write → re-read and parse once to confirm validity. If the re-parse fails, restore and report.
+
+NEVER use a partial/string-replace edit for structural changes (e.g. setting `activeSprint` to `null`, removing a nested block). A surgical string edit on a large JSON orphans the body and corrupts the single source of truth. The only exception is the per-sprint archive snapshot (`archive/sprint-NNN-slug.json`) — a fresh file, pure write, never re-read.
+
+## Routing (handoff.nextAction → mode)
+
+| nextAction | Load |
+|------------|------|
+| `init` (no sprint.json) | `modes/INIT.md` + one `helpers/analysis/{workType}.md` |
+| `plan_sprint` | `modes/SPRINT.md`, `modes/plan-sprint.md`, then `helpers/sprint-generator.md` |
+| `execute_task` | `modes/SPRINT.md`, `modes/execute-task.md` |
+| `review_task` | `modes/SPRINT.md`, `modes/review-task.md`, `helpers/reviewer.md` |
+| `close_sprint` | `modes/SPRINT.md`, `modes/close-sprint.md`, `helpers/debt-tracker.md` + `helpers/learner.md` as needed |
+| `wrap_up` | `modes/close-sprint.md` only if a milestone closed |
+| status report | `modes/STATUS.md` |
+| inconsistent | `modes/recover.md` |
 
 Templates are loaded only immediately before writing their artifact.
 
 ## Artifact Contract
 
-- Project state: `.agents/kyro/kyro.json`.
-- Scope state: `.agents/kyro/scopes/{scope}/state.json` and `index.json`.
-- Compact events: `.agents/kyro/scopes/{scope}/events.ndjson`.
-- Rule index: `.agents/kyro/scopes/rules.index.json`; open `rules.md` only when a matching rule may apply or when closing/proposing rules.
-- Re-entry prompts update only at INIT, sprint close, and wrap-up.
+| File | Role |
+|------|------|
+| `.agents/kyro/kyro.json` | Global registry: `scopes[]` (objects `{id,title,status}`), `activeScope` |
+| `.agents/kyro/scopes/{scope}/sprint.json` | Single source of truth (see template) |
+| `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.md` | Human narrative at close (write-only) |
+| `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |
+| `.agents/kyro/scopes/{scope}/findings/NN-slug.md` | INIT analysis evidence (write-only) |
+
+There are no `state.json`, `index.json`, `events.ndjson`, `ROADMAP.summary.json`, `DEBT.summary.json`, `rules.index.json`, `rules.md`, `RE-ENTRY-PROMPTS.md`, `phases/`, or `*.summary.json` files. Those are v3 artifacts; run `kyro migrate` to upgrade a v3 scope.
 
 ## Boundaries
 
 - INIT is read-only against source code until writing Kyro artifacts.
-- SPRINT may modify project code/docs but must validate touched areas.
+- Execution may modify project code/docs but must validate touched areas before marking a task done.
 - STATUS is read-only unless explicitly mutating debt status.
-- Recover preserves user-authored Markdown and rebuilds structured state from the best available evidence.
+- Recover preserves user-authored archives and rebuilds `sprint.json` from the best available evidence.
