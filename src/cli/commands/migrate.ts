@@ -108,6 +108,8 @@ function buildSprintFromV3(scope: string): SprintFile {
     title,
     status,
     objective,
+    successCriteria: [],
+    clarifications: [],
     conventions,
     roadmap,
     ledger,

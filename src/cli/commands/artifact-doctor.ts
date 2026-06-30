@@ -93,6 +93,14 @@ function checkScope(scope: string): CheckResult[] {
   }
   checks.push(pass(`${scope}/sprint.json`, 'Schema shapes are valid.'));
 
+  // 2b. Unresolved ambiguity: a [NEEDS CLARIFICATION] marker anywhere in sprint.json means the agent
+  //     guessed instead of asking. This is the deterministic enforcement of the clarify discipline —
+  //     it fails in ANY harness (including OpenCode), where prose-only guidance gets ignored.
+  const markerCount = (JSON.stringify(sprintRead.value).match(/\[NEEDS CLARIFICATION/g) ?? []).length;
+  if (markerCount > 0) {
+    checks.push(fail(`${scope}/clarity`, `${markerCount} unresolved [NEEDS CLARIFICATION] marker(s) in sprint.json`, 'Run the clarify mode (or kyro analyze) to resolve them before planning/executing — do not guess.'));
+  }
+
   // 3. Zero-loss audit: every closed sprint in the ledger must have its verbatim snapshot on disk.
   //    A missing snapshot means the sprint was closed by hand (skipping kyro close-sprint) and its
   //    full structured record is unrecoverable. Deterministic — catches the failure in any harness.

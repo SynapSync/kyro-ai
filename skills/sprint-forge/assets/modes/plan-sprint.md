@@ -25,6 +25,13 @@ Using the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate
 - Update `roadmap.sprints[N-1].state` to `active`.
 - Set `handoff.nextAction: "execute_task"`, `handoff.nextTaskId` to the first task id, `handoff.lastUpdated` to today.
 
+## Clarity gate (before generating tasks)
+
+- If any design-affecting detail is unknown, write `[NEEDS CLARIFICATION: <what is missing>]` in the
+  relevant field instead of guessing, and set `handoff.nextAction: "clarify"` to resolve it first.
+- Do NOT generate or finalize tasks while `[NEEDS CLARIFICATION]` markers remain — `kyro doctor` and
+  `kyro analyze` fail on them. Resolve via `clarify.md`, then return here.
+
 ## Rules
 
 - Never generate Sprint N+1 before Sprint N is closed (in `ledger[]`).

@@ -10,7 +10,7 @@ export const KYRO_SCOPE_STATUS = {
 export type KyroScopeStatus = (typeof KYRO_SCOPE_STATUS)[keyof typeof KYRO_SCOPE_STATUS];
 
 export const SCOPE_STATUS_VALUES = ['planning', 'active', 'blocked', 'completed'] as const;
-export const NEXT_ACTION_VALUES = ['init', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'wrap_up'] as const;
+export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'wrap_up'] as const;
 export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
 export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'] as const;
 export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
@@ -164,6 +164,19 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
   requireString(value, 'status', path, issues);
   requireString(value, 'objective', path, issues);
 
+  // successCriteria / clarifications are v4.1 additions — validate shape only if present so
+  // scopes created before 4.1 (which omit them) are not failed by close-sprint's gate.
+  if ('successCriteria' in value && !Array.isArray(value.successCriteria)) {
+    issues.push({ path, field: 'successCriteria', message: 'must be an array of strings when present' });
+  }
+  if ('clarifications' in value) {
+    if (!Array.isArray(value.clarifications)) {
+      issues.push({ path, field: 'clarifications', message: 'must be an array when present' });
+    } else {
+      value.clarifications.forEach((c, i) => validateClarification(c, path, `clarifications[${i}]`, issues));
+    }
+  }
+
   if (!Array.isArray(value.conventions)) {
     issues.push({ path, field: 'conventions', message: 'must be an array' });
   } else {
@@ -198,6 +211,17 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
     requireNullableString(value.handoff, 'nextTaskId', path, issues);
   }
   return issues;
+}
+
+function validateClarification(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { q, a, sprint, date }' });
+    return;
+  }
+  requireString(value, 'q', path, issues, `${prefix}.q`);
+  requireString(value, 'a', path, issues, `${prefix}.a`);
+  requireNumber(value, 'sprint', path, issues, `${prefix}.sprint`);
+  requireString(value, 'date', path, issues, `${prefix}.date`);
 }
 
 function validateConvention(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {

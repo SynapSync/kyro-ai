@@ -39,6 +39,7 @@ One scope = one `sprint.json`. Agents read `kyro.json` (global registry) and the
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
 6. At sprint close, the destructive snapshot-then-clear of `activeSprint` is owned by the `kyro close-sprint` CLI — never hand-edit `sprint.json` to null `activeSprint`. The closed sprint becomes one `ledger[]` entry.
 7. Findings and archives are write-only human evidence; agents never re-read them to route.
+8. **Admit unknowns, never guess.** When a detail that affects design/data/tasks/tests is unknown, write `[NEEDS CLARIFICATION: <what is missing>]` in the relevant field instead of inventing an answer, and route to `clarify`. `kyro doctor`/`kyro analyze` FAIL while any such marker remains — it is a deterministic gate, not a suggestion.
 
 ## Artifact Write Contract (MANDATORY)
 
@@ -66,6 +67,7 @@ In Claude Code, a `PreToolUse` hook blocks any hand edit that nulls `activeSprin
 | nextAction | Load |
 |------------|------|
 | `init` (no sprint.json) | `modes/INIT.md` + one `helpers/analysis/{workType}.md` |
+| `clarify` | `modes/clarify.md` |
 | `plan_sprint` | `modes/SPRINT.md`, `modes/plan-sprint.md`, then `helpers/sprint-generator.md` |
 | `execute_task` | `modes/SPRINT.md`, `modes/execute-task.md` |
 | `review_task` | `modes/SPRINT.md`, `modes/review-task.md`, `helpers/reviewer.md` |

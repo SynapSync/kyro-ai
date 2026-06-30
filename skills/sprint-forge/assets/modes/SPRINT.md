@@ -6,6 +6,7 @@ Lightweight index for sprint work. Do not load the full sprint protocol upfront.
 
 | nextAction | Load |
 |------------|------|
+| `clarify` | `clarify.md` |
 | `plan_sprint` | `plan-sprint.md` |
 | `execute_task` | `execute-task.md` |
 | `review_task` | `review-task.md` |

@@ -26,6 +26,8 @@ const validSprintJson = {
   title: 'Demo',
   status: 'active',
   objective: 'Demonstrate a valid v4 sprint file.',
+  successCriteria: ['The doctor reports the file as valid.'],
+  clarifications: [],
   conventions: [{ id: 'c-1', rule: 'Run build before close.', tags: ['build'], addedSprint: 1 }],
   roadmap: {
     plannedSprintCount: 1,
@@ -182,6 +184,15 @@ assertCase(
   validSprintJson,
   1,
   'incomplete v4 file',
+);
+
+// 8. An unresolved [NEEDS CLARIFICATION] marker must FAIL — the deterministic clarify gate.
+assertCase(
+  'unresolved-clarification',
+  validKyroJson,
+  { ...validSprintJson, objective: 'Build auth [NEEDS CLARIFICATION: OAuth or JWT?]' },
+  1,
+  'unresolved [NEEDS CLARIFICATION]',
 );
 
 console.log('check:sprint-doctor-v4 — all cases passed');

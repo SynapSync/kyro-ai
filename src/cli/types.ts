@@ -34,11 +34,20 @@ export interface KyroProjectState {
 
 export type NextAction =
   | 'init'
+  | 'clarify'
   | 'plan_sprint'
   | 'execute_task'
   | 'review_task'
   | 'close_sprint'
   | 'wrap_up';
+
+/** A resolved ambiguity, recorded verbatim like spec-kit's Clarifications section. */
+export interface Clarification {
+  q: string;
+  a: string;
+  sprint: number;
+  date: string;
+}
 
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
 export type DebtStatus = 'open' | 'in_progress' | 'resolved' | 'deferred';
@@ -123,6 +132,10 @@ export interface SprintFile {
   title: string;
   status: string;
   objective: string;
+  /** Technology-agnostic, measurable outcomes for the scope (the WHAT/WHY layer). */
+  successCriteria: string[];
+  /** Resolved ambiguities, appended one per accepted clarify answer. */
+  clarifications: Clarification[];
   conventions: Convention[];
   roadmap: Roadmap;
   ledger: LedgerEntry[];
