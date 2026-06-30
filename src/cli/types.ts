@@ -91,6 +91,7 @@ export interface Phase {
 export interface ActiveSprint {
   n: number;
   slug: string;
+  title: string;
   objective: string;
   status: string;
   phases: Phase[];

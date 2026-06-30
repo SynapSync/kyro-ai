@@ -20,7 +20,7 @@ Generate the next sprint as the `activeSprint` object inside `sprint.json`. This
 
 Using the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse):
 
-- Set `activeSprint` to the new sprint object: `{ n, slug, objective, status: "executing", phases, emergentTasks: [], definitionOfDone }`.
+- Set `activeSprint` to the new sprint object: `{ n, slug, title, objective, status: "executing", phases, emergentTasks: [], definitionOfDone }`. Copy `title` verbatim from `roadmap.sprints[]` for Sprint N — it must never be omitted (a missing title renders `Sprint N: undefined` in the archive narrative).
 - Mark due `debt[]` items `in_progress` (do not delete or reset any debt).
 - Update `roadmap.sprints[N-1].state` to `active`.
 - Set `handoff.nextAction: "execute_task"`, `handoff.nextTaskId` to the first task id, `handoff.lastUpdated` to today.
