@@ -51,7 +51,23 @@ Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Cont
 
 ## Step 6 — Update kyro.json
 
-Add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }`, never a bare string (a string is v3 drift and `kyro doctor` will fail it). Set `activeScope` to this scope if none is active. Use the Artifact Write Contract (read → parse → mutate → overwrite whole file → re-parse).
+**If `.agents/kyro/kyro.json` already exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }`, never a bare string (a string is v3 drift and `kyro doctor` will fail it). Set `activeScope` to this scope if none is active. Use the Artifact Write Contract (read → parse → mutate → overwrite whole file → re-parse).
+
+**If `.agents/kyro/kyro.json` does NOT exist** (no prior `kyro install` in this harness): create it with the COMPLETE v4 shape — every required field, not just `scopes`/`activeScope`. A partial file (e.g. only `{ scopes, activeScope }`) is an *incomplete v4* that `kyro doctor` flags and that the agent-facing tools must repair. Write exactly:
+
+```json
+{
+  "schemaVersion": 4,
+  "artifactRoot": ".agents/kyro/scopes",
+  "scopes": [{ "id": "{scope}", "title": "{title}", "status": "planning" }],
+  "activeScope": "{scope}",
+  "runtimeVersion": "4.0.0",
+  "runtimePath": "~/.agents/kyro/current",
+  "installedAdapters": []
+}
+```
+
+After creating it, recommend running `kyro install` once so the adapter inventory (`installedAdapters`) and runtime paths are populated authoritatively.
 
 ## Output
 
