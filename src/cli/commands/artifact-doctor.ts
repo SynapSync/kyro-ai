@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { KYRO_STATE_PATH } from '../constants';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
@@ -107,7 +107,52 @@ function checkScope(scope: string): CheckResult[] {
   } else if (ledger.length > 0) {
     checks.push(pass(`${scope}/snapshots`, `${ledger.length} closed sprint(s), all with a snapshot.`));
   }
+
+  // 4. Narrative integrity: each ledger[].archive .md must render a real title and an objective.
+  //    A broken title ("Sprint N: undefined") means the narrative was rendered by hand without the
+  //    sprint title — exactly the failure that close-sprint now owns deterministically. This catches
+  //    it in any harness, including narratives written by other agents (e.g. OpenCode).
+  const brokenNarratives = ledger
+    .map((entry) => validateNarrative(root, entry))
+    .filter((issue): issue is string => issue !== null);
+  if (brokenNarratives.length > 0) {
+    checks.push(fail(`${scope}/narratives`, `broken archive narrative(s): ${brokenNarratives.join('; ')}`, 'Regenerate the narrative via kyro close-sprint (it derives the title from roadmap.sprints[]); do not hand-write the .md.'));
+  } else if (ledger.length > 0) {
+    checks.push(pass(`${scope}/narratives`, `${ledger.length} narrative(s), all well-formed.`));
+  }
+
+  // 5. activeSprint.title (warn-only): a planned sprint must carry its title so the snapshot is
+  //    self-contained and the narrative never renders undefined. Warn (not fail) so an in-flight
+  //    sprint planned by an older generator can still be closed.
+  const active = (sprintRead.value as { activeSprint?: { title?: unknown; n?: number } | null }).activeSprint;
+  if (active && typeof active.title !== 'string') {
+    checks.push(warn(`${scope}/activeSprint`, `sprint ${active.n ?? '?'} has no title field`, 'Re-plan or add activeSprint.title (copied from roadmap.sprints[]) so the archive narrative renders correctly.'));
+  }
   return checks;
+}
+
+/** Validate one archive narrative .md. Returns a short issue string, or null if well-formed. */
+function validateNarrative(root: string, entry: { n?: number; archive?: string }): string | null {
+  if (!entry.archive) return null; // snapshot check already covers a missing archive path
+  const abs = resolveManagedPath(`${root}/${entry.archive}`);
+  if (!existsSync(abs)) return `sprint ${entry.n ?? '?'}: narrative file missing (${entry.archive})`;
+  let content: string;
+  try {
+    content = readFileSync(abs, 'utf8');
+  } catch {
+    return `sprint ${entry.n ?? '?'}: narrative unreadable (${entry.archive})`;
+  }
+  const heading = content.match(/^# Sprint \d+:\s*(.+?)\s*$/m);
+  if (!heading) return `sprint ${entry.n ?? '?'}: missing "# Sprint N: <title>" heading`;
+  if (heading[1] === 'undefined' || heading[1].length === 0) {
+    return `sprint ${entry.n ?? '?'}: title is "${heading[1] || '(empty)'}"`;
+  }
+  if (/^title:\s*['"]?.*undefined/m.test(content)) {
+    return `sprint ${entry.n ?? '?'}: frontmatter title contains "undefined"`;
+  }
+  const objective = content.match(/##\s*Objective\s*\n+\s*(\S.*)/);
+  if (!objective) return `sprint ${entry.n ?? '?'}: missing or empty "## Objective" section`;
+  return null;
 }
 
 function resolveScopeNames(scopes: KyroScopeEntry[], activeScope: string | null, requestedScope: string | null): string[] {
