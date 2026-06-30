@@ -43,7 +43,7 @@ All writes to `sprint.json` use the **Artifact Write Contract** in `SKILL.md` (r
 | Plan sprint | Set `activeSprint` and `handoff.nextAction: "execute_task"` in `sprint.json`. |
 | Task done | Set that task's `evidence` and `status` in `sprint.json`. |
 | Task reviewed | Set that task's `verdict` in `sprint.json`. |
-| Sprint close | Snapshot to `archive/`, append a `ledger[]` entry, clear `activeSprint`, update `debt[]`/`conventions[]`. |
+| Sprint close | Additive `debt[]`/`conventions[]` writes by hand; then run `kyro close-sprint` — the CLI snapshots to `archive/`, appends the `ledger[]` entry, and clears `activeSprint` atomically. Never null `activeSprint` by hand. |
 | Wrap-up | Update `handoff` (next action + note) only. |
 
 Never split a structural JSON change into a partial string edit. Never create v3 artifacts (`state.json`, `index.json`, `events.ndjson`, summaries, `phases/`, `RE-ENTRY-PROMPTS.md`).

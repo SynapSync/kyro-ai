@@ -37,7 +37,7 @@ One scope = one `sprint.json`. Agents read `kyro.json` (global registry) and the
 3. Generate one sprint at a time; never pre-generate future sprints.
 4. Tasks are self-contained: every task carries `description`, `files_to_touch`, `context`, `acceptance_criteria`.
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
-6. At sprint close, snapshot the sprint verbatim to `archive/`, then clear `activeSprint` — the closed sprint becomes one `ledger[]` entry.
+6. At sprint close, the destructive snapshot-then-clear of `activeSprint` is owned by the `kyro close-sprint` CLI — never hand-edit `sprint.json` to null `activeSprint`. The closed sprint becomes one `ledger[]` entry.
 7. Findings and archives are write-only human evidence; agents never re-read them to route.
 
 ## Artifact Write Contract (MANDATORY)
@@ -47,6 +47,19 @@ Every mutation of `sprint.json` or `kyro.json` MUST be a **safe write**:
 > Read the whole file → `JSON.parse` to an in-memory object → mutate the object → serialize → overwrite the entire file in one write → re-read and parse once to confirm validity. If the re-parse fails, restore and report.
 
 NEVER use a partial/string-replace edit for structural changes (e.g. setting `activeSprint` to `null`, removing a nested block). A surgical string edit on a large JSON orphans the body and corrupts the single source of truth. The only exception is the per-sprint archive snapshot (`archive/sprint-NNN-slug.json`) — a fresh file, pure write, never re-read.
+
+## Tool-owned operations (use the CLI, do not hand-roll)
+
+Some operations are irreversible or schema-critical. The CLI does them deterministically — invoke it instead of editing JSON by hand:
+
+| Command | What it owns |
+|---------|--------------|
+| `kyro close-sprint --kyro-scope <scope> --outcome <...>` | The zero-loss close: snapshots `activeSprint` to `archive/` **before** clearing it, appends the `ledger[]` entry, sets `previousSprint`/`roadmap` state/`handoff`, flips `kyro.json` scope status. Refuses on double-close. |
+| `kyro migrate --kyro-scope <scope>` | Upgrades a v3 scope to a v4 `sprint.json`. |
+| `kyro doctor --artifacts --kyro-scope <scope>` | Validates artifact integrity (shape drift, missing snapshots, v3 leakage). |
+| `kyro repair --kyro-scope <scope>` | Validates and normalizes `sprint.json` formatting. |
+
+In Claude Code, a `PreToolUse` hook blocks any hand edit that nulls `activeSprint` and redirects you to `kyro close-sprint`. Other harnesses rely on this contract directly.
 
 ## Routing (handoff.nextAction → mode)
 

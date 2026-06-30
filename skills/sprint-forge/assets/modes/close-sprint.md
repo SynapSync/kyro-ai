@@ -2,7 +2,9 @@
 
 Close a sprint by snapshotting it verbatim, recording a one-line ledger entry, then clearing `activeSprint`. Zero loss: the full structured record is preserved in the archive snapshot.
 
-All `sprint.json` mutations use the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse).
+**The destructive step is NOT done by hand. It is owned by the CLI.** You prepare the additive work (narrative, conventions, debt); then a single command — `kyro close-sprint` — snapshots `activeSprint` to `archive/` and only then clears it, atomically, and re-parses to verify. This is non-negotiable: a hand-edited close is how Sprint data has been lost before. Do **not** manually null `activeSprint` or hand-write the ledger entry.
+
+Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse).
 
 ## Inputs
 
@@ -13,35 +15,37 @@ All `sprint.json` mutations use the Artifact Write Contract in `../../SKILL.md` 
 ## Workflow
 
 1. Run the pre-close quality checkpoint. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason).
+2. Fill the retro reasoning: went well, did not go well, surprises, new debt. Capture recommendations for Sprint N+1 (you will pass them to the close command).
+3. **Additive writes first (safe-write).** These must happen before the close command, because the command re-serializes the current `sprint.json`:
+   - Extract learned rules as `conventions[]` objects via `../helpers/learner.md` — each `{ id, rule, tags, addedSprint }`. Append to `sprint.json.conventions[]`.
+   - Update `debt[]` via `../helpers/debt-tracker.md`: mark resolved items `resolved`, defer with reason, add new debt objects.
+4. Render the human narrative to `archive/sprint-{NNN}-{slug}.md` using `../templates/archive-sprint.md` (objective, definitionOfDone, phases→tasks, learnings, resolved debt, recommendations for Sprint N+1). `{NNN}` is the zero-padded sprint number (e.g. `sprint-002-modal-decouple.md`).
 
-### 1b. Snapshot the sprint as JSON (verbatim, zero-loss)
+### 5. Close with the CLI (deterministic, zero-loss)
 
-Before touching anything, write the entire `activeSprint` object verbatim to `archive/sprint-{NNN}-{slug}.json` (zero-padded number, e.g. `sprint-002-modal-decouple.json`). This is a fresh write-only file — never re-read by agents. It preserves 100% of the structured record (descriptions, context, acceptance_criteria, evidence, full verdicts incl. checked_criteria, timestamps, emergentTasks) regardless of how lean the narrative `.md` is.
+Run:
 
-2. Render the human narrative to `archive/sprint-{NNN}-{slug}.md` using `../templates/archive-sprint.md` (objective, definitionOfDone, phases→tasks, learnings, resolved debt, recommendations for Sprint N+1).
-3. Fill the retro reasoning: went well, did not go well, surprises, new debt. Capture recommendations for Sprint N+1 (carried in the ledger entry).
-4. Extract learned rules as `conventions[]` objects via `../helpers/learner.md` — each `{ id, rule, tags, addedSprint }`, e.g. `{ "id": "test-1", "rule": "...", "tags": ["testing"], "addedSprint": 2 }`. Append to `sprint.json.conventions[]`.
-5. Update `debt[]` via `../helpers/debt-tracker.md`: mark resolved items `resolved`, defer with reason, add new debt objects.
+```
+kyro close-sprint --kyro-scope {scope} --outcome {shipped|partial|...} \
+  [--note "handoff note for next session"] \
+  [--summary "one-line previousSprint summary"] \
+  [--recommendation "..."]   # repeatable
+```
 
-### 6. Close out (one safe-write to sprint.json)
+The command, in one atomic operation:
 
-In a single in-memory mutation:
+- Writes the verbatim JSON snapshot to `archive/sprint-{NNN}-{slug}.json` **before** touching anything (refuses to run if that snapshot already exists — double-close protection).
+- Appends the `ledger[]` entry (`archive` + `snapshot` paths, outcome, recommendations).
+- Sets `previousSprint`, clears `activeSprint`, marks `roadmap.sprints[*].state` closed.
+- Sets `handoff.nextAction` to `plan_sprint` (more sprints remain) or `wrap_up` (none remain).
+- Flips the scope `status` to `completed` in `kyro.json` if this was the last sprint.
+- Re-parses the written `sprint.json` to confirm validity; on failure it reports and the snapshot still preserves the sprint.
 
-- Append a `ledger[]` entry: `{ n, slug, outcome, closedAt, archive: "archive/sprint-NNN-slug.md", snapshot: "archive/sprint-NNN-slug.json", recommendations: [...] }`.
-- Set `previousSprint` to a compact summary of the sprint just closed.
-- Set `activeSprint: null`.
-- Update `roadmap.sprints[N-1].state` to `closed`.
-- Set `handoff.nextAction`: `"plan_sprint"` if more sprints remain, else `"wrap_up"`; `handoff.nextTaskId: null`; update `handoff.note` and `handoff.lastUpdated`.
-
-Then overwrite the whole file and re-parse to confirm validity.
-
-### 7. Update kyro.json scope status
-
-If this was the last sprint, set the scope's `status` to `"completed"` in `kyro.json.scopes[]` (object form `{ id, title, status }`), via the Artifact Write Contract.
+Use `--dry-run` first if you want to review the plan. Do not replicate this by hand.
 
 ## Rules
 
-- The JSON snapshot is the complete record; the `.md` is the readable narrative; the `ledger[]` entry is the one-line index.
+- The destructive snapshot+clear is the CLI's job, never a manual edit. The JSON snapshot is the complete record; the `.md` is the readable narrative; the `ledger[]` entry is the one-line index.
 - Retro must be honest and specific. Recommendations must point to concrete next actions.
 - Debt is never deleted; resolved debt appears in the archive and is dropped from `debt[]` only after it is recorded there.
 - Never create `state.json`, `index.json`, `events.ndjson`, summaries, `RE-ENTRY-PROMPTS.md`, or `phases/`.
