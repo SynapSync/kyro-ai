@@ -124,11 +124,40 @@ function checkScope(scope: string): CheckResult[] {
   // 5. activeSprint.title (warn-only): a planned sprint must carry its title so the snapshot is
   //    self-contained and the narrative never renders undefined. Warn (not fail) so an in-flight
   //    sprint planned by an older generator can still be closed.
-  const active = (sprintRead.value as { activeSprint?: { title?: unknown; n?: number } | null }).activeSprint;
+  const active = (sprintRead.value as { activeSprint?: ActiveSprintShape | null }).activeSprint;
   if (active && typeof active.title !== 'string') {
     checks.push(warn(`${scope}/activeSprint`, `sprint ${active.n ?? '?'} has no title field`, 'Re-plan or add activeSprint.title (copied from roadmap.sprints[]) so the archive narrative renders correctly.'));
   }
+
+  // 6. evidence shape (warn-only): a done task should record evidence as an object
+  //    { summary, validation, files_changed, notes } (see execute-task.md). A plain string means an
+  //    agent wrote loose evidence; the close render tolerates it, but flag the drift. Warn, not fail.
+  if (active) {
+    const looseEvidence = collectDoneTasks(active)
+      .filter((t) => t.evidence !== null && t.evidence !== undefined && typeof t.evidence !== 'object')
+      .map((t) => t.id ?? '?');
+    if (looseEvidence.length > 0) {
+      checks.push(warn(`${scope}/evidence`, `done task(s) with non-object evidence: ${looseEvidence.join(', ')}`, 'Record task.evidence as { summary, validation, files_changed, notes } (see execute-task.md).'));
+    }
+  }
   return checks;
+}
+
+interface ActiveSprintShape {
+  n?: number;
+  title?: unknown;
+  phases?: Array<{ tasks?: Array<{ id?: string; status?: string; evidence?: unknown }> }>;
+}
+
+/** Flatten done tasks across an activeSprint's phases (defensive against missing arrays). */
+function collectDoneTasks(active: ActiveSprintShape): Array<{ id?: string; evidence?: unknown }> {
+  const out: Array<{ id?: string; evidence?: unknown }> = [];
+  for (const phase of active.phases ?? []) {
+    for (const task of phase.tasks ?? []) {
+      if (task.status === 'done') out.push(task);
+    }
+  }
+  return out;
 }
 
 /** Validate one archive narrative .md. Returns a short issue string, or null if well-formed. */
