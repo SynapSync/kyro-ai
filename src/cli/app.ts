@@ -3,6 +3,7 @@ import { detect } from './commands/detect';
 import { install, sync } from './commands/install';
 import { runTui } from './commands/tui';
 import { repair } from './commands/repair';
+import { migrate } from './commands/migrate';
 import { contextPack } from './commands/context-pack';
 import { runScopeCommand } from './commands/scope';
 import { uninstall } from './commands/uninstall';
@@ -61,6 +62,9 @@ export async function runCli(): Promise<void> {
       break;
     case 'repair':
       await repair(options);
+      break;
+    case 'migrate':
+      await migrate(options);
       break;
     case 'sync':
       sync(options);

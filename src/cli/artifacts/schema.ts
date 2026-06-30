@@ -1,4 +1,4 @@
-import type { KyroProjectState } from '../types';
+import type { KyroProjectState, SprintFile } from '../types';
 
 export const KYRO_SCOPE_STATUS = {
   PLANNING: 'planning',
@@ -8,6 +8,12 @@ export const KYRO_SCOPE_STATUS = {
 } as const;
 
 export type KyroScopeStatus = (typeof KYRO_SCOPE_STATUS)[keyof typeof KYRO_SCOPE_STATUS];
+
+export const SCOPE_STATUS_VALUES = ['planning', 'active', 'blocked', 'completed'] as const;
+export const NEXT_ACTION_VALUES = ['init', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'wrap_up'] as const;
+export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
+export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'] as const;
+export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
 
 export interface ValidationIssue {
   path: string;
@@ -120,14 +126,151 @@ export interface RuleIndexEntry {
 export function validateProjectStateShape(value: unknown, path: string): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
-  requireLiteral(value, 'schemaVersion', 1, path, issues);
+  requireLiteral(value, 'schemaVersion', 4, path, issues);
   requireString(value, 'artifactRoot', path, issues);
-  requireStringArray(value, 'scopes', path, issues);
+  if (!Array.isArray(value.scopes)) {
+    issues.push({ path, field: 'scopes', message: 'must be an array' });
+  } else {
+    value.scopes.forEach((entry, index) => validateScopeEntry(entry, path, `scopes[${index}]`, issues));
+  }
   requireNullableString(value, 'activeScope', path, issues);
   requireString(value, 'runtimeVersion', path, issues);
   requireString(value, 'runtimePath', path, issues);
   if (!Array.isArray(value.installedAdapters)) issues.push({ path, field: 'installedAdapters', message: 'must be an array' });
   return issues;
+}
+
+function validateScopeEntry(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (typeof value === 'string') {
+    issues.push({ path, field: prefix, message: 'must be an object { id, title, status }, not a string (v3 drift)' });
+    return;
+  }
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { id, title, status }' });
+    return;
+  }
+  requireString(value, 'id', path, issues, `${prefix}.id`);
+  requireString(value, 'title', path, issues, `${prefix}.title`);
+  requireLiteralSet(value, 'status', SCOPE_STATUS_VALUES, path, issues, `${prefix}.status`);
+}
+
+/** Validate a v4 sprint.json. Catches shape drift (string conventions, bad snapshot, etc.). */
+export function validateSprintFile(value: unknown, path: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
+  requireLiteral(value, 'schemaVersion', 4, path, issues);
+  requireString(value, 'scope', path, issues);
+  requireString(value, 'title', path, issues);
+  requireString(value, 'status', path, issues);
+  requireString(value, 'objective', path, issues);
+
+  if (!Array.isArray(value.conventions)) {
+    issues.push({ path, field: 'conventions', message: 'must be an array' });
+  } else {
+    value.conventions.forEach((c, i) => validateConvention(c, path, `conventions[${i}]`, issues));
+  }
+
+  if (!isRecord(value.roadmap)) {
+    issues.push({ path, field: 'roadmap', message: 'must be an object' });
+  } else {
+    requireNumber(value.roadmap, 'plannedSprintCount', path, issues, 'roadmap.plannedSprintCount');
+    if (!Array.isArray(value.roadmap.sprints)) issues.push({ path, field: 'roadmap.sprints', message: 'must be an array' });
+  }
+
+  if (!Array.isArray(value.ledger)) {
+    issues.push({ path, field: 'ledger', message: 'must be an array' });
+  } else {
+    value.ledger.forEach((e, i) => validateLedgerEntry(e, path, `ledger[${i}]`, issues));
+  }
+
+  if (value.activeSprint !== null) validateActiveSprint(value.activeSprint, path, 'activeSprint', issues);
+
+  if (!Array.isArray(value.debt)) {
+    issues.push({ path, field: 'debt', message: 'must be an array' });
+  } else {
+    value.debt.forEach((d, i) => validateDebtItem(d, path, `debt[${i}]`, issues));
+  }
+
+  if (!isRecord(value.handoff)) {
+    issues.push({ path, field: 'handoff', message: 'must be an object' });
+  } else {
+    requireLiteralSet(value.handoff, 'nextAction', NEXT_ACTION_VALUES, path, issues, 'handoff.nextAction');
+    requireNullableString(value.handoff, 'nextTaskId', path, issues);
+  }
+  return issues;
+}
+
+function validateConvention(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (typeof value === 'string') {
+    issues.push({ path, field: prefix, message: 'must be an object { id, rule, tags, addedSprint }, not a string (v3 drift)' });
+    return;
+  }
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { id, rule, tags, addedSprint }' });
+    return;
+  }
+  requireString(value, 'id', path, issues, `${prefix}.id`);
+  requireString(value, 'rule', path, issues, `${prefix}.rule`);
+  requireStringArrayField(value, 'tags', path, issues, `${prefix}.tags`);
+  requireNumber(value, 'addedSprint', path, issues, `${prefix}.addedSprint`);
+}
+
+function validateLedgerEntry(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object' });
+    return;
+  }
+  requireNumber(value, 'n', path, issues, `${prefix}.n`);
+  requireString(value, 'slug', path, issues, `${prefix}.slug`);
+  requireString(value, 'outcome', path, issues, `${prefix}.outcome`);
+  requireString(value, 'archive', path, issues, `${prefix}.archive`);
+  if ('snapshot' in value && typeof value.snapshot !== 'string') {
+    issues.push({ path, field: `${prefix}.snapshot`, message: 'must be a string when present' });
+  }
+}
+
+function validateActiveSprint(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object or null' });
+    return;
+  }
+  requireNumber(value, 'n', path, issues, `${prefix}.n`);
+  requireString(value, 'slug', path, issues, `${prefix}.slug`);
+  if (!Array.isArray(value.phases)) {
+    issues.push({ path, field: `${prefix}.phases`, message: 'must be an array' });
+  } else {
+    value.phases.forEach((phase, pi) => {
+      if (!isRecord(phase) || !Array.isArray(phase.tasks)) {
+        issues.push({ path, field: `${prefix}.phases[${pi}].tasks`, message: 'must be an array' });
+        return;
+      }
+      phase.tasks.forEach((task, ti) => validateTask(task, path, `${prefix}.phases[${pi}].tasks[${ti}]`, issues));
+    });
+  }
+}
+
+function validateTask(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object' });
+    return;
+  }
+  requireString(value, 'id', path, issues, `${prefix}.id`);
+  requireString(value, 'description', path, issues, `${prefix}.description`);
+  requireLiteralSet(value, 'status', TASK_STATUS_VALUES, path, issues, `${prefix}.status`);
+}
+
+function validateDebtItem(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (typeof value === 'string') {
+    issues.push({ path, field: prefix, message: 'must be an object { id, title, ... }, not a string (v3 drift)' });
+    return;
+  }
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object' });
+    return;
+  }
+  requireString(value, 'id', path, issues, `${prefix}.id`);
+  requireString(value, 'title', path, issues, `${prefix}.title`);
+  requireLiteralSet(value, 'status', DEBT_STATUS_VALUES, path, issues, `${prefix}.status`);
 }
 
 export function validateScopeState(value: unknown, path: string): ValidationIssue[] {
@@ -268,6 +411,10 @@ export function asProjectState(value: unknown): KyroProjectState | null {
   return validateProjectStateShape(value, '.agents/kyro/kyro.json').length === 0 ? value as KyroProjectState : null;
 }
 
+export function asSprintFile(value: unknown): SprintFile | null {
+  return validateSprintFile(value, 'sprint.json').length === 0 ? value as SprintFile : null;
+}
+
 export function asScopeState(value: unknown): KyroScopeState | null {
   return validateScopeState(value, 'state.json').length === 0 ? value as KyroScopeState : null;
 }
@@ -288,8 +435,14 @@ function requireNullableString(record: Record<string, unknown>, key: string, pat
   if (record[key] !== null && typeof record[key] !== 'string') issues.push({ path, field: key, message: 'must be a string or null' });
 }
 
-function requireNumber(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[]): void {
-  if (typeof record[key] !== 'number' || Number.isNaN(record[key])) issues.push({ path, field: key, message: 'must be a number' });
+function requireNumber(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field = key): void {
+  if (typeof record[key] !== 'number' || Number.isNaN(record[key])) issues.push({ path, field, message: 'must be a number' });
+}
+
+function requireLiteralSet(record: Record<string, unknown>, key: string, allowed: readonly string[], path: string, issues: ValidationIssue[], field = key): void {
+  if (typeof record[key] !== 'string' || !allowed.includes(record[key] as string)) {
+    issues.push({ path, field, message: `must be one of: ${allowed.join(', ')}` });
+  }
 }
 
 function requireStringArray(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[]): void {

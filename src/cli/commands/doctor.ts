@@ -86,13 +86,13 @@ function checkProjectState(): CheckResult {
     };
   }
   if (
-    state.schemaVersion !== 1
+    state.schemaVersion !== 4
     || state.artifactRoot !== ARTIFACT_ROOT
     || !Array.isArray(state.scopes)
     || typeof state.runtimeVersion !== 'string'
     || typeof state.runtimePath !== 'string'
   ) {
-    return { status: 'fail', name: 'project state', detail: `${KYRO_STATE_PATH} has invalid shape` };
+    return { status: 'fail', name: 'project state', detail: `${KYRO_STATE_PATH} has invalid shape`, remedy: 'Run kyro migrate to upgrade a v3 kyro.json.' };
   }
   return { status: 'pass', name: 'project state', detail: `${KYRO_STATE_PATH} is valid` };
 }

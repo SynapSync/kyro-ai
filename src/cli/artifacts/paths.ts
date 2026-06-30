@@ -4,6 +4,17 @@ export function scopeRoot(scope: string): string {
   return `${ARTIFACT_ROOT}/${scope}`;
 }
 
+/** v4 single source of truth for a scope. */
+export function sprintJsonPath(scope: string): string {
+  return `${scopeRoot(scope)}/sprint.json`;
+}
+
+export function archiveDir(scope: string): string {
+  return `${scopeRoot(scope)}/archive`;
+}
+
+// --- legacy v3 paths: used ONLY by `kyro migrate` to read old scopes. Do not use for new code. ---
+
 export function scopeStatePath(scope: string): string {
   return `${scopeRoot(scope)}/state.json`;
 }

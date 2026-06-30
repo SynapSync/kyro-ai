@@ -61,7 +61,7 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
 function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: string, runtimeVersion: string): KyroProjectState {
   const existing = readProjectState();
   const base: KyroProjectState = existing ?? {
-    schemaVersion: 1,
+    schemaVersion: 4,
     artifactRoot: ARTIFACT_ROOT,
     scopes: [],
     activeScope: null,
@@ -80,7 +80,7 @@ function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: st
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 4,
     artifactRoot: ARTIFACT_ROOT,
     scopes: [...base.scopes],
     activeScope: base.activeScope,

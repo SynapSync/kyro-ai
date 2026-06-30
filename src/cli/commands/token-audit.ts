@@ -65,8 +65,7 @@ export function runTokenAuditChecks(): CheckResult[] {
   checks.push(...checkModeFiles());
   checks.push(checkInitModeBudget());
   checks.push(...checkAnalysisHelperBudgets());
-  checks.push(checkTemplateBudget('skills/sprint-forge/assets/templates/ROADMAP.md', TOKEN_BUDGET.roadmapTemplateWords, 'ROADMAP template'));
-  checks.push(checkTemplateBudget('skills/sprint-forge/assets/templates/REENTRY-PROMPTS.md', TOKEN_BUDGET.reentryTemplateWords, 'REENTRY template'));
+  // v4 has no ROADMAP.md / REENTRY-PROMPTS.md templates; sprint.json is the single source of truth.
   checks.push(checkProjectedSkills());
   checks.push(checkAgentsBlockBudget());
   checks.push(checkStartupBudget());
@@ -183,12 +182,10 @@ function checkStatusBriefBudget(): CheckResult {
 }
 
 function checkInitHappyPathBudget(): CheckResult {
+  // v4: INIT loads only the INIT mode + one routed analysis helper. No v3 templates.
   const baseFiles = [
     'commands/forge.md',
     'skills/sprint-forge/assets/modes/INIT.md',
-    'skills/sprint-forge/assets/templates/ROADMAP.md',
-    'skills/sprint-forge/assets/templates/PROJECT-README.md',
-    'skills/sprint-forge/assets/templates/REENTRY-PROMPTS.md',
   ].map(weightPackageFile);
   const heaviestHelper = listPackageFiles('skills/sprint-forge/assets/helpers/analysis', '.md').map(weightPackageFile).sort((a, b) => b.estimatedTokens - a.estimatedTokens)[0];
   const files = heaviestHelper ? [...baseFiles, heaviestHelper] : baseFiles;
