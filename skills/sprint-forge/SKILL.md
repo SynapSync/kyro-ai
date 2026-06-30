@@ -57,7 +57,8 @@ Some operations are irreversible or schema-critical. The CLI does them determini
 |---------|--------------|
 | `kyro close-sprint --kyro-scope <scope> --outcome <...>` | The zero-loss close: snapshots `activeSprint` to `archive/` **before** clearing it, renders the narrative `.md` deterministically (title from `roadmap.sprints[]`, never `undefined`), appends the `ledger[]` entry, sets `previousSprint`/`roadmap` state/`handoff`, flips `kyro.json` scope status. Refuses on double-close. |
 | `kyro migrate --kyro-scope <scope>` | Upgrades a v3 scope to a v4 `sprint.json`. |
-| `kyro doctor --artifacts --kyro-scope <scope>` | Validates artifact integrity (shape drift, missing snapshots, v3 leakage). |
+| `kyro doctor --artifacts --kyro-scope <scope>` | Validates artifact integrity (shape drift, missing snapshots, unresolved `[NEEDS CLARIFICATION]`, v3 leakage). |
+| `kyro analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, dependencies, overdue debt, principles). Severity-triaged; exits non-zero on CRITICAL/HIGH. Gate before `close_sprint`. |
 | `kyro repair --kyro-scope <scope>` | Validates and normalizes `sprint.json` formatting. |
 
 In Claude Code, a `PreToolUse` hook blocks any hand edit that nulls `activeSprint` and redirects you to `kyro close-sprint`. Other harnesses rely on this contract directly.
