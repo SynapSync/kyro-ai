@@ -26,9 +26,9 @@ Kyro gives agents:
 
 - a **managed core** with orchestrator, command, skill, and template instructions
 - **command-like skills** such as `kyro-forge`, `kyro-status`, and `kyro-wrap-up`
-- **workspace state** that tracks installed adapters and future scopes
-- **human-readable artifacts** for roadmaps, phase documents, debt, retros, and re-entry context
-- **doctor/sync/uninstall commands** so setup can be validated instead of guessed
+- **a single source of truth per scope** — one `sprint.json` holding objective, success criteria, roadmap, the active sprint, debt, conventions, and handoff routing
+- **zero-loss archives** — every closed sprint is snapshotted verbatim before it is cleared
+- **deterministic CLI gates** (`doctor`, `analyze`) so quality is enforced in code, not left to prompt discipline
 
 ---
 
@@ -99,26 +99,24 @@ Global runtime:
     └── kyro-wrap-up/SKILL.md
 ```
 
-Project state and artifacts:
+Project state and artifacts (v4 — one `sprint.json` per scope):
 
 ```text
 <project>/
 └── .agents/
     └── kyro/
-        ├── kyro.json
+        ├── kyro.json                    # registry: scopes[], activeScope, principles[]
         └── scopes/
-            ├── rules.md
-            ├── rules.index.json
             └── {scope}/
-                ├── state.json
-                ├── index.json
-                ├── events.ndjson
-                ├── ROADMAP.md
-                ├── ROADMAP.summary.json
-                └── phases/
+                ├── sprint.json          # single source of truth
+                ├── archive/             # write-only, at sprint close
+                │   ├── sprint-001-slug.json   # verbatim zero-loss snapshot
+                │   └── sprint-001-slug.md      # human narrative
+                └── findings/            # write-only INIT analysis evidence
+                    └── 01-slug.md
 ```
 
-Important invariant: `kyro install` creates the root project state at `.agents/kyro/kyro.json`. It does **not** create `.agents/kyro/scopes/{scope}/state.json`; scoped state belongs to future scope/forge creation.
+Important invariant: `kyro install` creates the root project state at `.agents/kyro/kyro.json`. Each scope's `sprint.json` is created by `/kyro:forge` (INIT). There are no `state.json`, `index.json`, `events.ndjson`, `ROADMAP.md`, `*.summary.json`, `rules.md`, or `phases/` artifacts — those are v3; run `kyro migrate` to upgrade a v3 scope.
 
 ## Who Invokes Whom
 
@@ -159,21 +157,28 @@ kyro-ai
 
 Commands:
 
-| Command          | Purpose                                                            |
-| ---------------- | ------------------------------------------------------------------ |
-| `kyro`           | Open the basic interactive configuration TUI                       |
-| `kyro install`   | Install managed core and selected agent adapters                   |
-| `kyro doctor`    | Validate package health, workspace state, core files, and adapters |
-| `kyro sync`      | Refresh managed assets without rewriting unmanaged files           |
-| `kyro uninstall` | Remove managed workspace assets                                    |
+| Command             | Purpose                                                                        |
+| ------------------- | ------------------------------------------------------------------------------ |
+| `kyro`              | Open the basic interactive configuration TUI                                   |
+| `kyro install`      | Install managed core and selected agent adapters                               |
+| `kyro doctor`       | Validate package health, workspace state, artifacts, and adapters              |
+| `kyro analyze`      | Semantic cross-check of a scope (clarity, coverage, dependencies, debt, principles) |
+| `kyro close-sprint` | Snapshot + close the active sprint (zero-loss, tool-owned)                      |
+| `kyro migrate`      | Upgrade a v3 scope to the v4 `sprint.json` model                                |
+| `kyro repair`       | Validate and normalize a scope's `sprint.json`                                 |
+| `kyro context-pack` | Emit a summary-first context package for a scope                               |
+| `kyro scope`        | List, inspect, or set the active Kyro scope                                    |
+| `kyro sync`         | Refresh managed assets without rewriting unmanaged files                       |
+| `kyro uninstall`    | Remove managed workspace assets                                                |
 
 Common usage:
 
 ```bash
 kyro install --agent opencode,codex --scope workspace --yes
 kyro doctor --tokens --artifacts
+kyro analyze --kyro-scope auth-refactor
+kyro close-sprint --kyro-scope auth-refactor --outcome shipped --learning "..."
 kyro sync --agent codex --dry-run
-kyro uninstall --dry-run
 ```
 
 Supported install adapters today:
@@ -196,11 +201,12 @@ Kyro treats the repo as the system of record. Validate and repair the knowledge 
 
 ```bash
 kyro doctor --artifacts
+kyro analyze --kyro-scope <scope>
 kyro repair --kyro-scope <scope> --yes
 kyro scope inspect <scope>
 ```
 
-`repair` only rebuilds JSON routing/summaries from existing Markdown evidence; it does not rewrite user-authored Markdown.
+`doctor --artifacts` validates `sprint.json` shape, zero-loss snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. `analyze` adds a severity-triaged semantic pass (coverage, dependencies, overdue debt, principle violations). `repair` re-parses and normalizes `sprint.json` without rewriting user-authored archives.
 
 ## Core Workflow
 
@@ -212,16 +218,17 @@ Kyro has three stable workflow intents:
 | Status  | `kyro-status` / `/kyro:status`   | Report project progress, roadmap health, and technical debt     |
 | Wrap-up | `kyro-wrap-up` / `/kyro:wrap-up` | Close a session, update handoff context, and preserve learnings |
 
-Forge is routed progressively:
+Forge is routed deterministically by state, not by guesswork:
 
 ```text
-read kyro.json/state.json/index.json
-  → choose INIT, plan, execute, review, close, or recover
+read kyro.json + scopes/{scope}/sprint.json
+  → route on sprint.json.handoff.nextAction
+    (init → clarify → plan → execute → review → close, or recover)
   → load only the selected mode/helper/template
-  → update Markdown evidence plus JSON summaries
+  → one safe-write back to sprint.json
 ```
 
-Kyro is intentionally sprint-by-sprint and summary-first. It should not pre-load every roadmap, sprint, helper, and template just to decide the next action.
+Kyro is intentionally sprint-by-sprint and single-source. It loads two files to start (`kyro.json` + `sprint.json`) and updates one file per action — it never pre-loads every roadmap, sprint, helper, and template just to decide the next move. Unknowns are surfaced as `[NEEDS CLARIFICATION]` markers and resolved by the `clarify` mode before planning — the agent admits what it does not know instead of guessing.
 
 ---
 
@@ -254,7 +261,7 @@ Runtime contract:
 | Projected skill | Give the agent a short command entrypoint without duplicating lifecycle prose |
 | Orchestrator    | Coordinate phases, gates, review, debugging, and handoff                      |
 | Sprint Forge skill | Define workflow modes, helpers, templates, and discipline rules |
-| Artifacts       | Persist roadmap, phases, debt, retros, and re-entry context in markdown       |
+| Artifacts       | Persist objective, roadmap, active sprint, debt, conventions, and handoff in one `sprint.json` per scope, plus write-only archives |
 
 ---
 
@@ -304,12 +311,14 @@ npm pack --dry-run
 - TypeScript typecheck
 - package/plugin/workflow version validation
 - relative markdown link validation
+- anti-v3 gate (runtime must speak only the `sprint.json` model)
+- `dist/` freshness, budget-manifest, and v4 sprint-doctor fixtures
 
 Release tags publish to npm through GitHub Actions when the tag matches `package.json.version`:
 
 ```bash
-git tag v3.2.2
-git push origin v3.2.2
+git tag v4.1.0
+git push origin v4.1.0
 ```
 
 The release workflow expects the repository secret `NPM_TOKEN`.
@@ -340,7 +349,7 @@ See [`docs/release-checklist.md`](docs/release-checklist.md) for the full mainta
 
 ## Cost Model
 
-Kyro uses lean runtime loading: command router → structured state → one routed mode → only required helpers. During execution it records compact `events.ndjson` evidence and materializes full Markdown, summaries, debt, rules, and re-entry prompts at sprint close. See [docs/cost-model.md](docs/cost-model.md).
+Kyro uses lean runtime loading: command router → `sprint.json` state → one routed mode → only required helpers. Task evidence is recorded directly on the task object in `sprint.json`; at sprint close the CLI writes the verbatim snapshot and a human narrative to `archive/`. See [docs/cost-model.md](docs/cost-model.md).
 
 ## Documentation
 
@@ -353,7 +362,7 @@ Kyro uses lean runtime loading: command router → structured state → one rout
 | [Harness Migration](docs/harness-migration.md)   | Direction for the multi-agent runtime                    |
 | [Getting Started](docs/getting-started.md)       | Introductory workflow guide                              |
 | [Rules Guide](docs/rules-guide.md)               | Persistent learning rules                                |
-| [Context Management](docs/context-management.md) | Re-entry prompts and continuity strategy                 |
+| [Context Management](docs/context-management.md) | Handoff routing and cross-session continuity             |
 | [Programmatic Usage](docs/programmatic-usage.md) | Using Kyro instructions from custom LLM apps             |
 
 ---
