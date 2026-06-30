@@ -34,7 +34,7 @@ export function sync(options: CliOptions): void {
   if (!state) {
     throw new Error('Kyro is not installed in this workspace. Run kyro install first.');
   }
-  const agents = options.agents.length > 0 ? options.agents : state.installedAdapters.map((adapter) => adapter.agent);
+  const agents = options.agents.length > 0 ? options.agents : (state.installedAdapters ?? []).map((adapter) => adapter.agent);
   const unique = uniqueAgents(agents);
   runAdapterPreflight('sync', unique);
 

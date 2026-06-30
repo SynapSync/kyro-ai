@@ -174,4 +174,14 @@ assertCase(
   { 'archive/sprint-001-demo.json': goodSnapshot, 'archive/sprint-001-demo.md': goodNarrative },
 );
 
+// 7. An incomplete kyro.json (missing required v4 fields) must produce a CLEAN fail, not a crash.
+//    A crash would print "Cannot read properties of undefined" instead of the diagnostic message.
+assertCase(
+  'incomplete-kyro-json',
+  { scopes: [{ id: 'demo', title: 'Demo', status: 'active' }], activeScope: 'demo' },
+  validSprintJson,
+  1,
+  'incomplete v4 file',
+);
+
 console.log('check:sprint-doctor-v4 — all cases passed');
