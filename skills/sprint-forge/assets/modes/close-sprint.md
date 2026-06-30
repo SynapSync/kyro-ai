@@ -19,7 +19,7 @@ Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Cont
 3. **Additive writes first (safe-write).** These must happen before the close command, because the command re-serializes the current `sprint.json`:
    - Extract learned rules as `conventions[]` objects via `../helpers/learner.md` — each `{ id, rule, tags, addedSprint }`. Append to `sprint.json.conventions[]`.
    - Update `debt[]` via `../helpers/debt-tracker.md`: mark resolved items `resolved`, defer with reason, add new debt objects.
-4. Render the human narrative to `archive/sprint-{NNN}-{slug}.md` using `../templates/archive-sprint.md` (objective, definitionOfDone, phases→tasks, learnings, resolved debt, recommendations for Sprint N+1). `{NNN}` is the zero-padded sprint number (e.g. `sprint-002-modal-decouple.md`).
+4. **Do NOT hand-write the narrative `.md`.** The CLI renders it deterministically from the snapshot (the title comes from `roadmap.sprints[]`, so it can never be `undefined`). You only supply the *judgment* text — learnings and recommendations — as flags to the close command in the next step.
 
 ### 5. Close with the CLI (deterministic, zero-loss)
 
@@ -29,12 +29,14 @@ Run:
 kyro close-sprint --kyro-scope {scope} --outcome {shipped|partial|...} \
   [--note "handoff note for next session"] \
   [--summary "one-line previousSprint summary"] \
-  [--recommendation "..."]   # repeatable
+  [--learning "..."]          # repeatable — recorded in the narrative
+  [--recommendation "..."]    # repeatable — recorded in the narrative + ledger
 ```
 
 The command, in one atomic operation:
 
 - Writes the verbatim JSON snapshot to `archive/sprint-{NNN}-{slug}.json` **before** touching anything (refuses to run if that snapshot already exists — double-close protection).
+- Renders the human narrative `archive/sprint-{NNN}-{slug}.md` deterministically (title from `roadmap.sprints[]`; objective, phases, tasks, evidence and verdict from the snapshot; plus your `--learning` and `--recommendation` text, and any `debt[]` marked `resolved`).
 - Appends the `ledger[]` entry (`archive` + `snapshot` paths, outcome, recommendations).
 - Sets `previousSprint`, clears `activeSprint`, marks `roadmap.sprints[*].state` closed.
 - Sets `handoff.nextAction` to `plan_sprint` (more sprints remain) or `wrap_up` (none remain).
@@ -45,7 +47,7 @@ Use `--dry-run` first if you want to review the plan. Do not replicate this by h
 
 ## Rules
 
-- The destructive snapshot+clear is the CLI's job, never a manual edit. The JSON snapshot is the complete record; the `.md` is the readable narrative; the `ledger[]` entry is the one-line index.
+- The destructive snapshot+clear AND the narrative render are the CLI's job, never a manual edit. The JSON snapshot is the complete record; the `.md` is the readable narrative the CLI generates; the `ledger[]` entry is the one-line index.
 - Retro must be honest and specific. Recommendations must point to concrete next actions.
 - Debt is never deleted; resolved debt appears in the archive and is dropped from `debt[]` only after it is recorded there.
 - Never create `state.json`, `index.json`, `events.ndjson`, summaries, `RE-ENTRY-PROMPTS.md`, or `phases/`.

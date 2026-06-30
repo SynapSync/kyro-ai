@@ -55,7 +55,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'repair') {
     console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]');
   } else if (command === 'close-sprint') {
-    console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--dry-run] [--yes]');
+    console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
   } else if (command === 'migrate') {
     console.log('Usage: kyro migrate [--kyro-scope <scope>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {

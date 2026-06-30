@@ -54,7 +54,7 @@ Some operations are irreversible or schema-critical. The CLI does them determini
 
 | Command | What it owns |
 |---------|--------------|
-| `kyro close-sprint --kyro-scope <scope> --outcome <...>` | The zero-loss close: snapshots `activeSprint` to `archive/` **before** clearing it, appends the `ledger[]` entry, sets `previousSprint`/`roadmap` state/`handoff`, flips `kyro.json` scope status. Refuses on double-close. |
+| `kyro close-sprint --kyro-scope <scope> --outcome <...>` | The zero-loss close: snapshots `activeSprint` to `archive/` **before** clearing it, renders the narrative `.md` deterministically (title from `roadmap.sprints[]`, never `undefined`), appends the `ledger[]` entry, sets `previousSprint`/`roadmap` state/`handoff`, flips `kyro.json` scope status. Refuses on double-close. |
 | `kyro migrate --kyro-scope <scope>` | Upgrades a v3 scope to a v4 `sprint.json`. |
 | `kyro doctor --artifacts --kyro-scope <scope>` | Validates artifact integrity (shape drift, missing snapshots, v3 leakage). |
 | `kyro repair --kyro-scope <scope>` | Validates and normalizes `sprint.json` formatting. |

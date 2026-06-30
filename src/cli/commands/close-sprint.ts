@@ -26,6 +26,7 @@ export interface CloseSprintArgs {
   note: string | null;
   summary: string | null;
   recommendations: string[];
+  learnings: string[];
   dryRun: boolean;
   yes: boolean;
   help: boolean;
@@ -105,6 +106,7 @@ export function buildClosePlan(
 
   const nnn = String(active.n).padStart(3, '0');
   const snapshotPath = `${archiveDir(scope)}/sprint-${nnn}-${active.slug}.json`;
+  const narrativePath = `${archiveDir(scope)}/sprint-${nnn}-${active.slug}.md`;
   const archiveMdPath = `archive/sprint-${nnn}-${active.slug}.md`;
   const snapshotRel = `archive/sprint-${nnn}-${active.slug}.json`;
 
@@ -116,12 +118,15 @@ export function buildClosePlan(
     );
   }
 
-  const closed = applyClose(sprint, active, args, archiveMdPath, snapshotRel);
+  const closedAt = new Date().toISOString().slice(0, 10);
+  const closed = applyClose(sprint, active, args, archiveMdPath, snapshotRel, closedAt);
 
   const plan: OperationPlan[] = [
     // 1. Snapshot FIRST — the verbatim, zero-loss record. Written before any mutation.
     { action: 'write', path: snapshotPath, content: `${JSON.stringify(active, null, 2)}\n` },
-    // 2. Overwrite the whole sprint.json with activeSprint cleared.
+    // 2. Render the human narrative deterministically (title from roadmap — never undefined).
+    { action: 'write', path: narrativePath, content: renderNarrative(sprint, active, args, closedAt) },
+    // 3. Overwrite the whole sprint.json with activeSprint cleared.
     { action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(closed, null, 2)}\n` },
   ];
 
@@ -141,9 +146,8 @@ function applyClose(
   args: CloseSprintArgs,
   archiveMdPath: string,
   snapshotRel: string,
+  closedAt: string,
 ): SprintFile {
-  const closedAt = new Date().toISOString().slice(0, 10);
-
   const ledgerEntry: LedgerEntry = {
     n: active.n,
     slug: active.slug,
@@ -183,6 +187,141 @@ function applyClose(
   };
 }
 
+/**
+ * Render the human narrative .md deterministically. The TITLE is taken from `roadmap.sprints[]`
+ * (the authoritative source, always present) with safe fallbacks — so it can never render
+ * `Sprint N: undefined`, the failure that hand-rendered narratives produced. The agent supplies
+ * only judgment text (learnings, recommendations) via args; structure comes from the snapshot.
+ */
+function renderNarrative(sprint: SprintFile, active: ActiveSprint, args: CloseSprintArgs, closedAt: string): string {
+  const roadmapTitle = sprint.roadmap.sprints.find((s) => s.n === active.n)?.title;
+  const title = roadmapTitle ?? active.title ?? active.objective;
+  const nextN = active.n + 1;
+
+  const lines: string[] = [];
+  lines.push('---');
+  lines.push(`title: '${sprint.scope} — Sprint ${active.n}: ${title.replace(/'/g, "''")}'`);
+  lines.push(`date: '${closedAt}'`);
+  lines.push(`scope: '${sprint.scope}'`);
+  lines.push(`sprint: ${active.n}`);
+  lines.push(`slug: '${active.slug}'`);
+  lines.push(`outcome: '${args.outcome}'`);
+  lines.push("type: 'sprint-archive'");
+  lines.push('---');
+  lines.push('');
+  lines.push(`# Sprint ${active.n}: ${title}`);
+  lines.push('');
+  lines.push(`> Closed: ${closedAt}`);
+  lines.push(`> Outcome: ${args.outcome}`);
+  lines.push('');
+  lines.push('## Objective');
+  lines.push('');
+  lines.push(active.objective);
+  lines.push('');
+
+  lines.push('## Definition of Done');
+  lines.push('');
+  if (active.definitionOfDone.length > 0) {
+    for (const item of active.definitionOfDone) lines.push(`- ${item}`);
+  } else {
+    lines.push('_None recorded._');
+  }
+  lines.push('');
+
+  lines.push('## Phases');
+  lines.push('');
+  for (const phase of active.phases) {
+    lines.push(`### ${phase.id} — ${phase.title}`);
+    lines.push('');
+    if (phase.objective) {
+      lines.push(`> ${phase.objective}`);
+      lines.push('');
+    }
+    for (const task of phase.tasks) {
+      lines.push(`#### ${task.id}: ${task.title}`);
+      lines.push('');
+      lines.push(`**Status**: ${task.status}`);
+      lines.push('');
+      if (task.description) {
+        lines.push(`**Description**: ${task.description}`);
+        lines.push('');
+      }
+      lines.push(...renderEvidence(task.evidence));
+      lines.push(`**Verdict**: ${renderVerdict(task.verdict)}`);
+      lines.push('');
+      lines.push('---');
+    }
+  }
+  lines.push('');
+
+  lines.push('## Learnings');
+  lines.push('');
+  if (args.learnings.length > 0) {
+    for (const item of args.learnings) lines.push(`- ${item}`);
+  } else {
+    lines.push('_No learnings recorded._');
+  }
+  lines.push('');
+
+  lines.push('## Resolved Debt');
+  lines.push('');
+  const resolved = sprint.debt.filter((d) => d.status === 'resolved');
+  if (resolved.length > 0) {
+    for (const d of resolved) lines.push(`- **${d.id}**: ${d.title}`);
+  } else {
+    lines.push('_No debt resolved in this sprint._');
+  }
+  lines.push('');
+
+  lines.push(`## Recommendations for Sprint ${nextN}`);
+  lines.push('');
+  if (args.recommendations.length > 0) {
+    for (const item of args.recommendations) lines.push(`- ${item}`);
+  } else {
+    lines.push('_None recorded._');
+  }
+  lines.push('');
+
+  return `${lines.join('\n')}`;
+}
+
+/** Tolerate evidence as a plain string OR an object { summary, validation, files_changed, notes }. */
+function renderEvidence(evidence: unknown): string[] {
+  if (evidence === null || evidence === undefined) {
+    return ['**Evidence**: _No evidence recorded._', ''];
+  }
+  if (typeof evidence === 'string') {
+    return [`**Evidence**: ${evidence}`, ''];
+  }
+  if (typeof evidence === 'object') {
+    const e = evidence as Record<string, unknown>;
+    const out: string[] = ['**Evidence**:'];
+    if (typeof e.summary === 'string') out.push(`- Summary: ${e.summary}`);
+    if (typeof e.validation === 'string') out.push(`- Validation: ${e.validation}`);
+    if (Array.isArray(e.files_changed)) out.push(`- Files changed: ${e.files_changed.map((f) => `\`${String(f)}\``).join(', ')}`);
+    if (typeof e.notes === 'string') out.push(`- Notes: ${e.notes}`);
+    if (out.length === 1) out.push('- _Recorded (unstructured)._');
+    out.push('');
+    return out;
+  }
+  return [`**Evidence**: ${String(evidence)}`, ''];
+}
+
+/** Tolerate verdict as an object { result, findings } or null. */
+function renderVerdict(verdict: unknown): string {
+  if (verdict === null || verdict === undefined) return '_Not reviewed._';
+  if (typeof verdict === 'string') return verdict;
+  if (typeof verdict === 'object') {
+    const v = verdict as Record<string, unknown>;
+    const result = typeof v.result === 'string' ? v.result : 'recorded';
+    const findings = Array.isArray(v.findings) && v.findings.length > 0
+      ? ` — ${v.findings.map((f) => String(f)).join('; ')}`
+      : '';
+    return `${result}${findings}`;
+  }
+  return String(verdict);
+}
+
 function buildScopeCompletedPlan(scope: string): OperationPlan | null {
   const state = readProjectState();
   if (!state) return null;
@@ -212,6 +351,7 @@ function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
   let note: string | null = null;
   let summary: string | null = null;
   const recommendations: string[] = [];
+  const learnings: string[] = [];
   let dryRun = false;
   let yes = false;
   let help = false;
@@ -237,10 +377,14 @@ function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
       const [value, next] = takeValue(arg, i);
       recommendations.push(value);
       i = next;
+    } else if (arg === '--learning' || arg.startsWith('--learning=')) {
+      const [value, next] = takeValue(arg, i);
+      learnings.push(value);
+      i = next;
     } else throw new Error(`Unknown option: ${arg}`);
   }
 
-  return { scope, outcome, note, summary, recommendations, dryRun, yes, help };
+  return { scope, outcome, note, summary, recommendations, learnings, dryRun, yes, help };
 }
 
 function printCloseSprintHelp(): void {
@@ -258,6 +402,7 @@ Options:
   --note <text>            handoff.note for the next session
   --summary <text>         previousSprint summary (defaults to the sprint objective)
   --recommendation <text>  Recommendation for the next sprint (repeatable)
+  --learning <text>        Learning to record in the narrative (repeatable)
   --dry-run                Show the plan without writing
   -y, --yes                Skip confirmation
   -h, --help               Show this help

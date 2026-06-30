@@ -1,3 +1,9 @@
+{{!--
+  REFERENCE ONLY — this narrative is generated deterministically by `kyro close-sprint`
+  (see src/cli/commands/close-sprint.ts → renderNarrative). The title comes from
+  roadmap.sprints[], so it can never render "undefined". Do NOT hand-fill this template;
+  pass --learning / --recommendation to the close command instead.
+--}}
 ---
 title: '{{scope}} — Sprint {{n}}: {{title}}'
 date: '{{closedAt}}'
