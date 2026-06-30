@@ -89,8 +89,23 @@ function checkScope(scope: string): CheckResult[] {
   const issues = validateSprintFile(sprintRead.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
     checks.push(fail(`${scope}/sprint.json`, formatIssues(issues), 'Fix the shape drift (see field paths). Conventions/scopes/debt must be objects, not strings.'));
-  } else {
-    checks.push(pass(`${scope}/sprint.json`, 'Schema shapes are valid.'));
+    return checks;
+  }
+  checks.push(pass(`${scope}/sprint.json`, 'Schema shapes are valid.'));
+
+  // 3. Zero-loss audit: every closed sprint in the ledger must have its verbatim snapshot on disk.
+  //    A missing snapshot means the sprint was closed by hand (skipping kyro close-sprint) and its
+  //    full structured record is unrecoverable. Deterministic — catches the failure in any harness.
+  const ledger = (sprintRead.value as { ledger?: Array<{ n?: number; slug?: string; snapshot?: string }> }).ledger ?? [];
+  const missing = ledger.filter((entry) => {
+    if (!entry.snapshot) return true;
+    return !existsSync(resolveManagedPath(`${root}/${entry.snapshot}`));
+  });
+  if (missing.length > 0) {
+    const detail = missing.map((e) => `sprint ${e.n ?? '?'} (${e.slug ?? '?'})`).join(', ');
+    checks.push(fail(`${scope}/snapshots`, `closed sprint(s) without a zero-loss snapshot: ${detail}`, 'These were closed by hand, not via kyro close-sprint — their structured record is lost. Close future sprints with kyro close-sprint.'));
+  } else if (ledger.length > 0) {
+    checks.push(pass(`${scope}/snapshots`, `${ledger.length} closed sprint(s), all with a snapshot.`));
   }
   return checks;
 }

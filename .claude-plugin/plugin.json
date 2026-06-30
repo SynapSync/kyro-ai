@@ -38,5 +38,6 @@
   ],
   "commands": [
     "./commands/"
-  ]
+  ],
+  "hooks": "./hooks/hooks.json"
 }
