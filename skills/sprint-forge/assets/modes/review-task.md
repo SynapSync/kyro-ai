@@ -18,6 +18,11 @@ Validate completed work and record the verdict on the task object in `sprint.jso
    - On `pass`: advance `handoff` (next pending task → `execute_task`, or `close_sprint` when all tasks pass).
    - On `fail`: set `task.status = "pending"`, keep `handoff.nextAction: "execute_task"`, and record the findings so the executor can fix them.
 
+## Principles gate
+
+- Before passing a task, confirm its change does not violate a `non-negotiable` principle in
+  `kyro.json.principles[]`. A violation is a `fail` finding, not a suggestion.
+
 ## Rules
 
 - Do not mark a task complete without evidence and a passing verdict.

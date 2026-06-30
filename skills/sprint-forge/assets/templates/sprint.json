@@ -4,6 +4,9 @@
   "title": "{{title}}",
   "status": "planning",
   "objective": "{{objective}}",
+  "successCriteria": [],
+
+  "clarifications": [],
 
   "conventions": [],
 
@@ -20,6 +23,7 @@
   "activeSprint": {
     "n": 1,
     "slug": "{{sprint-1-slug}}",
+    "title": "{{sprint-1-title}}",
     "objective": "{{sprint-1-objective}}",
     "status": "planning",
     "phases": [

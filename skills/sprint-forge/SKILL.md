@@ -39,6 +39,7 @@ One scope = one `sprint.json`. Agents read `kyro.json` (global registry) and the
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
 6. At sprint close, the destructive snapshot-then-clear of `activeSprint` is owned by the `kyro close-sprint` CLI — never hand-edit `sprint.json` to null `activeSprint`. The closed sprint becomes one `ledger[]` entry.
 7. Findings and archives are write-only human evidence; agents never re-read them to route.
+8. **Admit unknowns, never guess.** When a detail that affects design/data/tasks/tests is unknown, write `[NEEDS CLARIFICATION: <what is missing>]` in the relevant field instead of inventing an answer, and route to `clarify`. `kyro doctor`/`kyro analyze` FAIL while any such marker remains — it is a deterministic gate, not a suggestion.
 
 ## Artifact Write Contract (MANDATORY)
 
@@ -56,7 +57,8 @@ Some operations are irreversible or schema-critical. The CLI does them determini
 |---------|--------------|
 | `kyro close-sprint --kyro-scope <scope> --outcome <...>` | The zero-loss close: snapshots `activeSprint` to `archive/` **before** clearing it, renders the narrative `.md` deterministically (title from `roadmap.sprints[]`, never `undefined`), appends the `ledger[]` entry, sets `previousSprint`/`roadmap` state/`handoff`, flips `kyro.json` scope status. Refuses on double-close. |
 | `kyro migrate --kyro-scope <scope>` | Upgrades a v3 scope to a v4 `sprint.json`. |
-| `kyro doctor --artifacts --kyro-scope <scope>` | Validates artifact integrity (shape drift, missing snapshots, v3 leakage). |
+| `kyro doctor --artifacts --kyro-scope <scope>` | Validates artifact integrity (shape drift, missing snapshots, unresolved `[NEEDS CLARIFICATION]`, v3 leakage). |
+| `kyro analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, dependencies, overdue debt, principles). Severity-triaged; exits non-zero on CRITICAL/HIGH. Gate before `close_sprint`. |
 | `kyro repair --kyro-scope <scope>` | Validates and normalizes `sprint.json` formatting. |
 
 In Claude Code, a `PreToolUse` hook blocks any hand edit that nulls `activeSprint` and redirects you to `kyro close-sprint`. Other harnesses rely on this contract directly.
@@ -66,6 +68,7 @@ In Claude Code, a `PreToolUse` hook blocks any hand edit that nulls `activeSprin
 | nextAction | Load |
 |------------|------|
 | `init` (no sprint.json) | `modes/INIT.md` + one `helpers/analysis/{workType}.md` |
+| `clarify` | `modes/clarify.md` |
 | `plan_sprint` | `modes/SPRINT.md`, `modes/plan-sprint.md`, then `helpers/sprint-generator.md` |
 | `execute_task` | `modes/SPRINT.md`, `modes/execute-task.md` |
 | `review_task` | `modes/SPRINT.md`, `modes/review-task.md`, `helpers/reviewer.md` |
@@ -76,11 +79,22 @@ In Claude Code, a `PreToolUse` hook blocks any hand edit that nulls `activeSprin
 
 Templates are loaded only immediately before writing their artifact.
 
+## Principles vs conventions
+
+- **`conventions[]`** (in `sprint.json`) are *learned*, descriptive rules captured during retros. They
+  evolve and inform task `context`.
+- **`principles[]`** (in `kyro.json`, project-level) are *authored*, immutable rules checked as
+  **gates** — like spec-kit's constitution. Each `{ id, rule, severity, rationale, check? }`. A
+  `non-negotiable` principle that is violated is a hard stop. Principles with a built-in `check`
+  (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`) are
+  enforced deterministically by `kyro analyze`; free-text principles are agent gates confirmed at
+  `plan-sprint` and `review-task`.
+
 ## Artifact Contract
 
 | File | Role |
 |------|------|
-| `.agents/kyro/kyro.json` | Global registry: `scopes[]` (objects `{id,title,status}`), `activeScope` |
+| `.agents/kyro/kyro.json` | Global registry: `scopes[]` (objects `{id,title,status}`), `activeScope`, optional `principles[]` |
 | `.agents/kyro/scopes/{scope}/sprint.json` | Single source of truth (see template) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.md` | Human narrative at close (write-only) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |

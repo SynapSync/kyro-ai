@@ -4,6 +4,36 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-06-30
+
+Adds the **input discipline** that the v4 execution engine lacked, borrowing the proven mechanisms
+from spec-kit but keeping Kyro's single-source-of-truth model. The rule throughout: what must happen
+is enforced deterministically by the CLI, not left to prose a weak model can ignore.
+
+### Added
+
+- **Clarify discipline.** A new `clarify` mode and `handoff.nextAction` resolve ambiguity before
+  planning (≤5 questions, one at a time, recommended option first), recording each answer in
+  `sprint.json.clarifications[]`. Agents write `[NEEDS CLARIFICATION: ...]` instead of guessing, and
+  `kyro doctor --artifacts` **fails** while any such marker remains — a deterministic gate that works
+  in any harness.
+- **`kyro analyze`** — semantic cross-check of a scope (where `doctor` checks shape, `analyze` checks
+  meaning). Severity-triaged findings (CRITICAL/HIGH/MEDIUM/LOW): unresolved clarifications, coverage
+  gaps, missing acceptance criteria, broken `depends_on`, overdue debt, principle violations. Exits
+  non-zero on CRITICAL/HIGH. Gate before `close_sprint`. `--json` supported.
+- **Project-level principles.** `kyro.json.principles[]` (authored, immutable — spec-kit's
+  "constitution"), distinct from learned `conventions[]`. Each `{ id, rule, severity, rationale,
+  check? }`; principles with a built-in `check` are enforced deterministically by `kyro analyze`,
+  free-text ones are agent gates at `plan-sprint`/`review-task`.
+- `successCriteria[]` on `sprint.json` — technology-agnostic, measurable outcomes (the WHAT/WHY layer).
+
+### Changed
+
+- `INIT` seeds `successCriteria[]` and (optionally) `principles[]`; `plan-sprint` and `review-task`
+  enforce clarity and principle gates before advancing.
+- The `sprint.json` template carries `successCriteria`, `clarifications`, and the previously missing
+  `activeSprint.title`.
+
 ## [4.0.0] - 2026-06-30
 
 Major release. Kyro moves to a single source of truth per scope — `sprint.json` — and makes the
@@ -52,4 +82,5 @@ agent-rendered prose. This removes the entire v3 artifact stack.
 - Sprint archive narratives no longer render `Sprint N: undefined` — the title is carried through the
   model and rendered deterministically by the CLI.
 
+[4.1.0]: https://github.com/SynapSync/kyro-ai/releases/tag/v4.1.0
 [4.0.0]: https://github.com/SynapSync/kyro-ai/releases/tag/v4.0.0

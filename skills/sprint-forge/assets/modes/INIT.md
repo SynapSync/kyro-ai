@@ -42,10 +42,15 @@ Rules: every sprint needs a distinct verifiable objective. Multi-sprint plans ne
 Load `../templates/sprint.json`. Fill:
 
 - `scope`, `title`, `status: "planning"`, `objective` (one sentence).
+- `successCriteria: [...]` — 2–5 **technology-agnostic, measurable** outcomes that define success for
+  the scope (the WHAT/WHY, not the HOW). Example: "A user completes checkout in under 2 minutes."
 - `roadmap` from the sizing above.
 - `conventions: []` — populated later by `learner.md` during sprint retros.
+- `clarifications: []` — populated by `clarify.md` when ambiguities are resolved.
 - `activeSprint: null` — planning hasn't started yet.
-- `handoff.nextAction: "plan_sprint"`, `handoff.nextTaskId: null`.
+- `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write
+  `[NEEDS CLARIFICATION: ...]` markers in `objective`/`successCriteria` rather than guessing),
+  otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.
 
 Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`. Create `archive/` and `findings/` directories alongside it.
 
@@ -68,6 +73,11 @@ Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Cont
 ```
 
 After creating it, recommend running `kyro install` once so the adapter inventory (`installedAdapters`) and runtime paths are populated authoritatively.
+
+**Optional — seed `principles[]`:** if the user states non-negotiable project rules, add them to
+`kyro.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
+`check` (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`)
+when the rule maps to one, so `kyro analyze` enforces it deterministically.
 
 ## Output
 

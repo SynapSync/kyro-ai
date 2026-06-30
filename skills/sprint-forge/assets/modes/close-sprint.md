@@ -14,7 +14,7 @@ Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Cont
 
 ## Workflow
 
-1. Run the pre-close quality checkpoint. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason).
+1. Run the pre-close quality checkpoint. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason). **Run `kyro analyze --kyro-scope {scope}` and do not proceed while any CRITICAL or HIGH finding remains** — resolve them first (route to `clarify` for `[NEEDS CLARIFICATION]` markers).
 2. Fill the retro reasoning: went well, did not go well, surprises, new debt. Capture recommendations for Sprint N+1 (you will pass them to the close command).
 3. **Additive writes first (safe-write).** These must happen before the close command, because the command re-serializes the current `sprint.json`:
    - Extract learned rules as `conventions[]` objects via `../helpers/learner.md` — each `{ id, rule, tags, addedSprint }`. Append to `sprint.json.conventions[]`.

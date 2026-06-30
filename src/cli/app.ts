@@ -1,4 +1,5 @@
 import { doctor } from './commands/doctor';
+import { analyze } from './commands/analyze';
 import { detect } from './commands/detect';
 import { install, sync } from './commands/install';
 import { runTui } from './commands/tui';
@@ -65,6 +66,9 @@ export async function runCli(): Promise<void> {
       break;
     case 'doctor':
       doctor(options);
+      break;
+    case 'analyze':
+      analyze(options);
       break;
     case 'repair':
       await repair(options);

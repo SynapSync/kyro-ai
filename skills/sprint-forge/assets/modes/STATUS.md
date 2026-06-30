@@ -30,6 +30,11 @@ Report progress from the single source of truth. One read, no summaries.
 - `brief`: scope, status, active sprint, next action, task progress, open debt count, next command.
 - `full`: add roadmap health, sprint table, debt trend, and the resume note from `handoff.note`.
 
+## Health check (optional)
+
+For a deeper read than counts, run `kyro analyze --kyro-scope {scope}` — it surfaces clarity,
+coverage, dependency, and overdue-debt issues with severity. Read-only.
+
 ## Rules
 
 - A report is read-only unless an explicit `debt-*` mutation is requested.
