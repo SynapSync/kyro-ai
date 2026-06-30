@@ -1,32 +1,38 @@
 # Sprint Generator Helper
 
-Use only from `plan-sprint.md` after the next sprint number is known.
+Use only from `plan-sprint.md` after the next sprint number is known. Produces the `activeSprint` object that gets written into `sprint.json`. Writes nothing on its own.
 
-## Required Inputs
+## Required Inputs (all from sprint.json)
 
-- Roadmap sprint summary/section for Sprint N.
-- Previous sprint summary first; open previous sprint Markdown only for missing retro, recommendations, or debt detail.
-- Relevant finding summaries/files for Sprint N.
+- `roadmap` section for Sprint N (focus, type, target, suggested phases).
+- `ledger[]` last entry: previous outcome and recommendations.
+- `previousSprint` summary.
+- `debt[]` items due for Sprint N.
+- `conventions[]` relevant to estimation and architecture.
 - User overrides from the current request.
 
 ## Algorithm
 
-1. Resolve Sprint N and verify Sprint N-1 is complete when N > 1.
-2. Extract title, focus, type, target version, suggested phases, dependencies, and verification needs.
-3. For Sprint 2+, create a disposition row for every previous recommendation: incorporated, deferred, resolved, N/A, or converted to phase. Nothing is silently dropped.
-4. Build phases from roadmap suggestions, incorporated recommendations, and due debt. Each task needs an id, concise description, known files, and verification criteria.
-5. Carry debt forward completely. Add new debt, mark due items `in-progress`, and never delete resolved rows.
-6. Write `phases/SPRINT-{N}-{slug}.md` and `SPRINT-{N}-{slug}.summary.json`.
-7. Set `state.json.activeSprint`, `currentPhase: "planning"`, `nextAction: "execute_task"`, and update `index.json` routing fields.
+1. Resolve Sprint N and verify Sprint N-1 is closed (present in `ledger[]`) when N > 1.
+2. Extract title, focus, type, target version, suggested phases, dependencies, and verification needs. The `title` MUST be copied verbatim from `roadmap.sprints[]` for this sprint number and written into the `activeSprint` object (see shape below) — never leave it out, or the archive narrative renders `Sprint N: undefined`.
+3. For Sprint 2+, create a disposition for every previous recommendation: incorporated, deferred, resolved, N/A, or converted to phase. Nothing is silently dropped.
+4. Build `phases[]` from roadmap suggestions, incorporated recommendations, and due debt. Each task needs `id`, `title`, `description`, `files_to_touch`, `context` (fold in relevant `conventions[]`), `acceptance_criteria`, `depends_on`, `status: "pending"`, `evidence: null`, `verdict: null`.
+5. Carry debt forward completely in `debt[]`: add new debt objects, mark due items `in_progress`, never delete resolved rows.
 
-## Sprint File Requirements
+## activeSprint shape produced
 
-- Disposition table exists for Sprint 2+.
+```json
+{
+  "n": 2, "slug": "validation-hardening", "title": "Validation hardening", "objective": "...", "status": "executing",
+  "phases": [ { "id": "P1", "title": "...", "objective": "...", "status": "pending", "tasks": [ /* task objects */ ] } ],
+  "emergentTasks": [],
+  "definitionOfDone": ["All tasks done with evidence", "All tasks pass verdict", "Quality gates pass"]
+}
+```
+
+## Requirements
+
 - Planned phases are reviewable and independently verifiable.
-- Emergent phase placeholder exists but is not pre-filled.
-- Retro and recommendations remain placeholders until close.
-- Definition of Done includes task completion, validation, debt update, compact evidence, retro, and re-entry update at close.
-
-## Numbering
-
-Sprint numbers are sequential and never reused. Emergent execution tasks use `TE.{n}` and are materialized at close.
+- `emergentTasks` starts empty; it is filled during execution only.
+- Sprint numbers are sequential and never reused. Emergent tasks use `TE.{n}`.
+- The generator hands this object back to `plan-sprint.md`, which performs the single safe-write to `sprint.json`. No `phases/` files, no `state.json`, no `index.json`.

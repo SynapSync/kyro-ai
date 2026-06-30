@@ -6,14 +6,14 @@ Kyro assets are designed for progressive disclosure: load the router first, then
 
 | File | Description |
 |------|-------------|
-| [INIT.md](modes/INIT.md) | Lean analysis, justified sprint sizing, roadmap, scoped state, and summaries |
-| [SPRINT.md](modes/SPRINT.md) | Lightweight sprint router |
-| [plan-sprint.md](modes/plan-sprint.md) | Generate the next sprint |
-| [execute-task.md](modes/execute-task.md) | Execute active sprint tasks |
-| [review-task.md](modes/review-task.md) | Validate task or phase quality |
-| [close-sprint.md](modes/close-sprint.md) | Retro, debt, summaries, and re-entry closeout |
-| [recover.md](modes/recover.md) | Rebuild state/summaries after interruption |
-| [STATUS.md](modes/STATUS.md) | Summary-first progress reporting |
+| [INIT.md](modes/INIT.md) | Scope analysis, sprint sizing, and `sprint.json` bootstrap |
+| [SPRINT.md](modes/SPRINT.md) | Router on `handoff.nextAction` |
+| [plan-sprint.md](modes/plan-sprint.md) | Generate the next sprint into `activeSprint` |
+| [execute-task.md](modes/execute-task.md) | Execute active sprint tasks, record evidence |
+| [review-task.md](modes/review-task.md) | Validate task quality, record verdict |
+| [close-sprint.md](modes/close-sprint.md) | Snapshot, ledger entry, retro, debt, conventions |
+| [recover.md](modes/recover.md) | Rebuild `sprint.json` from archive snapshots |
+| [STATUS.md](modes/STATUS.md) | Progress report from `sprint.json` |
 
 ## helpers/
 
@@ -25,11 +25,13 @@ Kyro assets are designed for progressive disclosure: load the router first, then
 | [analysis/refactor.md](helpers/analysis/refactor.md) | Refactor analysis and sizing signals |
 | [analysis/new-project.md](helpers/analysis/new-project.md) | New project analysis and sizing signals |
 | [analysis/tech-debt.md](helpers/analysis/tech-debt.md) | Tech debt analysis and sizing signals |
-| [sprint-generator.md](helpers/sprint-generator.md) | Sprint generation algorithm |
-| [debt-tracker.md](helpers/debt-tracker.md) | Accumulated debt rules |
-| [reentry-generator.md](helpers/reentry-generator.md) | Re-entry prompt updates |
+| [sprint-generator.md](helpers/sprint-generator.md) | Builds the `activeSprint` object |
+| [debt-tracker.md](helpers/debt-tracker.md) | Accumulated debt rules (`sprint.json.debt[]`) |
+| [learner.md](helpers/learner.md) | Learned rules into `sprint.json.conventions[]` |
+| [analyzer.md](helpers/analyzer.md) | Scope analysis support |
+| [metrics.md](helpers/metrics.md) | Velocity & debt analytics from `sprint.json` |
 | [reviewer.md](helpers/reviewer.md) | Review classification |
-| [handoff.md](helpers/handoff.md) | Session handoff format |
+| [handoff.md](helpers/handoff.md) | Resume context in `sprint.json.handoff` |
 
 ## protocols/
 
@@ -37,19 +39,15 @@ Protocol files are lazy-loaded only when a routed mode needs expanded detail: an
 
 ## templates/
 
+v4 installs exactly these. The two JSON files are the agent-facing source of truth; the markdown is a write-only human archive.
+
 | File | Description |
 |------|-------------|
-| [ROADMAP.md](templates/ROADMAP.md) | Human roadmap evidence with sizingDecision |
-| [SPRINT.md](templates/SPRINT.md) | Human sprint evidence |
-| [PROJECT-README.md](templates/PROJECT-README.md) | Scope README |
-| [REENTRY-PROMPTS.md](templates/REENTRY-PROMPTS.md) | Summary-first recovery prompts |
-| [state.json](templates/state.json) | Scoped routing state |
-| [index.json](templates/index.json) | Fast agent routing index |
-| [ROADMAP.summary.json](templates/ROADMAP.summary.json) | Roadmap summary cache |
-| [SPRINT.summary.json](templates/SPRINT.summary.json) | Sprint summary cache |
-| [DEBT.summary.json](templates/DEBT.summary.json) | Debt summary cache |
-| [rules.index.json](templates/rules.index.json) | Compact learned-rules index |
-| [events.ndjson.example](templates/events.ndjson.example) | Compact execution event shape |
+| [sprint.json](templates/sprint.json) | Single source of truth per scope (objective, conventions, roadmap, ledger, activeSprint, debt, handoff) |
+| [kyro.json](templates/kyro.json) | Global registry: scopes list and activeScope |
+| [archive-sprint.md](templates/archive-sprint.md) | Human-readable narrative written when a sprint closes |
+
+Deprecated v3 templates (state.json, index.json, ROADMAP.summary.json, DEBT.summary.json, rules.index.json, events.ndjson) have been moved to [old-to-delete/](templates/old-to-delete/) and must not be used. Run `kyro migrate` to upgrade v3 scopes.
 
 ## fixtures/
 

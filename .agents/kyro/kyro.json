@@ -1,18 +1,18 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 4,
   "artifactRoot": ".agents/kyro/scopes",
   "scopes": [
     "00-p0-reproducibility-and-ci",
     "01-token-cost-optimization"
   ],
   "activeScope": "01-token-cost-optimization",
-  "runtimeVersion": "3.4.3",
+  "runtimeVersion": "4.0.0",
   "runtimePath": "~/.agents/kyro/current",
   "installedAdapters": [
     {
       "agent": "standard",
       "scope": "workspace",
-      "installedAt": "2026-06-20T14:04:43.789Z",
+      "installedAt": "2026-06-30T01:39:26.063Z",
       "corePath": "~/.agents/kyro/current",
       "commandsPath": "~/.agents/skills",
       "skillsPath": "~/.agents/skills"

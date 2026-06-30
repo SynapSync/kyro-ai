@@ -1,30 +1,35 @@
 # Debt Tracker Helper
 
-Use only for sprint planning debt carry-forward, explicit debt mutation, status debt reports, or sprint close.
+Use only for sprint planning debt carry-forward, explicit debt mutation, status debt reports, or sprint close. Debt lives in `sprint.json.debt[]` — there is no `DEBT.summary.json` or debt Markdown table in v4.
 
 ## Principle
 
-Debt never disappears. Rows are inherited across sprints and only change status when explicitly resolved, deferred, or moved in progress.
+Debt never disappears. Items are inherited across sprints and only change status when explicitly resolved, deferred, or moved in progress.
 
-## Table Contract
+## Debt item shape (`sprint.json.debt[]`)
 
-| # | Item | Origin | Sprint Target | Status | Resolved In |
-|---|------|--------|---------------|--------|-------------|
+```json
+{ "id": "debt-3", "title": "OnPush not applied to table component", "origin": 1,
+  "priority": "medium", "status": "open", "targetSprint": 3, "note": "" }
+```
 
-- `#`: stable id; never reused.
-- `Item`: actionable debt description.
-- `Origin`: `INIT finding NN`, `Sprint N Phase X`, `Sprint N retro`, or `Sprint N generation`.
-- `Sprint Target`: expected resolution sprint.
-- `Status`: `open`, `in-progress`, `resolved`, or `deferred`.
-- `Resolved In`: sprint number or `—`.
+- `id`: stable, never reused (e.g. `debt-3`).
+- `title`: actionable debt description.
+- `origin`: sprint number where the debt was first recorded.
+- `priority`: `critical | high | medium | low`.
+- `status`: `open | in_progress | resolved | deferred` (snake_case — `in-progress` is v3 drift).
+- `targetSprint`: expected resolution sprint, or `null`.
+- `note`: reason / context (required when deferring).
 
 ## Mutations
 
-- New debt: append next id, status `open`, target best estimate, `Resolved In` = `—`.
-- Start work: `open` or `deferred` → `in-progress`.
-- Resolve: set `resolved`, fill `Resolved In`, and record validation evidence.
-- Defer: set `deferred`, update target, and include a concrete reason.
+All edits go through the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate `debt[]` in memory → overwrite the whole `sprint.json` → re-parse). Do not splice array items with a string edit.
+
+- New debt: append with a fresh `id`, `status: "open"`, best-estimate `targetSprint`.
+- Start work: `open` or `deferred` → `in_progress`.
+- Resolve: set `status: "resolved"` and record validation evidence. At sprint close, resolved items appear in the archive, then are dropped from `debt[]`.
+- Defer: set `status: "deferred"`, update `targetSprint`, and include a concrete reason in `note`.
 
 ## Reporting
 
-STATUS can compute open, in-progress, resolved, deferred, critical, trend, and oldest open item from `DEBT.summary.json` first. Open sprint Markdown only when summary data is missing or a debt mutation is requested.
+`/kyro:status` computes open / in_progress / resolved / deferred / critical counts and the oldest open item directly from `sprint.json.debt[]`. No summary file, no Markdown — one read.

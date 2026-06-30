@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 4,
+  "scope": "{{scope}}",
+  "title": "{{title}}",
+  "status": "planning",
+  "objective": "{{objective}}",
+
+  "conventions": [],
+
+  "roadmap": {
+    "plannedSprintCount": 0,
+    "sizingRationale": "",
+    "sprints": []
+  },
+
+  "ledger": [],
+
+  "previousSprint": null,
+
+  "activeSprint": {
+    "n": 1,
+    "slug": "{{sprint-1-slug}}",
+    "objective": "{{sprint-1-objective}}",
+    "status": "planning",
+    "phases": [
+      {
+        "id": "P1",
+        "title": "{{phase-title}}",
+        "objective": "{{phase-objective}}",
+        "status": "pending",
+        "tasks": [
+          {
+            "id": "T1.1",
+            "title": "{{task-title}}",
+            "description": "What exactly to build or change. Be specific enough that the executor needs no other file to understand the work.",
+            "files_to_touch": ["path/to/file.ts"],
+            "context": "What the executor must know before starting: existing patterns, constraints, gotchas.",
+            "acceptance_criteria": [
+              "Criterion 1 — verifiable, not vague.",
+              "Criterion 2 — maps to a concrete check (tsc, jest, grep, manual)."
+            ],
+            "depends_on": [],
+            "status": "pending",
+            "evidence": null,
+            "verdict": null
+          }
+        ]
+      }
+    ],
+    "emergentTasks": [],
+    "definitionOfDone": [
+      "All tasks have status done with evidence.",
+      "All tasks have a passing verdict.",
+      "Quality gates pass (tsc, lint, tests)."
+    ]
+  },
+
+  "debt": [],
+
+  "handoff": {
+    "nextAction": "plan_sprint",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "",
+    "lastUpdated": "{{date}}"
+  }
+}

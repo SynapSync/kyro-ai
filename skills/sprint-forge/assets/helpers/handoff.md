@@ -1,103 +1,39 @@
-# Sprint Handoff — Enriched Context Transfer
+# Sprint Handoff — Resume Context
 
 ## Purpose
 
-Generates a handoff document that captures not just file state but **mental context** — the hypotheses, decisions, and reasoning that a new session needs to continue effectively.
+Captures the mental context a fresh session needs to resume — hypotheses, decisions, blockers, and the single most important next action. In v4 this lives in `sprint.json.handoff`, not a separate file.
 
-## Handoff Structure
+## Where it lives
 
-### 1. Sprint State
+`sprint.json.handoff`:
 
-```text
-## Sprint State
-- Active sprint: Sprint 3 (in progress)
-- Tasks completed: 5/8
-- Current task: T2.3 — "Implement rate limiting middleware"
-- Phase: 2 of 3
-- Last checkpoint: Phase 2 complete
+```json
+{
+  "nextAction": "execute_task",
+  "nextTaskId": "T2.3",
+  "blockers": ["Staging env not provisioned (infra team, ETA unknown)"],
+  "note": "Implementing rate-limit middleware in src/middleware/rate-limit.ts (half done). Suspected N+1 at userService.ts:47. Decision pending: Redis vs in-memory cache.",
+  "lastUpdated": "2026-06-29"
+}
 ```
 
-### 2. Mental Context
+- `nextAction`: the route (`init | plan_sprint | execute_task | review_task | close_sprint | wrap_up`).
+- `nextTaskId`: the task to resume, or `null`.
+- `blockers`: concrete things preventing progress.
+- `note`: free-text mental context — active hypotheses, pending decisions, where work was left. This is the resume prompt; keep it specific and current.
 
-#### Active Hypotheses
+## Update points
 
-Ideas being investigated but not yet confirmed:
-
-```text
-### Active Hypotheses
-- "The performance issue in /api/users is likely an N+1 query at line 47 of userService.ts"
-- "The auth module may have a race condition under concurrent login attempts"
-- "The memory spike during CSV export correlates with unbounded stream buffering"
-```
-
-#### Pending Decisions
-
-Choices that need to be made before proceeding:
-
-```text
-### Pending Decisions
-- Redis vs in-memory cache backend (waiting for load test results)
-- Migrate to new payments API now or defer to Sprint 5 (cost-benefit unclear)
-- Monorepo restructure: packages/ or apps/ pattern?
-```
-
-#### Identified Blockers
-
-Things that are preventing progress:
-
-```text
-### Identified Blockers
-- Infra team hasn't provisioned staging environment (ETA unknown)
-- Payments API documentation is outdated (v2 docs reference v1 endpoints)
-- CI pipeline intermittent failures (flaky test in auth.spec.ts:142)
-```
-
-### 3. Recommended Next Action
-
-The single most important thing to do when resuming:
-
-```text
-### Next Action
-1. Check if infra provisioned staging (ask in #infra channel)
-2. If yes → run integration test suite against staging
-3. If no → continue with non-blocked tasks: T3.1 (UI polish), T3.2 (error messages)
-```
-
-### 4. Corrections & Rules This Session
-
-```text
-### Corrections Applied
-- User corrected: "Always use parameterized queries, never string concatenation"
-  → Saved as RULE-012
-
-### Rules Triggered
-- RULE-005: Added 20% buffer to DB migration estimate (Sprint 3, T1.2)
-```
-
-### 5. Files Context
-
-```text
-### Key Files
-- src/middleware/rate-limit.ts — work in progress, half-implemented
-- src/services/userService.ts:47 — suspected N+1 query
-- tests/auth.spec.ts:142 — flaky test causing CI failures
-```
+- Each task transition: refresh `nextTaskId`, `nextAction`, and `note`.
+- Wrap-up: set `note` to the most important thing to do next session, list `blockers`.
+- Sprint close: point `note` at the next sprint or scope completion.
 
 ## Generation
 
-When generating a handoff:
-1. Read current sprint file for task state
-2. Review conversation for hypotheses and decisions
-3. Check git status for uncommitted work
-4. Check rules applied/proposed this session
-5. Write to `{output_kyro_dir}/handoffs/[date]-sprint-[N].md`
-6. Update re-entry prompts with handoff reference
+1. Read current `sprint.json` for task state.
+2. Review the session for hypotheses, decisions, and blockers.
+3. Check `git status` for uncommitted work.
+4. Write `handoff` via the Artifact Write Contract in `../../SKILL.md`.
 
-## Difference from Re-entry Prompts
-
-| Aspect | Re-entry Prompts | Handoff |
-|--------|-----------------|---------|
-| Focus | File paths and sprint state | Mental context and reasoning |
-| When | After INIT and each sprint | Any time during execution |
-| For whom | Any agent, any session | Specifically the next session |
-| Content | What to read | What to think about |
+There is no `handoffs/` directory and no `RE-ENTRY-PROMPTS.md` — the resume context is a field on the single source of truth.

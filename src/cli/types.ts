@@ -13,14 +13,123 @@ export interface KyroInstalledAdapter {
   skillsPath?: string;
 }
 
+/** A scope entry in kyro.json.scopes[] — always an object, never a bare string (v3 drift). */
+export interface KyroScopeEntry {
+  id: string;
+  title: string;
+  status: 'planning' | 'active' | 'blocked' | 'completed';
+}
+
 export interface KyroProjectState {
-  schemaVersion: 1;
+  schemaVersion: 4;
   artifactRoot: string;
-  scopes: string[];
+  scopes: KyroScopeEntry[];
   activeScope: string | null;
   runtimeVersion: string;
   runtimePath: string;
   installedAdapters: KyroInstalledAdapter[];
+}
+
+// --- v4 sprint.json model (single source of truth per scope) ---
+
+export type NextAction =
+  | 'init'
+  | 'plan_sprint'
+  | 'execute_task'
+  | 'review_task'
+  | 'close_sprint'
+  | 'wrap_up';
+
+export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
+export type DebtStatus = 'open' | 'in_progress' | 'resolved' | 'deferred';
+
+export interface Convention {
+  id: string;
+  rule: string;
+  tags: string[];
+  addedSprint: number;
+}
+
+export interface Roadmap {
+  plannedSprintCount: number;
+  sizingRationale: string;
+  sprints: Array<{ n: number; slug: string; title: string; state: string }>;
+}
+
+export interface LedgerEntry {
+  n: number;
+  slug: string;
+  outcome: string;
+  closedAt: string;
+  archive: string;
+  /** Path to the verbatim JSON snapshot of the closed activeSprint (write-only audit trail). */
+  snapshot?: string;
+  recommendations?: string[];
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  files_to_touch: string[];
+  context: string;
+  acceptance_criteria: string[];
+  depends_on: string[];
+  status: TaskStatus;
+  evidence: unknown | null;
+  verdict: unknown | null;
+}
+
+export interface Phase {
+  id: string;
+  title: string;
+  objective: string;
+  status: string;
+  tasks: Task[];
+}
+
+export interface ActiveSprint {
+  n: number;
+  slug: string;
+  title: string;
+  objective: string;
+  status: string;
+  phases: Phase[];
+  emergentTasks: Task[];
+  definitionOfDone: string[];
+}
+
+export interface Debt {
+  id: string;
+  title: string;
+  origin: number;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  status: DebtStatus;
+  targetSprint: number | null;
+  note: string;
+}
+
+export interface Handoff {
+  nextAction: NextAction;
+  nextTaskId: string | null;
+  blockers: string[];
+  note: string;
+  lastUpdated: string;
+}
+
+export interface SprintFile {
+  schemaVersion: 4;
+  scope: string;
+  title: string;
+  status: string;
+  objective: string;
+  conventions: Convention[];
+  roadmap: Roadmap;
+  ledger: LedgerEntry[];
+  previousSprint: unknown | null;
+  activeSprint: ActiveSprint | null;
+  debt: Debt[];
+  handoff: Handoff;
 }
 
 export interface KyroManifest {
@@ -80,40 +189,32 @@ export interface CheckResult {
   remedy?: string;
 }
 
-export interface ContextPackRuleSummary {
+export interface ContextPackConvention {
   id: string;
-  category: string;
-  summary: string;
-}
-
-export interface ContextPackArtifactPaths {
-  roadmap: string;
-  roadmapSummary: string;
-  sprints: string;
-  reentry: string;
+  rule: string;
+  tags: string[];
 }
 
 export interface ContextPackOutput {
-  schemaVersion: 1;
+  schemaVersion: 4;
   packMode: ContextPackMode;
   scope: string;
   status: string | null;
-  currentPhase: string | null;
+  objective: string | null;
   nextAction: string | null;
-  activeSprint: string | null;
-  roadmapSummary: string | null;
-  activeSprintSummary: string | null;
-  nextTask: string | null;
-  openDebtCount: number | null;
-  relevantArtifactPaths: ContextPackArtifactPaths | null;
+  nextTaskId: string | null;
+  activeSprintSlug: string | null;
+  activeSprintObjective: string | null;
+  openDebtCount: number;
   taskId: string | null;
+  taskTitle: string | null;
   taskDescription: string | null;
   taskFiles: string[];
-  taskVerification: string | null;
-  sourceMarkdown: string | null;
-  sprintSummaryPath: string | null;
-  evidencePaths: string[];
-  rules: ContextPackRuleSummary[];
+  taskContext: string | null;
+  taskAcceptanceCriteria: string[];
+  handoffNote: string | null;
+  blockers: string[];
+  conventions: ContextPackConvention[];
   warnings: string[];
   estimatedTokens: number;
   budgetClass: BudgetClassId;

@@ -65,8 +65,7 @@ export function runTokenAuditChecks(): CheckResult[] {
   checks.push(...checkModeFiles());
   checks.push(checkInitModeBudget());
   checks.push(...checkAnalysisHelperBudgets());
-  checks.push(checkTemplateBudget('skills/sprint-forge/assets/templates/ROADMAP.md', TOKEN_BUDGET.roadmapTemplateWords, 'ROADMAP template'));
-  checks.push(checkTemplateBudget('skills/sprint-forge/assets/templates/REENTRY-PROMPTS.md', TOKEN_BUDGET.reentryTemplateWords, 'REENTRY template'));
+  // v4 has no ROADMAP.md / REENTRY-PROMPTS.md templates; sprint.json is the single source of truth.
   checks.push(checkProjectedSkills());
   checks.push(checkAgentsBlockBudget());
   checks.push(checkStartupBudget());
@@ -183,12 +182,10 @@ function checkStatusBriefBudget(): CheckResult {
 }
 
 function checkInitHappyPathBudget(): CheckResult {
+  // v4: INIT loads only the INIT mode + one routed analysis helper. No v3 templates.
   const baseFiles = [
     'commands/forge.md',
     'skills/sprint-forge/assets/modes/INIT.md',
-    'skills/sprint-forge/assets/templates/ROADMAP.md',
-    'skills/sprint-forge/assets/templates/PROJECT-README.md',
-    'skills/sprint-forge/assets/templates/REENTRY-PROMPTS.md',
   ].map(weightPackageFile);
   const heaviestHelper = listPackageFiles('skills/sprint-forge/assets/helpers/analysis', '.md').map(weightPackageFile).sort((a, b) => b.estimatedTokens - a.estimatedTokens)[0];
   const files = heaviestHelper ? [...baseFiles, heaviestHelper] : baseFiles;
@@ -226,7 +223,7 @@ function checkForbiddenRuntimeLoading(): CheckResult[] {
   }
 
   const orchestrator = readFileSync(resolve(PACKAGE_ROOT, 'agents/orchestrator.md'), 'utf-8');
-  const eagerSprintHelperPattern = /SPRINT phase[^\n]*(sprint-generator|debt-tracker|reentry-generator)/i;
+  const eagerSprintHelperPattern = /SPRINT phase[^\n]*(sprint-generator|debt-tracker|learner)/i;
   if (eagerSprintHelperPattern.test(orchestrator)) {
     checks.push(fail('runtime loading: orchestrator sprint route', 'SPRINT phase eagerly references heavy helpers', 'Keep SPRINT routing to SPRINT.md plus exactly one routed mode.'));
   } else {
@@ -247,7 +244,7 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
   const commonSprintForbidden = [
     'skills/sprint-forge/assets/helpers/sprint-generator.md',
     'skills/sprint-forge/assets/helpers/debt-tracker.md',
-    'skills/sprint-forge/assets/helpers/reentry-generator.md',
+    'skills/sprint-forge/assets/helpers/learner.md',
   ];
   return [
     {
@@ -262,7 +259,7 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       budget: TOKEN_BUDGET.runtimeForgePlanTokens,
       projectedSkill: 'forge',
       files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/plan-sprint.md', 'skills/sprint-forge/assets/helpers/sprint-generator.md'],
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/reentry-generator.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/learner.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
     },
     {
       name: 'runtime path: kyro-forge:execute',
@@ -276,13 +273,13 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       budget: TOKEN_BUDGET.runtimeForgeExecuteTokens,
       projectedSkill: 'forge',
       files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/review-task.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/reentry-generator.md'],
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/learner.md'],
     },
     {
       name: 'runtime path: kyro-forge:close',
       budget: TOKEN_BUDGET.runtimeForgeCloseTokens,
       projectedSkill: 'forge',
-      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/close-sprint.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md', 'skills/sprint-forge/assets/helpers/reentry-generator.md'],
+      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/close-sprint.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md', 'skills/sprint-forge/assets/helpers/learner.md'],
       forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md'],
     },
     {

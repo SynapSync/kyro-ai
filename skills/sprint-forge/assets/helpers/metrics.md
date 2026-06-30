@@ -2,80 +2,44 @@
 
 ## Purpose
 
-Provides quantitative analysis of sprint execution history to identify patterns, improve estimation accuracy, and visualize technical debt distribution.
+Quantitative analysis of sprint history to identify patterns, improve estimation, and visualize debt. All data comes from `sprint.json` — `ledger[]`, `previousSprint`, `activeSprint`, and `debt[]`. No summaries, no `index.json`.
 
 ## Metrics
 
 ### Velocity Trend
 
-Track completion rate per sprint:
+Completion rate per closed sprint, from `ledger[]` outcomes + the closed-sprint snapshots:
 
 ```text
-## Velocity Trend
 Sprint 1: ████████░░  8/10 tasks (80%)
 Sprint 2: ██████████ 10/10 tasks (100%)
-Sprint 3: ███████░░░  7/10 tasks (70%) ← underperformance: DB tasks x2
-Sprint 4: █████████░  9/10 tasks (90%)
-
-Average velocity: 85%
-Trend: stable (±10%)
+Average velocity: 90%
 ```
 
 ### Debt Heatmap
 
-Show debt concentration by directory/module:
+Group `debt[]` items by the directory implied in `title`/`note`:
 
 ```text
-## Debt Heatmap
-src/auth/    ████████ 4 items (2 critical, aged: 3 sprints)
-src/db/      █████░░░ 3 items (1 critical)
-src/api/     ██░░░░░░ 1 item
-src/ui/      ░░░░░░░░ 0 items
-
-Total: 8 items (3 critical, 2 aged >3 sprints)
+src/auth/  ████████ 4 items (2 critical)
+src/db/    █████░░░ 3 items (1 critical)
 ```
 
 ### Underestimation Patterns
 
-Identify task types that are consistently underestimated:
-
-```text
-## Underestimation Patterns
-- DB/migration tasks: underestimated by ~40% (3 occurrences)
-- Auth tasks: reveal hidden dependencies in 67% of cases
-- UI tasks: generally accurate (±10%)
-- API tasks: underestimated by ~15% when involving auth
-```
+Compare planned vs actual (including `emergentTasks`) across the closed sprints to spot task types that overrun.
 
 ### Sprint Health Score
 
-Composite score based on:
-- Velocity (weight: 30%)
-- Debt trend — increasing or decreasing (weight: 25%)
-- Carry-over count (weight: 20%)
-- Estimation accuracy (weight: 25%)
+Composite of velocity (30%), debt trend (25%), carry-over count (20%), estimation accuracy (25%).
 
-```text
-## Sprint Health
-Score: 72/100 (Good)
-  Velocity:    ████████░░ 85% (25.5/30)
-  Debt trend:  ██████░░░░ ↗ increasing (15/25)
-  Carry-over:  ████████░░ 2 tasks (16/20)
-  Estimation:  ██████░░░░ ±25% avg error (15.5/25)
-```
+## Data Sources (all in sprint.json)
 
-## Data Sources
-
-- Sprint summaries first: task counts, completion status, retro highlights
-- Debt summary or latest debt table: accumulated debt state
-- Roadmap summary first, roadmap Markdown when summary is missing
-- Rules file: estimation adjustment rules
+- `ledger[]` + closed-sprint snapshots (`archive/sprint-NNN-slug.json`) for task counts and outcomes.
+- `debt[]` for accumulated debt state and age (`origin` vs current sprint).
+- `roadmap` for planned vs actual sprint sequencing.
+- `conventions[]` tagged `estimation` for adjustment rules.
 
 ## Calculation
 
-Read `index.json` and available `*.summary.json` files first. Open sprint Markdown only for missing fields, then compute:
-
-1. Count tasks per sprint (total, completed, blocked, skipped, carry-over)
-2. Map debt items to source directories
-3. Track item age (sprint introduced vs current sprint)
-4. Compare planned phases vs actual phases (including emergent)
+Read `sprint.json` once. For historical task counts, read the per-sprint archive snapshots (write-only JSON) only when computing trends across closed sprints. Then compute task counts, debt-to-directory mapping, item age, and planned-vs-actual phases.

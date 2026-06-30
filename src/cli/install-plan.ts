@@ -60,8 +60,8 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
 
 function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: string, runtimeVersion: string): KyroProjectState {
   const existing = readProjectState();
-  const base: KyroProjectState = existing ?? {
-    schemaVersion: 1,
+  const defaults: KyroProjectState = {
+    schemaVersion: 4,
     artifactRoot: ARTIFACT_ROOT,
     scopes: [],
     activeScope: null,
@@ -69,6 +69,11 @@ function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: st
     runtimePath: KYRO_ROOT,
     installedAdapters: [],
   };
+  // Merge over defaults so an incomplete kyro.json (e.g. hand-written by an agent that never ran
+  // kyro install) is REPAIRED instead of crashing. Arrays are normalized before we iterate them.
+  const base: KyroProjectState = { ...defaults, ...(existing ?? {}) };
+  if (!Array.isArray(base.scopes)) base.scopes = [];
+  if (!Array.isArray(base.installedAdapters)) base.installedAdapters = [];
 
   const adaptersByAgent = new Map<Agent, KyroProjectState['installedAdapters'][number]>();
   for (const adapter of base.installedAdapters) {
@@ -80,7 +85,7 @@ function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: st
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 4,
     artifactRoot: ARTIFACT_ROOT,
     scopes: [...base.scopes],
     activeScope: base.activeScope,

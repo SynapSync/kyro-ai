@@ -97,14 +97,13 @@ This skill is part of the **kyro-ai** system. Sprint artifacts live at:
 
 Where `{scope}` is the kebab-case work topic (e.g., `oauth-implementation`, `ui-redesign`).
 
-Within each scope directory, expect:
+Within each scope directory, expect a single source of truth:
 
-- `ROADMAP.md` — project roadmap and sprint sequence
-- `SPRINT-{N}.md` — individual sprint execution files
-- `REENTRY-PROMPTS.md` — context persistence for future agents
-- `PROJECT-README.md` — project overview and architecture decisions
+- `sprint.json` — the v4 single source of truth: objective, conventions, roadmap, ledger, activeSprint (phases→tasks with evidence/verdict), debt, and handoff
+- `archive/sprint-NNN-slug.md` + `archive/sprint-NNN-slug.json` — write-only history of closed sprints
+- `findings/` — INIT analysis evidence
 
-When reviewing, always check if these artifacts are present and up to date.
+When reviewing, always check that `sprint.json` is present, valid, and synchronized with the code (run `kyro doctor --artifacts`).
 
 Junior development agents (Claude, OpenCode, Codex, or other implementation agents) are expected to update sprint-forge artifacts as the project progresses.
 
@@ -340,9 +339,9 @@ Reject or request changes if code changed but planning artifacts are stale, inco
 
 ---
 
-### 10. Re-entry Prompt Validation
+### 10. Resume Context Validation
 
-Validate that re-entry prompts (`REENTRY-PROMPTS.md`) are:
+Validate that the resume context (`sprint.json.handoff` — `nextAction`, `nextTaskId`, `blockers`, `note`) is:
 
 - Accurate
 - Current
@@ -538,12 +537,11 @@ Verify whether the sprint-forge artifacts were updated correctly.
 
 Check:
 
-- Sprint status
-- Roadmap
-- Task tracking
-- Re-entry prompts (`REENTRY-PROMPTS.md`)
-- Technical notes
-- Relevant planning documents
+- Sprint status (`sprint.json.status` + `activeSprint`)
+- Roadmap (`sprint.json.roadmap`)
+- Task tracking (`activeSprint.phases[].tasks` with evidence/verdict)
+- Resume context (`sprint.json.handoff`)
+- Debt (`sprint.json.debt[]`) and conventions (`sprint.json.conventions[]`)
 
 Artifacts expected at: `{cwd}/.agents/kyro/scopes/{scope}/`
 

@@ -1,8 +1,8 @@
-import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { ARTIFACT_ROOT, KYRO_STATE_PATH } from '../constants';
 import { readJsonSafely } from '../artifacts/json';
-import { scopeIndexPath, scopeStatePath } from '../artifacts/paths';
-import { asScopeIndex, asScopeState } from '../artifacts/schema';
+import { sprintJsonPath } from '../artifacts/paths';
+import { asSprintFile } from '../artifacts/schema';
 import { resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
 import { inspectScope } from './artifact-doctor';
@@ -60,23 +60,16 @@ function inspectScopeCommand(scope: string): void {
 }
 
 function printScopeSummary(scope: string): void {
-  const state = asScopeState(readJsonSafely(scopeStatePath(scope)).value);
-  const index = asScopeIndex(readJsonSafely(scopeIndexPath(scope)).value);
+  const sprint = asSprintFile(readJsonSafely(sprintJsonPath(scope)).value);
   console.log(`Scope: ${scope}`);
-  if (state) {
-    console.log(`Status: ${state.status}`);
-    console.log(`Active sprint: ${state.activeSprint ?? 'none'}`);
-    console.log(`Current phase: ${state.currentPhase}`);
-    console.log(`Next action: ${state.nextAction}`);
+  if (sprint) {
+    console.log(`Status: ${sprint.status}`);
+    console.log(`Active sprint: ${sprint.activeSprint ? `${sprint.activeSprint.n} — ${sprint.activeSprint.slug}` : 'none'}`);
+    console.log(`Next action: ${sprint.handoff.nextAction}`);
+    console.log(`Next task: ${sprint.handoff.nextTaskId ?? 'none'}`);
+    console.log(`Open debt: ${sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length}`);
   } else {
-    console.log('State: missing or invalid');
-  }
-  if (index) {
-    console.log(`Next task: ${index.nextTask ?? 'none'}`);
-    console.log(`Open debt: ${index.openDebtCount}`);
-    console.log(`Roadmap summary: ${index.roadmapSummary || 'none'}`);
-  } else {
-    console.log('Index: missing or invalid');
+    console.log('sprint.json: missing or invalid (run kyro migrate for a v3 scope)');
   }
   console.log('');
 }
@@ -85,17 +78,18 @@ function setActiveScope(scope: string): void {
   const state = readProjectState();
   if (!state) throw new Error(`Kyro project state not found: ${KYRO_STATE_PATH}`);
   if (!scopeExists(scope, state)) throw new Error(`Scope not found: ${scope}`);
-  const nextState: KyroProjectState = {
-    ...state,
-    scopes: [...new Set([...state.scopes, scope])].sort(),
-    activeScope: scope,
-  };
+  const scopes = [...state.scopes];
+  if (!scopes.some((entry) => entry.id === scope)) {
+    scopes.push({ id: scope, title: scope, status: 'active' });
+  }
+  scopes.sort((a, b) => a.id.localeCompare(b.id));
+  const nextState: KyroProjectState = { ...state, scopes, activeScope: scope };
   writeFileSync(resolveManagedPath(KYRO_STATE_PATH), `${JSON.stringify(nextState, null, 2)}\n`, 'utf-8');
   console.log(`Active Kyro scope set to: ${scope}`);
 }
 
 function scopeExists(scope: string, state: KyroProjectState): boolean {
-  if (state.scopes.includes(scope) || state.activeScope === scope) return true;
+  if (state.scopes.some((entry) => entry.id === scope) || state.activeScope === scope) return true;
   return existsSync(resolveManagedPath(`${ARTIFACT_ROOT}/${scope}`));
 }
 

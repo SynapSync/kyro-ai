@@ -7,49 +7,53 @@ model: opus
 memory: project
 ---
 
-# Orchestrator — Lean Runtime Contract
+# Orchestrator — Lean Runtime Contract (v4)
 
-Kyro preserves quality by loading the smallest contract needed for the current lifecycle boundary. Do not load full protocols, helpers, templates, roadmap Markdown, sprint Markdown, or rules Markdown until the routed mode requires them.
+Kyro preserves quality by loading the smallest contract needed for the current lifecycle boundary. The single source of truth is `sprint.json`. Do not load protocols, helpers, templates, or archive Markdown until the routed mode requires them.
 
 ## Startup
 
 1. Read `.agents/kyro/kyro.json` if present.
-2. Resolve scope from user input, `activeScope`, or `.agents/kyro/scopes/`.
-3. For a scope, read `state.json`, `index.json`, and `rules.index.json` if present.
-4. Load `skills/sprint-forge/SKILL.md`, then the single routed mode.
-5. Open `.agents/kyro/scopes/rules.md` only when `rules.index.json` says a relevant rule may apply, the user asks for rules, or sprint close proposes new rules.
+2. Resolve scope from user input, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
+3. Read the scope's `sprint.json` (the single source of truth). If absent, route to INIT.
+4. Load `skills/sprint-forge/SKILL.md`, then the single mode named by `sprint.json.handoff.nextAction`.
 
-## Routed Loading
+`conventions[]` are already inside `sprint.json` — no extra read for learned rules.
 
-| Situation | Load only |
+## Routed Loading (route on `handoff.nextAction`)
+
+| nextAction | Load only |
 |-----------|-----------|
-| No scope or roadmap | `assets/modes/INIT.md` + one `helpers/analysis/{workType}.md` |
-| Need next sprint | `assets/modes/SPRINT.md` + `assets/modes/plan-sprint.md` |
-| Execute tasks | `assets/modes/SPRINT.md` + `assets/modes/execute-task.md` |
-| Validate work | `assets/modes/SPRINT.md` + `assets/modes/review-task.md` |
-| Close sprint/session | `assets/modes/SPRINT.md` + `assets/modes/close-sprint.md` |
-| Inconsistent state | `assets/modes/SPRINT.md` + `assets/modes/recover.md` |
-| Status | `assets/modes/STATUS.md` |
+| `init` / no `sprint.json` | `assets/modes/INIT.md` + one `helpers/analysis/{workType}.md` |
+| `plan_sprint` | `assets/modes/SPRINT.md` + `assets/modes/plan-sprint.md` |
+| `execute_task` | `assets/modes/SPRINT.md` + `assets/modes/execute-task.md` |
+| `review_task` | `assets/modes/SPRINT.md` + `assets/modes/review-task.md` |
+| `close_sprint` / `wrap_up` | `assets/modes/SPRINT.md` + `assets/modes/close-sprint.md` |
+| inconsistent state | `assets/modes/SPRINT.md` + `assets/modes/recover.md` |
+| status report | `assets/modes/STATUS.md` |
 
-Helper boundaries are strict: `sprint-generator` only planning; `debt-tracker` only debt mutation or close; `reentry-generator` only INIT, close, or wrap-up; `reviewer` only validation.
+Helper boundaries are strict: `sprint-generator` only planning; `debt-tracker` only debt mutation or close; `learner` only at close or on an explicit correction; `reviewer` only validation.
 
 ## Write Policy
 
+All writes to `sprint.json` use the **Artifact Write Contract** in `SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse). Per action:
+
 | Moment | Write only |
 |--------|------------|
-| Task close | Append one compact event to `{scope}/events.ndjson`. |
-| Phase close | Update phase status and compact routing fields only. |
-| Sprint close | Materialize Markdown, summaries, debt, re-entry prompts, roadmap changes, and rule proposals. |
-| Wrap-up | Handoff plus changed summaries/re-entry context. |
+| Plan sprint | Set `activeSprint` and `handoff.nextAction: "execute_task"` in `sprint.json`. |
+| Task done | Set that task's `evidence` and `status` in `sprint.json`. |
+| Task reviewed | Set that task's `verdict` in `sprint.json`. |
+| Sprint close | Additive `debt[]`/`conventions[]` writes by hand; then run `kyro close-sprint` — the CLI snapshots to `archive/`, appends the `ledger[]` entry, and clears `activeSprint` atomically. Never null `activeSprint` by hand. |
+| Wrap-up | Update `handoff` (next action + note) only. |
 
-Never refresh roadmap, re-entry prompts, debt summary, or learned rules during normal task execution.
+Never split a structural JSON change into a partial string edit. Never create v3 artifacts (`state.json`, `index.json`, `events.ndjson`, summaries, `phases/`, `RE-ENTRY-PROMPTS.md`).
 
 ## Gates and Quality
 
-- Ask for approval only at lifecycle gates, not after every internal checkpoint.
+- Ask for approval only at lifecycle gates (sprint close, scope close), not after every internal checkpoint.
 - Run validation appropriate to touched files before task completion.
 - Block completion on failing tests/typecheck, debug artifacts, secrets, syntax errors, or broken imports.
-- On failure, reproduce, identify root cause, fix once, revalidate; after three failed correction rounds, mark blocked with evidence.
+- On failure, reproduce, identify root cause, fix once, revalidate; after three failed correction rounds, mark the task blocked with evidence.
 
 ## Lazy Protocols
 
@@ -61,12 +65,11 @@ Load these only when the routed mode needs details:
 | validation tiers | `assets/protocols/validation.md` |
 | failure recovery | `assets/protocols/debug.md` |
 | gate copy | `assets/protocols/gates.md` |
-| sprint close | `assets/modes/close-sprint.md` |
 
 ## Non-negotiables
 
 - One sprint active at a time.
-- Markdown is durable evidence; JSON and NDJSON are routing/recovery caches.
-- Debt never disappears; only status changes.
+- `sprint.json` is the single source of truth; the `archive/` snapshot + Markdown are write-only history.
+- Debt never disappears; only its status changes.
 - Preserve user work over making state look clean.
 - Do not delete standalone skills or registries unless explicitly requested.

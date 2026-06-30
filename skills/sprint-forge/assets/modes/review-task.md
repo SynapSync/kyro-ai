@@ -1,25 +1,25 @@
 # Review Task Mode
 
-Validate completed Kyro work without loading unrelated lifecycle context.
+Validate completed work and record the verdict on the task object in `sprint.json`.
 
 ## Inputs
 
-1. Read `state.json`, `index.json`, and the active sprint summary.
-2. Open the active sprint Markdown only for the completed task or phase.
+1. Read `.agents/kyro/scopes/{scope}/sprint.json`.
+2. Review the task identified by `handoff.nextTaskId` (the one just executed): compare its `evidence` against actual code/docs changes and its `acceptance_criteria`.
 3. Read `../helpers/reviewer.md` when classifying findings.
-4. Read project-specific quality commands from config or repository scripts.
 
 ## Workflow
 
-1. Verify task evidence matches actual code/docs changes.
-2. Run relevant checks for the touched area.
-3. Classify findings as critical, warning, or suggestion.
-4. Block completion on critical issues.
-5. Record warnings and suggestions in the sprint evidence or retro queue.
-6. Record the review result as compact task evidence. Refresh summaries only at sprint close or explicit status/debt mutation.
+1. Verify the task's `evidence` matches real changes.
+2. Run the relevant checks for the touched area.
+3. Classify findings as critical, warning, or suggestion. Critical issues block completion.
+4. Record the verdict on the task object via the Artifact Write Contract in `../../SKILL.md`:
+   - Set `task.verdict = { result: "pass" | "fail", checked_criteria: [...], findings: [...], reviewedAt }`.
+   - On `pass`: advance `handoff` (next pending task → `execute_task`, or `close_sprint` when all tasks pass).
+   - On `fail`: set `task.status = "pending"`, keep `handoff.nextAction: "execute_task"`, and record the findings so the executor can fix them.
 
 ## Rules
 
-- Review happens during execution and at close.
-- Do not mark tasks complete without evidence.
-- Suggestions do not block, but they must be visible in retro inputs.
+- Do not mark a task complete without evidence and a passing verdict.
+- Suggestions do not block, but must be visible in `task.verdict.findings` for the retro.
+- One safe-write per review; never partial-edit the JSON. No summaries, no v3 artifacts.

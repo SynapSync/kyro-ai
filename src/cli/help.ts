@@ -12,8 +12,10 @@ Usage:
   kyro install                 Install Kyro standard .agents assets
   kyro detect                  Detect local agent adapters
   kyro doctor                  Check package/workspace health
-  kyro repair [options]        Repair scoped JSON artifacts from Markdown
-  kyro context-pack [options]  Emit a summary-first context package for a scope
+  kyro repair [options]        Validate and normalize a scope's sprint.json
+  kyro close-sprint [options]  Snapshot + close the active sprint (zero-loss, tool-owned)
+  kyro migrate [options]       Upgrade v3 scopes to the v4 sprint.json model
+  kyro context-pack [options]  Emit a context package for a scope from sprint.json
   kyro scope <subcommand>      List, inspect, or set active Kyro scopes
   kyro sync [options]          Refresh managed workspace assets
   kyro uninstall [options]     Remove managed workspace assets
@@ -52,6 +54,10 @@ export function printCommandHelp(command: string): void {
     console.log('Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--kyro-scope <scope>]');
   } else if (command === 'repair') {
     console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]');
+  } else if (command === 'close-sprint') {
+    console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
+  } else if (command === 'migrate') {
+    console.log('Usage: kyro migrate [--kyro-scope <scope>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {
     console.log('Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--json]');
   } else if (command === 'scope') {

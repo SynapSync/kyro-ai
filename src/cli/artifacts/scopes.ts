@@ -9,7 +9,7 @@ export function listScopeNames(): string[] {
   const projectStateRead = readJsonSafely(KYRO_STATE_PATH);
   if (projectStateRead.exists && !projectStateRead.error) {
     const projectState = asProjectState(projectStateRead.value);
-    for (const scope of projectState?.scopes ?? []) names.add(scope);
+    for (const scope of projectState?.scopes ?? []) names.add(scope.id);
     if (projectState?.activeScope) names.add(projectState.activeScope);
   }
   for (const scope of listScopeFolders()) names.add(scope);
