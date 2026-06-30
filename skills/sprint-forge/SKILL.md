@@ -79,11 +79,22 @@ In Claude Code, a `PreToolUse` hook blocks any hand edit that nulls `activeSprin
 
 Templates are loaded only immediately before writing their artifact.
 
+## Principles vs conventions
+
+- **`conventions[]`** (in `sprint.json`) are *learned*, descriptive rules captured during retros. They
+  evolve and inform task `context`.
+- **`principles[]`** (in `kyro.json`, project-level) are *authored*, immutable rules checked as
+  **gates** — like spec-kit's constitution. Each `{ id, rule, severity, rationale, check? }`. A
+  `non-negotiable` principle that is violated is a hard stop. Principles with a built-in `check`
+  (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`) are
+  enforced deterministically by `kyro analyze`; free-text principles are agent gates confirmed at
+  `plan-sprint` and `review-task`.
+
 ## Artifact Contract
 
 | File | Role |
 |------|------|
-| `.agents/kyro/kyro.json` | Global registry: `scopes[]` (objects `{id,title,status}`), `activeScope` |
+| `.agents/kyro/kyro.json` | Global registry: `scopes[]` (objects `{id,title,status}`), `activeScope`, optional `principles[]` |
 | `.agents/kyro/scopes/{scope}/sprint.json` | Single source of truth (see template) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.md` | Human narrative at close (write-only) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |

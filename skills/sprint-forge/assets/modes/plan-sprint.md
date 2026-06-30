@@ -25,6 +25,13 @@ Using the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate
 - Update `roadmap.sprints[N-1].state` to `active`.
 - Set `handoff.nextAction: "execute_task"`, `handoff.nextTaskId` to the first task id, `handoff.lastUpdated` to today.
 
+## Principles gate (before generating tasks)
+
+- Read `kyro.json.principles[]`. No task may violate a `non-negotiable` principle. For free-text
+  principles, confirm compliance explicitly; for principles with a `check`, `kyro analyze` enforces
+  them and will FAIL on violation. If a principle genuinely must bend, amend it explicitly — never
+  ignore it silently.
+
 ## Clarity gate (before generating tasks)
 
 - If any design-affecting detail is unknown, write `[NEEDS CLARIFICATION: <what is missing>]` in the

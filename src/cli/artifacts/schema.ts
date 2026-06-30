@@ -137,7 +137,32 @@ export function validateProjectStateShape(value: unknown, path: string): Validat
   requireString(value, 'runtimeVersion', path, issues);
   requireString(value, 'runtimePath', path, issues);
   if (!Array.isArray(value.installedAdapters)) issues.push({ path, field: 'installedAdapters', message: 'must be an array' });
+  // principles[] is a v4.1 addition — validate shape only if present so pre-4.1 kyro.json stays valid.
+  if ('principles' in value) {
+    if (!Array.isArray(value.principles)) {
+      issues.push({ path, field: 'principles', message: 'must be an array when present' });
+    } else {
+      value.principles.forEach((p, i) => validatePrinciple(p, path, `principles[${i}]`, issues));
+    }
+  }
   return issues;
+}
+
+const PRINCIPLE_SEVERITY_VALUES = ['non-negotiable', 'strong', 'advisory'] as const;
+const PRINCIPLE_CHECK_VALUES = ['tasks-have-acceptance-criteria', 'no-clarification-markers', 'success-criteria-present'] as const;
+
+function validatePrinciple(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { id, rule, severity, rationale }' });
+    return;
+  }
+  requireString(value, 'id', path, issues, `${prefix}.id`);
+  requireString(value, 'rule', path, issues, `${prefix}.rule`);
+  requireLiteralSet(value, 'severity', PRINCIPLE_SEVERITY_VALUES, path, issues, `${prefix}.severity`);
+  requireString(value, 'rationale', path, issues, `${prefix}.rationale`);
+  if ('check' in value && !PRINCIPLE_CHECK_VALUES.includes(value.check as (typeof PRINCIPLE_CHECK_VALUES)[number])) {
+    issues.push({ path, field: `${prefix}.check`, message: `must be one of ${PRINCIPLE_CHECK_VALUES.join(', ')} when present` });
+  }
 }
 
 function validateScopeEntry(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {

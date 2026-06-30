@@ -74,6 +74,11 @@ Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Cont
 
 After creating it, recommend running `kyro install` once so the adapter inventory (`installedAdapters`) and runtime paths are populated authoritatively.
 
+**Optional — seed `principles[]`:** if the user states non-negotiable project rules, add them to
+`kyro.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
+`check` (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`)
+when the rule maps to one, so `kyro analyze` enforces it deterministically.
+
 ## Output
 
 Report: scope, work type, finding count, sprint count, sizing rationale, files created. Next action: run `/kyro:forge` to plan Sprint 1.

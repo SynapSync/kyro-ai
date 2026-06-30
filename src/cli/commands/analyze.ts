@@ -3,7 +3,7 @@ import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
 import { listScopeFolders } from '../artifacts/scopes';
 import { readProjectState } from '../state';
-import type { ActiveSprint, CliOptions, Phase, SprintFile, Task } from '../types';
+import type { ActiveSprint, CliOptions, Phase, Principle, PrincipleCheck, SprintFile, Task } from '../types';
 
 /**
  * `kyro analyze` — semantic cross-check of a scope's sprint.json, modeled on spec-kit's `analyze`.
@@ -38,7 +38,8 @@ export function analyze(options: Pick<CliOptions, 'kyroScope' | 'json'>): void {
     fail(`sprint.json for "${scope}" is not a valid v4 file. Run kyro doctor --artifacts for shape details.`);
   }
 
-  const findings = collectFindings(sprint).slice(0, MAX_FINDINGS);
+  const principles = readProjectState()?.principles ?? [];
+  const findings = collectFindings(sprint, principles).slice(0, MAX_FINDINGS);
   const blocking = findings.some((f) => f.severity === 'CRITICAL' || f.severity === 'HIGH');
 
   if (options.json) {
@@ -49,13 +50,23 @@ export function analyze(options: Pick<CliOptions, 'kyroScope' | 'json'>): void {
   if (blocking) process.exit(1);
 }
 
-function collectFindings(sprint: SprintFile): Finding[] {
+function collectFindings(sprint: SprintFile, principles: Principle[]): Finding[] {
   const out: Finding[] = [];
   let n = 0;
   const add = (severity: Severity, category: string, detail: string, remedy: string): void => {
     n += 1;
     out.push({ id: `A${String(n).padStart(3, '0')}`, severity, category, detail, remedy });
   };
+
+  // Principles with a built-in `check` are enforced deterministically. A non-negotiable violation is
+  // CRITICAL and "is not diluted or silently ignored" (spec-kit). Free-text principles are agent gates.
+  for (const p of principles) {
+    if (!p.check) continue;
+    if (principleViolated(p.check, sprint)) {
+      const severity: Severity = p.severity === 'non-negotiable' ? 'CRITICAL' : p.severity === 'strong' ? 'HIGH' : 'MEDIUM';
+      add(severity, 'principle', `principle ${p.id} violated (${p.rule})`, `Satisfy the principle or amend it explicitly. Rationale: ${p.rationale}`);
+    }
+  }
 
   // CRITICAL — unresolved ambiguity anywhere in the file.
   const markers = (JSON.stringify(sprint).match(/\[NEEDS CLARIFICATION/g) ?? []).length;
@@ -106,6 +117,21 @@ function collectFindings(sprint: SprintFile): Finding[] {
   }
 
   return out.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+}
+
+/** Evaluate a built-in principle check against the scope. Returns true when the principle is violated. */
+function principleViolated(check: PrincipleCheck, sprint: SprintFile): boolean {
+  switch (check) {
+    case 'no-clarification-markers':
+      return /\[NEEDS CLARIFICATION/.test(JSON.stringify(sprint));
+    case 'success-criteria-present':
+      return !Array.isArray(sprint.successCriteria) || sprint.successCriteria.length === 0;
+    case 'tasks-have-acceptance-criteria':
+      if (!sprint.activeSprint) return false;
+      return allTasks(sprint.activeSprint).some((t) => !Array.isArray(t.acceptance_criteria) || t.acceptance_criteria.length === 0);
+    default:
+      return false;
+  }
 }
 
 function allTasks(active: ActiveSprint): Task[] {

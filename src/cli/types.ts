@@ -20,6 +20,25 @@ export interface KyroScopeEntry {
   status: 'planning' | 'active' | 'blocked' | 'completed';
 }
 
+/** Built-in, machine-checkable predicates a principle can bind to (enforced by `kyro analyze`). */
+export type PrincipleCheck =
+  | 'tasks-have-acceptance-criteria'
+  | 'no-clarification-markers'
+  | 'success-criteria-present';
+
+/**
+ * An authored, project-level principle (spec-kit's "constitution"). Distinct from learned
+ * `conventions[]`: principles are immutable rules checked as gates. A free-text principle is an agent
+ * gate; one with `check` is enforced deterministically by `kyro analyze`.
+ */
+export interface Principle {
+  id: string;
+  rule: string;
+  severity: 'non-negotiable' | 'strong' | 'advisory';
+  rationale: string;
+  check?: PrincipleCheck;
+}
+
 export interface KyroProjectState {
   schemaVersion: 4;
   artifactRoot: string;
@@ -28,6 +47,8 @@ export interface KyroProjectState {
   runtimeVersion: string;
   runtimePath: string;
   installedAdapters: KyroInstalledAdapter[];
+  /** Optional project-level principles (v4.1+). Absent in pre-4.1 files. */
+  principles?: Principle[];
 }
 
 // --- v4 sprint.json model (single source of truth per scope) ---
