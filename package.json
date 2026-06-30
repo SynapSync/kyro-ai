@@ -77,7 +77,8 @@
     "WORKFLOW.yaml",
     ".claude-plugin",
     "settings.example.json",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "bin": {
     "kyro": "dist/cli.js",
