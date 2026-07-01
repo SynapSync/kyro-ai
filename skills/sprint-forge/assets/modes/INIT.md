@@ -18,7 +18,7 @@ Classify as `feature`, `bugfix`, `audit`, `refactor`, `new-project`, or `tech-de
 
 ## Step 3 — Analyze
 
-Read only what the work type requires. Let evidence determine findings. Write each distinct finding to `{outputDir}/findings/NN-slug.md` (summary, severity, affected files, recommendation). These are write-only human evidence; agents never re-read them to route.
+Read only what the work type requires. Write each distinct finding to `{outputDir}/findings/NN-slug.md` (summary, severity, affected files, recommendation) — write-only, never re-read to route.
 
 ## Step 4 — Size the roadmap
 
@@ -42,23 +42,18 @@ Rules: every sprint needs a distinct verifiable objective. Multi-sprint plans ne
 Load `../templates/sprint.json`. Fill:
 
 - `scope`, `title`, `status: "planning"`, `objective` (one sentence).
-- `successCriteria: [...]` — 2–5 **technology-agnostic, measurable** outcomes that define success for
-  the scope (the WHAT/WHY, not the HOW). Example: "A user completes checkout in under 2 minutes."
+- `successCriteria: [...]` — 2–5 **technology-agnostic, measurable** outcomes (WHAT/WHY, not HOW). Example: "A user completes checkout in under 2 minutes."
 - `roadmap` from the sizing above.
-- `conventions: []` — populated later by `learner.md` during sprint retros.
-- `clarifications: []` — populated by `clarify.md` when ambiguities are resolved.
-- `activeSprint: null` — planning hasn't started yet.
-- `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write
-  `[NEEDS CLARIFICATION: ...]` markers in `objective`/`successCriteria` rather than guessing),
-  otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.
+- `conventions: []` (populated later by `learner.md`), `clarifications: []` (populated by `clarify.md`), `activeSprint: null`.
+- `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write `[NEEDS CLARIFICATION: ...]` markers rather than guessing), otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.
 
 Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`. Create `archive/` and `findings/` directories alongside it.
 
 ## Step 6 — Update kyro.json
 
-**If `.agents/kyro/kyro.json` already exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }`, never a bare string (a bare string is invalid and `kyro doctor` will fail it). Set `activeScope` to this scope if none is active. Use the Artifact Write Contract (read → parse → mutate → overwrite whole file → re-parse).
+**If `.agents/kyro/kyro.json` exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }` (never a bare string — `kyro doctor` fails it). Set `activeScope` if none is active. Use the Artifact Write Contract.
 
-**If `.agents/kyro/kyro.json` does NOT exist** (no prior `kyro install` in this harness): create it with the COMPLETE v4 shape — every required field, not just `scopes`/`activeScope`. A partial file (e.g. only `{ scopes, activeScope }`) is an *incomplete v4* that `kyro doctor` flags and that the agent-facing tools must repair. Write exactly:
+**If it does NOT exist:** create it with the COMPLETE v4 shape — every required field, not just `scopes`/`activeScope` (a partial file is flagged by `kyro doctor`). Write exactly:
 
 ```json
 {
@@ -72,12 +67,12 @@ Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Cont
 }
 ```
 
-After creating it, recommend running `kyro install` once so the adapter inventory (`installedAdapters`) and runtime paths are populated authoritatively.
+After creating it, recommend running `kyro install` once to populate `installedAdapters` and runtime paths.
 
 **Optional — seed `principles[]`:** if the user states non-negotiable project rules, add them to
 `kyro.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
 `check` (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`)
-when the rule maps to one, so `kyro analyze` enforces it deterministically.
+when it maps to the rule, so `kyro analyze` enforces it deterministically.
 
 ## Output
 
@@ -85,7 +80,6 @@ Report: scope, work type, finding count, sprint count, sizing rationale, files c
 
 ## Rules
 
-- INIT writes exactly two files: `sprint.json` + updates `kyro.json`. Plus write-only `findings/`.
 - Write only `sprint.json` + `kyro.json` (plus write-only `findings/`). No other files.
 - Do not generate the first sprint — that is `plan-sprint.md`'s job.
 - Do not load sprint templates, debt tracker, execution modes, or unrelated analysis helpers during INIT.

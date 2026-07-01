@@ -358,7 +358,6 @@ Kyro uses lean runtime loading: command router → `sprint.json` state → one r
 | [Commands Reference](docs/commands-reference.md) | `/kyro:*` command semantics                              |
 | [Architecture](docs/architecture.md)             | System architecture and data flow                        |
 | [Agent Adapters](docs/agent-adapters.md)         | Adapter setup and host-specific notes                    |
-| [Harness Migration](docs/harness-migration.md)   | Direction for the multi-agent runtime                    |
 | [Getting Started](docs/getting-started.md)       | Introductory workflow guide                              |
 | [Rules Guide](docs/rules-guide.md)               | Persistent learning rules                                |
 | [Context Management](docs/context-management.md) | Handoff routing and cross-session continuity             |

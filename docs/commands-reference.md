@@ -36,7 +36,7 @@ The argument describes what to analyze or work on. It can be a path, a module na
 
 ### Routing
 
-`/kyro:forge` starts with `.agents/kyro/kyro.json`, then scoped `state.json` and `index.json` when a scope exists. It routes to exactly one mode:
+`/kyro:forge` starts with `.agents/kyro/kyro.json`, then the scope's `sprint.json` when a scope exists. It routes on `sprint.json.handoff.nextAction` to exactly one mode:
 
 ```text
 no roadmap       -> INIT.md
@@ -127,8 +127,8 @@ Sprint 4: [title]
 
 ### Data Sources
 
-The status command reads summaries first:
-- `.agents/kyro/kyro.json` for project state
-- `{scope}/state.json` and `{scope}/index.json` for routing
-- `ROADMAP.summary.json`, `SPRINT-*.summary.json`, and `DEBT.summary.json` for metrics
-- Markdown files only when summaries are missing or a full report needs evidence
+The status command reads structured state first:
+- `.agents/kyro/kyro.json` for project state and the active scope
+- `{scope}/sprint.json` for roadmap, active sprint progress, and debt
+
+All metrics come directly from `sprint.json` fields — there are no separate summary files to keep in sync.

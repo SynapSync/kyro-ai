@@ -28,7 +28,7 @@ export function analyze(options: Pick<CliOptions, 'kyroScope' | 'json'>): void {
   const scope = resolveScope(options.kyroScope);
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) {
-    fail(`Scope "${scope}" has no sprint.json. Run kyro migrate or /kyro:forge (INIT).`);
+    fail(`Scope "${scope}" has no sprint.json. Run /kyro:forge (INIT).`);
   }
   if (read.error) {
     fail(`sprint.json for "${scope}" is invalid JSON (${read.error}).`);

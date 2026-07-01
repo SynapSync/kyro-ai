@@ -31,16 +31,12 @@ Persist scope artifacts under:
 
 ```text
 .agents/kyro/scopes/{scope}/
-├── state.json
-├── index.json
-├── ROADMAP.md
-├── ROADMAP.summary.json
-└── phases/
-    ├── SPRINT-N-*.md
-    └── SPRINT-N-*.summary.json
+├── sprint.json          # single source of truth
+├── archive/             # write-only, at sprint close
+└── findings/            # write-only INIT analysis evidence
 ```
 
-Markdown is human evidence. JSON files are the fast routing index.
+`sprint.json` is the single source of truth for the scope. `archive/` and `findings/` are write-only evidence directories.
 
 ## Verify
 

@@ -34,13 +34,9 @@ Save workflow artifacts under:
 
 ```text
 .agents/kyro/scopes/{scope}/
-├── state.json
-├── index.json
-├── ROADMAP.md
-├── ROADMAP.summary.json
-└── phases/
-    ├── SPRINT-N-*.md
-    └── SPRINT-N-*.summary.json
+├── sprint.json          # single source of truth
+├── archive/             # write-only, at sprint close
+└── findings/            # write-only INIT analysis evidence
 ```
 
 ## Verify
