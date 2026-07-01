@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-06-30
+
+Kyro is now a single-model tool: everything is `sprint.json`. Internal cleanup plus a repaired
+release pipeline.
+
+### Removed
+
+- **`kyro migrate` command.** Kyro reads and writes only the `sprint.json` model; there is no
+  separate conversion step.
+
+### Fixed
+
+- Repaired the CI `validate` pipeline (build now runs before the checks; removed references to
+  scripts that no longer exist) so tags publish cleanly again.
+
+### Changed
+
+- Recalibrated runtime token budgets to the real footprint of the lean runtime, with ~10% headroom;
+  they remain a meaningful ceiling that flags a mode/helper growing too large.
+- Renamed the runtime verification gate to `check:runtime-artifacts` (runtime must reference only the
+  `sprint.json` model).
+
 ## [4.1.0] - 2026-06-30
 
 Adds the **input discipline** that the v4 execution engine lacked, borrowing the proven mechanisms
