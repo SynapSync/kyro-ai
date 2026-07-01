@@ -14,7 +14,7 @@ User Command (/kyro:forge, /kyro:status, /kyro:wrap-up)
   v
 Agent (orchestrator)
   |
-  +---> Skill (core)
+  +---> Skill (sprint-forge)
   |
   +---> Skill (qa-review)
 ```
@@ -43,7 +43,7 @@ Skills provide domain knowledge that the orchestrator consumes.
 
 | Skill | Knowledge Domain |
 |-------|-----------------|
-| `core` | Core orchestration: modes, helpers, templates, gates, re-entry prompts |
+| `sprint-forge` | Core orchestration: modes, helpers, templates, gates, sprint.json read/write |
 | `qa-review` | Senior QA audit, architecture validation, security review, sprint alignment |
 
 ---
@@ -58,58 +58,50 @@ USER
   |
   v
 ORCHESTRATOR
-  |-- loads .agents/kyro/scopes/rules.index.json
+  |-- loads .agents/kyro/kyro.json
+  |-- reads scoped sprint.json
   |-- reads sprint-forge skill assets
   |-- runs built-in checkpoints
   |
   v
 .agents/kyro/scopes/{scope}/
+  |-- sprint.json
+  |-- archive/
   |-- findings/
-  |-- phases/
-  |-- ROADMAP.md
-  |-- README.md
-  |-- RE-ENTRY-PROMPTS.md
 ```
 
 ### Flow for `/kyro:forge`
 
-1. **Rules Loading** - Orchestrator reads `.agents/kyro/scopes/rules.md` if present.
-2. **Analysis** - Orchestrator explores the codebase and creates finding files.
+1. **Routing** - Orchestrator reads `.agents/kyro/kyro.json`, then the scope's `sprint.json`, and routes on `handoff.nextAction`.
+2. **Analysis** - Orchestrator explores the codebase and writes finding files under `findings/`.
 3. **Gate 1** - User approves analysis.
-4. **Planning** - Orchestrator generates a sprint document with phases and tasks.
+4. **Planning** - Orchestrator writes the objective, roadmap, and active sprint into `sprint.json`.
 5. **Gate 2** - User approves the plan.
-6. **Implementation** - Orchestrator executes tasks, runs review checks, and records compact task evidence.
+6. **Implementation** - Orchestrator executes tasks, runs review checks, and records compact task evidence directly on the task object in `sprint.json`.
 7. **Gate 3** - User approves implementation.
-8. **Review and Close** - Orchestrator materializes sprint evidence, runs retro, updates debt tables in markdown, refreshes summaries, proposes rules, and updates re-entry prompts.
+8. **Review and Close** - Orchestrator updates debt entries in `sprint.json`, runs retro, and closes the sprint — writing a verbatim snapshot plus a human narrative to `archive/`.
 
 ---
 
 ## Artifact Layout
 
-Kyro stores durable evidence in markdown and routing state in small JSON/NDJSON files. Agents read JSON first to save context, then open Markdown only when evidence or mutation is required. See [Cost Model](cost-model.md).
+Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, conventions, and handoff routing. Agents read `kyro.json` and `sprint.json` first, then write back to `sprint.json` as the only routine mutation. See [Cost Model](cost-model.md).
 
 ```
-.agents/kyro/scopes/
-├── rules.md
-├── rules.index.json
-└── {scope}/
-    ├── README.md
-    ├── state.json
-    ├── index.json
-    ├── ROADMAP.md
-    ├── ROADMAP.summary.json
-    ├── RE-ENTRY-PROMPTS.md
-    ├── events.ndjson
-    ├── findings/
-    ├── phases/
-    │   ├── SPRINT-N-*.md
-    │   └── SPRINT-N-*.summary.json
-    └── handoffs/
+.agents/kyro/
+├── kyro.json
+└── scopes/
+    └── {scope}/
+        ├── sprint.json          # single source of truth
+        ├── archive/             # write-only, at sprint close
+        │   ├── sprint-001-slug.json  # verbatim zero-loss snapshot
+        │   └── sprint-001-slug.md    # human narrative
+        └── findings/            # write-only INIT analysis evidence
 ```
 
 `{scope}` is the work topic in kebab-case, for example `oauth-implementation` or `ui-redesign`.
 
-The output directory path (`{output_kyro_dir}`) is resolved once at the start of any mode and embedded in `README.md` and `RE-ENTRY-PROMPTS.md`. These two files are the source of truth for the path.
+The output directory path (`{output_kyro_dir}`) is resolved once at the start of any mode and recorded in the scope's `sprint.json` under `handoff`. That file is the source of truth for the path.
 
 ---
 
@@ -137,20 +129,20 @@ Kyro v2.0 is a full workflow that replaces the v1.x single-skill approach.
 v1.x: User message -> sprint-forge skill -> markdown artifacts
 
 v2.0: User command -> orchestrator
-                    -> core / qa-review skills
+                    -> sprint-forge / qa-review skills
                     -> built-in checkpoints
-                    -> markdown artifacts
+                    -> sprint.json
 ```
 
 | Dimension | v1.x | v2.0 |
 |-----------|------|------|
 | Type | Single skill | Full workflow with commands, one agent, skills, and checkpoints |
 | Entry point | Text triggers | Slash commands |
-| Learning | Per-project retro only | Persistent rules in `.agents/kyro/scopes/rules.md` |
+| Learning | Per-project retro only | Persistent conventions and debt tracked in `sprint.json` |
 | Agent | Skill-only execution | Orchestrator |
 | Quality gates | Basic | Per-task checklist + approval gates |
-| Context transfer | Re-entry prompts | Re-entry prompts + enriched handoffs |
-| State model | Markdown artifacts | Markdown evidence + JSON routing summaries |
+| Context transfer | None | `sprint.json` `handoff` field carries next-action routing across sessions |
+| State model | Markdown artifacts | Single `sprint.json` per scope + write-only `archive/`/`findings/` |
 
 ---
 

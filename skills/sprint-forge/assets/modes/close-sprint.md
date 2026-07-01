@@ -33,15 +33,7 @@ kyro close-sprint --kyro-scope {scope} --outcome {shipped|partial|...} \
   [--recommendation "..."]    # repeatable — recorded in the narrative + ledger
 ```
 
-The command, in one atomic operation:
-
-- Writes the verbatim JSON snapshot to `archive/sprint-{NNN}-{slug}.json` **before** touching anything (refuses to run if that snapshot already exists — double-close protection).
-- Renders the human narrative `archive/sprint-{NNN}-{slug}.md` deterministically (title from `roadmap.sprints[]`; objective, phases, tasks, evidence and verdict from the snapshot; plus your `--learning` and `--recommendation` text, and any `debt[]` marked `resolved`).
-- Appends the `ledger[]` entry (`archive` + `snapshot` paths, outcome, recommendations).
-- Sets `previousSprint`, clears `activeSprint`, marks `roadmap.sprints[*].state` closed.
-- Sets `handoff.nextAction` to `plan_sprint` (more sprints remain) or `wrap_up` (none remain).
-- Flips the scope `status` to `completed` in `kyro.json` if this was the last sprint.
-- Re-parses the written `sprint.json` to confirm validity; on failure it reports and the snapshot still preserves the sprint.
+In one atomic operation the command snapshots `activeSprint` to `archive/` (double-close protected), renders the narrative `.md` deterministically, appends the `ledger[]` entry, clears `activeSprint`, routes `handoff.nextAction` (`plan_sprint` or `wrap_up`), and re-parses to verify. The snapshot always survives even if the final write fails.
 
 Use `--dry-run` first if you want to review the plan. Do not replicate this by hand.
 

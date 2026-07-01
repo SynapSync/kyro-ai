@@ -62,7 +62,7 @@ Project state:
 └── scopes/
 ```
 
-`kyro install` does not create scoped `state.json`; the forge/INIT workflow creates scoped state only when a scope exists.
+`kyro install` does not create a scoped `sprint.json`; the forge/INIT workflow creates it only when a scope is opened for the first time.
 
 ## First run
 
@@ -82,9 +82,9 @@ Kyro routes progressively:
 
 1. read `.agents/kyro/kyro.json`
 2. resolve or create scope
-3. read scoped `state.json` and `index.json` if present
-4. load only the required mode: INIT, plan, execute, review, close, or recover
-5. record compact task evidence during execution, then update Markdown evidence plus JSON summaries at sprint close
+3. read the scope's `sprint.json` if present
+4. route on `sprint.json.handoff.nextAction` and load only the required mode: INIT, clarify, plan, execute, review, close, or recover
+5. record compact task evidence directly on the task object in `sprint.json` during execution, then write the archive snapshot and narrative at sprint close
 
 ## Scope output
 
@@ -92,19 +92,12 @@ After INIT, a scope looks like:
 
 ```text
 .agents/kyro/scopes/{scope}/
-├── README.md
-├── ROADMAP.md
-├── ROADMAP.summary.json
-├── RE-ENTRY-PROMPTS.md
-├── state.json
-├── index.json
-├── findings/
-└── phases/
-    ├── SPRINT-N-*.md
-    └── SPRINT-N-*.summary.json
+├── sprint.json          # single source of truth
+├── archive/             # write-only, at sprint close
+└── findings/            # write-only INIT analysis evidence
 ```
 
-Markdown is the human-readable evidence. JSON files are the fast routing cache, and `events.ndjson` records compact task evidence during execution.
+`sprint.json` is the single source of truth — it holds the objective, success criteria, roadmap, active sprint, debt, conventions, and handoff routing. `archive/` receives a verbatim snapshot plus a human narrative each time a sprint closes.
 
 ## Verify
 

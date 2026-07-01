@@ -90,16 +90,12 @@ The project keeps only state and artifacts:
 
 ```text
 .agents/kyro/
-├── kyro.json
+├── kyro.json                    # registry: scopes[], activeScope, principles[]
 └── scopes/
     └── {scope}/
-        ├── state.json
-        ├── index.json
-        ├── ROADMAP.md
-        ├── ROADMAP.summary.json
-        └── phases/
-            ├── SPRINT-N-*.md
-            └── SPRINT-N-*.summary.json
+        ├── sprint.json          # single source of truth
+        ├── archive/             # write-only, at sprint close
+        └── findings/            # write-only INIT analysis evidence
 ```
 
 ## Adapters
@@ -173,7 +169,7 @@ Initial state shape:
   "artifactRoot": ".agents/kyro/scopes",
   "scopes": [],
   "activeScope": null,
-  "runtimeVersion": "3.2.2",
+  "runtimeVersion": "4.2.0",
   "runtimePath": "~/.agents/kyro/current",
   "installedAdapters": []
 }
@@ -190,8 +186,6 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - mode file <= 900 words
 - INIT mode <= 500 words
 - each analysis helper <= 450 words
-- ROADMAP template <= 450 words
-- REENTRY template <= 350 words
 - startup, status brief, INIT happy path, and realistic forge/status/wrap-up runtime paths stay under estimated token budgets
 - forbidden eager helper combinations fail the audit
 - `sizingDecision` regression fixture stays internally consistent
@@ -210,14 +204,11 @@ kyro context-pack --kyro-scope 01-token-cost-optimization --task T1.1
 kyro context-pack --kyro-scope 01-token-cost-optimization --task
 ```
 
-Use `--task` alone to default to `index.json` `nextTask` during active sprint execution.
+Use `--task` alone to default to the sprint's next pending task during active sprint execution.
 
-The command reads structured artifacts first:
+The command reads the scope's structured artifact first:
 
-- `state.json`
-- `index.json`
-- `ROADMAP.summary.json`
-- `rules.index.json`
+- `sprint.json`
 
 It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, warnings, budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
 
@@ -239,9 +230,9 @@ kyro doctor --tokens --artifacts
 kyro doctor --artifacts --kyro-scope auth-refactor
 ```
 
-The audit validates project state, scoped `state.json`, `index.json`, optional `events.ndjson`, optional `rules.index.json`, roadmap/sprint summaries, source Markdown references, stale summaries, and active sprint pointers. Missing summaries warn; invalid JSON and broken state references fail.
+The audit validates project state in `kyro.json`, scoped `sprint.json` shape, zero-loss archive snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. Missing archives warn; invalid JSON and broken `sprint.json` references fail.
 
-Repair JSON summaries from Markdown without rewriting Markdown:
+Repair and normalize a scope's `sprint.json` without rewriting user-authored archives:
 
 ```bash
 kyro repair --kyro-scope auth-refactor --dry-run

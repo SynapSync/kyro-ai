@@ -8,11 +8,11 @@ When a user says "use Kyro", the agent should load:
 
 1. command stub and command router
 2. `.agents/kyro/kyro.json`
-3. scoped `state.json`, `index.json`, and `rules.index.json` when present
-4. exactly one routed mode
+3. the scope's `sprint.json` when present
+4. exactly one routed mode, selected from `sprint.json.handoff.nextAction`
 5. only helpers named by that mode
 
-It should not load roadmap Markdown, every sprint file, debt helpers, re-entry helpers, or full rules Markdown by default.
+It should not load the full sprint history, archived sprints, or unrelated helpers by default.
 
 ## Runtime Paths
 
@@ -34,16 +34,16 @@ The audit includes command stubs, routers, eager agent/skill files, routed modes
 
 | Moment | Write |
 |--------|-------|
-| Task close | append one compact event to `events.ndjson` |
-| Phase close | update compact routing state only |
-| Sprint close | materialize Markdown, summaries, debt, roadmap, re-entry prompts, and rules |
-| Wrap-up | handoff plus final re-entry context |
+| Task close | record compact evidence directly on the task object in `sprint.json` |
+| Phase close | update `sprint.json.handoff.nextAction` only |
+| Sprint close | write the verbatim snapshot plus human narrative to `archive/`, then clear the active sprint block in `sprint.json` |
+| Wrap-up | update `sprint.json.handoff` with final context for the next session |
 
 This keeps work recoverable without rewriting large artifacts after every task.
 
-## Rules Loading
+## Conventions and Debt
 
-Startup reads `rules.index.json`, not full `rules.md`. Open `rules.md` only when a matching rule may apply, the user asks for rules, or sprint close proposes new rules.
+Conventions and technical debt are tracked as fields on `sprint.json`, not as separate files. Startup reads `sprint.json` once; there is no separate rules index to keep in sync.
 
 ## Budget Classes
 
@@ -56,7 +56,7 @@ Startup reads `rules.index.json`, not full `rules.md`. Open `rules.md` only when
 | `review` | 2,500 | standard | Review, certification, regression checks |
 | `close` | 3,200 | deep | Sprint close, retro, wrap-up materialization |
 
-`kyro context-pack` selects a class from pack mode and `state.json` `nextAction`:
+`kyro context-pack` selects a class from pack mode and `sprint.json.handoff.nextAction`:
 
 - `plan_sprint` or `status` → `brief`
 - task pack or `execute_task` → `execute`
