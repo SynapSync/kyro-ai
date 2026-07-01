@@ -116,7 +116,7 @@ Project state and artifacts (v4 — one `sprint.json` per scope):
                     └── 01-slug.md
 ```
 
-Important invariant: `kyro install` creates the root project state at `.agents/kyro/kyro.json`. Each scope's `sprint.json` is created by `/kyro:forge` (INIT). There are no `state.json`, `index.json`, `events.ndjson`, `ROADMAP.md`, `*.summary.json`, `rules.md`, or `phases/` artifacts — those are v3; run `kyro migrate` to upgrade a v3 scope.
+Important invariant: `kyro install` creates the root project state at `.agents/kyro/kyro.json`. Each scope's `sprint.json` is created by `/kyro:forge` (INIT). The only per-scope files are `sprint.json` plus the write-only `archive/` and `findings/`.
 
 ## Who Invokes Whom
 
@@ -164,7 +164,6 @@ Commands:
 | `kyro doctor`       | Validate package health, workspace state, artifacts, and adapters              |
 | `kyro analyze`      | Semantic cross-check of a scope (clarity, coverage, dependencies, debt, principles) |
 | `kyro close-sprint` | Snapshot + close the active sprint (zero-loss, tool-owned)                      |
-| `kyro migrate`      | Upgrade a v3 scope to the v4 `sprint.json` model                                |
 | `kyro repair`       | Validate and normalize a scope's `sprint.json`                                 |
 | `kyro context-pack` | Emit a summary-first context package for a scope                               |
 | `kyro scope`        | List, inspect, or set the active Kyro scope                                    |
@@ -311,7 +310,7 @@ npm pack --dry-run
 - TypeScript typecheck
 - package/plugin/workflow version validation
 - relative markdown link validation
-- anti-v3 gate (runtime must speak only the `sprint.json` model)
+- runtime-artifact gate (runtime must speak only the `sprint.json` model)
 - `dist/` freshness, budget-manifest, and v4 sprint-doctor fixtures
 
 Release tags publish to npm through GitHub Actions when the tag matches `package.json.version`:

@@ -56,7 +56,7 @@ Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Cont
 
 ## Step 6 — Update kyro.json
 
-**If `.agents/kyro/kyro.json` already exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }`, never a bare string (a string is v3 drift and `kyro doctor` will fail it). Set `activeScope` to this scope if none is active. Use the Artifact Write Contract (read → parse → mutate → overwrite whole file → re-parse).
+**If `.agents/kyro/kyro.json` already exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }`, never a bare string (a bare string is invalid and `kyro doctor` will fail it). Set `activeScope` to this scope if none is active. Use the Artifact Write Contract (read → parse → mutate → overwrite whole file → re-parse).
 
 **If `.agents/kyro/kyro.json` does NOT exist** (no prior `kyro install` in this harness): create it with the COMPLETE v4 shape — every required field, not just `scopes`/`activeScope`. A partial file (e.g. only `{ scopes, activeScope }`) is an *incomplete v4* that `kyro doctor` flags and that the agent-facing tools must repair. Write exactly:
 
@@ -86,6 +86,6 @@ Report: scope, work type, finding count, sprint count, sizing rationale, files c
 ## Rules
 
 - INIT writes exactly two files: `sprint.json` + updates `kyro.json`. Plus write-only `findings/`.
-- Do not generate `state.json`, `index.json`, `ROADMAP.md`, `ROADMAP.summary.json`, `RE-ENTRY-PROMPTS.md`, `phases/`, or any v3 artifact.
+- Write only `sprint.json` + `kyro.json` (plus write-only `findings/`). No other files.
 - Do not generate the first sprint — that is `plan-sprint.md`'s job.
 - Do not load sprint templates, debt tracker, execution modes, or unrelated analysis helpers during INIT.

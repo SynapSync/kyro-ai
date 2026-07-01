@@ -10,9 +10,8 @@ import { listScopeFolders } from '../artifacts/scopes';
 import type { CliOptions, OperationPlan } from '../types';
 
 /**
- * v4 repair: validate and normalize a scope's sprint.json (stable formatting + trailing newline).
- * It does NOT regenerate v3 summaries/state/index — those artifacts no longer exist. To upgrade a
- * v3 scope, use `kyro migrate`.
+ * Repair: validate and normalize a scope's sprint.json (stable formatting + trailing newline).
+ * The sprint.json is the single source of truth; there is nothing else to regenerate.
  */
 export async function repair(options: CliOptions): Promise<void> {
   const scope = resolveRepairScope(options.kyroScope);
@@ -41,7 +40,7 @@ export function buildRepairPlan(scope: string): OperationPlan[] {
   }
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) {
-    throw new Error(`Cannot repair ${scope}: sprint.json not found. Run 'kyro migrate --kyro-scope ${scope}' to upgrade a v3 scope.`);
+    throw new Error(`Cannot repair ${scope}: sprint.json not found. Run /kyro:forge (INIT) to create it.`);
   }
   if (read.error) {
     throw new Error(`Cannot repair ${scope}: sprint.json is invalid JSON (${read.error}). Restore from an archive snapshot.`);

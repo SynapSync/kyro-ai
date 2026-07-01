@@ -27,4 +27,4 @@ Validate completed work and record the verdict on the task object in `sprint.jso
 
 - Do not mark a task complete without evidence and a passing verdict.
 - Suggestions do not block, but must be visible in `task.verdict.findings` for the retro.
-- One safe-write per review; never partial-edit the JSON. No summaries, no v3 artifacts.
+- One safe-write per review; never partial-edit the JSON.

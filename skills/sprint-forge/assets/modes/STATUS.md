@@ -39,4 +39,4 @@ coverage, dependency, and overdue-debt issues with severity. Read-only.
 
 - A report is read-only unless an explicit `debt-*` mutation is requested.
 - Debt items are never deleted; only `status` changes.
-- No summaries, no `index.json`, no v3 artifacts — one read of `sprint.json`.
+- One read of `sprint.json`; no other files.

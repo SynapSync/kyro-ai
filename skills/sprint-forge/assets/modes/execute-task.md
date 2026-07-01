@@ -20,6 +20,6 @@ Execute the active sprint task by task, recording evidence directly into `sprint
 ## Rules
 
 - One safe-write per task transition; never partial-edit the JSON.
-- Do not create `events.ndjson`, summaries, or any v3 artifact. Evidence lives on the task object.
+- Evidence lives on the task object in `sprint.json`; create no other files.
 - Do not introduce new project patterns without justification.
 - If task analysis reveals the plan is wrong, set the task `blocked`, note the mismatch, and set `handoff.nextAction: "plan_sprint"` to route back.

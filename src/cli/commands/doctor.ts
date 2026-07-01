@@ -92,15 +92,11 @@ function checkProjectState(): CheckResult {
   if (typeof state.runtimePath !== 'string') missing.push('runtimePath');
   if (!Array.isArray(state.installedAdapters)) missing.push('installedAdapters');
 
-  if (typeof state.schemaVersion === 'number' && state.schemaVersion < 4) {
-    // An explicit older numeric version (1/2/3) is a genuine v3 file — migration is the right path.
-    return { status: 'fail', name: 'project state', detail: `${KYRO_STATE_PATH} is v${state.schemaVersion} (pre-v4)`, remedy: 'Run kyro migrate to upgrade a v3 kyro.json.' };
-  }
   if (state.schemaVersion !== 4 || missing.length > 0) {
-    // schemaVersion absent or fields missing — an incomplete v4 (e.g. hand-written by an agent that
-    // never ran kyro install). install/sync repopulates the required fields, preserving scopes.
+    // schemaVersion wrong/absent or fields missing — an incomplete file (e.g. hand-written by an
+    // agent that never ran kyro install). install/sync repopulates the fields, preserving scopes.
     const gaps = [...(state.schemaVersion !== 4 ? ['schemaVersion'] : []), ...missing];
-    return { status: 'fail', name: 'project state', detail: `${KYRO_STATE_PATH} is an incomplete v4 file (missing/invalid: ${gaps.join(', ')})`, remedy: 'Run kyro install --scope workspace to repopulate the required fields (scopes are preserved).' };
+    return { status: 'fail', name: 'project state', detail: `${KYRO_STATE_PATH} is incomplete (missing/invalid: ${gaps.join(', ')})`, remedy: 'Run kyro install --scope workspace to repopulate the required fields (scopes are preserved).' };
   }
   return { status: 'pass', name: 'project state', detail: `${KYRO_STATE_PATH} is valid` };
 }

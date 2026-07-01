@@ -36,18 +36,14 @@ is enforced deterministically by the CLI, not left to prose a weak model can ign
 
 ## [4.0.0] - 2026-06-30
 
-Major release. Kyro moves to a single source of truth per scope — `sprint.json` — and makes the
+Major release. Kyro adopts a single source of truth per scope — `sprint.json` — and makes the
 irreversible operations (sprint close, narrative rendering) tool-owned and deterministic instead of
-agent-rendered prose. This removes the entire v3 artifact stack.
+agent-rendered prose.
 
-### Breaking Changes
+### Highlights
 
-- **Single source of truth.** Each scope is now one `sprint.json` plus the global `kyro.json`
+- **Single source of truth.** Each scope is one `sprint.json` plus the global `kyro.json`
   registry. Agents read two files and route on `handoff.nextAction`.
-- **v3 artifacts removed.** `state.json`, `index.json`, `ROADMAP.md`, `ROADMAP.summary.json`,
-  `DEBT.summary.json`, `events.ndjson`, `rules.index.json`, `rules.md`, `RE-ENTRY-PROMPTS.md`,
-  `phases/`, and all `*.summary.json` are gone. Run `kyro migrate --kyro-scope <scope>` to upgrade a
-  v3 scope.
 - `kyro.json.scopes[]` entries are objects `{ id, title, status }`, never bare strings.
 
 ### Added
@@ -57,17 +53,15 @@ agent-rendered prose. This removes the entire v3 artifact stack.
   from `roadmap.sprints[]`, so it can never be `undefined`), appends the `ledger[]` entry, updates
   `previousSprint`/`roadmap`/`handoff`, and flips the `kyro.json` scope status on the last sprint.
   Refuses to run if a snapshot already exists (double-close protection). New `--learning` flag.
-- **`kyro migrate`** — upgrades a v3 scope to the v4 `sprint.json` model.
 - **PreToolUse guard** (Claude Code) that blocks any hand edit nulling `activeSprint`, redirecting to
   `kyro close-sprint`.
 - **`kyro doctor --artifacts`** now audits zero-loss snapshots, archive narratives (catches
   `Sprint N: undefined`), `activeSprint.title`, and non-object task `evidence`.
-- Anti-v3 verification gate (`check:no-v3`) and v4 doctor fixtures (`check:sprint-doctor-v4`) wired
-  into `npm run check`.
+- Runtime-artifact verification gate and doctor fixtures wired into `npm run check`.
 
 ### Changed
 
-- Runtime (orchestrator, commands, modes, helpers) and the CLI both speak only the v4 `sprint.json`
+- Runtime (orchestrator, commands, modes, helpers) and the CLI both speak only the `sprint.json`
   model.
 - Sprint narratives are rendered by the CLI, not hand-written by the agent.
 - `activeSprint` now carries `title`, making each snapshot self-contained.

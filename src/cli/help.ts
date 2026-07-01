@@ -15,7 +15,6 @@ Usage:
   kyro analyze [options]       Semantic cross-check of a scope (clarity, coverage, deps, debt)
   kyro repair [options]        Validate and normalize a scope's sprint.json
   kyro close-sprint [options]  Snapshot + close the active sprint (zero-loss, tool-owned)
-  kyro migrate [options]       Upgrade v3 scopes to the v4 sprint.json model
   kyro context-pack [options]  Emit a context package for a scope from sprint.json
   kyro scope <subcommand>      List, inspect, or set active Kyro scopes
   kyro sync [options]          Refresh managed workspace assets
@@ -59,8 +58,6 @@ export function printCommandHelp(command: string): void {
     console.log('Usage: kyro analyze [--kyro-scope <scope>] [--json]');
   } else if (command === 'close-sprint') {
     console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
-  } else if (command === 'migrate') {
-    console.log('Usage: kyro migrate [--kyro-scope <scope>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {
     console.log('Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--json]');
   } else if (command === 'scope') {

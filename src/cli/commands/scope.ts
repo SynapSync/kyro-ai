@@ -69,7 +69,7 @@ function printScopeSummary(scope: string): void {
     console.log(`Next task: ${sprint.handoff.nextTaskId ?? 'none'}`);
     console.log(`Open debt: ${sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length}`);
   } else {
-    console.log('sprint.json: missing or invalid (run kyro migrate for a v3 scope)');
+    console.log('sprint.json: missing or invalid (run /kyro:forge INIT to create it)');
   }
   console.log('');
 }

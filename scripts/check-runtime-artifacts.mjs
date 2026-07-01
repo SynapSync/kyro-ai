@@ -1,17 +1,16 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-// Fail the build if the agent-facing runtime references a v3 artifact as something to read/write.
-// The runtime (agents/, commands/, skills/) must speak only the v4 sprint.json model.
-// Prohibitive mentions ("do not create state.json", "... are v3 artifacts") are allowed.
+// The agent-facing runtime (agents/, commands/, skills/) must speak only the sprint.json model.
+// Fail the build if it references any non-model artifact filename as something to read or write.
 
 const repo = resolve(new URL('..', import.meta.url).pathname);
 const ROOTS = ['agents', 'commands', 'skills'];
-const SKIP_DIRS = new Set(['old-to-delete', 'node_modules']);
-// manifest.json is a historical changelog (describes past v3-era versions), not agent instructions.
+const SKIP_DIRS = new Set(['node_modules']);
 const SKIP_FILES = new Set(['manifest.json']);
 
-const V3_PATTERNS = [
+// Filenames the sprint.json model never uses. Their presence in runtime docs is drift.
+const FORBIDDEN_PATTERNS = [
   /\bstate\.json\b/,
   /\bindex\.json\b/,
   /\bROADMAP\.md\b/,
@@ -26,8 +25,8 @@ const V3_PATTERNS = [
   /\bphases\//,
 ];
 
-// A line that references a v3 artifact is OK only if it is clearly prohibitive/explanatory.
-const ALLOW_MARKERS = /\b(no|not|never|don't|do not|v3|migrate|deprecated|instead of|no longer|are v3|legacy)\b/i;
+// A reference is allowed only if the line is clearly prohibitive ("never create state.json").
+const ALLOW_MARKERS = /\b(no|not|never|don't|do not|instead of|no longer)\b/i;
 
 function walk(dir) {
   const out = [];
@@ -49,7 +48,7 @@ for (const root of ROOTS) {
   for (const file of walk(abs)) {
     const lines = readFileSync(file, 'utf-8').split(/\r?\n/);
     lines.forEach((line, i) => {
-      if (!V3_PATTERNS.some((p) => p.test(line))) return;
+      if (!FORBIDDEN_PATTERNS.some((p) => p.test(line))) return;
       if (ALLOW_MARKERS.test(line)) return; // prohibitive / explanatory mention
       violations.push(`${file.slice(repo.length + 1)}:${i + 1}  ${line.trim()}`);
     });
@@ -57,10 +56,10 @@ for (const root of ROOTS) {
 }
 
 if (violations.length > 0) {
-  console.error('check:no-v3 FAILED — runtime references v3 artifacts as read/write targets:');
+  console.error('check:runtime-artifacts FAILED — runtime references non-model artifacts:');
   for (const v of violations) console.error(`  ${v}`);
-  console.error('\nThe runtime must use only sprint.json (v4). Reword or remove these references.');
+  console.error('\nThe runtime must use only sprint.json. Reword or remove these references.');
   process.exit(1);
 }
 
-console.log('check:no-v3 — runtime is clean (no v3 artifact instructions)');
+console.log('check:runtime-artifacts — runtime speaks only the sprint.json model');
