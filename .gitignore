@@ -6,3 +6,9 @@ dist/
 .env
 .env.local
 .atl/
+
+
+# AI 
+.agents/
+.claude-plugin/
+.cursor/
