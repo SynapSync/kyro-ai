@@ -47,8 +47,6 @@ v4 installs exactly these. The two JSON files are the agent-facing source of tru
 | [kyro.json](templates/kyro.json) | Global registry: scopes list and activeScope |
 | [archive-sprint.md](templates/archive-sprint.md) | Human-readable narrative written when a sprint closes |
 
-Deprecated v3 templates (state.json, index.json, ROADMAP.summary.json, DEBT.summary.json, rules.index.json, events.ndjson) have been moved to [old-to-delete/](templates/old-to-delete/) and must not be used. Run `kyro migrate` to upgrade v3 scopes.
-
 ## fixtures/
 
 | File | Description |

@@ -17,7 +17,7 @@ Debt never disappears. Items are inherited across sprints and only change status
 - `title`: actionable debt description.
 - `origin`: sprint number where the debt was first recorded.
 - `priority`: `critical | high | medium | low`.
-- `status`: `open | in_progress | resolved | deferred` (snake_case — `in-progress` is v3 drift).
+- `status`: `open | in_progress | resolved | deferred` (snake_case).
 - `targetSprint`: expected resolution sprint, or `null`.
 - `note`: reason / context (required when deferring).
 

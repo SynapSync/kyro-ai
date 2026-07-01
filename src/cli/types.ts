@@ -13,7 +13,7 @@ export interface KyroInstalledAdapter {
   skillsPath?: string;
 }
 
-/** A scope entry in kyro.json.scopes[] — always an object, never a bare string (v3 drift). */
+/** A scope entry in kyro.json.scopes[] — always an object, never a bare string. */
 export interface KyroScopeEntry {
   id: string;
   title: string;

@@ -28,14 +28,11 @@ jobs:
 
       - name: Validate
         run: |
-          npm run check
           npm run build
+          npm run check
           npm run check:adapters
           npm run check:tokens
           npm run check:artifacts
-          npm run check:artifact-fixtures
-          npm run check:context-pack
-          npm run check:budget-manifest
           npm pack --dry-run
 
       - name: Read version

@@ -108,7 +108,7 @@ function assertCase(name, kyroJson, sprintJson, expectedStatus, expectedText, ar
 // 1. Valid v4 artifacts pass.
 assertCase('valid', validKyroJson, validSprintJson, 0, 'Schema shapes are valid.');
 
-// 2. kyro.json scopes as string[] (v3 drift) fails with a specific message.
+// 2. kyro.json scopes as string[] fails with a specific message.
 assertCase(
   'string-scopes',
   { ...validKyroJson, scopes: ['demo'] },
@@ -117,7 +117,7 @@ assertCase(
   'scopes[0] must be an object',
 );
 
-// 3. conventions[] as plain strings (v3 drift) fails and names the field.
+// 3. conventions[] as plain strings fails and names the field.
 assertCase(
   'string-conventions',
   validKyroJson,
@@ -183,7 +183,7 @@ assertCase(
   { scopes: [{ id: 'demo', title: 'Demo', status: 'active' }], activeScope: 'demo' },
   validSprintJson,
   1,
-  'incomplete v4 file',
+  'is incomplete',
 );
 
 // 8. An unresolved [NEEDS CLARIFICATION] marker must FAIL — the deterministic clarify gate.

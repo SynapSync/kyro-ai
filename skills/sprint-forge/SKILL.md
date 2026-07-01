@@ -28,7 +28,7 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task
 
 # Kyro Sprint Forge — Runtime Contract (v4)
 
-One scope = one `sprint.json`. Agents read `kyro.json` (global registry) and the scope's `sprint.json`, then route on `handoff.nextAction`. There are no other agent-facing files.
+One scope = one `sprint.json`. Agents read `kyro.json` (registry) + the scope's `sprint.json`, then route on `handoff.nextAction`. No other agent-facing files.
 
 ## Core Invariants
 
@@ -37,31 +37,30 @@ One scope = one `sprint.json`. Agents read `kyro.json` (global registry) and the
 3. Generate one sprint at a time; never pre-generate future sprints.
 4. Tasks are self-contained: every task carries `description`, `files_to_touch`, `context`, `acceptance_criteria`.
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
-6. At sprint close, the destructive snapshot-then-clear of `activeSprint` is owned by the `kyro close-sprint` CLI — never hand-edit `sprint.json` to null `activeSprint`. The closed sprint becomes one `ledger[]` entry.
-7. Findings and archives are write-only human evidence; agents never re-read them to route.
-8. **Admit unknowns, never guess.** When a detail that affects design/data/tasks/tests is unknown, write `[NEEDS CLARIFICATION: <what is missing>]` in the relevant field instead of inventing an answer, and route to `clarify`. `kyro doctor`/`kyro analyze` FAIL while any such marker remains — it is a deterministic gate, not a suggestion.
+6. Closing a sprint (snapshot-then-clear of `activeSprint`) is owned by `kyro close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
+7. Findings and archives are write-only evidence; agents never re-read them to route.
+8. **Admit unknowns, never guess.** Write `[NEEDS CLARIFICATION: <gap>]` instead of inventing, and route to `clarify`. `kyro doctor`/`analyze` FAIL while any marker remains — a deterministic gate, not a suggestion.
 
 ## Artifact Write Contract (MANDATORY)
 
 Every mutation of `sprint.json` or `kyro.json` MUST be a **safe write**:
 
-> Read the whole file → `JSON.parse` to an in-memory object → mutate the object → serialize → overwrite the entire file in one write → re-read and parse once to confirm validity. If the re-parse fails, restore and report.
+> Read the whole file → `JSON.parse` → mutate the object → serialize → overwrite in one write → re-parse to confirm. If the re-parse fails, restore and report.
 
-NEVER use a partial/string-replace edit for structural changes (e.g. setting `activeSprint` to `null`, removing a nested block). A surgical string edit on a large JSON orphans the body and corrupts the single source of truth. The only exception is the per-sprint archive snapshot (`archive/sprint-NNN-slug.json`) — a fresh file, pure write, never re-read.
+NEVER partial/string-replace for structural changes (nulling `activeSprint`, removing a nested block) — it orphans the JSON body and corrupts the source of truth. Only exception: the per-sprint archive snapshot (a fresh file, pure write, never re-read).
 
 ## Tool-owned operations (use the CLI, do not hand-roll)
 
-Some operations are irreversible or schema-critical. The CLI does them deterministically — invoke it instead of editing JSON by hand:
+Irreversible or schema-critical operations are done deterministically by the CLI — never by hand:
 
 | Command | What it owns |
 |---------|--------------|
-| `kyro close-sprint --kyro-scope <scope> --outcome <...>` | The zero-loss close: snapshots `activeSprint` to `archive/` **before** clearing it, renders the narrative `.md` deterministically (title from `roadmap.sprints[]`, never `undefined`), appends the `ledger[]` entry, sets `previousSprint`/`roadmap` state/`handoff`, flips `kyro.json` scope status. Refuses on double-close. |
-| `kyro migrate --kyro-scope <scope>` | Upgrades a v3 scope to a v4 `sprint.json`. |
-| `kyro doctor --artifacts --kyro-scope <scope>` | Validates artifact integrity (shape drift, missing snapshots, unresolved `[NEEDS CLARIFICATION]`, v3 leakage). |
-| `kyro analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, dependencies, overdue debt, principles). Severity-triaged; exits non-zero on CRITICAL/HIGH. Gate before `close_sprint`. |
-| `kyro repair --kyro-scope <scope>` | Validates and normalizes `sprint.json` formatting. |
+| `kyro close-sprint --kyro-scope <scope> --outcome <...>` | Zero-loss close: snapshots `activeSprint` to `archive/` **before** clearing it, renders the narrative `.md` (title from `roadmap.sprints[]`), appends the `ledger[]` entry, updates `previousSprint`/`roadmap`/`handoff`, flips `kyro.json` status. Refuses on double-close. |
+| `kyro doctor --artifacts --kyro-scope <scope>` | Validates shape drift, missing snapshots, and unresolved `[NEEDS CLARIFICATION]`. |
+| `kyro analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, deps, debt, principles), severity-triaged; non-zero on CRITICAL/HIGH. Gate before close. |
+| `kyro repair --kyro-scope <scope>` | Normalizes `sprint.json` formatting. |
 
-In Claude Code, a `PreToolUse` hook blocks any hand edit that nulls `activeSprint` and redirects you to `kyro close-sprint`. Other harnesses rely on this contract directly.
+In Claude Code a `PreToolUse` hook blocks any hand edit that nulls `activeSprint`; other harnesses rely on this contract directly.
 
 ## Routing (handoff.nextAction → mode)
 
@@ -81,14 +80,8 @@ Templates are loaded only immediately before writing their artifact.
 
 ## Principles vs conventions
 
-- **`conventions[]`** (in `sprint.json`) are *learned*, descriptive rules captured during retros. They
-  evolve and inform task `context`.
-- **`principles[]`** (in `kyro.json`, project-level) are *authored*, immutable rules checked as
-  **gates** — like spec-kit's constitution. Each `{ id, rule, severity, rationale, check? }`. A
-  `non-negotiable` principle that is violated is a hard stop. Principles with a built-in `check`
-  (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`) are
-  enforced deterministically by `kyro analyze`; free-text principles are agent gates confirmed at
-  `plan-sprint` and `review-task`.
+- **`conventions[]`** (`sprint.json`): *learned*, descriptive rules from retros; inform task `context`.
+- **`principles[]`** (`kyro.json`, project-level): *authored*, immutable gates (spec-kit's constitution). Each `{ id, rule, severity, rationale, check? }`. A violated `non-negotiable` is a hard stop. Those with a built-in `check` are enforced by `kyro analyze`; free-text ones are agent gates at `plan-sprint`/`review-task`.
 
 ## Artifact Contract
 
@@ -100,11 +93,11 @@ Templates are loaded only immediately before writing their artifact.
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |
 | `.agents/kyro/scopes/{scope}/findings/NN-slug.md` | INIT analysis evidence (write-only) |
 
-There are no `state.json`, `index.json`, `events.ndjson`, `ROADMAP.summary.json`, `DEBT.summary.json`, `rules.index.json`, `rules.md`, `RE-ENTRY-PROMPTS.md`, `phases/`, or `*.summary.json` files. Those are v3 artifacts; run `kyro migrate` to upgrade a v3 scope.
+The only per-scope files are `sprint.json` and the write-only `archive/` + `findings/`. Nothing else is created or read.
 
 ## Boundaries
 
-- INIT is read-only against source code until writing Kyro artifacts.
-- Execution may modify project code/docs but must validate touched areas before marking a task done.
+- INIT is read-only against source code until it writes Kyro artifacts.
+- Execution may modify code/docs but must validate touched areas before marking a task done.
 - STATUS is read-only unless explicitly mutating debt status.
-- Recover preserves user-authored archives and rebuilds `sprint.json` from the best available evidence.
+- Recover preserves user archives and rebuilds `sprint.json` from the best evidence.

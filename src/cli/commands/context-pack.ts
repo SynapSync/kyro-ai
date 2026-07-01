@@ -28,7 +28,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const warnings: string[] = [];
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) {
-    throw new Error(`Scope '${scope}' has no sprint.json. Run 'kyro migrate --kyro-scope ${scope}' to upgrade a v3 scope.`);
+    throw new Error(`Scope '${scope}' has no sprint.json. Run /kyro:forge (INIT) to create it.`);
   }
   if (read.error) {
     throw new Error(`sprint.json for '${scope}' is invalid JSON: ${read.error}`);

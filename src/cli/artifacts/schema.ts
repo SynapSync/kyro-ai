@@ -167,7 +167,7 @@ function validatePrinciple(value: unknown, path: string, prefix: string, issues:
 
 function validateScopeEntry(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
   if (typeof value === 'string') {
-    issues.push({ path, field: prefix, message: 'must be an object { id, title, status }, not a string (v3 drift)' });
+    issues.push({ path, field: prefix, message: 'must be an object { id, title, status }, not a bare string' });
     return;
   }
   if (!isRecord(value)) {
@@ -251,7 +251,7 @@ function validateClarification(value: unknown, path: string, prefix: string, iss
 
 function validateConvention(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
   if (typeof value === 'string') {
-    issues.push({ path, field: prefix, message: 'must be an object { id, rule, tags, addedSprint }, not a string (v3 drift)' });
+    issues.push({ path, field: prefix, message: 'must be an object { id, rule, tags, addedSprint }, not a bare string' });
     return;
   }
   if (!isRecord(value)) {
@@ -310,7 +310,7 @@ function validateTask(value: unknown, path: string, prefix: string, issues: Vali
 
 function validateDebtItem(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
   if (typeof value === 'string') {
-    issues.push({ path, field: prefix, message: 'must be an object { id, title, ... }, not a string (v3 drift)' });
+    issues.push({ path, field: prefix, message: 'must be an object { id, title, ... }, not a bare string' });
     return;
   }
   if (!isRecord(value)) {

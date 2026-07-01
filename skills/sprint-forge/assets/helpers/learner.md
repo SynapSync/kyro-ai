@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Captures corrections, patterns, and estimation insights as persistent **conventions** stored in `sprint.json.conventions[]`. Conventions are scope-local and carried forward between sprints. There is no `rules.md` — `conventions[]` is the single home for learned rules (a `rules.md` is a v3 artifact; never create one).
+Captures corrections, patterns, and estimation insights as persistent **conventions** stored in `sprint.json.conventions[]`. Conventions are scope-local and carried forward between sprints. `conventions[]` is the single home for learned rules; never create a separate rules file.
 
 ## Convention shape
 

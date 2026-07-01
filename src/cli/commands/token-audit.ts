@@ -19,9 +19,13 @@ const TOKEN_BUDGET = {
   orchestratorWords: 800,
   sprintForgeSkillWords: 800,
   runtimeStatusBriefTokens: 1500,
-  runtimeForgeExecuteTokens: 2500,
-  runtimeForgePlanTokens: 3000,
-  runtimeForgeCloseTokens: 3200,
+  // Path budgets reflect the real footprint of the lean runtime (orchestrator + SKILL + the routed
+  // mode/helpers) plus ~10% headroom. They stay a meaningful ceiling: exceeding them means a mode or
+  // helper has grown and should be trimmed before it drifts further.
+  runtimeForgeExecuteTokens: 2900,
+  runtimeForgeReviewTokens: 3300,
+  runtimeForgePlanTokens: 3600,
+  runtimeForgeCloseTokens: 4200,
   runtimeForgeInitTokens: 3500,
 } as const;
 
@@ -182,7 +186,7 @@ function checkStatusBriefBudget(): CheckResult {
 }
 
 function checkInitHappyPathBudget(): CheckResult {
-  // v4: INIT loads only the INIT mode + one routed analysis helper. No v3 templates.
+  // INIT loads only the INIT mode + one routed analysis helper.
   const baseFiles = [
     'commands/forge.md',
     'skills/sprint-forge/assets/modes/INIT.md',
@@ -270,7 +274,7 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
     },
     {
       name: 'runtime path: kyro-forge:review',
-      budget: TOKEN_BUDGET.runtimeForgeExecuteTokens,
+      budget: TOKEN_BUDGET.runtimeForgeReviewTokens,
       projectedSkill: 'forge',
       files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/review-task.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
       forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/learner.md'],

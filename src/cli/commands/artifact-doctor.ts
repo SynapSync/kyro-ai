@@ -16,20 +16,6 @@ export interface ArtifactAuditOptions {
   kyroScope: string | null;
 }
 
-/** v3 artifacts that must not exist in a v4 scope. Their presence means the scope needs migration. */
-const V3_ARTIFACTS = [
-  'state.json',
-  'index.json',
-  'events.ndjson',
-  'ROADMAP.md',
-  'ROADMAP.summary.json',
-  'DEBT.summary.json',
-  'rules.index.json',
-  'RE-ENTRY-PROMPTS.md',
-  'REENTRY-PROMPTS.md',
-  'phases',
-];
-
 export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResult[] {
   const checks: CheckResult[] = [];
   const projectStateRead = readJsonSafely(KYRO_STATE_PATH);
@@ -41,7 +27,7 @@ export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResu
   }
   const projectIssues = validateProjectStateShape(projectStateRead.value, KYRO_STATE_PATH);
   if (projectIssues.length > 0) {
-    checks.push(fail('kyro.json', formatIssues(projectIssues), 'Fix kyro.json so scopes[] are objects { id, title, status } and schemaVersion is 4. Run kyro migrate for a v3 file.'));
+    checks.push(fail('kyro.json', formatIssues(projectIssues), 'Fix kyro.json so scopes[] are objects { id, title, status } and schemaVersion is 4, or run kyro install to repopulate.'));
     return checks;
   }
   checks.push(pass('kyro.json', 'Valid v4 schema.'));
@@ -70,16 +56,10 @@ function checkScope(scope: string): CheckResult[] {
     return [fail(`${scope}`, `${root} not found`, 'Create the scope with /kyro:forge (INIT) or choose an existing scope.')];
   }
 
-  // 1. v3 drift: any legacy artifact present means this scope was never migrated.
-  const v3Found = V3_ARTIFACTS.filter((name) => existsSync(resolveManagedPath(`${root}/${name}`)));
-  if (v3Found.length > 0) {
-    checks.push(fail(`${scope}/v3-artifacts`, `legacy v3 artifacts present: ${v3Found.join(', ')}`, `Run kyro migrate --kyro-scope ${scope} to consolidate into sprint.json.`));
-  }
-
-  // 2. sprint.json must exist and be a valid v4 file.
+  // 1. sprint.json must exist and be a valid file.
   const sprintRead = readJsonSafely(sprintJsonPath(scope));
   if (!sprintRead.exists) {
-    checks.push(fail(`${scope}/sprint.json`, 'missing', `Run kyro migrate --kyro-scope ${scope} (v3 scope) or /kyro:forge INIT.`));
+    checks.push(fail(`${scope}/sprint.json`, 'missing', `Run /kyro:forge (INIT) to create it.`));
     return checks;
   }
   if (sprintRead.error) {

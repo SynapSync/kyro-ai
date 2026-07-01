@@ -84,7 +84,7 @@ export function buildClosePlan(
 
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) {
-    throw new Error(`Cannot close ${scope}: sprint.json not found. Run 'kyro migrate --kyro-scope ${scope}' to upgrade a v3 scope.`);
+    throw new Error(`Cannot close ${scope}: sprint.json not found. Run /kyro:forge (INIT) to create it.`);
   }
   if (read.error) {
     throw new Error(`Cannot close ${scope}: sprint.json is invalid JSON (${read.error}). Restore from an archive snapshot.`);

@@ -1,6 +1,6 @@
 # Plan Sprint Mode
 
-Generate the next sprint as the `activeSprint` object inside `sprint.json`. This is the file that historically produced v3 drift — it writes ONLY `sprint.json`, never `phases/`, `state.json`, `index.json`, or summaries.
+Generate the next sprint as the `activeSprint` object inside `sprint.json`. It writes ONLY `sprint.json` — no other files.
 
 ## Inputs
 
