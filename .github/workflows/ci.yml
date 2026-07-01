@@ -67,7 +67,7 @@ jobs:
           git push origin ${{ needs.validate.outputs.version_tag }}
 
   publish:
-    needs: create_tag
+    needs: [validate, create_tag]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -98,7 +98,7 @@ jobs:
           git tag -d ${{ needs.validate.outputs.version_tag }} 2>/dev/null || true
 
   create_release:
-    needs: publish
+    needs: [validate, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
