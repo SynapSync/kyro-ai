@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-07-01
+
+Documentation audit, bug fixes, and token optimization. Eliminates all artifact model drift and
+removes stale forward-looking docs.
+
+### Fixed
+
+- **Critical:** `kyro analyze` error message no longer references the removed `kyro migrate` command.
+- **High:** 10 documentation files rewritten to reflect the `sprint.json`-only model; eliminated all
+  references to pre-4.0 artifacts (`state.json`, `index.json`, `ROADMAP.md`, `events.ndjson`, `phases/`).
+
+### Removed
+
+- `docs/harness-migration.md` — described v4.x features (CLI runtime, install, doctor, sync) as
+  future work; no longer needed.
+- Historical v3.4.0 release notes — shipped as `docs/releases/` but not relevant to current users.
+
+### Changed
+
+- Trimmed `INIT.md` (623w → 526w, −97w) and `close-sprint.md` (610w → 529w, −81w) for runtime
+  efficiency; gates and safety contracts preserved.
+- Runtime token budgets now have tighter but sustainable margins across all paths.
+
 ## [4.2.0] - 2026-06-30
 
 Kyro is now a single-model tool: everything is `sprint.json`. Internal cleanup plus a repaired
