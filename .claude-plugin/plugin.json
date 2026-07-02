@@ -29,15 +29,8 @@
     "worktrees",
     "context-persistence"
   ],
-  "skills": [
-    "./skills/sprint-forge",
-    "./skills/qa-review"
-  ],
-  "agents": [
-    "./agents/orchestrator.md"
-  ],
-  "commands": [
-    "./commands/"
-  ],
+  "skills": ["./skills/sprint-forge", "./skills/qa-review"],
+  "agents": ["./agents/orchestrator.md"],
+  "commands": ["./commands/"],
   "hooks": "./hooks/hooks.json"
 }

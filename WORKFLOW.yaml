@@ -12,19 +12,19 @@ author:
 license: Apache-2.0
 
 commands:
-  - forge       # Full cycle: Analyze → Plan → Implement → Review → Commit
-  - status      # Project progress and technical debt summary
-  - wrap-up     # End-of-session closure ritual with quality check
+  - forge # Full cycle: Analyze → Plan → Implement → Review → Commit
+  - status # Project progress and technical debt summary
+  - wrap-up # End-of-session closure ritual with quality check
 
 agents:
-  - orchestrator  # Full cycle coordination — analysis, review, debugging, and sprint execution
+  - orchestrator # Full cycle coordination — analysis, review, debugging, and sprint execution
 
 skills:
-  - sprint-forge  # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
-  - qa-review         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
+  - sprint-forge # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+  - qa-review # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 
 artifacts:
-  root: .agents/kyro/scopes/    # Rules and sprint documents (per-scope)
+  root: .agents/kyro/scopes/ # Rules and sprint documents (per-scope)
 
 philosophy:
   - "Learn from every sprint, apply in the next"

@@ -95,7 +95,7 @@ is enforced deterministically by the CLI, not left to prose a weak model can ign
   non-zero on CRITICAL/HIGH. Gate before `close_sprint`. `--json` supported.
 - **Project-level principles.** `kyro.json.principles[]` (authored, immutable — spec-kit's
   "constitution"), distinct from learned `conventions[]`. Each `{ id, rule, severity, rationale,
-  check? }`; principles with a built-in `check` are enforced deterministically by `kyro analyze`,
+check? }`; principles with a built-in `check` are enforced deterministically by `kyro analyze`,
   free-text ones are agent gates at `plan-sprint`/`review-task`.
 - `successCriteria[]` on `sprint.json` — technology-agnostic, measurable outcomes (the WHAT/WHY layer).
 
