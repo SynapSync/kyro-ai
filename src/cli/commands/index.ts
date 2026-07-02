@@ -10,6 +10,7 @@ export const CLI_COMMANDS = [
   'sync',
   'uninstall',
   'eval',
+  'mcp',
 ] as const;
 
 export type CliCommand = (typeof CLI_COMMANDS)[number];

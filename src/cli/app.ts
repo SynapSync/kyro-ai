@@ -9,6 +9,7 @@ import { runScopeCommand } from './commands/scope';
 import { runCloseSprintCommand } from './commands/close-sprint';
 import { uninstall } from './commands/uninstall';
 import { runEval } from './commands/eval';
+import { runMcpCommand } from './commands/mcp';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
 
@@ -27,6 +28,11 @@ export async function runCli(): Promise<void> {
 
   if (command === '--version' || command === '-v' || command === 'version') {
     console.log(readPackageVersion());
+    return;
+  }
+
+  if (command === 'mcp') {
+    runMcpCommand(args);
     return;
   }
 

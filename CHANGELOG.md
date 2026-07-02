@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.0] - 2026-07-02
+
+Adds a tools-only MCP typed tool surface over Kyro's deterministic CLI core.
+
+### Added
+
+- `kyro mcp serve` stdio server with JSON-RPC lifecycle, tools/list, tools/call, ping, protocol negotiation, and stdout purity.
+- `kyro mcp tools` for printing the tool catalog.
+- Seven typed MCP tools: `context_pack`, `doctor_artifacts`, `analyze_scope`, `close_sprint`, `scope_list`, `scope_inspect`, `repair_scope`.
+- Shared core layer for scope resolution, analysis, scope listing, and structured `KyroCoreError` envelopes.
+- Two-phase mutation protocol for MCP mutations: dry-run plan by default, apply only with `confirm: true`.
+- `check:mcp` conformance gate and `fixtures/mcp/tool-catalog.golden.json`.
+- `docs/mcp.md` with host registration examples.
+
+### Changed
+
+- `kyro analyze` now uses the shared analysis core; CLI behavior remains pinned by evals.
+- `close-sprint` double-close errors now expose the stable `SNAPSHOT_EXISTS` code.
+
 ## [4.4.0] - 2026-07-02
 
 Adds deterministic behavioral evals for agent-facing Kyro contracts.

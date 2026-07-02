@@ -220,6 +220,17 @@ export interface OperationPlan {
   jsonPath?: string;
 }
 
+
+export type AnalysisSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface AnalysisFinding {
+  id: string;
+  severity: AnalysisSeverity;
+  category: string;
+  detail: string;
+  remedy: string;
+}
+
 export interface CheckResult {
   status: 'pass' | 'warn' | 'fail';
   name: string;

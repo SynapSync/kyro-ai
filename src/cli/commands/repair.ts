@@ -2,19 +2,18 @@ import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { applyPlan, printPlan, resolveManagedPath } from '../fs';
-import { readProjectState } from '../state';
 import { readJsonSafely } from '../artifacts/json';
 import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile } from '../artifacts/schema';
-import { listScopeFolders } from '../artifacts/scopes';
 import type { CliOptions, OperationPlan } from '../types';
+import { resolveScope } from '../core/scope-resolution';
 
 /**
  * Repair: validate and normalize a scope's sprint.json (stable formatting + trailing newline).
  * The sprint.json is the single source of truth; there is nothing else to regenerate.
  */
 export async function repair(options: CliOptions): Promise<void> {
-  const scope = resolveRepairScope(options.kyroScope);
+  const scope = resolveScope(options.kyroScope);
   const plan = buildRepairPlan(scope);
   printPlan('Repair plan', plan);
 
@@ -54,16 +53,6 @@ export function buildRepairPlan(scope: string): OperationPlan[] {
   return [{ action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(read.value, null, 2)}\n` }];
 }
 
-function resolveRepairScope(requestedScope: string | null): string {
-  if (requestedScope) return requestedScope;
-  const state = readProjectState();
-  if (state?.activeScope) return state.activeScope;
-  const scopes = new Set<string>((state?.scopes ?? []).map((s) => s.id));
-  for (const folder of listScopeFolders()) scopes.add(folder);
-  if (scopes.size === 1) return [...scopes][0];
-  if (scopes.size === 0) throw new Error('No Kyro scopes found. Pass --kyro-scope <scope>.');
-  throw new Error(`Multiple scopes found (${[...scopes].sort().join(', ')}). Pass --kyro-scope <scope>.`);
-}
 
 async function confirmRepair(): Promise<boolean> {
   const rl = createInterface({ input, output });

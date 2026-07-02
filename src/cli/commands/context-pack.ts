@@ -4,15 +4,12 @@ import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
 import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
-import { readProjectState } from '../state';
 import { listScopeNames } from '../artifacts/scopes';
+import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, SprintFile, Task } from '../types';
 
 export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json'>): void {
-  const scope = resolveScope(options.kyroScope);
-  if (!scope) {
-    throw new Error('No Kyro scope selected. Use --kyro-scope <scope> or set activeScope in kyro.json.');
-  }
+  const scope = resolveKyroScope(options.kyroScope);
   if (!scopeExists(scope)) {
     throw new Error(`Scope not found: ${scope}. Run kyro scope list to see available scopes.`);
   }
@@ -114,10 +111,6 @@ function selectConventions(sprint: SprintFile, packMode: ContextPackMode, task: 
   return relevant.map((c) => ({ id: c.id, rule: c.rule, tags: c.tags }));
 }
 
-function resolveScope(kyroScope: string | null): string | null {
-  if (kyroScope) return kyroScope;
-  return readProjectState()?.activeScope ?? null;
-}
 
 function scopeExists(scope: string): boolean {
   if (listScopeNames().includes(scope)) return true;

@@ -11,6 +11,7 @@ kyro doctor             # Read-only package/workspace health check
 kyro doctor --tokens    # Audit context/token budgets
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
 kyro eval               # Run deterministic behavioral eval cases
+kyro mcp serve          # Start the tools-only MCP stdio server
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
@@ -291,3 +292,7 @@ Kyro does not provide `--agent generic`. Cross-agent instructions belong in root
 ## Behavioral Evals
 
 Use `kyro eval` to run deterministic agent-facing regression cases from `fixtures/evals/`. It supports `--case`, `--tag`, `--agent`, `--json`, `--list`, and `--keep-sandbox`. See [evals.md](evals.md).
+
+## MCP Server
+
+Use `kyro mcp serve` to expose Kyro operations as typed MCP tools over stdio. Use `kyro mcp tools` to print the catalog. See [mcp.md](mcp.md).
