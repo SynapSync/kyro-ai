@@ -5,6 +5,7 @@ import { applyPlan, printPlan, resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { KyroCoreError } from '../core/errors';
+import { emitToolCommandRun, emitTraceEvent, traceSnapshotId } from '../core/trace';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
@@ -57,6 +58,7 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
     }
   }
 
+  emitToolCommandRun(scope, 'cli', 'close-sprint', { outcome: args.outcome });
   applyPlan(plan);
 
   // Re-parse the written sprint.json to prove validity (the safe-write verify step).
@@ -69,6 +71,16 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
     const detail = issues.map((i) => `${i.field} ${i.message}`).join('; ');
     throw new Error(`Close wrote sprint.json but it failed validation — ${detail}. The snapshot at ${snapshotPath} preserves the sprint.`);
   }
+
+  emitTraceEvent({
+    v: 1,
+    ts: new Date().toISOString(),
+    scope,
+    type: 'close_snapshot',
+    sprintN: sprint.activeSprint!.n,
+    snapshotId: traceSnapshotId(snapshotPath),
+    outcome: normalizeCloseOutcome(args.outcome),
+  });
 
   console.log(`\nSprint ${sprint.activeSprint!.n} closed. activeSprint cleared; ledger entry + snapshot recorded.`);
   console.log(`Next action: ${(verify.value as SprintFile).handoff.nextAction}.`);
@@ -420,4 +432,8 @@ async function confirm(question: string): Promise<boolean> {
   } finally {
     rl.close();
   }
+}
+
+function normalizeCloseOutcome(outcome: string): 'shipped' | 'partial' | 'aborted' {
+  return outcome === 'partial' || outcome === 'aborted' ? outcome : 'shipped';
 }

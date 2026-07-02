@@ -6,6 +6,7 @@ import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
 import { listScopeNames } from '../artifacts/scopes';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
+import { emitTraceEvent } from '../core/trace';
 import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, SprintFile, Task } from '../types';
 
 export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json'>): void {
@@ -39,6 +40,16 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const task = packMode === 'task' ? resolveTask(sprint, taskOption, warnings) : null;
 
   const routing = resolveRoute(sprint.handoff.nextAction, packMode);
+  emitTraceEvent({
+    v: 1,
+    ts: new Date().toISOString(),
+    scope,
+    type: 'route_selected',
+    nextAction: sprint.handoff.nextAction,
+    packMode,
+    budgetClass: routing.budgetClass,
+    reasoningTier: routing.reasoningTier,
+  });
   const openDebtCount = sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length;
   const conventions = selectConventions(sprint, packMode, task);
 

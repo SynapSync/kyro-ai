@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 4,
+  "scope": "demo",
+  "title": "Demo",
+  "status": "active",
+  "objective": "Demo objective",
+  "successCriteria": [
+    "Demo works."
+  ],
+  "clarifications": [],
+  "conventions": [],
+  "roadmap": {
+    "plannedSprintCount": 1,
+    "sizingRationale": "One sprint is enough.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "demo-sprint",
+        "title": "Demo Sprint",
+        "state": "active"
+      }
+    ]
+  },
+  "ledger": [],
+  "previousSprint": null,
+  "activeSprint": {
+    "n": 1,
+    "slug": "demo-sprint",
+    "title": "Demo Sprint",
+    "objective": "Ship demo sprint.",
+    "status": "executing",
+    "phases": [
+      {
+        "id": "P1",
+        "title": "Demo Phase",
+        "objective": "Complete demo work.",
+        "status": "executing",
+        "tasks": [
+          {
+            "id": "T1.1",
+            "title": "Implement demo",
+            "description": "Implement the demo task.",
+            "files_to_touch": [
+              "src/demo.ts"
+            ],
+            "context": "Use the existing demo pattern.",
+            "acceptance_criteria": [
+              "Validation passes."
+            ],
+            "depends_on": [],
+            "status": "done",
+            "evidence": {
+              "summary": "done",
+              "validation": [
+                "ok"
+              ],
+              "files_changed": [
+                "src/demo.ts"
+              ],
+              "notes": ""
+            },
+            "verdict": {
+              "status": "pass",
+              "notes": "ok"
+            }
+          }
+        ]
+      }
+    ],
+    "emergentTasks": [],
+    "definitionOfDone": [
+      "All tasks done."
+    ]
+  },
+  "debt": [],
+  "handoff": {
+    "nextAction": "close_sprint",
+    "nextTaskId": "T1.1",
+    "blockers": [],
+    "note": "Resume demo.",
+    "lastUpdated": "2026-07-02"
+  }
+}

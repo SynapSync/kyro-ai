@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.0] - 2026-07-02
+
+Adds append-only trace events for per-scope observability without making trace a source of truth.
+
+### Added
+
+- `kyro trace` command with `--json`, `--tail`, `--type`, and explicit-scope `--clear`.
+- `doctor --trace` informational trace summaries.
+- Append-only best-effort trace core with `KYRO_TRACE=0` kill switch and `KYRO_TRACE_DEBUG` diagnostics.
+- Seven-versioned trace event catalog and golden drift check.
+- `check:trace` conformance gate for append-only writes, non-fatal failures, stdout purity, NDJSON validity, crash-tolerant reads, and no routing reads.
+- Eval cases pinning `close_snapshot` emission and trace kill-switch behavior.
+- `docs/trace.md` with trace-vs-ledger disambiguation.
+
+### Changed
+
+- Eval replay steps now support scoped environment variables for behavioral checks.
+
 ## [4.5.0] - 2026-07-02
 
 Adds a tools-only MCP typed tool surface over Kyro's deterministic CLI core.

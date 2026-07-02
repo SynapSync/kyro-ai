@@ -12,6 +12,7 @@ import { runAnalysis } from '../core/analysis';
 import { KyroCoreError, toErrorEnvelope } from '../core/errors';
 import { listScopes } from '../core/scopes';
 import { resolveScope } from '../core/scope-resolution';
+import { emitToolCommandRun, emitTraceEvent, traceSnapshotId } from '../core/trace';
 import { getTool } from './tool-catalog';
 import { validateInput } from './input-validation';
 import type { OperationPlan } from '../types';
@@ -45,7 +46,7 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
     case 'context_pack':
       return buildContextPack(resolveScope(optionalString(args.scope) ?? null), taskOption(args.task_id));
     case 'doctor_artifacts':
-      return { checks: runDoctorChecks(false, true, false, optionalString(args.scope) ?? null) };
+      return { checks: runDoctorChecks(false, true, false, false, optionalString(args.scope) ?? null) };
     case 'analyze_scope':
       return runAnalysis(optionalString(args.scope) ?? null);
     case 'scope_list':
@@ -76,8 +77,18 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
   };
   const { sprint, plan, snapshotPath } = buildClosePlan(scope, closeArgs);
   if (args.confirm !== true) return planResult(scope, plan, { snapshotPath, activeSprint: sprint.activeSprint });
+  emitToolCommandRun(scope, 'mcp', 'close_sprint', { outcome: closeArgs.outcome });
   applyPlan(plan);
   assertValidSprint(scope, snapshotPath);
+  emitTraceEvent({
+    v: 1,
+    ts: new Date().toISOString(),
+    scope,
+    type: 'close_snapshot',
+    sprintN: sprint.activeSprint!.n,
+    snapshotId: traceSnapshotId(snapshotPath),
+    outcome: closeArgs.outcome === 'partial' || closeArgs.outcome === 'aborted' ? closeArgs.outcome : 'shipped',
+  });
   return { phase: 'applied', scope, snapshotPath, plan };
 }
 
@@ -85,6 +96,7 @@ function repairScopeTool(args: Record<string, unknown>): unknown {
   const scope = resolveScope(optionalString(args.scope) ?? null);
   const plan = buildRepairPlan(scope);
   if (args.confirm !== true) return planResult(scope, plan);
+  emitToolCommandRun(scope, 'mcp', 'repair_scope');
   applyPlan(plan);
   assertValidSprint(scope);
   return { phase: 'applied', scope, plan };

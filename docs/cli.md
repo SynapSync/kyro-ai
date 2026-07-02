@@ -12,6 +12,7 @@ kyro doctor --tokens    # Audit context/token budgets
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
+kyro trace              # Read append-only trace events for a scope
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
@@ -294,3 +295,17 @@ Use `kyro eval` to run deterministic agent-facing regression cases from `fixture
 ## MCP Server
 
 Use `kyro mcp serve` to expose Kyro operations as typed MCP tools over stdio. Use `kyro mcp tools` to print the catalog. See [mcp.md](mcp.md).
+
+
+## Trace events
+
+Use `kyro trace` to inspect append-only per-scope diagnostic events:
+
+```bash
+kyro trace --kyro-scope auth-refactor
+kyro trace --kyro-scope auth-refactor --json --tail 20
+kyro trace --kyro-scope auth-refactor --type close_snapshot
+kyro doctor --trace --kyro-scope auth-refactor
+```
+
+Trace files are audit data only. They are never read for routing or workflow decisions. See [trace.md](trace.md).
