@@ -8,6 +8,7 @@ import { contextPack } from './commands/context-pack';
 import { runScopeCommand } from './commands/scope';
 import { runCloseSprintCommand } from './commands/close-sprint';
 import { uninstall } from './commands/uninstall';
+import { runEval } from './commands/eval';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
 
@@ -77,6 +78,9 @@ export async function runCli(): Promise<void> {
       break;
     case 'uninstall':
       uninstall(options);
+      break;
+    case 'eval':
+      runEval(options);
       break;
     default:
       throw new Error(`Unknown command: ${command}. Run kyro --help.`);

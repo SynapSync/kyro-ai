@@ -46,5 +46,9 @@ function tuiInstallOptions(agent: Agent): CliOptions {
     json: false,
     purgeAdapterAssets: false,
     prune: false,
+    evalCases: [],
+    evalTags: [],
+    evalList: false,
+    keepSandbox: false,
   };
 }

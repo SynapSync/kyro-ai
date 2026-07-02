@@ -1,0 +1,39 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "route-init",
+  "title": "Route init",
+  "kind": "replay",
+  "tags": [
+    "routing",
+    "init"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "[PASS]"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false,
+  "route": {
+    "nextAction": "init",
+    "expectedModes": [
+      "INIT.md"
+    ],
+    "expectedBudgetClass": "brief",
+    "expectedReasoningTier": "light"
+  }
+}

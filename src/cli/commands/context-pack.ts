@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readJsonSafely } from '../artifacts/json';
 import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
-import { resolveBudgetRouting } from '../budget-manifest';
+import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
 import { listScopeNames } from '../artifacts/scopes';
@@ -41,7 +41,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const packMode: ContextPackMode = resolvePackMode(taskOption, sprint, warnings);
   const task = packMode === 'task' ? resolveTask(sprint, taskOption, warnings) : null;
 
-  const budgetRouting = resolveBudgetRouting(packMode, sprint.handoff.nextAction);
+  const routing = resolveRoute(sprint.handoff.nextAction, packMode);
   const openDebtCount = sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length;
   const conventions = selectConventions(sprint, packMode, task);
 
@@ -66,10 +66,11 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     blockers: sprint.handoff.blockers ?? [],
     conventions,
     warnings,
-    budgetClass: budgetRouting.budgetClass,
-    reasoningTier: budgetRouting.reasoningTier as ContextPackOutput['reasoningTier'],
-    maxContextTokens: budgetRouting.maxContextTokens,
-    budgetGuidance: budgetRouting.budgetGuidance,
+    routing: { modes: [...routing.modes] },
+    budgetClass: routing.budgetClass,
+    reasoningTier: routing.reasoningTier as ContextPackOutput['reasoningTier'],
+    maxContextTokens: routing.maxContextTokens,
+    budgetGuidance: routing.budgetGuidance,
   };
   return { ...packWithoutTokens, estimatedTokens: estimatePackTokens(packWithoutTokens) };
 }

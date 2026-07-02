@@ -25,6 +25,7 @@ Kyro preserves quality by loading the smallest contract needed for the current l
 | nextAction | Load only |
 |-----------|-----------|
 | `init` / no `sprint.json` | `assets/modes/INIT.md` + one `helpers/analysis/{workType}.md` |
+| `clarify` | `assets/modes/SPRINT.md` + `assets/modes/clarify.md` |
 | `plan_sprint` | `assets/modes/SPRINT.md` + `assets/modes/plan-sprint.md` |
 | `execute_task` | `assets/modes/SPRINT.md` + `assets/modes/execute-task.md` |
 | `review_task` | `assets/modes/SPRINT.md` + `assets/modes/review-task.md` |

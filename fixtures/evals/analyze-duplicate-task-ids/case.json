@@ -1,0 +1,30 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "analyze-duplicate-task-ids",
+  "title": "Analyze reports duplicate ids as advisory",
+  "kind": "replay",
+  "tags": [
+    "analyze"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "analyze",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "MEDIUM",
+          "duplicate task id"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}

@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-07-02
+
+Adds deterministic behavioral evals for agent-facing Kyro contracts.
+
+### Added
+
+- `kyro eval` command with strict `case.json` manifests, isolated temp sandboxes, route assertions, CLI step expectations, final-state normalization, human output, and `--json` reports.
+- `fixtures/evals/` seed suite with 15 replay cases covering all routes, known guardrail failures, close-sprint happy path, task-mode context packs, and adapter filtering.
+- `check:eval` and `check:eval-harness` regression gates, now included in `npm run check`.
+- Code-owned routing contract (`src/cli/routing.ts`) plus `check:routing` to prevent drift between `agents/orchestrator.md` and runtime route resolution.
+- `context-pack --json` now includes `routing.modes` for machine-checkable route assertions.
+
+### Changed
+
+- `agents/orchestrator.md` now documents the `clarify` route explicitly.
+
 ## [4.3.0] - 2026-07-01
 
 Documentation audit, bug fixes, and token optimization. Eliminates all artifact model drift and

@@ -1,0 +1,32 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "close-sprint-corruption",
+  "title": "Doctor catches missing zero-loss snapshot",
+  "kind": "replay",
+  "tags": [
+    "guardrail",
+    "close-sprint"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 1,
+        "stdoutIncludes": [
+          "[FAIL]",
+          "closed sprint(s) without a zero-loss snapshot"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": true
+}

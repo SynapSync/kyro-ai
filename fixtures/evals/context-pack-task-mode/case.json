@@ -1,0 +1,36 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "context-pack-task-mode",
+  "title": "Context pack task mode exposes task fields",
+  "kind": "replay",
+  "tags": [
+    "context-pack",
+    "happy"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "context-pack",
+        "--kyro-scope",
+        "demo",
+        "--task",
+        "T1.1",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "\"packMode\": \"task\"",
+          "\"taskId\": \"T1.1\"",
+          "Use focused tests.",
+          "\"estimatedTokens\""
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}
