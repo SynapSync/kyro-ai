@@ -1,0 +1,40 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "route-clarify",
+  "title": "Route clarify",
+  "kind": "replay",
+  "tags": [
+    "routing",
+    "clarify"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "[PASS]"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false,
+  "route": {
+    "nextAction": "clarify",
+    "expectedModes": [
+      "SPRINT.md",
+      "clarify.md"
+    ],
+    "expectedBudgetClass": "brief",
+    "expectedReasoningTier": "light"
+  }
+}

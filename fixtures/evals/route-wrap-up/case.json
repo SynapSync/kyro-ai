@@ -1,0 +1,40 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "route-wrap-up",
+  "title": "Route wrap_up",
+  "kind": "replay",
+  "tags": [
+    "routing",
+    "wrap_up"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "[PASS]"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false,
+  "route": {
+    "nextAction": "wrap_up",
+    "expectedModes": [
+      "SPRINT.md",
+      "close-sprint.md"
+    ],
+    "expectedBudgetClass": "close",
+    "expectedReasoningTier": "deep"
+  }
+}

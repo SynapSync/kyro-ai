@@ -1,0 +1,31 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "analyze-broken-deps",
+  "title": "Analyze blocks dangling task dependency",
+  "kind": "replay",
+  "tags": [
+    "guardrail",
+    "analyze"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "analyze",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 1,
+        "stdoutIncludes": [
+          "HIGH",
+          "depends_on"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}

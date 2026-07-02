@@ -10,6 +10,7 @@ kyro install            # Install standard .agents assets by default
 kyro doctor             # Read-only package/workspace health check
 kyro doctor --tokens    # Audit context/token budgets
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
+kyro eval               # Run deterministic behavioral eval cases
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
@@ -208,7 +209,7 @@ The command reads the scope's structured artifact first:
 
 - `sprint.json`
 
-It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, warnings, budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
+It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, warnings, machine-checkable routing (`routing.modes`), budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
 
 Prefer `context-pack` over manual file selection at session start, after compaction, or when resuming a scope through summary-first routing.
 
@@ -286,3 +287,7 @@ The Claude plugin adapter remains first-class through `.claude-plugin/`. The CLI
 ## Unsupported Generic Adapter
 
 Kyro does not provide `--agent generic`. Cross-agent instructions belong in root `AGENTS.md`, and adapter installs should target concrete agent capabilities.
+
+## Behavioral Evals
+
+Use `kyro eval` to run deterministic agent-facing regression cases from `fixtures/evals/`. It supports `--case`, `--tag`, `--agent`, `--json`, `--list`, and `--keep-sandbox`. See [evals.md](evals.md).

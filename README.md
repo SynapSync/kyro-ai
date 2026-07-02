@@ -29,6 +29,7 @@ Kyro gives agents:
 - **a single source of truth per scope** — one `sprint.json` holding objective, success criteria, roadmap, the active sprint, debt, conventions, and handoff routing
 - **zero-loss archives** — every closed sprint is snapshotted verbatim before it is cleared
 - **deterministic CLI gates** (`doctor`, `analyze`) so quality is enforced in code, not left to prompt discipline
+- **behavioral evals** (`kyro eval`) that replay agent-facing routing, guardrails, and artifact transitions
 
 ---
 
@@ -387,3 +388,7 @@ Kyro uses lean runtime loading: command router → `sprint.json` state → one r
   <br/><br/>
   <sub>Built by <a href="https://github.com/SynapSync">SynapSync</a> — a practical harness for multi-agent software delivery.</sub>
 </p>
+
+## Documentation
+
+- [Behavioral evals](docs/evals.md)

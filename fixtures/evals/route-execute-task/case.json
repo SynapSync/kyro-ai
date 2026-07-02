@@ -1,0 +1,40 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "route-execute-task",
+  "title": "Route execute_task",
+  "kind": "replay",
+  "tags": [
+    "routing",
+    "execute_task"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "[PASS]"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false,
+  "route": {
+    "nextAction": "execute_task",
+    "expectedModes": [
+      "SPRINT.md",
+      "execute-task.md"
+    ],
+    "expectedBudgetClass": "execute",
+    "expectedReasoningTier": "standard"
+  }
+}

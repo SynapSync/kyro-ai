@@ -16,6 +16,10 @@ export function parseOptions(args: string[]): CliOptions {
   let json = false;
   let purgeAdapterAssets = false;
   let prune = false;
+  const evalCases: string[] = [];
+  const evalTags: string[] = [];
+  let evalList = false;
+  let keepSandbox = false;
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -37,6 +41,24 @@ export function parseOptions(args: string[]): CliOptions {
       purgeAdapterAssets = true;
     } else if (arg === '--prune') {
       prune = true;
+    } else if (arg === '--list') {
+      evalList = true;
+    } else if (arg === '--keep-sandbox') {
+      keepSandbox = true;
+    } else if (arg === '--case') {
+      const value = args[i + 1];
+      if (!value) throw new Error('--case requires a value');
+      evalCases.push(value);
+      i += 1;
+    } else if (arg.startsWith('--case=')) {
+      evalCases.push(arg.slice('--case='.length));
+    } else if (arg === '--tag') {
+      const value = args[i + 1];
+      if (!value) throw new Error('--tag requires a value');
+      evalTags.push(value);
+      i += 1;
+    } else if (arg.startsWith('--tag=')) {
+      evalTags.push(arg.slice('--tag='.length));
     } else if (arg === '--kyro-scope') {
       const value = args[i + 1];
       if (!value) throw new Error('--kyro-scope requires a value');
@@ -89,6 +111,10 @@ export function parseOptions(args: string[]): CliOptions {
     json,
     purgeAdapterAssets,
     prune,
+    evalCases,
+    evalTags,
+    evalList,
+    keepSandbox,
   };
 }
 

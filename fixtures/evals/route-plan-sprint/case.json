@@ -1,0 +1,40 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "route-plan-sprint",
+  "title": "Route plan_sprint",
+  "kind": "replay",
+  "tags": [
+    "routing",
+    "plan_sprint"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "[PASS]"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false,
+  "route": {
+    "nextAction": "plan_sprint",
+    "expectedModes": [
+      "SPRINT.md",
+      "plan-sprint.md"
+    ],
+    "expectedBudgetClass": "brief",
+    "expectedReasoningTier": "light"
+  }
+}

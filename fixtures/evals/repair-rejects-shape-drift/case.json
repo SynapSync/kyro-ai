@@ -1,0 +1,31 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "repair-rejects-shape-drift",
+  "title": "Repair rejects schema-invalid sprint json",
+  "kind": "replay",
+  "tags": [
+    "repair",
+    "guardrail"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "repair",
+        "--kyro-scope",
+        "demo",
+        "--yes"
+      ],
+      "expect": {
+        "exitCode": 1,
+        "stderrIncludes": [
+          "shape drift"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": true
+}

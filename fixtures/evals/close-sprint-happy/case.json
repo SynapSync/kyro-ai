@@ -1,0 +1,34 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "close-sprint-happy",
+  "title": "Close sprint snapshots and clears active sprint",
+  "kind": "replay",
+  "tags": [
+    "close-sprint",
+    "happy"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "close-sprint",
+        "--kyro-scope",
+        "demo",
+        "--outcome",
+        "shipped",
+        "--yes"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "Sprint 1 closed",
+          "activeSprint cleared"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": true
+}

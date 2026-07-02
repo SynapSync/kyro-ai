@@ -1,0 +1,46 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "clarity-gate",
+  "title": "Clarification markers block doctor and analyze",
+  "kind": "replay",
+  "tags": [
+    "guardrail",
+    "clarity"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 1,
+        "stdoutIncludes": [
+          "[FAIL]",
+          "NEEDS CLARIFICATION"
+        ]
+      }
+    },
+    {
+      "run": [
+        "analyze",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 1,
+        "stdoutIncludes": [
+          "CRITICAL",
+          "clarity"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}
