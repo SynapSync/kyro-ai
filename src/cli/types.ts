@@ -214,11 +214,50 @@ export type BudgetManifest = Record<BudgetClassId, BudgetClassDefinition>;
 
 export interface OperationPlan {
   action: 'write' | 'copy' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'symlink' | 'merge-json' | 'remove-json-key';
+  commentStyle?: 'html' | 'hash';
   path: string;
   source?: string;
   content?: string;
   blockName?: string;
   jsonPath?: string;
+}
+
+
+// --- portable guardrail policy ---
+
+export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'clear_active_sprint' | 'delete_archive';
+export type GuardLevel = 'tool_owned' | 'confirm' | 'blocked';
+export type GuardDecisionKind = 'allow' | 'confirmation_required' | 'blocked';
+export type EnforcementTier = 'enforced' | 'advisory';
+
+export interface PolicyOperationRule {
+  level: GuardLevel;
+}
+
+export interface PolicyDefinition {
+  policyVersion: 1;
+  operations: Record<GuardedOperation, PolicyOperationRule>;
+  allow: GuardedOperation[];
+}
+
+export interface PolicyIssue {
+  field: string;
+  message: string;
+}
+
+export interface GuardContext {
+  surface: 'cli' | 'mcp';
+  scope?: string;
+  confirmed: boolean;
+}
+
+export interface GuardDecision {
+  op: GuardedOperation;
+  level: GuardLevel;
+  kind: GuardDecisionKind;
+  code?: 'CONFIRMATION_REQUIRED' | 'POLICY_BLOCKED';
+  message: string;
+  remedy?: string;
 }
 
 // --- append-only trace model (audit trail, never source of truth) ---

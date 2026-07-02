@@ -5,6 +5,9 @@ import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
 import { resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
+import { KyroCoreError } from '../core/errors';
+import { evaluateGuard } from '../core/policy';
+import { emitBlockedReason, emitGateApproved } from '../core/trace';
 import { inspectScope } from './artifact-doctor';
 import { listScopeNames } from '../artifacts/scopes';
 import type { KyroProjectState } from '../types';
@@ -25,8 +28,9 @@ export function runScopeCommand(args: string[]): void {
     return;
   }
   if (subcommand === 'set-active') {
-    if (!maybeScope) throw new Error('Usage: kyro scope set-active <scope>');
-    setActiveScope(maybeScope);
+    const parsed = parseSetActiveArgs(args.slice(1));
+    if (!parsed.scope) throw new Error('Usage: kyro scope set-active <scope> [--yes] [--dry-run]');
+    setActiveScope(parsed.scope, parsed.yes, parsed.dryRun);
     return;
   }
   throw new Error(`Unknown scope subcommand: ${subcommand}. Run kyro scope --help.`);
@@ -74,18 +78,45 @@ function printScopeSummary(scope: string): void {
   console.log('');
 }
 
-function setActiveScope(scope: string): void {
+function setActiveScope(scope: string, yes: boolean, dryRun: boolean): void {
   const state = readProjectState();
   if (!state) throw new Error(`Kyro project state not found: ${KYRO_STATE_PATH}`);
   if (!scopeExists(scope, state)) throw new Error(`Scope not found: ${scope}`);
+  const guard = evaluateGuard('scope_set_active', { surface: 'cli', scope, confirmed: yes });
+  if (guard.kind === 'blocked') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
+  }
+  if (guard.kind === 'confirmation_required') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
+  }
   const scopes = [...state.scopes];
   if (!scopes.some((entry) => entry.id === scope)) {
     scopes.push({ id: scope, title: scope, status: 'active' });
   }
   scopes.sort((a, b) => a.id.localeCompare(b.id));
   const nextState: KyroProjectState = { ...state, scopes, activeScope: scope };
+  if (dryRun) {
+    console.log(`Would set active Kyro scope to: ${scope}`);
+    return;
+  }
+  emitGateApproved(scope, 'scope_set_active');
   writeFileSync(resolveManagedPath(KYRO_STATE_PATH), `${JSON.stringify(nextState, null, 2)}\n`, 'utf-8');
   console.log(`Active Kyro scope set to: ${scope}`);
+}
+
+function parseSetActiveArgs(args: string[]): { scope: string; yes: boolean; dryRun: boolean } {
+  let scope = '';
+  let yes = false;
+  let dryRun = false;
+  for (const arg of args) {
+    if (arg === '--yes' || arg === '-y') yes = true;
+    else if (arg === '--dry-run') dryRun = true;
+    else if (!arg.startsWith('--') && !scope) scope = arg;
+    else throw new Error(`Unknown scope set-active option: ${arg}`);
+  }
+  return { scope, yes, dryRun };
 }
 
 function scopeExists(scope: string, state: KyroProjectState): boolean {
@@ -97,6 +128,6 @@ function printScopeHelp(): void {
   console.log(`Usage:
   kyro scope list
   kyro scope inspect <scope>
-  kyro scope set-active <scope>
+  kyro scope set-active <scope> --yes
 `);
 }

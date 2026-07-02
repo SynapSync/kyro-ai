@@ -32,6 +32,7 @@ Kyro gives agents:
 - **behavioral evals** (`kyro eval`) that replay agent-facing routing, guardrails, and artifact transitions
 - **typed MCP tools** (`kyro mcp serve`) for hosts that prefer structured tool calls over CLI text
 - **append-only trace events** (`kyro trace`) for audit/debugging without becoming a source of truth
+- **portable guardrails** for dangerous operations across CLI and MCP surfaces
 
 ---
 
@@ -396,3 +397,4 @@ Kyro uses lean runtime loading: command router → `sprint.json` state → one r
 - [Behavioral evals](docs/evals.md)
 - [MCP typed tools](docs/mcp.md)
 - [Trace events](docs/trace.md)
+- [Portable guardrails](docs/guardrails.md)

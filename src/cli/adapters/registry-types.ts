@@ -1,4 +1,5 @@
-import type { Agent, CheckResult, InstallScope, KyroInstalledAdapter, KyroManifest, OperationPlan } from '../types';
+import type { Agent, CheckResult, EnforcementTier, GuardLevel, GuardedOperation, InstallScope, KyroInstalledAdapter, KyroManifest, OperationPlan } from '../types';
+import { guardedOperationLevel } from '../core/policy';
 
 export type AdapterStatus = 'implemented' | 'planned';
 export type AdapterCapability =
@@ -51,8 +52,20 @@ export interface AdapterDefinition {
   mcpStrategy(): MCPStrategy;
   buildProjection(plan: OperationPlan[]): void;
   buildRemoval(plan: OperationPlan[]): void;
+  buildMcpProjection(plan: OperationPlan[]): void;
+  buildMcpRemoval(plan: OperationPlan[]): void;
   buildManagedFiles(): string[];
   buildManagedBlocks(): string[];
   buildInstalledAdapter(scope: InstallScope, installedAt: string): KyroInstalledAdapter;
   doctor(manifest: KyroManifest | null): CheckResult;
+}
+
+export function guardEnforcement(capabilities: AdapterCapability[], op: GuardedOperation): EnforcementTier {
+  const level = guardedOperationLevel(op);
+  return guardEnforcementForLevel(capabilities, level);
+}
+
+export function guardEnforcementForLevel(capabilities: AdapterCapability[], level: GuardLevel): EnforcementTier {
+  if (level === 'blocked' || level === 'tool_owned') return 'enforced';
+  return capabilities.includes('mcp') ? 'enforced' : 'advisory';
 }

@@ -82,3 +82,8 @@ Keep platform-specific behavior in adapters. The core workflow must remain porta
 ## Trace events
 
 All adapters can inspect Kyro's append-only trace through `kyro trace`. Trace files live under `.agents/kyro/scopes/{scope}/trace/events.ndjson`, are best-effort, and are never used for routing. See [trace.md](trace.md).
+
+
+## Portable guardrails
+
+Adapters report guardrail enforcement tiers through `kyro doctor --adapters`. MCP-capable adapters receive host-native MCP registration so Kyro can enforce confirm-level operations through typed tools. Text-only adapters are reported honestly as advisory where an agent could pass `--yes` unattended. See [guardrails.md](guardrails.md).

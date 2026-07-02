@@ -7,6 +7,8 @@ import { detectFromPaths } from './detection';
 
 const AGENTS_PATH = 'AGENTS.md';
 const KYRO_AGENTS_BLOCK = 'agents-md';
+const CODEX_MCP_CONFIG_PATH = '~/.codex/config.toml';
+const KYRO_MCP_BLOCK = 'mcp-server-kyro';
 
 export const codexAdapter: AdapterDefinition = {
   agent: AGENT.CODEX,
@@ -44,11 +46,23 @@ export const codexAdapter: AdapterDefinition = {
   buildRemoval(plan) {
     plan.push({ action: 'remove-block', path: AGENTS_PATH, blockName: KYRO_AGENTS_BLOCK });
   },
+  buildMcpProjection(plan) {
+    plan.push({
+      action: 'upsert-block',
+      path: CODEX_MCP_CONFIG_PATH,
+      blockName: KYRO_MCP_BLOCK,
+      commentStyle: 'hash',
+      content: '[mcp_servers.kyro]\ncommand = \"kyro\"\nargs = [\"mcp\", \"serve\"]',
+    });
+  },
+  buildMcpRemoval(plan) {
+    plan.push({ action: 'remove-block', path: CODEX_MCP_CONFIG_PATH, blockName: KYRO_MCP_BLOCK, commentStyle: 'hash' });
+  },
   buildManagedFiles() {
     return buildCommandSkillManagedFiles();
   },
   buildManagedBlocks() {
-    return [`${AGENTS_PATH}#${KYRO_AGENTS_BLOCK}`];
+    return [`${AGENTS_PATH}#${KYRO_AGENTS_BLOCK}`, `${CODEX_MCP_CONFIG_PATH}#${KYRO_MCP_BLOCK}`];
   },
   buildInstalledAdapter(scope, installedAt) {
     return {

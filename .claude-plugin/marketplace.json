@@ -49,5 +49,5 @@
       ]
     }
   ],
-  "description": "Sprint-based multi-agent workflow with deterministic evals, typed MCP tools, append-only trace events, checkpoint gates, and persistent learning"
+  "description": "Sprint-based multi-agent workflow with deterministic evals, typed MCP tools, trace events, portable guardrails, checkpoint gates, and persistent learning"
 }

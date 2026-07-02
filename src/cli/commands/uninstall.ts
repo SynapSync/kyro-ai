@@ -18,6 +18,7 @@ export function uninstall(options: CliOptions): void {
   const purgeDirectories = new Set<string>();
   for (const adapter of getInstalledAdapterDefinitions(state.installedAdapters.map((installedAdapter) => installedAdapter.agent))) {
     adapter.buildRemoval(plan);
+    if (adapter.capabilities().includes('mcp')) adapter.buildMcpRemoval(plan);
     if (options.purgeAdapterAssets) {
       for (const file of adapter.buildManagedFiles()) {
         plan.push({ action: 'remove', path: file });

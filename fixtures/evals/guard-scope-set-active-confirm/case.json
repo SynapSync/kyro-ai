@@ -1,0 +1,26 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "guard-scope-set-active-confirm",
+  "title": "scope set-active requires explicit confirmation",
+  "kind": "replay",
+  "tags": ["guardrails", "scope"],
+  "agents": ["any"],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": ["scope", "set-active", "demo"],
+      "expect": {
+        "exitCode": 1,
+        "stderrIncludes": ["requires explicit confirmation"]
+      }
+    },
+    {
+      "run": ["scope", "set-active", "demo", "--yes"],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": ["Active Kyro scope set to: demo"]
+      }
+    }
+  ],
+  "expectFinalState": false
+}

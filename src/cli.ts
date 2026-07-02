@@ -5,6 +5,7 @@ import { KyroCoreError } from './cli/core/errors';
 void runCli().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`ERROR: ${message}`);
+  if (error instanceof KyroCoreError) console.error(`Code: ${error.code}`);
   if (error instanceof KyroCoreError && error.remedy) console.error(`Remedy: ${error.remedy}`);
   process.exit(1);
 });

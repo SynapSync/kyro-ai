@@ -1,6 +1,8 @@
-export function upsertManagedBlock(existing: string, blockName: string, content: string): string {
-  const block = formatManagedBlock(blockName, content);
-  const pattern = managedBlockPattern(blockName);
+export type ManagedBlockCommentStyle = 'html' | 'hash';
+
+export function upsertManagedBlock(existing: string, blockName: string, content: string, style: ManagedBlockCommentStyle = 'html'): string {
+  const block = formatManagedBlock(blockName, content, style);
+  const pattern = managedBlockPattern(blockName, style);
   if (pattern.test(existing)) {
     return existing.replace(pattern, block);
   }
@@ -8,28 +10,28 @@ export function upsertManagedBlock(existing: string, blockName: string, content:
   return `${existing.trimEnd()}${separator}${block}\n`;
 }
 
-export function removeManagedBlock(existing: string, blockName: string): string {
-  return existing.replace(managedBlockPattern(blockName), '').trimEnd() + '\n';
+export function removeManagedBlock(existing: string, blockName: string, style: ManagedBlockCommentStyle = 'html'): string {
+  return existing.replace(managedBlockPattern(blockName, style), '').trimEnd() + '\n';
 }
 
-export function hasManagedBlockContent(existing: string, blockName: string): boolean {
-  return existing.includes(startMarker(blockName)) && existing.includes(endMarker(blockName));
+export function hasManagedBlockContent(existing: string, blockName: string, style: ManagedBlockCommentStyle = 'html'): boolean {
+  return existing.includes(startMarker(blockName, style)) && existing.includes(endMarker(blockName, style));
 }
 
-export function formatManagedBlock(blockName: string, content: string): string {
-  return `${startMarker(blockName)}\n${content.trim()}\n${endMarker(blockName)}`;
+export function formatManagedBlock(blockName: string, content: string, style: ManagedBlockCommentStyle = 'html'): string {
+  return `${startMarker(blockName, style)}\n${content.trim()}\n${endMarker(blockName, style)}`;
 }
 
-export function startMarker(blockName: string): string {
-  return `<!-- kyro-ai:${blockName}:start -->`;
+export function startMarker(blockName: string, style: ManagedBlockCommentStyle = 'html'): string {
+  return style === 'hash' ? `# kyro-ai:${blockName}:start` : `<!-- kyro-ai:${blockName}:start -->`;
 }
 
-export function endMarker(blockName: string): string {
-  return `<!-- kyro-ai:${blockName}:end -->`;
+export function endMarker(blockName: string, style: ManagedBlockCommentStyle = 'html'): string {
+  return style === 'hash' ? `# kyro-ai:${blockName}:end` : `<!-- kyro-ai:${blockName}:end -->`;
 }
 
-function managedBlockPattern(blockName: string): RegExp {
-  return new RegExp(`${escapeRegExp(startMarker(blockName))}[\\s\\S]*?${escapeRegExp(endMarker(blockName))}\\n?`, 'm');
+function managedBlockPattern(blockName: string, style: ManagedBlockCommentStyle): RegExp {
+  return new RegExp(`${escapeRegExp(startMarker(blockName, style))}[\\s\\S]*?${escapeRegExp(endMarker(blockName, style))}\\n?`, 'm');
 }
 
 function escapeRegExp(value: string): string {

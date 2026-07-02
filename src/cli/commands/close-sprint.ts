@@ -5,7 +5,8 @@ import { applyPlan, printPlan, resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { KyroCoreError } from '../core/errors';
-import { emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
+import { evaluateGuard } from '../core/policy';
+import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
@@ -59,6 +60,12 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
   }
 
   emitToolCommandRun(scope, 'cli', 'close-sprint', { outcome: args.outcome });
+  const guard = evaluateGuard('close_sprint', { surface: 'cli', scope, confirmed: true });
+  if (guard.kind === 'blocked') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
+  }
+  emitGateApproved(scope, 'close_sprint');
   applyPlan(plan);
 
   // Re-parse the written sprint.json to prove validity (the safe-write verify step).
