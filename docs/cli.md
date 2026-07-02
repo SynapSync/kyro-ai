@@ -157,17 +157,17 @@ The uninstall output includes a summary with overlay, purged file, and empty-dir
 .agents/kyro/kyro.json
 ```
 
-It does not create scoped state. Scoped state, indexes, and summaries are created later when a scope is created or opened by forge/INIT.
+It does not create per-scope files. Each scope's `sprint.json` (the single source of truth for that scope) is created later by forge/INIT.
 
-Initial state shape:
+Initial state shape (`runtimeVersion` reflects the installed CLI version):
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 4,
   "artifactRoot": ".agents/kyro/scopes",
   "scopes": [],
   "activeScope": null,
-  "runtimeVersion": "4.2.0",
+  "runtimeVersion": "4.3.0",
   "runtimePath": "~/.agents/kyro/current",
   "installedAdapters": []
 }
