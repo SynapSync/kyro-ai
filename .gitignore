@@ -8,7 +8,7 @@ dist/
 .atl/
 
 
-# AI 
-.agents/
+# AI runtime state
+/.agents/
 .claude-plugin/
 .cursor/

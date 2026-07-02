@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 4,
+  "scope": "demo",
+  "title": "Demo",
+  "status": "active",
+  "objective": "Demo objective",
+  "successCriteria": [
+    "Demo works."
+  ],
+  "clarifications": [],
+  "conventions": [
+    {
+      "id": "c1",
+      "rule": "Use focused tests.",
+      "tags": [
+        "testing"
+      ],
+      "addedSprint": 1
+    },
+    {
+      "id": "c2",
+      "rule": "Ignore marketing copy.",
+      "tags": [
+        "docs"
+      ],
+      "addedSprint": 1
+    }
+  ],
+  "roadmap": {
+    "plannedSprintCount": 1,
+    "sizingRationale": "One sprint is enough.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "demo-sprint",
+        "title": "Demo Sprint",
+        "state": "active"
+      }
+    ]
+  },
+  "ledger": [],
+  "previousSprint": null,
+  "activeSprint": {
+    "n": 1,
+    "slug": "demo-sprint",
+    "title": "Demo Sprint",
+    "objective": "Ship demo sprint.",
+    "status": "executing",
+    "phases": [
+      {
+        "id": "P1",
+        "title": "Demo Phase",
+        "objective": "Complete demo work.",
+        "status": "executing",
+        "tasks": [
+          {
+            "id": "T1.1",
+            "title": "Implement demo",
+            "description": "Implement the demo task.",
+            "files_to_touch": [
+              "src/demo.ts"
+            ],
+            "context": "Use the existing demo pattern.",
+            "acceptance_criteria": [
+              "Validation passes."
+            ],
+            "depends_on": [],
+            "status": "pending",
+            "evidence": null,
+            "verdict": null
+          }
+        ]
+      }
+    ],
+    "emergentTasks": [],
+    "definitionOfDone": [
+      "All tasks done."
+    ]
+  },
+  "debt": [],
+  "handoff": {
+    "nextAction": "execute_task",
+    "nextTaskId": "T1.1",
+    "blockers": [],
+    "note": "Resume demo.",
+    "lastUpdated": "2026-07-02"
+  }
+}

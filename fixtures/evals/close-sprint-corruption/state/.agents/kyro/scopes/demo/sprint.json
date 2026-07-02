@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 4,
+  "scope": "demo",
+  "title": "Demo",
+  "status": "active",
+  "objective": "Demo objective",
+  "successCriteria": [
+    "Demo works."
+  ],
+  "clarifications": [],
+  "conventions": [],
+  "roadmap": {
+    "plannedSprintCount": 1,
+    "sizingRationale": "One sprint is enough.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "demo-sprint",
+        "title": "Demo Sprint",
+        "state": "active"
+      }
+    ]
+  },
+  "ledger": [
+    {
+      "n": 1,
+      "slug": "demo-sprint",
+      "outcome": "shipped",
+      "closedAt": "2026-07-02",
+      "archive": "archive/sprint-001-demo-sprint.md",
+      "snapshot": "archive/missing.json"
+    }
+  ],
+  "previousSprint": null,
+  "activeSprint": null,
+  "debt": [],
+  "handoff": {
+    "nextAction": "wrap_up",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "Resume demo.",
+    "lastUpdated": "2026-07-02"
+  }
+}
