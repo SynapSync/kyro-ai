@@ -23,7 +23,7 @@ export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adap
   if (failed) process.exit(1);
 }
 
-function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, kyroScope: string | null): CheckResult[] {
+export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, kyroScope: string | null): CheckResult[] {
   const checks = [
     checkPackageVersionSync(),
     checkPackageAssets(),
@@ -158,7 +158,8 @@ function checkAdapterInventory(): CheckResult[] {
       `managedBlocks=${managedBlocks.length}`,
       `nativePaths=${nativePaths}`,
       `systemPromptStrategy=${adapter.systemPromptStrategy()}`,
-      `mcpStrategy=${adapter.mcpStrategy()}`,
+      `mcpConfigStrategy=${adapter.mcpStrategy()}`,
+      'mcpServer=kyro mcp serve',
       `capabilities=${capabilities.length > 0 ? capabilities.join(',') : 'none'}`,
     ].join('; ');
 

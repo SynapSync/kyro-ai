@@ -30,6 +30,7 @@ Kyro gives agents:
 - **zero-loss archives** — every closed sprint is snapshotted verbatim before it is cleared
 - **deterministic CLI gates** (`doctor`, `analyze`) so quality is enforced in code, not left to prompt discipline
 - **behavioral evals** (`kyro eval`) that replay agent-facing routing, guardrails, and artifact transitions
+- **typed MCP tools** (`kyro mcp serve`) for hosts that prefer structured tool calls over CLI text
 
 ---
 
@@ -392,3 +393,4 @@ Kyro uses lean runtime loading: command router → `sprint.json` state → one r
 ## Documentation
 
 - [Behavioral evals](docs/evals.md)
+- [MCP typed tools](docs/mcp.md)
