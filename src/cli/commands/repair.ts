@@ -7,6 +7,7 @@ import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile } from '../artifacts/schema';
 import type { CliOptions, OperationPlan } from '../types';
 import { resolveScope } from '../core/scope-resolution';
+import { emitToolCommandRun } from '../core/trace';
 
 /**
  * Repair: validate and normalize a scope's sprint.json (stable formatting + trailing newline).
@@ -28,6 +29,7 @@ export async function repair(options: CliOptions): Promise<void> {
       return;
     }
   }
+  emitToolCommandRun(scope, 'cli', 'repair');
   applyPlan(plan);
   console.log(`sprint.json normalized for scope: ${scope}`);
 }

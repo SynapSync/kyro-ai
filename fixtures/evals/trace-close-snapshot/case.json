@@ -1,0 +1,20 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "trace-close-snapshot",
+  "title": "Close sprint emits close snapshot trace event",
+  "kind": "replay",
+  "tags": ["trace", "close-sprint"],
+  "agents": ["any"],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": ["close-sprint", "--kyro-scope", "demo", "--outcome", "shipped", "--yes"],
+      "expect": { "exitCode": 0, "stdoutIncludes": ["Sprint 1 closed"] }
+    },
+    {
+      "run": ["trace", "--kyro-scope", "demo", "--json", "--type", "close_snapshot"],
+      "expect": { "exitCode": 0, "stdoutIncludes": ["\"type\":\"close_snapshot\"", "\"snapshotId\":\"sprint-001-demo-sprint.json\""] }
+    }
+  ],
+  "expectFinalState": false
+}

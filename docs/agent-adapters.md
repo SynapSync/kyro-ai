@@ -77,3 +77,8 @@ Cursor adapter automation is planned. Until then, use the standard install and r
 ## Compatibility rule
 
 Keep platform-specific behavior in adapters. The core workflow must remain portable through command routers, scoped state, summaries, and Markdown artifacts.
+
+
+## Trace events
+
+All adapters can inspect Kyro's append-only trace through `kyro trace`. Trace files live under `.agents/kyro/scopes/{scope}/trace/events.ndjson`, are best-effort, and are never used for routing. See [trace.md](trace.md).

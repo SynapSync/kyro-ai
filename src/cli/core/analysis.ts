@@ -5,6 +5,7 @@ import { readProjectState } from '../state';
 import type { ActiveSprint, AnalysisFinding, AnalysisSeverity, Phase, Principle, PrincipleCheck, SprintFile, Task } from '../types';
 import { KyroCoreError } from './errors';
 import { resolveScope } from './scope-resolution';
+import { emitBlockedReason, emitTraceEvent } from './trace';
 
 const SEVERITY_ORDER: AnalysisSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const MAX_FINDINGS = 50;
@@ -25,7 +26,21 @@ export function runAnalysis(requestedScope: string | null): AnalysisResult {
 
   const principles = readProjectState()?.principles ?? [];
   const findings = collectFindings(sprint, principles).slice(0, MAX_FINDINGS);
-  return { scope, findings, blocking: findings.some((f) => f.severity === 'CRITICAL' || f.severity === 'HIGH') };
+  const blocking = findings.some((f) => f.severity === 'CRITICAL' || f.severity === 'HIGH');
+  emitTraceEvent({
+    v: 1,
+    ts: new Date().toISOString(),
+    scope,
+    type: 'validation_result',
+    source: 'analyze',
+    blocking,
+    findingCount: findings.length,
+    codes: findings.map((finding) => finding.id),
+  });
+  for (const finding of findings.filter((f) => f.severity === 'CRITICAL' || f.severity === 'HIGH').slice(0, 3)) {
+    emitBlockedReason(scope, finding.detail, finding.id);
+  }
+  return { scope, findings, blocking };
 }
 
 export function collectFindings(sprint: SprintFile, principles: Principle[]): AnalysisFinding[] {

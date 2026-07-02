@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "events": [
+    { "v": 1, "ts": "2026-01-01T00:00:00.000Z", "scope": "demo", "type": "route_selected", "nextAction": "execute_task", "packMode": "task", "budgetClass": "execute", "reasoningTier": "standard" },
+    { "v": 1, "ts": "2026-01-01T00:00:00.000Z", "scope": "demo", "type": "tool_command_run", "surface": "cli", "command": "close-sprint", "args": { "outcome": "shipped" } },
+    { "v": 1, "ts": "2026-01-01T00:00:00.000Z", "scope": "demo", "type": "validation_result", "source": "analyze", "blocking": false, "findingCount": 0, "codes": [] },
+    { "v": 1, "ts": "2026-01-01T00:00:00.000Z", "scope": "demo", "type": "gate_approved", "gate": "review", "taskId": "T1" },
+    { "v": 1, "ts": "2026-01-01T00:00:00.000Z", "scope": "demo", "type": "retry_count", "round": 1, "limit": 3, "blocked": false },
+    { "v": 1, "ts": "2026-01-01T00:00:00.000Z", "scope": "demo", "type": "blocked_reason", "reason": "missing acceptance criteria", "code": "A001" },
+    { "v": 1, "ts": "2026-01-01T00:00:00.000Z", "scope": "demo", "type": "close_snapshot", "sprintN": 1, "snapshotId": "sprint-001-demo-sprint.json", "outcome": "shipped" }
+  ]
+}

@@ -10,6 +10,7 @@ export interface EvalExpectation {
 
 export interface EvalStep {
   run: string[];
+  env?: Record<string, string>;
   expect: EvalExpectation;
 }
 

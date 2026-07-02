@@ -186,6 +186,7 @@ export interface CliOptions {
   tokens: boolean;
   artifacts: boolean;
   adapters: boolean;
+  trace: boolean;
   kyroScope: string | null;
   task: string | null;
   json: boolean;
@@ -219,6 +220,50 @@ export interface OperationPlan {
   blockName?: string;
   jsonPath?: string;
 }
+
+// --- append-only trace model (audit trail, never source of truth) ---
+
+export type TraceEventType =
+  | 'route_selected'
+  | 'tool_command_run'
+  | 'validation_result'
+  | 'gate_approved'
+  | 'retry_count'
+  | 'blocked_reason'
+  | 'close_snapshot';
+
+export interface TraceEventBase {
+  v: 1;
+  ts: string;
+  scope: string;
+  type: TraceEventType;
+}
+
+export type TraceEvent =
+  | (TraceEventBase & {
+      type: 'route_selected';
+      nextAction: NextAction;
+      packMode: ContextPackMode;
+      budgetClass: string;
+      reasoningTier: string;
+    })
+  | (TraceEventBase & {
+      type: 'tool_command_run';
+      surface: 'cli' | 'mcp';
+      command: string;
+      args?: Record<string, string | number | boolean>;
+    })
+  | (TraceEventBase & {
+      type: 'validation_result';
+      source: 'analyze' | 'doctor';
+      blocking: boolean;
+      findingCount: number;
+      codes: string[];
+    })
+  | (TraceEventBase & { type: 'gate_approved'; gate: string; taskId?: string })
+  | (TraceEventBase & { type: 'retry_count'; round: number; limit: number; blocked: boolean })
+  | (TraceEventBase & { type: 'blocked_reason'; reason: string; code?: string })
+  | (TraceEventBase & { type: 'close_snapshot'; sprintN: number; snapshotId: string; outcome: 'shipped' | 'partial' | 'aborted' });
 
 
 export type AnalysisSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';

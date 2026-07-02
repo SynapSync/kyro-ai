@@ -11,6 +11,7 @@ export const CLI_COMMANDS = [
   'uninstall',
   'eval',
   'mcp',
+  'trace',
 ] as const;
 
 export type CliCommand = (typeof CLI_COMMANDS)[number];

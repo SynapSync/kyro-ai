@@ -15,7 +15,7 @@ export function runEvalCase(item: DiscoveredEvalCase, keepSandbox: boolean): Eva
   try {
     if (item.case.route) failures.push(...assertRoute(item, sandbox.root, sandbox.home));
     item.case.steps.forEach((step, index) => {
-      failures.push(...runStep(step.run, step.expect, sandbox.root, sandbox.home, index));
+      failures.push(...runStep(step.run, step.env ?? {}, step.expect, sandbox.root, sandbox.home, index));
     });
     if (item.case.expectFinalState) failures.push(...assertFinalState(item, sandbox.root));
   } finally {
@@ -48,8 +48,8 @@ function assertRoute(item: DiscoveredEvalCase, cwd: string, home: string): EvalF
   return failures;
 }
 
-function runStep(run: string[], expect: { exitCode: number; stdoutIncludes?: string[]; stdoutExcludes?: string[]; stderrIncludes?: string[]; stderrExcludes?: string[] }, cwd: string, home: string, index: number): EvalFailure[] {
-  const result = spawnCli(run, cwd, home);
+function runStep(run: string[], env: Record<string, string>, expect: { exitCode: number; stdoutIncludes?: string[]; stdoutExcludes?: string[]; stderrIncludes?: string[]; stderrExcludes?: string[] }, cwd: string, home: string, index: number): EvalFailure[] {
+  const result = spawnCli(run, cwd, home, env);
   const failures: EvalFailure[] = [];
   compare(failures, `step[${index}].exitCode`, expect.exitCode, result.status);
   for (const needle of expect.stdoutIncludes ?? []) if (!result.stdout.includes(needle)) failures.push({ at: `step[${index}].stdoutIncludes`, expected: needle, actual: result.stdout });
@@ -70,12 +70,12 @@ function assertFinalState(item: DiscoveredEvalCase, sandboxRoot: string): EvalFa
   return [];
 }
 
-function spawnCli(args: string[], cwd: string, home: string): { status: number; stdout: string; stderr: string } {
+function spawnCli(args: string[], cwd: string, home: string, extraEnv: Record<string, string> = {}): { status: number; stdout: string; stderr: string } {
   const cli = join(PACKAGE_ROOT, 'dist/cli.js');
   if (!existsSync(cli)) throw new Error('dist/cli.js missing. Run npm run build first.');
   const result = spawnSync(process.execPath, [cli, ...args], {
     cwd,
-    env: { ...process.env, HOME: home },
+    env: { ...process.env, HOME: home, ...extraEnv },
     encoding: 'utf-8',
   });
   return { status: result.status ?? 1, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
