@@ -3,10 +3,11 @@ import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { applyPlan, printPlan, resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
+import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
+import { KyroCoreError } from '../core/errors';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { listScopeFolders } from '../artifacts/scopes';
 import type { ActiveSprint, LedgerEntry, OperationPlan, SprintFile } from '../types';
 
 /**
@@ -39,7 +40,7 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
     return;
   }
 
-  const scope = resolveScope(args.scope);
+  const scope = resolveKyroScope(args.scope);
   const { sprint, plan, snapshotPath } = buildClosePlan(scope, args);
   printPlan(`Close sprint ${sprint.activeSprint!.n} (${sprint.activeSprint!.slug}) — zero-loss`, plan);
   console.log(`\nSnapshot (written first, never overwritten): ${snapshotPath}`);
@@ -79,29 +80,37 @@ export function buildClosePlan(
 ): { sprint: SprintFile; plan: OperationPlan[]; snapshotPath: string } {
   const root = scopeRoot(scope);
   if (!existsSync(resolveManagedPath(root))) {
-    throw new Error(`Scope not found: ${scope}`);
+    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see available scopes.');
   }
 
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) {
-    throw new Error(`Cannot close ${scope}: sprint.json not found. Run /kyro:forge (INIT) to create it.`);
+    throw new KyroCoreError('SCOPE_NOT_FOUND', `Cannot close ${scope}: sprint.json not found. Run /kyro:forge (INIT) to create it.`);
   }
   if (read.error) {
-    throw new Error(`Cannot close ${scope}: sprint.json is invalid JSON (${read.error}). Restore from an archive snapshot.`);
+    throw new KyroCoreError('INVALID_JSON', `Cannot close ${scope}: sprint.json is invalid JSON (${read.error}). Restore from an archive snapshot.`);
   }
   const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
     const detail = issues.map((i) => `${i.field} ${i.message}`).join('; ');
-    throw new Error(`Cannot close ${scope}: sprint.json has shape drift — ${detail}. Fix it before closing.`);
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot close ${scope}: sprint.json has shape drift — ${detail}. Fix it before closing.`);
   }
 
   const sprint = asSprintFile(read.value);
   if (!sprint) {
-    throw new Error(`Cannot close ${scope}: sprint.json is not a valid v4 SprintFile.`);
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot close ${scope}: sprint.json is not a valid v4 SprintFile.`);
   }
   const active = sprint.activeSprint;
   if (!active) {
-    throw new Error(`Cannot close ${scope}: activeSprint is null (no sprint in progress). Nothing to snapshot.`);
+    const latest = sprint.ledger[sprint.ledger.length - 1];
+    if (latest?.snapshot) {
+      throw new KyroCoreError(
+        'SNAPSHOT_EXISTS',
+        `Cannot close ${scope}: activeSprint is null and the latest ledger entry already has snapshot ${latest.snapshot}.`,
+        'This scope appears already closed for the latest sprint; do not double-close it.',
+      );
+    }
+    throw new KyroCoreError('INVALID_INPUT', `Cannot close ${scope}: activeSprint is null (no sprint in progress). Nothing to snapshot.`);
   }
 
   const nnn = String(active.n).padStart(3, '0');
@@ -113,8 +122,10 @@ export function buildClosePlan(
   // Audit-trail protection: never overwrite an existing snapshot. A collision means this sprint
   // number was already closed — exactly the double-close that destroyed Sprint 1 data before.
   if (existsSync(resolveManagedPath(snapshotPath))) {
-    throw new Error(
+    throw new KyroCoreError(
+      'SNAPSHOT_EXISTS',
       `Refusing to close: snapshot already exists at ${snapshotPath}. Sprint ${active.n} appears already closed; overwriting would destroy the audit trail.`,
+      'Do not overwrite archives. Inspect the ledger/snapshot and choose the next valid action.',
     );
   }
 
@@ -334,16 +345,6 @@ function buildScopeCompletedPlan(scope: string): OperationPlan | null {
   return { action: 'write', path: projectStatePath(), content: `${JSON.stringify(updated, null, 2)}\n` };
 }
 
-function resolveScope(requested: string | null): string {
-  if (requested) return requested;
-  const state = readProjectState();
-  if (state?.activeScope) return state.activeScope;
-  const scopes = new Set<string>((state?.scopes ?? []).map((s) => s.id));
-  for (const folder of listScopeFolders()) scopes.add(folder);
-  if (scopes.size === 1) return [...scopes][0];
-  if (scopes.size === 0) throw new Error('No Kyro scopes found. Pass --kyro-scope <scope>.');
-  throw new Error(`Multiple scopes found (${[...scopes].sort().join(', ')}). Pass --kyro-scope <scope>.`);
-}
 
 function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
   let scope: string | null = null;

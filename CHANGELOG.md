@@ -4,6 +4,41 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.0] - 2026-07-02
+
+Adds a tools-only MCP typed tool surface over Kyro's deterministic CLI core.
+
+### Added
+
+- `kyro mcp serve` stdio server with JSON-RPC lifecycle, tools/list, tools/call, ping, protocol negotiation, and stdout purity.
+- `kyro mcp tools` for printing the tool catalog.
+- Seven typed MCP tools: `context_pack`, `doctor_artifacts`, `analyze_scope`, `close_sprint`, `scope_list`, `scope_inspect`, `repair_scope`.
+- Shared core layer for scope resolution, analysis, scope listing, and structured `KyroCoreError` envelopes.
+- Two-phase mutation protocol for MCP mutations: dry-run plan by default, apply only with `confirm: true`.
+- `check:mcp` conformance gate and `fixtures/mcp/tool-catalog.golden.json`.
+- `docs/mcp.md` with host registration examples.
+
+### Changed
+
+- `kyro analyze` now uses the shared analysis core; CLI behavior remains pinned by evals.
+- `close-sprint` double-close errors now expose the stable `SNAPSHOT_EXISTS` code.
+
+## [4.4.0] - 2026-07-02
+
+Adds deterministic behavioral evals for agent-facing Kyro contracts.
+
+### Added
+
+- `kyro eval` command with strict `case.json` manifests, isolated temp sandboxes, route assertions, CLI step expectations, final-state normalization, human output, and `--json` reports.
+- `fixtures/evals/` seed suite with 15 replay cases covering all routes, known guardrail failures, close-sprint happy path, task-mode context packs, and adapter filtering.
+- `check:eval` and `check:eval-harness` regression gates, now included in `npm run check`.
+- Code-owned routing contract (`src/cli/routing.ts`) plus `check:routing` to prevent drift between `agents/orchestrator.md` and runtime route resolution.
+- `context-pack --json` now includes `routing.modes` for machine-checkable route assertions.
+
+### Changed
+
+- `agents/orchestrator.md` now documents the `clarify` route explicitly.
+
 ## [4.3.0] - 2026-07-01
 
 Documentation audit, bug fixes, and token optimization. Eliminates all artifact model drift and
@@ -11,9 +46,20 @@ removes stale forward-looking docs.
 
 ### Fixed
 
+- **Critical (schema/runtime contract):** `kyro doctor --artifacts` now validates every field the
+  runtime consumes from `activeSprint` (`objective`, `definitionOfDone`, `phases[].id/title`,
+  `tasks[].title`) and from `roadmap.sprints[]` (`n`, `slug`, `title`, `state`). Previously an
+  incomplete `sprint.json` could PASS the doctor and then crash `close-sprint`. Regression fixtures
+  added. Contract: if the doctor says PASS, no downstream command may crash on a missing field.
 - **Critical:** `kyro analyze` error message no longer references the removed `kyro migrate` command.
+- **High:** `package-lock.json` was stale (pinned 3.4.3); regenerated at the release version and now
+  enforced by `check:versions`. Removed the non-canonical `pnpm-lock.yaml` (CI uses `npm ci`).
 - **High:** 10 documentation files rewritten to reflect the `sprint.json`-only model; eliminated all
   references to pre-4.0 artifacts (`state.json`, `index.json`, `ROADMAP.md`, `events.ndjson`, `phases/`).
+- Docs no longer reference removed scripts (`check:artifact-fixtures`, `check:context-pack`) in
+  `cli.md`, `release-checklist.md`, and `cost-model.md`.
+- `KYRO_WORKFLOW.stateModel` public export corrected from `markdown` to `sprint-json`.
+- Removed dead `checkTemplateBudget` helper; strict `tsc --noUnusedLocals --noUnusedParameters` is clean.
 
 ### Removed
 
@@ -68,7 +114,7 @@ is enforced deterministically by the CLI, not left to prose a weak model can ign
   non-zero on CRITICAL/HIGH. Gate before `close_sprint`. `--json` supported.
 - **Project-level principles.** `kyro.json.principles[]` (authored, immutable — spec-kit's
   "constitution"), distinct from learned `conventions[]`. Each `{ id, rule, severity, rationale,
-  check? }`; principles with a built-in `check` are enforced deterministically by `kyro analyze`,
+check? }`; principles with a built-in `check` are enforced deterministically by `kyro analyze`,
   free-text ones are agent gates at `plan-sprint`/`review-task`.
 - `successCriteria[]` on `sprint.json` — technology-agnostic, measurable outcomes (the WHAT/WHY layer).
 

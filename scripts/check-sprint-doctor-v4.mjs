@@ -195,4 +195,33 @@ assertCase(
   'unresolved [NEEDS CLARIFICATION]',
 );
 
+// 9. REGRESSION (schema/runtime contract): an activeSprint missing a field the runtime consumes
+//    (definitionOfDone — close-sprint reads `.length`) must FAIL the doctor, never PASS and then
+//    crash close-sprint. If the doctor says PASS, no downstream command may explode.
+const { definitionOfDone: _dod, ...activeWithoutDod } = validSprintJson.activeSprint;
+assertCase(
+  'incomplete-active-sprint',
+  validKyroJson,
+  { ...validSprintJson, activeSprint: activeWithoutDod },
+  1,
+  'activeSprint.definitionOfDone',
+);
+
+// 10. Same contract for tasks: a task missing `title` (consumed by the narrative render) must FAIL.
+const taskWithoutTitle = { ...validSprintJson.activeSprint.phases[0].tasks[0] };
+delete taskWithoutTitle.title;
+assertCase(
+  'task-missing-title',
+  validKyroJson,
+  {
+    ...validSprintJson,
+    activeSprint: {
+      ...validSprintJson.activeSprint,
+      phases: [{ ...validSprintJson.activeSprint.phases[0], tasks: [taskWithoutTitle] }],
+    },
+  },
+  1,
+  'tasks[0].title',
+);
+
 console.log('check:sprint-doctor-v4 — all cases passed');

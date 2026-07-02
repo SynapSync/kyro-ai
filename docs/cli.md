@@ -10,6 +10,8 @@ kyro install            # Install standard .agents assets by default
 kyro doctor             # Read-only package/workspace health check
 kyro doctor --tokens    # Audit context/token budgets
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
+kyro eval               # Run deterministic behavioral eval cases
+kyro mcp serve          # Start the tools-only MCP stdio server
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
@@ -47,13 +49,11 @@ This exercises adapter detection, install plans, preflight, doctor output, JSON 
 The full release validation sequence is:
 
 ```bash
-npm run check        # includes check:dist
 npm run build
+npm run check        # typecheck + versions + links + runtime-artifacts + dist + budget-manifest + sprint-doctor-v4
 npm run check:adapters
 npm run check:tokens
 npm run check:artifacts
-npm run check:artifact-fixtures
-npm run check:context-pack
 npm pack --dry-run
 ```
 
@@ -102,11 +102,11 @@ The project keeps only state and artifacts:
 
 Implemented workspace adapters:
 
-| Adapter | Purpose |
-| --- | --- |
-| `standard` | Base `~/.agents/skills/kyro-*` command skill projection for compatible agents |
+| Adapter    | Purpose                                                                                                                      |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `standard` | Base `~/.agents/skills/kyro-*` command skill projection for compatible agents                                                |
 | `opencode` | Native OpenCode skills, commands under `~/.config/opencode/commands/kyro/`, and `agent.kyro-orchestrator` in `opencode.json` |
-| `codex` | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block |
+| `codex`    | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block                                       |
 
 Default install uses `standard`:
 
@@ -159,22 +159,21 @@ The uninstall output includes a summary with overlay, purged file, and empty-dir
 .agents/kyro/kyro.json
 ```
 
-It does not create scoped state. Scoped state, indexes, and summaries are created later when a scope is created or opened by forge/INIT.
+It does not create per-scope files. Each scope's `sprint.json` (the single source of truth for that scope) is created later by forge/INIT.
 
-Initial state shape:
+Initial state shape (`runtimeVersion` reflects the installed CLI version):
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 4,
   "artifactRoot": ".agents/kyro/scopes",
   "scopes": [],
   "activeScope": null,
-  "runtimeVersion": "4.2.0",
+  "runtimeVersion": "4.3.0",
   "runtimePath": "~/.agents/kyro/current",
   "installedAdapters": []
 }
 ```
-
 
 ## Token Audit
 
@@ -191,7 +190,6 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - `sizingDecision` regression fixture stays internally consistent
 
 Warnings mean Kyro still works, but the harness is becoming expensive to load. Failing sizing checks mean INIT can no longer prove its sprint boundaries.
-
 
 ## Context Pack
 
@@ -210,15 +208,9 @@ The command reads the scope's structured artifact first:
 
 - `sprint.json`
 
-It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, warnings, budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
+It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, warnings, machine-checkable routing (`routing.modes`), budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
 
 Prefer `context-pack` over manual file selection at session start, after compaction, or when resuming a scope through summary-first routing.
-
-Fixture validation:
-
-```bash
-npm run check:context-pack
-```
 
 ## Artifact Integrity
 
@@ -294,3 +286,11 @@ The Claude plugin adapter remains first-class through `.claude-plugin/`. The CLI
 ## Unsupported Generic Adapter
 
 Kyro does not provide `--agent generic`. Cross-agent instructions belong in root `AGENTS.md`, and adapter installs should target concrete agent capabilities.
+
+## Behavioral Evals
+
+Use `kyro eval` to run deterministic agent-facing regression cases from `fixtures/evals/`. It supports `--case`, `--tag`, `--agent`, `--json`, `--list`, and `--keep-sandbox`. See [evals.md](evals.md).
+
+## MCP Server
+
+Use `kyro mcp serve` to expose Kyro operations as typed MCP tools over stdio. Use `kyro mcp tools` to print the catalog. See [mcp.md](mcp.md).

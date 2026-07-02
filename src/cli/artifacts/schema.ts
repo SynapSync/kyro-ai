@@ -212,7 +212,11 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
     issues.push({ path, field: 'roadmap', message: 'must be an object' });
   } else {
     requireNumber(value.roadmap, 'plannedSprintCount', path, issues, 'roadmap.plannedSprintCount');
-    if (!Array.isArray(value.roadmap.sprints)) issues.push({ path, field: 'roadmap.sprints', message: 'must be an array' });
+    if (!Array.isArray(value.roadmap.sprints)) {
+      issues.push({ path, field: 'roadmap.sprints', message: 'must be an array' });
+    } else {
+      value.roadmap.sprints.forEach((s, i) => validateRoadmapSprint(s, path, `roadmap.sprints[${i}]`, issues));
+    }
   }
 
   if (!Array.isArray(value.ledger)) {
@@ -278,6 +282,22 @@ function validateLedgerEntry(value: unknown, path: string, prefix: string, issue
   }
 }
 
+/** Roadmap sprint entries are consumed by close-sprint (`s.n`, `s.state`) and narrative render (`s.title`). */
+function validateRoadmapSprint(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { n, slug, title, state }' });
+    return;
+  }
+  requireNumber(value, 'n', path, issues, `${prefix}.n`);
+  requireString(value, 'slug', path, issues, `${prefix}.slug`);
+  requireString(value, 'title', path, issues, `${prefix}.title`);
+  requireString(value, 'state', path, issues, `${prefix}.state`);
+}
+
+/**
+ * Validate every field the runtime (close-sprint, analyze, context-pack) reads from activeSprint.
+ * Contract: if this passes, no downstream command may crash on a missing field.
+ */
 function validateActiveSprint(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
   if (!isRecord(value)) {
     issues.push({ path, field: prefix, message: 'must be an object or null' });
@@ -285,11 +305,23 @@ function validateActiveSprint(value: unknown, path: string, prefix: string, issu
   }
   requireNumber(value, 'n', path, issues, `${prefix}.n`);
   requireString(value, 'slug', path, issues, `${prefix}.slug`);
+  requireString(value, 'objective', path, issues, `${prefix}.objective`);
+  // title is a v4.2 addition — optional (narrative falls back to roadmap title → objective).
+  if ('title' in value && typeof value.title !== 'string') {
+    issues.push({ path, field: `${prefix}.title`, message: 'must be a string when present' });
+  }
+  requireStringArrayField(value, 'definitionOfDone', path, issues, `${prefix}.definitionOfDone`);
   if (!Array.isArray(value.phases)) {
     issues.push({ path, field: `${prefix}.phases`, message: 'must be an array' });
   } else {
     value.phases.forEach((phase, pi) => {
-      if (!isRecord(phase) || !Array.isArray(phase.tasks)) {
+      if (!isRecord(phase)) {
+        issues.push({ path, field: `${prefix}.phases[${pi}]`, message: 'must be an object' });
+        return;
+      }
+      requireString(phase, 'id', path, issues, `${prefix}.phases[${pi}].id`);
+      requireString(phase, 'title', path, issues, `${prefix}.phases[${pi}].title`);
+      if (!Array.isArray(phase.tasks)) {
         issues.push({ path, field: `${prefix}.phases[${pi}].tasks`, message: 'must be an array' });
         return;
       }
@@ -304,6 +336,7 @@ function validateTask(value: unknown, path: string, prefix: string, issues: Vali
     return;
   }
   requireString(value, 'id', path, issues, `${prefix}.id`);
+  requireString(value, 'title', path, issues, `${prefix}.title`);
   requireString(value, 'description', path, issues, `${prefix}.description`);
   requireLiteralSet(value, 'status', TASK_STATUS_VALUES, path, issues, `${prefix}.status`);
 }

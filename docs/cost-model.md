@@ -69,7 +69,6 @@ Fixture validation:
 
 ```bash
 npm run check:budget-manifest
-npm run check:context-pack
 ```
 
 ## Quality Boundary

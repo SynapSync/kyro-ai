@@ -16,6 +16,8 @@ Usage:
   kyro repair [options]        Validate and normalize a scope's sprint.json
   kyro close-sprint [options]  Snapshot + close the active sprint (zero-loss, tool-owned)
   kyro context-pack [options]  Emit a context package for a scope from sprint.json
+  kyro eval [options]          Run deterministic behavioral eval cases
+  kyro mcp <subcommand>        Run or inspect the Kyro MCP server
   kyro scope <subcommand>      List, inspect, or set active Kyro scopes
   kyro sync [options]          Refresh managed workspace assets
   kyro uninstall [options]     Remove managed workspace assets
@@ -41,6 +43,7 @@ Examples:
   kyro doctor --tokens --artifacts
   kyro repair --kyro-scope auth-refactor --dry-run
   kyro context-pack --kyro-scope 01-token-cost-optimization --json
+  kyro eval --json
   kyro scope list
 `);
 }
@@ -60,6 +63,11 @@ export function printCommandHelp(command: string): void {
     console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {
     console.log('Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--json]');
+  } else if (command === 'eval') {
+    console.log('Usage: kyro eval [--case <id>] [--tag <tag>] [--agent <name>] [--json] [--list] [--keep-sandbox]');
+    console.log('Exit codes: 0 all passed; 1 expectation failed; 2 harness error.');
+  } else if (command === 'mcp') {
+    console.log('Usage: kyro mcp serve | tools');
   } else if (command === 'scope') {
     console.log('Usage: kyro scope list | inspect <scope> | set-active <scope>');
   } else if (command === 'sync') {

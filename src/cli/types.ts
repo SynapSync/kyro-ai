@@ -191,6 +191,10 @@ export interface CliOptions {
   json: boolean;
   purgeAdapterAssets: boolean;
   prune: boolean;
+  evalCases: string[];
+  evalTags: string[];
+  evalList: boolean;
+  keepSandbox: boolean;
 }
 
 export type ContextPackMode = 'scope' | 'task';
@@ -214,6 +218,17 @@ export interface OperationPlan {
   content?: string;
   blockName?: string;
   jsonPath?: string;
+}
+
+
+export type AnalysisSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface AnalysisFinding {
+  id: string;
+  severity: AnalysisSeverity;
+  category: string;
+  detail: string;
+  remedy: string;
 }
 
 export interface CheckResult {
@@ -251,6 +266,7 @@ export interface ContextPackOutput {
   conventions: ContextPackConvention[];
   warnings: string[];
   estimatedTokens: number;
+  routing: { modes: string[] };
   budgetClass: BudgetClassId;
   reasoningTier: ReasoningTier;
   maxContextTokens: number;

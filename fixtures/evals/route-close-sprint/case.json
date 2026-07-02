@@ -1,0 +1,40 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "route-close-sprint",
+  "title": "Route close_sprint",
+  "kind": "replay",
+  "tags": [
+    "routing",
+    "close_sprint"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "[PASS]"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false,
+  "route": {
+    "nextAction": "close_sprint",
+    "expectedModes": [
+      "SPRINT.md",
+      "close-sprint.md"
+    ],
+    "expectedBudgetClass": "close",
+    "expectedReasoningTier": "deep"
+  }
+}

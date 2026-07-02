@@ -1,0 +1,40 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "route-review-task",
+  "title": "Route review_task",
+  "kind": "replay",
+  "tags": [
+    "routing",
+    "review_task"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "[PASS]"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false,
+  "route": {
+    "nextAction": "review_task",
+    "expectedModes": [
+      "SPRINT.md",
+      "review-task.md"
+    ],
+    "expectedBudgetClass": "review",
+    "expectedReasoningTier": "standard"
+  }
+}

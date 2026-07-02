@@ -121,14 +121,6 @@ function checkAnalysisHelperBudgets(): CheckResult[] {
   });
 }
 
-function checkTemplateBudget(file: string, budget: number, label: string): CheckResult {
-  const weighted = weightPackageFile(file);
-  if (weighted.words > budget) {
-    return warn(`token budget: ${label}`, `${file} has ${weighted.words} words`, 'Keep templates lean; avoid copying lifecycle rules already defined in modes/helpers.');
-  }
-  return pass(`token budget: ${label}`, `${weighted.words}/${budget} words`);
-}
-
 function checkRuntimeAssetBudget(file: string, budget: number, label: string): CheckResult {
   const weighted = weightPackageFile(file);
   if (weighted.words > budget) {

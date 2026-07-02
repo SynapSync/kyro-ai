@@ -2,17 +2,14 @@ import { existsSync } from 'node:fs';
 import { readJsonSafely } from '../artifacts/json';
 import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
-import { resolveBudgetRouting } from '../budget-manifest';
+import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
-import { readProjectState } from '../state';
 import { listScopeNames } from '../artifacts/scopes';
+import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, SprintFile, Task } from '../types';
 
 export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json'>): void {
-  const scope = resolveScope(options.kyroScope);
-  if (!scope) {
-    throw new Error('No Kyro scope selected. Use --kyro-scope <scope> or set activeScope in kyro.json.');
-  }
+  const scope = resolveKyroScope(options.kyroScope);
   if (!scopeExists(scope)) {
     throw new Error(`Scope not found: ${scope}. Run kyro scope list to see available scopes.`);
   }
@@ -41,7 +38,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const packMode: ContextPackMode = resolvePackMode(taskOption, sprint, warnings);
   const task = packMode === 'task' ? resolveTask(sprint, taskOption, warnings) : null;
 
-  const budgetRouting = resolveBudgetRouting(packMode, sprint.handoff.nextAction);
+  const routing = resolveRoute(sprint.handoff.nextAction, packMode);
   const openDebtCount = sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length;
   const conventions = selectConventions(sprint, packMode, task);
 
@@ -66,10 +63,11 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     blockers: sprint.handoff.blockers ?? [],
     conventions,
     warnings,
-    budgetClass: budgetRouting.budgetClass,
-    reasoningTier: budgetRouting.reasoningTier as ContextPackOutput['reasoningTier'],
-    maxContextTokens: budgetRouting.maxContextTokens,
-    budgetGuidance: budgetRouting.budgetGuidance,
+    routing: { modes: [...routing.modes] },
+    budgetClass: routing.budgetClass,
+    reasoningTier: routing.reasoningTier as ContextPackOutput['reasoningTier'],
+    maxContextTokens: routing.maxContextTokens,
+    budgetGuidance: routing.budgetGuidance,
   };
   return { ...packWithoutTokens, estimatedTokens: estimatePackTokens(packWithoutTokens) };
 }
@@ -113,10 +111,6 @@ function selectConventions(sprint: SprintFile, packMode: ContextPackMode, task: 
   return relevant.map((c) => ({ id: c.id, rule: c.rule, tags: c.tags }));
 }
 
-function resolveScope(kyroScope: string | null): string | null {
-  if (kyroScope) return kyroScope;
-  return readProjectState()?.activeScope ?? null;
-}
 
 function scopeExists(scope: string): boolean {
   if (listScopeNames().includes(scope)) return true;

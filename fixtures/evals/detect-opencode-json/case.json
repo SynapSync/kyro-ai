@@ -1,0 +1,32 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "detect-opencode-json",
+  "title": "Detect opencode json output is well-formed",
+  "kind": "replay",
+  "tags": [
+    "detect",
+    "adapter"
+  ],
+  "agents": [
+    "opencode"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "detect",
+        "--agent",
+        "opencode",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "\"agent\": \"opencode\"",
+          "\"installed\""
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}
