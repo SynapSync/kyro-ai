@@ -102,11 +102,11 @@ The project keeps only state and artifacts:
 
 Implemented workspace adapters:
 
-| Adapter | Purpose |
-| --- | --- |
-| `standard` | Base `~/.agents/skills/kyro-*` command skill projection for compatible agents |
+| Adapter    | Purpose                                                                                                                      |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `standard` | Base `~/.agents/skills/kyro-*` command skill projection for compatible agents                                                |
 | `opencode` | Native OpenCode skills, commands under `~/.config/opencode/commands/kyro/`, and `agent.kyro-orchestrator` in `opencode.json` |
-| `codex` | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block |
+| `codex`    | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block                                       |
 
 Default install uses `standard`:
 
@@ -175,7 +175,6 @@ Initial state shape (`runtimeVersion` reflects the installed CLI version):
 }
 ```
 
-
 ## Token Audit
 
 Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
@@ -191,7 +190,6 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - `sizingDecision` regression fixture stays internally consistent
 
 Warnings mean Kyro still works, but the harness is becoming expensive to load. Failing sizing checks mean INIT can no longer prove its sprint boundaries.
-
 
 ## Context Pack
 

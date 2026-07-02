@@ -4,6 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+<<<<<<< HEAD
 ## [4.5.0] - 2026-07-02
 
 Adds a tools-only MCP typed tool surface over Kyro's deterministic CLI core.
@@ -39,6 +40,8 @@ Adds deterministic behavioral evals for agent-facing Kyro contracts.
 
 - `agents/orchestrator.md` now documents the `clarify` route explicitly.
 
+=======
+>>>>>>> bbcf3ee (Release 4.3.0: docs audit, bug fixes, token optimization (#9))
 ## [4.3.0] - 2026-07-01
 
 Documentation audit, bug fixes, and token optimization. Eliminates all artifact model drift and
@@ -46,6 +49,7 @@ removes stale forward-looking docs.
 
 ### Fixed
 
+<<<<<<< HEAD
 - **Critical (schema/runtime contract):** `kyro doctor --artifacts` now validates every field the
   runtime consumes from `activeSprint` (`objective`, `definitionOfDone`, `phases[].id/title`,
   `tasks[].title`) and from `roadmap.sprints[]` (`n`, `slug`, `title`, `state`). Previously an
@@ -60,6 +64,11 @@ removes stale forward-looking docs.
   `cli.md`, `release-checklist.md`, and `cost-model.md`.
 - `KYRO_WORKFLOW.stateModel` public export corrected from `markdown` to `sprint-json`.
 - Removed dead `checkTemplateBudget` helper; strict `tsc --noUnusedLocals --noUnusedParameters` is clean.
+=======
+- **Critical:** `kyro analyze` error message no longer references the removed `kyro migrate` command.
+- **High:** 10 documentation files rewritten to reflect the `sprint.json`-only model; eliminated all
+  references to pre-4.0 artifacts (`state.json`, `index.json`, `ROADMAP.md`, `events.ndjson`, `phases/`).
+>>>>>>> bbcf3ee (Release 4.3.0: docs audit, bug fixes, token optimization (#9))
 
 ### Removed
 
