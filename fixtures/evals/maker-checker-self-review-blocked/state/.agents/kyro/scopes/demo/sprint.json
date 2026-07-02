@@ -50,24 +50,15 @@
             "depends_on": [],
             "status": "done",
             "evidence": {
-              "summary": "done",
-              "validation": "ok",
+              "summary": "Implemented demo.",
+              "validation": "npm test -- demo",
               "files_changed": [
                 "src/demo.ts"
               ],
-              "notes": "",
               "by": "maker",
               "recordedAt": "2026-07-02T00:00:00.000Z"
             },
-            "verdict": {
-              "result": "pass",
-              "checked_criteria": [
-                "Validation passes."
-              ],
-              "findings": [],
-              "by": "checker",
-              "reviewedAt": "2026-07-02T00:01:00.000Z"
-            }
+            "verdict": null
           }
         ]
       }
@@ -79,10 +70,10 @@
   },
   "debt": [],
   "handoff": {
-    "nextAction": "close_sprint",
+    "nextAction": "review_task",
     "nextTaskId": "T1.1",
     "blockers": [],
-    "note": "Resume demo.",
+    "note": "Review demo.",
     "lastUpdated": "2026-07-02"
   }
 }

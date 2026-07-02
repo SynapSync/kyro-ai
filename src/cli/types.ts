@@ -72,6 +72,18 @@ export interface Clarification {
 
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
 export type DebtStatus = 'open' | 'in_progress' | 'resolved' | 'deferred';
+export const TASK_VERDICT_RESULT = {
+  PASS: 'pass',
+  FAIL: 'fail',
+} as const;
+export type TaskVerdictResult = (typeof TASK_VERDICT_RESULT)[keyof typeof TASK_VERDICT_RESULT];
+
+export const TASK_VERDICT_FINDING_SEVERITY = {
+  CRITICAL: 'critical',
+  WARNING: 'warning',
+  SUGGESTION: 'suggestion',
+} as const;
+export type TaskVerdictFindingSeverity = (typeof TASK_VERDICT_FINDING_SEVERITY)[keyof typeof TASK_VERDICT_FINDING_SEVERITY];
 
 export interface Convention {
   id: string;
@@ -97,6 +109,28 @@ export interface LedgerEntry {
   recommendations?: string[];
 }
 
+export interface TaskEvidence {
+  summary: string;
+  validation: string;
+  files_changed: string[];
+  notes?: string;
+  by: string;
+  recordedAt: string;
+}
+
+export interface TaskVerdictFinding {
+  severity: TaskVerdictFindingSeverity;
+  detail: string;
+}
+
+export interface TaskVerdict {
+  result: TaskVerdictResult;
+  checked_criteria: string[];
+  findings: TaskVerdictFinding[];
+  by: string;
+  reviewedAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -106,8 +140,8 @@ export interface Task {
   acceptance_criteria: string[];
   depends_on: string[];
   status: TaskStatus;
-  evidence: unknown | null;
-  verdict: unknown | null;
+  evidence: TaskEvidence | null;
+  verdict: TaskVerdict | null;
 }
 
 export interface Phase {
@@ -225,7 +259,7 @@ export interface OperationPlan {
 
 // --- portable guardrail policy ---
 
-export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'clear_active_sprint' | 'delete_archive';
+export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
 export type GuardLevel = 'tool_owned' | 'confirm' | 'blocked';
 export type GuardDecisionKind = 'allow' | 'confirmation_required' | 'blocked';
 export type EnforcementTier = 'enforced' | 'advisory';
@@ -238,6 +272,11 @@ export interface PolicyDefinition {
   policyVersion: 1;
   operations: Record<GuardedOperation, PolicyOperationRule>;
   allow: GuardedOperation[];
+  maker_checker: MakerCheckerPolicy;
+}
+
+export interface MakerCheckerPolicy {
+  requireSeparateChecker: boolean;
 }
 
 export interface PolicyIssue {

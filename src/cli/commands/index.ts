@@ -3,6 +3,7 @@ export const CLI_COMMANDS = [
   'detect',
   'doctor',
   'analyze',
+  'review',
   'repair',
   'close-sprint',
   'context-pack',

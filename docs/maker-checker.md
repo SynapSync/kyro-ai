@@ -1,0 +1,75 @@
+# Maker/Checker Boundary
+
+Kyro separates the task maker from the task checker where the boundary can be enforced deterministically.
+
+## Honest contract
+
+Kyro checks that you checked the right criteria — not that the code is correct. Criterion truth remains agent/human judgment.
+
+Enforced by `kyro analyze`:
+
+- `done` tasks must have valid evidence.
+- `done` tasks must have a valid verdict.
+- `pass` verdicts must include every task `acceptance_criteria` entry in `checked_criteria`.
+- `pass` verdicts are blocked while non-negotiable principle gates are violated.
+- Verdict timestamps must not predate evidence timestamps.
+- Self-review is blocked only when policy enables `maker_checker.requireSeparateChecker`.
+
+Always advisory:
+
+- Whether the implementation actually satisfies prose acceptance criteria.
+
+## Evidence schema
+
+```json
+{
+  "summary": "Implemented the task.",
+  "validation": "npm test -- demo",
+  "files_changed": ["src/demo.ts"],
+  "notes": "optional",
+  "by": "maker",
+  "recordedAt": "2026-07-02T00:00:00.000Z"
+}
+```
+
+## Verdict schema
+
+```json
+{
+  "result": "pass",
+  "checked_criteria": ["Validation passes."],
+  "findings": [],
+  "by": "checker",
+  "reviewedAt": "2026-07-02T00:01:00.000Z"
+}
+```
+
+## Tool-owned review
+
+```bash
+kyro review T1.1 --kyro-scope demo --verdict pass --yes
+kyro review T1.1 --kyro-scope demo --verdict fail --finding critical:"Missing test evidence" --yes
+```
+
+`review_task` is guarded by policy and defaults to `confirm`, so CLI review needs `--yes`.
+
+## Separate checker policy
+
+```json
+{
+  "policyVersion": 1,
+  "operations": {},
+  "allow": [],
+  "maker_checker": {
+    "requireSeparateChecker": true
+  }
+}
+```
+
+When enabled, a `pass` where `verdict.by === evidence.by` is blocked as `SELF_REVIEW_BLOCKED`.
+
+## Error codes
+
+- `CONFIRMATION_REQUIRED` — review needs explicit confirmation.
+- `CHECKER_FAILED` — deterministic checker findings vetoed the pass.
+- `SELF_REVIEW_BLOCKED` — policy requires a separate checker actor.

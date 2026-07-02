@@ -6,7 +6,7 @@ import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { guardEnforcement } from '../adapters/registry-types';
-import { GUARDED_OPERATIONS, guardedOperationLevel } from '../core/policy';
+import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
 import { runTokenAuditChecks } from './token-audit';
 import { listScopes } from '../core/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
@@ -183,7 +183,7 @@ function checkAdapterProjections(): CheckResult[] {
 }
 
 function checkAdapterInventory(): CheckResult[] {
-  return ADAPTERS.map((adapter) => {
+  return [...ADAPTERS.map((adapter): CheckResult => {
     const managedFiles = adapter.buildManagedFiles();
     const managedBlocks = adapter.buildManagedBlocks();
     const capabilities = adapter.capabilities();
@@ -212,7 +212,23 @@ function checkAdapterInventory(): CheckResult[] {
     }
 
     return { status: 'pass', name: `adapter inventory: ${adapter.agent}`, detail };
-  });
+  }), checkMakerCheckerBoundary()];
+}
+
+function checkMakerCheckerBoundary(): CheckResult {
+  const separateCheckerTier = makerCheckerPolicy().requireSeparateChecker ? 'enforced' : 'advisory';
+  return {
+    status: 'pass',
+    name: 'maker/checker boundary',
+    detail: [
+      'evidence-present-on-done=enforced',
+      'criteria-coverage-on-pass=enforced',
+      'principle-gate-on-pass=enforced',
+      'verdict-not-before-evidence=enforced',
+      `separate-checker=${separateCheckerTier}`,
+      'criterion-actually-met=advisory',
+    ].join('; '),
+  };
 }
 
 function readYamlVersion(file: string): string {

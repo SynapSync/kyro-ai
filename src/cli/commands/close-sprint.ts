@@ -4,6 +4,7 @@ import { stdin as input, stdout as output } from 'node:process';
 import { applyPlan, printPlan, resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
+import { collectFindings } from '../core/analysis';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
@@ -130,6 +131,15 @@ export function buildClosePlan(
       );
     }
     throw new KyroCoreError('INVALID_INPUT', `Cannot close ${scope}: activeSprint is null (no sprint in progress). Nothing to snapshot.`);
+  }
+  const principles = readProjectState()?.principles ?? [];
+  const blockingFindings = collectFindings(sprint, principles).filter((finding) => finding.severity === 'CRITICAL' || finding.severity === 'HIGH');
+  if (blockingFindings.length > 0) {
+    throw new KyroCoreError(
+      'BLOCKING_FINDINGS',
+      `Cannot close ${scope}: ${blockingFindings.length} blocking analyze finding(s) remain — ${blockingFindings.map((finding) => finding.detail).join('; ')}`,
+      'Run kyro analyze, resolve CRITICAL/HIGH findings, then close the sprint.',
+    );
   }
 
   const nnn = String(active.n).padStart(3, '0');
@@ -440,4 +450,3 @@ async function confirm(question: string): Promise<boolean> {
     rl.close();
   }
 }
-

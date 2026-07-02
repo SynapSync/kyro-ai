@@ -13,6 +13,7 @@ Usage:
   kyro detect                  Detect local agent adapters
   kyro doctor                  Check package/workspace health
   kyro analyze [options]       Semantic cross-check of a scope (clarity, coverage, deps, debt)
+  kyro review <task> [options] Tool-owned maker/checker verdict write
   kyro repair [options]        Validate and normalize a scope's sprint.json
   kyro close-sprint [options]  Snapshot + close the active sprint (zero-loss, tool-owned)
   kyro context-pack [options]  Emit a context package for a scope from sprint.json
@@ -44,6 +45,7 @@ Examples:
   kyro detect --json
   kyro doctor --tokens --artifacts
   kyro repair --kyro-scope auth-refactor --dry-run
+  kyro review T1.1 --kyro-scope auth-refactor --verdict pass --yes
   kyro context-pack --kyro-scope 01-token-cost-optimization --json
   kyro eval --json
   kyro trace --kyro-scope auth-refactor --tail 20
@@ -62,6 +64,8 @@ export function printCommandHelp(command: string): void {
     console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]');
   } else if (command === 'analyze') {
     console.log('Usage: kyro analyze [--kyro-scope <scope>] [--json]');
+  } else if (command === 'review') {
+    console.log('Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes]');
   } else if (command === 'close-sprint') {
     console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {
