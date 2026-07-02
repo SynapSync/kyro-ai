@@ -61,6 +61,10 @@ export function traceSnapshotId(snapshotPath: string): string {
   return basename(snapshotPath);
 }
 
+export function normalizeTraceCloseOutcome(outcome: string): 'shipped' | 'partial' | 'aborted' {
+  return outcome === 'partial' || outcome === 'aborted' ? outcome : 'shipped';
+}
+
 export function emitToolCommandRun(scope: string, surface: 'cli' | 'mcp', command: string, args?: Record<string, unknown>): void {
   emitTraceEvent({
     v: 1,

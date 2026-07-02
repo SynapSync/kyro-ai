@@ -5,7 +5,7 @@ import { applyPlan, printPlan, resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { KyroCoreError } from '../core/errors';
-import { emitToolCommandRun, emitTraceEvent, traceSnapshotId } from '../core/trace';
+import { emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
@@ -79,7 +79,7 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
     type: 'close_snapshot',
     sprintN: sprint.activeSprint!.n,
     snapshotId: traceSnapshotId(snapshotPath),
-    outcome: normalizeCloseOutcome(args.outcome),
+    outcome: normalizeTraceCloseOutcome(args.outcome),
   });
 
   console.log(`\nSprint ${sprint.activeSprint!.n} closed. activeSprint cleared; ledger entry + snapshot recorded.`);
@@ -434,6 +434,3 @@ async function confirm(question: string): Promise<boolean> {
   }
 }
 
-function normalizeCloseOutcome(outcome: string): 'shipped' | 'partial' | 'aborted' {
-  return outcome === 'partial' || outcome === 'aborted' ? outcome : 'shipped';
-}

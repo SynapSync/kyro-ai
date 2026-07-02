@@ -12,7 +12,7 @@ import { runAnalysis } from '../core/analysis';
 import { KyroCoreError, toErrorEnvelope } from '../core/errors';
 import { listScopes } from '../core/scopes';
 import { resolveScope } from '../core/scope-resolution';
-import { emitToolCommandRun, emitTraceEvent, traceSnapshotId } from '../core/trace';
+import { emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
 import { getTool } from './tool-catalog';
 import { validateInput } from './input-validation';
 import type { OperationPlan } from '../types';
@@ -87,7 +87,7 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
     type: 'close_snapshot',
     sprintN: sprint.activeSprint!.n,
     snapshotId: traceSnapshotId(snapshotPath),
-    outcome: closeArgs.outcome === 'partial' || closeArgs.outcome === 'aborted' ? closeArgs.outcome : 'shipped',
+    outcome: normalizeTraceCloseOutcome(closeArgs.outcome),
   });
   return { phase: 'applied', scope, snapshotPath, plan };
 }
