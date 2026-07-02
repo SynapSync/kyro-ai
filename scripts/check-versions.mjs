@@ -17,6 +17,7 @@ function readYamlVersion(file) {
 
 const pkg = readJson('package.json');
 const plugin = readJson('.claude-plugin/plugin.json');
+const lock = readJson('package-lock.json');
 const workflowVersion = readYamlVersion('WORKFLOW.yaml');
 
 const pkgVersion = pkg.version;
@@ -35,6 +36,15 @@ if (pkgVersion !== workflowVersion) {
   console.error(`ERROR: Version mismatch`);
   console.error(`  package.json:     ${pkgVersion}`);
   console.error(`  WORKFLOW.yaml:    ${workflowVersion}`);
+  failed = true;
+}
+
+// The lockfile is part of the release contract: npm ci reproduces exactly what it pins.
+if (lock.version !== pkgVersion || lock.packages?.['']?.version !== pkgVersion) {
+  console.error(`ERROR: package-lock.json is stale`);
+  console.error(`  package.json:        ${pkgVersion}`);
+  console.error(`  package-lock.json:   ${lock.version} (packages[""].version: ${lock.packages?.['']?.version})`);
+  console.error(`  Fix: run "npm install --package-lock-only" and commit the lockfile.`);
   failed = true;
 }
 

@@ -11,9 +11,20 @@ removes stale forward-looking docs.
 
 ### Fixed
 
+- **Critical (schema/runtime contract):** `kyro doctor --artifacts` now validates every field the
+  runtime consumes from `activeSprint` (`objective`, `definitionOfDone`, `phases[].id/title`,
+  `tasks[].title`) and from `roadmap.sprints[]` (`n`, `slug`, `title`, `state`). Previously an
+  incomplete `sprint.json` could PASS the doctor and then crash `close-sprint`. Regression fixtures
+  added. Contract: if the doctor says PASS, no downstream command may crash on a missing field.
 - **Critical:** `kyro analyze` error message no longer references the removed `kyro migrate` command.
+- **High:** `package-lock.json` was stale (pinned 3.4.3); regenerated at the release version and now
+  enforced by `check:versions`. Removed the non-canonical `pnpm-lock.yaml` (CI uses `npm ci`).
 - **High:** 10 documentation files rewritten to reflect the `sprint.json`-only model; eliminated all
   references to pre-4.0 artifacts (`state.json`, `index.json`, `ROADMAP.md`, `events.ndjson`, `phases/`).
+- Docs no longer reference removed scripts (`check:artifact-fixtures`, `check:context-pack`) in
+  `cli.md`, `release-checklist.md`, and `cost-model.md`.
+- `KYRO_WORKFLOW.stateModel` public export corrected from `markdown` to `sprint-json`.
+- Removed dead `checkTemplateBudget` helper; strict `tsc --noUnusedLocals --noUnusedParameters` is clean.
 
 ### Removed
 

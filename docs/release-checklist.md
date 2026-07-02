@@ -27,9 +27,6 @@ npm run check:adapters
 # 4. Token budget and artifact integrity checks
 npm run check:tokens
 npm run check:artifacts
-npm run check:artifact-fixtures
-npm run check:context-pack
-npm run check:budget-manifest
 
 # 5. Simulate packaging with fresh, validated output
 npm pack --dry-run
@@ -48,14 +45,11 @@ npm pack --dry-run
 The GitHub Actions `validate` job runs the same sequence:
 
 ```yaml
-npm run check
 npm run build
+npm run check
 npm run check:adapters
 npm run check:tokens
 npm run check:artifacts
-npm run check:artifact-fixtures
-npm run check:context-pack
-npm run check:budget-manifest
 npm pack --dry-run
 ```
 

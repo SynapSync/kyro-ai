@@ -47,13 +47,11 @@ This exercises adapter detection, install plans, preflight, doctor output, JSON 
 The full release validation sequence is:
 
 ```bash
-npm run check        # includes check:dist
 npm run build
+npm run check        # typecheck + versions + links + runtime-artifacts + dist + budget-manifest + sprint-doctor-v4
 npm run check:adapters
 npm run check:tokens
 npm run check:artifacts
-npm run check:artifact-fixtures
-npm run check:context-pack
 npm pack --dry-run
 ```
 
@@ -213,12 +211,6 @@ The command reads the scope's structured artifact first:
 It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, warnings, budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
 
 Prefer `context-pack` over manual file selection at session start, after compaction, or when resuming a scope through summary-first routing.
-
-Fixture validation:
-
-```bash
-npm run check:context-pack
-```
 
 ## Artifact Integrity
 
