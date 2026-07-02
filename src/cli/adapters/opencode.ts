@@ -38,6 +38,8 @@ export const openCodeAdapter: AdapterDefinition = {
   },
   buildProjection: addOpenCodeProjection,
   buildRemoval: removeOpenCodeProjection,
+  buildMcpProjection() {},
+  buildMcpRemoval() {},
   buildManagedFiles: buildOpenCodeManagedFiles,
   buildManagedBlocks() {
     return [`${OPENCODE_SETTINGS_PATH}#agent.${KYRO_OPENCODE_AGENT}`];

@@ -4,6 +4,7 @@ import { asSprintFile } from '../artifacts/schema';
 import { readProjectState } from '../state';
 import type { ActiveSprint, AnalysisFinding, AnalysisSeverity, Phase, Principle, PrincipleCheck, SprintFile, Task } from '../types';
 import { KyroCoreError } from './errors';
+import { policyIssues } from './policy';
 import { resolveScope } from './scope-resolution';
 import { emitBlockedReason, emitTraceEvent } from './trace';
 
@@ -25,7 +26,10 @@ export function runAnalysis(requestedScope: string | null): AnalysisResult {
   if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" is not a valid v4 file.`, 'Run kyro doctor --artifacts for shape details.');
 
   const principles = readProjectState()?.principles ?? [];
-  const findings = collectFindings(sprint, principles).slice(0, MAX_FINDINGS);
+  const findings = [
+    ...collectPolicyFindings(),
+    ...collectFindings(sprint, principles),
+  ].slice(0, MAX_FINDINGS);
   const blocking = findings.some((f) => f.severity === 'CRITICAL' || f.severity === 'HIGH');
   emitTraceEvent({
     v: 1,
@@ -41,6 +45,16 @@ export function runAnalysis(requestedScope: string | null): AnalysisResult {
     emitBlockedReason(scope, finding.detail, finding.id);
   }
   return { scope, findings, blocking };
+}
+
+function collectPolicyFindings(): AnalysisFinding[] {
+  return policyIssues().map((issue, index) => ({
+    id: `P${String(index + 1).padStart(3, '0')}`,
+    severity: 'HIGH',
+    category: 'policy',
+    detail: `policy.json ${issue.field}: ${issue.message}`,
+    remedy: 'Fix .agents/kyro/policy.json or remove it to use the safe default policy.',
+  }));
 }
 
 export function collectFindings(sprint: SprintFile, principles: Principle[]): AnalysisFinding[] {

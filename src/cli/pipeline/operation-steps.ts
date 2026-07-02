@@ -96,12 +96,12 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
     if (!operation.blockName) throw new Error(`Block operation missing blockName for ${operation.path}`);
     mkdirSync(dirname(target), { recursive: true });
     const existing = existsSync(target) ? readFileSync(target, 'utf-8') : '';
-    writeFileSync(target, upsertManagedBlock(existing, operation.blockName, operation.content ?? ''), 'utf-8');
+    writeFileSync(target, upsertManagedBlock(existing, operation.blockName, operation.content ?? '', operation.commentStyle), 'utf-8');
   } else if (operation.action === 'remove-block') {
     if (!operation.blockName) throw new Error(`Block operation missing blockName for ${operation.path}`);
     if (existsSync(target)) {
       const existing = readFileSync(target, 'utf-8');
-      writeFileSync(target, removeManagedBlock(existing, operation.blockName), 'utf-8');
+      writeFileSync(target, removeManagedBlock(existing, operation.blockName, operation.commentStyle), 'utf-8');
     }
   } else if (operation.action === 'merge-json') {
     mkdirSync(dirname(target), { recursive: true });

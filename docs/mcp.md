@@ -39,7 +39,7 @@ Tool-level failures return `isError: true` with structured content:
 { "code": "SCOPE_NOT_FOUND", "message": "...", "remedy": "..." }
 ```
 
-Reserved codes: `SCOPE_NOT_FOUND`, `INVALID_JSON`, `INVALID_SPRINT_SHAPE`, `SNAPSHOT_EXISTS`, `CONFIRMATION_REQUIRED`, `BLOCKING_FINDINGS`, `INVALID_INPUT`, `INTERNAL`.
+Reserved codes: `SCOPE_NOT_FOUND`, `INVALID_JSON`, `INVALID_SPRINT_SHAPE`, `SNAPSHOT_EXISTS`, `CONFIRMATION_REQUIRED`, `POLICY_BLOCKED`, `BLOCKING_FINDINGS`, `INVALID_INPUT`, `INTERNAL`.
 
 ## Host registration examples
 

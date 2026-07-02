@@ -5,6 +5,8 @@ import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
+import { guardEnforcement } from '../adapters/registry-types';
+import { GUARDED_OPERATIONS, guardedOperationLevel } from '../core/policy';
 import { runTokenAuditChecks } from './token-audit';
 import { listScopes } from '../core/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
@@ -187,6 +189,12 @@ function checkAdapterInventory(): CheckResult[] {
     const capabilities = adapter.capabilities();
     const paths = adapter.paths('~');
     const nativePaths = Object.values(paths).filter(Boolean).length;
+    const enforcement = GUARDED_OPERATIONS.map((op) => {
+      const level = guardedOperationLevel(op);
+      const tier = guardEnforcement(capabilities, op);
+      const surfaces = capabilities.includes('mcp') ? 'cli,mcp' : 'cli';
+      return `${op}:${tier}(${level};${surfaces})`;
+    }).join(',');
     const detail = [
       `status=${adapter.status}`,
       `managedFiles=${managedFiles.length}`,
@@ -194,8 +202,9 @@ function checkAdapterInventory(): CheckResult[] {
       `nativePaths=${nativePaths}`,
       `systemPromptStrategy=${adapter.systemPromptStrategy()}`,
       `mcpConfigStrategy=${adapter.mcpStrategy()}`,
-      'mcpServer=kyro mcp serve',
+      capabilities.includes('mcp') ? 'mcpServer=kyro mcp serve' : 'mcpServer=none',
       `capabilities=${capabilities.length > 0 ? capabilities.join(',') : 'none'}`,
+      `guardrails=${enforcement}`,
     ].join('; ');
 
     if (adapter.status === 'planned') {

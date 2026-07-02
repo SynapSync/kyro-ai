@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.0] - 2026-07-02
+
+Adds portable guardrail policy enforcement for dangerous operations across CLI and MCP surfaces.
+
+### Added
+
+- Built-in guardrail policy with fail-safe `.agents/kyro/policy.json` overrides.
+- Shared `evaluateGuard` core for guarded operations.
+- `POLICY_BLOCKED` error code and CLI error-code rendering.
+- `check:guardrails` gate covering zero-write refusals, confirmation, fail-safe merge, trace, and MCP projection.
+- Adapter guardrail enforcement-tier reporting in `doctor --adapters`.
+- Codex MCP config projection for `kyro mcp serve`.
+- Eval cases for `scope set-active` confirmation and blocked policy behavior.
+- `docs/guardrails.md`.
+
+### Changed
+
+- `kyro scope set-active` now requires explicit `--yes` confirmation.
+
 ## [4.6.0] - 2026-07-02
 
 Adds append-only trace events for per-scope observability without making trace a source of truth.

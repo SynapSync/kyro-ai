@@ -1,0 +1,7 @@
+{
+  "policyVersion": 1,
+  "operations": {
+    "scope_set_active": { "level": "blocked" }
+  },
+  "allow": []
+}
