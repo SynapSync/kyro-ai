@@ -11,7 +11,7 @@ carries `[NEEDS CLARIFICATION]` markers or high ambiguity.
 
 1. Read `.agents/kyro/scopes/{scope}/sprint.json`.
 2. Note every `[NEEDS CLARIFICATION: ...]` marker already present in `objective`, `successCriteria`,
-   `roadmap`, or task fields — each is an explicit unknown to resolve.
+   `spec.openQuestions`, `roadmap`, or task fields — each is an explicit unknown to resolve.
 
 ## Ambiguity scan (mark Clear / Partial / Missing)
 
@@ -38,7 +38,8 @@ Scan these categories; only the weak ones become questions:
   - Append `{ q, a, sprint, date }` to `clarifications[]`.
   - Apply the answer to the right place: functional → `objective`/task fields; data shape → task
     `context`; non-functional → `successCriteria[]`; edge case → task `acceptance_criteria`;
-    terminology → normalize across the file.
+    requirement-level answer → move the resolved item from `spec.openQuestions[]` into a
+    `spec.requirements[]` entry or `clarifications[]`; terminology → normalize across the file.
   - **Remove the corresponding `[NEEDS CLARIFICATION]` marker** once resolved.
 - Stop when all critical ambiguities are resolved, the user signals done, or 5 questions are asked.
 
@@ -54,4 +55,6 @@ Set `handoff.nextAction` via safe-write:
 - Never invent an answer to dodge a question — that is exactly the failure this mode prevents.
 - `kyro doctor --artifacts` (and `kyro analyze`) **fail** while any `[NEEDS CLARIFICATION]` marker
   remains. Do not route to `plan_sprint`/`execute_task` with markers still in the file.
+- `spec.openQuestions[]` are visible analyze warnings. Drain them as the answers become stable
+  requirements; do not leave resolved questions in the queue.
 - One safe-write per accepted answer; never partial-edit the JSON. No new files.

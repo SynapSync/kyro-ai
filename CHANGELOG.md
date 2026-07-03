@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.0] - 2026-07-03
+
+Adds minimal spec traceability inside `sprint.json`.
+
+### Added
+
+- Optional `spec` block with requirements, scenarios, non-goals, and open questions.
+- Optional `task.scenario_refs` links for Requirement → Scenario → Task traceability.
+- Deterministic `kyro analyze` findings for broken spec references, duplicate ids, coverage gaps, open questions, and done/pass tasks without scenario references.
+- Spec traceability reporting in `doctor --adapters`.
+- Context-pack output for scope-level spec details and task-level resolved scenarios.
+- `check:spec-traceability`, eval fixtures, and `docs/spec-traceability.md`.
+
 ## [4.8.0] - 2026-07-02
 
 Adds a deterministic maker/checker boundary for task evidence and verdicts.

@@ -5,6 +5,12 @@
   "status": "planning",
   "objective": "{{objective}}",
   "successCriteria": [],
+  "spec": {
+    "requirements": [],
+    "scenarios": [],
+    "nonGoals": [],
+    "openQuestions": []
+  },
 
   "clarifications": [],
 
@@ -44,6 +50,7 @@
               "Criterion 2 — maps to a concrete check (tsc, jest, grep, manual)."
             ],
             "depends_on": [],
+            "scenario_refs": [],
             "status": "pending",
             "evidence": null,
             "verdict": null
