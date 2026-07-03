@@ -131,6 +131,35 @@ export interface TaskVerdict {
   reviewedAt: string;
 }
 
+export const SPEC_REQUIREMENT_PRIORITY = {
+  MUST: 'must',
+  SHOULD: 'should',
+  COULD: 'could',
+} as const;
+export type SpecRequirementPriority = (typeof SPEC_REQUIREMENT_PRIORITY)[keyof typeof SPEC_REQUIREMENT_PRIORITY];
+
+export interface SpecRequirement {
+  id: string;
+  statement: string;
+  priority?: SpecRequirementPriority;
+  rationale?: string;
+}
+
+export interface SpecScenario {
+  id: string;
+  requirement: string;
+  given: string;
+  when: string;
+  then: string;
+}
+
+export interface Spec {
+  requirements: SpecRequirement[];
+  scenarios: SpecScenario[];
+  nonGoals: string[];
+  openQuestions: string[];
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -139,6 +168,7 @@ export interface Task {
   context: string;
   acceptance_criteria: string[];
   depends_on: string[];
+  scenario_refs?: string[];
   status: TaskStatus;
   evidence: TaskEvidence | null;
   verdict: TaskVerdict | null;
@@ -189,6 +219,8 @@ export interface SprintFile {
   objective: string;
   /** Technology-agnostic, measurable outcomes for the scope (the WHAT/WHY layer). */
   successCriteria: string[];
+  /** Optional minimal spec layer for Requirement → Scenario → Task traceability. */
+  spec?: Spec;
   /** Resolved ambiguities, appended one per accepted clarify answer. */
   clarifications: Clarification[];
   conventions: Convention[];
@@ -384,6 +416,10 @@ export interface ContextPackOutput {
   taskFiles: string[];
   taskContext: string | null;
   taskAcceptanceCriteria: string[];
+  specRequirements: SpecRequirement[];
+  specNonGoals: string[];
+  specOpenQuestions: string[];
+  taskScenarios: SpecScenario[];
   handoffNote: string | null;
   blockers: string[];
   conventions: ContextPackConvention[];

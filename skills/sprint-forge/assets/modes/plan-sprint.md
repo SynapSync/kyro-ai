@@ -13,8 +13,9 @@ Generate the next sprint as the `activeSprint` object inside `sprint.json`. It w
 1. Resolve the next sprint number `N` from `roadmap.sprints` and `ledger[]` (highest closed + 1). Verify Sprint N-1 is closed when N > 1.
 2. Extract roadmap focus, type, target version, and suggested phases for Sprint N.
 3. For Sprint 2+, account for every previous recommendation from the last `ledger[]` entry: incorporate, defer, resolve, mark N/A, or convert to a phase. Nothing is silently dropped.
-4. Assemble `phases[]` from roadmap suggestions, carried recommendations, and due `debt[]` items. Each task needs `id`, `title`, `description`, `files_to_touch`, `context`, `acceptance_criteria`, `depends_on`, `status: "pending"`, `evidence: null`, `verdict: null`.
+4. Assemble `phases[]` from roadmap suggestions, carried recommendations, and due `debt[]` items. Each task needs `id`, `title`, `description`, `files_to_touch`, `context`, `acceptance_criteria`, `depends_on`, optional `scenario_refs`, `status: "pending"`, `evidence: null`, `verdict: null`.
 5. Fold relevant `conventions[]` into each task's `context`.
+6. If `spec.requirements[]` exists, create or refine `spec.scenarios[]` as Given/When/Then checks per requirement, then set each task's `scenario_refs[]` to the scenarios it implements. Leave `scenario_refs: []` only when the task is intentionally non-spec work and explain that in `context`.
 
 ## Write (safe-write to sprint.json only)
 
@@ -24,6 +25,7 @@ Using the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate
 - Mark due `debt[]` items `in_progress` (do not delete or reset any debt).
 - Update `roadmap.sprints[N-1].state` to `active`.
 - Set `handoff.nextAction: "execute_task"`, `handoff.nextTaskId` to the first task id, `handoff.lastUpdated` to today.
+- Preserve existing `spec.requirements`, `spec.nonGoals`, and `spec.openQuestions`; only add/refine `spec.scenarios` when planning reveals concrete behavior.
 
 ## Principles gate (before generating tasks)
 

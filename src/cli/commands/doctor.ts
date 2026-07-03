@@ -212,7 +212,7 @@ function checkAdapterInventory(): CheckResult[] {
     }
 
     return { status: 'pass', name: `adapter inventory: ${adapter.agent}`, detail };
-  }), checkMakerCheckerBoundary()];
+  }), checkMakerCheckerBoundary(), checkSpecTraceability()];
 }
 
 function checkMakerCheckerBoundary(): CheckResult {
@@ -227,6 +227,23 @@ function checkMakerCheckerBoundary(): CheckResult {
       'verdict-not-before-evidence=enforced',
       `separate-checker=${separateCheckerTier}`,
       'criterion-actually-met=advisory',
+    ].join('; '),
+  };
+}
+
+function checkSpecTraceability(): CheckResult {
+  return {
+    status: 'pass',
+    name: 'spec traceability',
+    detail: [
+      'requirement-ref-integrity=enforced(analyze HIGH)',
+      'scenario-ref-integrity=enforced(analyze HIGH)',
+      'duplicate-id=enforced(analyze MEDIUM)',
+      'requirement-coverage=surfaced(analyze MEDIUM)',
+      'scenario-coverage=surfaced(analyze MEDIUM)',
+      'open-questions-drained=surfaced(analyze MEDIUM)',
+      'requirement-actually-validated=advisory',
+      'task-implements-scenario=advisory',
     ].join('; '),
   };
 }

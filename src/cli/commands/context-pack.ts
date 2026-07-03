@@ -7,7 +7,7 @@ import { resolveManagedPath } from '../fs';
 import { listScopeNames } from '../artifacts/scopes';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { emitTraceEvent } from '../core/trace';
-import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, SprintFile, Task } from '../types';
+import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, SpecScenario, SprintFile, Task } from '../types';
 
 export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json'>): void {
   const scope = resolveKyroScope(options.kyroScope);
@@ -52,6 +52,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   });
   const openDebtCount = sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length;
   const conventions = selectConventions(sprint, packMode, task);
+  const taskScenarios = resolveTaskScenarios(sprint, task);
 
   const packWithoutTokens: Omit<ContextPackOutput, 'estimatedTokens'> = {
     schemaVersion: 4,
@@ -70,6 +71,10 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     taskFiles: task?.files_to_touch ?? [],
     taskContext: task?.context ?? null,
     taskAcceptanceCriteria: task?.acceptance_criteria ?? [],
+    specRequirements: sprint.spec?.requirements ?? [],
+    specNonGoals: sprint.spec?.nonGoals ?? [],
+    specOpenQuestions: sprint.spec?.openQuestions ?? [],
+    taskScenarios,
     handoffNote: sprint.handoff.note || null,
     blockers: sprint.handoff.blockers ?? [],
     conventions,
@@ -122,6 +127,11 @@ function selectConventions(sprint: SprintFile, packMode: ContextPackMode, task: 
   return relevant.map((c) => ({ id: c.id, rule: c.rule, tags: c.tags }));
 }
 
+function resolveTaskScenarios(sprint: SprintFile, task: Task | null): SpecScenario[] {
+  if (!task || !sprint.spec) return [];
+  const scenarioById = new Map(sprint.spec.scenarios.map((scenario) => [scenario.id, scenario]));
+  return (task.scenario_refs ?? []).map((id) => scenarioById.get(id)).filter((scenario): scenario is SpecScenario => Boolean(scenario));
+}
 
 function scopeExists(scope: string): boolean {
   if (listScopeNames().includes(scope)) return true;
@@ -133,6 +143,9 @@ function estimatePackTokens(pack: Omit<ContextPackOutput, 'estimatedTokens'>): n
     pack.scope, pack.status, pack.objective, pack.nextAction, pack.nextTaskId,
     pack.activeSprintSlug, pack.activeSprintObjective, pack.taskTitle, pack.taskDescription,
     pack.taskContext, pack.handoffNote, ...pack.taskFiles, ...pack.taskAcceptanceCriteria,
+    ...pack.specRequirements.map((requirement) => `${requirement.id} ${requirement.statement} ${requirement.rationale ?? ''}`),
+    ...pack.specNonGoals, ...pack.specOpenQuestions,
+    ...pack.taskScenarios.map((scenario) => `${scenario.id} ${scenario.given} ${scenario.when} ${scenario.then}`),
     ...pack.blockers, ...pack.conventions.map((c) => c.rule),
   ].filter(Boolean).join(' ');
   return Math.ceil(text.length / 4);
@@ -143,12 +156,16 @@ function printContextPackText(pack: ContextPackOutput): void {
   console.log(`Objective: ${pack.objective ?? '—'}`);
   console.log(`Next action: ${pack.nextAction ?? '—'}  Next task: ${pack.nextTaskId ?? '—'}`);
   if (pack.activeSprintSlug) console.log(`Active sprint: ${pack.activeSprintSlug} — ${pack.activeSprintObjective ?? ''}`);
+  if (pack.specRequirements.length) console.log(`Requirements: ${pack.specRequirements.map((r) => `${r.id}: ${r.statement}`).join(' | ')}`);
+  if (pack.specNonGoals.length) console.log(`Non-goals: ${pack.specNonGoals.join(' | ')}`);
+  if (pack.specOpenQuestions.length) console.log(`Open questions: ${pack.specOpenQuestions.join(' | ')}`);
   console.log(`Open debt: ${pack.openDebtCount}`);
   if (pack.packMode === 'task' && pack.taskId) {
     console.log(`\nTask ${pack.taskId}: ${pack.taskTitle ?? ''}`);
     if (pack.taskDescription) console.log(`  ${pack.taskDescription}`);
     if (pack.taskFiles.length) console.log(`  Files: ${pack.taskFiles.join(', ')}`);
     if (pack.taskAcceptanceCriteria.length) console.log(`  Acceptance: ${pack.taskAcceptanceCriteria.join('; ')}`);
+    if (pack.taskScenarios.length) console.log(`  Scenarios: ${pack.taskScenarios.map((s) => `${s.id}: Given ${s.given}; When ${s.when}; Then ${s.then}`).join(' | ')}`);
   }
   if (pack.handoffNote) console.log(`\nResume note: ${pack.handoffNote}`);
   if (pack.conventions.length) console.log(`Conventions: ${pack.conventions.map((c) => c.rule).join(' | ')}`);

@@ -1,0 +1,47 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "spec-traceability-happy",
+  "title": "Spec traceability permits a coherent Requirement Scenario Task chain",
+  "kind": "replay",
+  "tags": [
+    "spec",
+    "analyze",
+    "close"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "analyze",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "no semantic issues found"
+        ]
+      }
+    },
+    {
+      "run": [
+        "close-sprint",
+        "--kyro-scope",
+        "demo",
+        "--outcome",
+        "shipped",
+        "--yes"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "closed"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}

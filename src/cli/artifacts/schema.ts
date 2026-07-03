@@ -16,6 +16,7 @@ export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'
 export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
 export const TASK_VERDICT_RESULT_VALUES = ['pass', 'fail'] as const;
 export const TASK_VERDICT_FINDING_SEVERITY_VALUES = ['critical', 'warning', 'suggestion'] as const;
+export const SPEC_REQUIREMENT_PRIORITY_VALUES = ['must', 'should', 'could'] as const;
 
 export interface ValidationIssue {
   path: string;
@@ -196,6 +197,9 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
   if ('successCriteria' in value && !Array.isArray(value.successCriteria)) {
     issues.push({ path, field: 'successCriteria', message: 'must be an array of strings when present' });
   }
+  if ('spec' in value) {
+    validateSpec(value.spec, path, 'spec', issues);
+  }
   if ('clarifications' in value) {
     if (!Array.isArray(value.clarifications)) {
       issues.push({ path, field: 'clarifications', message: 'must be an array when present' });
@@ -253,6 +257,50 @@ function validateClarification(value: unknown, path: string, prefix: string, iss
   requireString(value, 'a', path, issues, `${prefix}.a`);
   requireNumber(value, 'sprint', path, issues, `${prefix}.sprint`);
   requireString(value, 'date', path, issues, `${prefix}.date`);
+}
+
+function validateSpec(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { requirements, scenarios, nonGoals, openQuestions } when present' });
+    return;
+  }
+  if (!Array.isArray(value.requirements)) {
+    issues.push({ path, field: `${prefix}.requirements`, message: 'must be an array' });
+  } else {
+    value.requirements.forEach((requirement, index) => validateSpecRequirement(requirement, path, `${prefix}.requirements[${index}]`, issues));
+  }
+  if (!Array.isArray(value.scenarios)) {
+    issues.push({ path, field: `${prefix}.scenarios`, message: 'must be an array' });
+  } else {
+    value.scenarios.forEach((scenario, index) => validateSpecScenario(scenario, path, `${prefix}.scenarios[${index}]`, issues));
+  }
+  requireStringArrayField(value, 'nonGoals', path, issues, `${prefix}.nonGoals`);
+  requireStringArrayField(value, 'openQuestions', path, issues, `${prefix}.openQuestions`);
+}
+
+function validateSpecRequirement(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { id, statement }' });
+    return;
+  }
+  requireNonEmptyString(value, 'id', path, issues, `${prefix}.id`);
+  requireNonEmptyString(value, 'statement', path, issues, `${prefix}.statement`);
+  if ('priority' in value) requireLiteralSet(value, 'priority', SPEC_REQUIREMENT_PRIORITY_VALUES, path, issues, `${prefix}.priority`);
+  if ('rationale' in value && typeof value.rationale !== 'string') {
+    issues.push({ path, field: `${prefix}.rationale`, message: 'must be a string when present' });
+  }
+}
+
+function validateSpecScenario(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { id, requirement, given, when, then }' });
+    return;
+  }
+  requireNonEmptyString(value, 'id', path, issues, `${prefix}.id`);
+  requireNonEmptyString(value, 'requirement', path, issues, `${prefix}.requirement`);
+  requireNonEmptyString(value, 'given', path, issues, `${prefix}.given`);
+  requireNonEmptyString(value, 'when', path, issues, `${prefix}.when`);
+  requireNonEmptyString(value, 'then', path, issues, `${prefix}.then`);
 }
 
 function validateConvention(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
@@ -344,6 +392,7 @@ function validateTask(value: unknown, path: string, prefix: string, issues: Vali
   if ('files_to_touch' in value) requireStringArrayField(value, 'files_to_touch', path, issues, `${prefix}.files_to_touch`);
   if ('acceptance_criteria' in value) requireStringArrayField(value, 'acceptance_criteria', path, issues, `${prefix}.acceptance_criteria`);
   if ('depends_on' in value) requireStringArrayField(value, 'depends_on', path, issues, `${prefix}.depends_on`);
+  if ('scenario_refs' in value) requireStringArrayField(value, 'scenario_refs', path, issues, `${prefix}.scenario_refs`);
 }
 
 function validateTaskEvidence(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {

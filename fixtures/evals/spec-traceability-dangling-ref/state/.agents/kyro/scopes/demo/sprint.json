@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 4,
+  "scope": "demo",
+  "title": "Demo",
+  "status": "active",
+  "objective": "Demo objective",
+  "successCriteria": [
+    "Demo works."
+  ],
+  "clarifications": [],
+  "conventions": [],
+  "roadmap": {
+    "plannedSprintCount": 1,
+    "sizingRationale": "One sprint is enough.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "demo-sprint",
+        "title": "Demo Sprint",
+        "state": "active"
+      }
+    ]
+  },
+  "ledger": [],
+  "previousSprint": null,
+  "activeSprint": {
+    "n": 1,
+    "slug": "demo-sprint",
+    "title": "Demo Sprint",
+    "objective": "Ship demo sprint.",
+    "status": "executing",
+    "phases": [
+      {
+        "id": "P1",
+        "title": "Demo Phase",
+        "objective": "Complete demo work.",
+        "status": "executing",
+        "tasks": [
+          {
+            "id": "T1.1",
+            "title": "Implement demo",
+            "description": "Implement the demo task.",
+            "files_to_touch": [
+              "src/demo.ts"
+            ],
+            "context": "Use the existing demo pattern.",
+            "acceptance_criteria": [
+              "Validation passes."
+            ],
+            "depends_on": [],
+            "status": "done",
+            "evidence": {
+              "summary": "done",
+              "validation": "ok",
+              "files_changed": [
+                "src/demo.ts"
+              ],
+              "notes": "",
+              "by": "maker",
+              "recordedAt": "2026-07-02T00:00:00.000Z"
+            },
+            "verdict": {
+              "result": "pass",
+              "checked_criteria": [
+                "Validation passes."
+              ],
+              "findings": [],
+              "by": "checker",
+              "reviewedAt": "2026-07-02T00:01:00.000Z"
+            },
+            "scenario_refs": [
+              "S1"
+            ]
+          }
+        ]
+      }
+    ],
+    "emergentTasks": [],
+    "definitionOfDone": [
+      "All tasks done."
+    ]
+  },
+  "debt": [],
+  "handoff": {
+    "nextAction": "close_sprint",
+    "nextTaskId": "T1.1",
+    "blockers": [],
+    "note": "Resume demo.",
+    "lastUpdated": "2026-07-02"
+  },
+  "spec": {
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "Demo requirement is fulfilled."
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "S1",
+        "requirement": "R404",
+        "given": "a demo scope",
+        "when": "the task is complete",
+        "then": "the demo works"
+      }
+    ],
+    "nonGoals": [],
+    "openQuestions": []
+  }
+}
