@@ -10,8 +10,10 @@ import { sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile } from '../artifacts/schema';
 import { runAnalysis } from '../core/analysis';
 import { KyroCoreError, toErrorEnvelope } from '../core/errors';
+import { evaluateGuard } from '../core/policy';
 import { listScopes } from '../core/scopes';
 import { resolveScope } from '../core/scope-resolution';
+import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
 import { getTool } from './tool-catalog';
 import { validateInput } from './input-validation';
 import type { OperationPlan } from '../types';
@@ -45,7 +47,7 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
     case 'context_pack':
       return buildContextPack(resolveScope(optionalString(args.scope) ?? null), taskOption(args.task_id));
     case 'doctor_artifacts':
-      return { checks: runDoctorChecks(false, true, false, optionalString(args.scope) ?? null) };
+      return { checks: runDoctorChecks(false, true, false, false, optionalString(args.scope) ?? null) };
     case 'analyze_scope':
       return runAnalysis(optionalString(args.scope) ?? null);
     case 'scope_list':
@@ -75,19 +77,58 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
     help: false,
   };
   const { sprint, plan, snapshotPath } = buildClosePlan(scope, closeArgs);
+  const guard = evaluateGuard('close_sprint', { surface: 'mcp', scope, confirmed: args.confirm === true });
+  if (guard.kind === 'blocked') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
+  }
   if (args.confirm !== true) return planResult(scope, plan, { snapshotPath, activeSprint: sprint.activeSprint });
+  if (guard.kind === 'confirmation_required') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
+  }
+  emitGateApproved(scope, 'close_sprint');
+  emitToolCommandRun(scope, 'mcp', 'close_sprint', { outcome: closeArgs.outcome });
   applyPlan(plan);
   assertValidSprint(scope, snapshotPath);
+  emitTraceEvent({
+    v: 1,
+    ts: new Date().toISOString(),
+    scope,
+    type: 'close_snapshot',
+    sprintN: sprint.activeSprint!.n,
+    snapshotId: traceSnapshotId(snapshotPath),
+    outcome: normalizeTraceCloseOutcome(closeArgs.outcome),
+  });
   return { phase: 'applied', scope, snapshotPath, plan };
 }
 
 function repairScopeTool(args: Record<string, unknown>): unknown {
   const scope = resolveScope(optionalString(args.scope) ?? null);
   const plan = buildRepairPlan(scope);
-  if (args.confirm !== true) return planResult(scope, plan);
+  const guard = evaluateGuard('repair_scope', { surface: 'mcp', scope, confirmed: args.confirm === true });
+  if (guard.kind === 'blocked') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
+  }
+  if (args.confirm !== true || guard.kind === 'confirmation_required') {
+    return confirmationRequiredResult(scope, plan, guard.message, guard.remedy);
+  }
+  emitGateApproved(scope, 'repair_scope');
+  emitToolCommandRun(scope, 'mcp', 'repair_scope');
   applyPlan(plan);
   assertValidSprint(scope);
   return { phase: 'applied', scope, plan };
+}
+
+function confirmationRequiredResult(scope: string, plan: OperationPlan[], message: string, remedy?: string): unknown {
+  return {
+    phase: 'plan',
+    scope,
+    plan,
+    requiresConfirm: true,
+    error: { code: 'CONFIRMATION_REQUIRED', message, ...(remedy ? { remedy } : {}) },
+  };
 }
 
 function planResult(scope: string, plan: OperationPlan[], extra: Record<string, unknown> = {}): unknown {

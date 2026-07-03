@@ -5,12 +5,16 @@ import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
+import { guardEnforcement } from '../adapters/registry-types';
+import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
 import { runTokenAuditChecks } from './token-audit';
+import { listScopes } from '../core/scopes';
+import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
 
-export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'kyroScope'>): void {
-  const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.kyroScope ?? null);
+export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'trace' | 'kyroScope'>): void {
+  const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.trace ?? false, options?.kyroScope ?? null);
   let failed = false;
 
   for (const check of checks) {
@@ -23,7 +27,7 @@ export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adap
   if (failed) process.exit(1);
 }
 
-export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, kyroScope: string | null): CheckResult[] {
+export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, includeTraceSummary: boolean, kyroScope: string | null): CheckResult[] {
   const checks = [
     checkPackageVersionSync(),
     checkPackageAssets(),
@@ -34,9 +38,42 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
   ];
 
   if (includeTokenAudit) checks.push(...runTokenAuditChecks());
-  if (includeArtifactAudit) checks.push(...runArtifactAuditChecks({ kyroScope }));
+  if (includeArtifactAudit) {
+    const artifactChecks = runArtifactAuditChecks({ kyroScope });
+    checks.push(...artifactChecks);
+    if (kyroScope) {
+      emitTraceEvent({
+        v: 1,
+        ts: new Date().toISOString(),
+        scope: kyroScope,
+        type: 'validation_result',
+        source: 'doctor',
+        blocking: artifactChecks.some((check) => check.status === 'fail'),
+        findingCount: artifactChecks.filter((check) => check.status !== 'pass').length,
+        codes: artifactChecks.filter((check) => check.status !== 'pass').map((check) => check.name),
+      });
+    }
+  }
   if (includeAdapterInventory) checks.push(...checkAdapterInventory());
+  if (includeTraceSummary) checks.push(...checkTraceSummary(kyroScope));
   return checks;
+}
+
+function checkTraceSummary(kyroScope: string | null): CheckResult[] {
+  const scopes = kyroScope ? [{ id: kyroScope }] : listScopes().scopes;
+  if (scopes.length === 0) return [{ status: 'warn', name: 'trace summary', detail: 'no scopes found' }];
+  return scopes.map((entry) => {
+    const trace = readTrace(entry.id);
+    const counts = new Map<string, number>();
+    for (const event of trace.events) counts.set(event.type, (counts.get(event.type) ?? 0) + 1);
+    const last = trace.events.at(-1)?.ts ?? 'none';
+    const byType = [...counts.entries()].map(([type, count]) => `${type}=${count}`).join(', ') || 'none';
+    return {
+      status: 'pass',
+      name: `trace: ${entry.id}`,
+      detail: `events=${trace.events.length}; byType=${byType}; last=${last}${trace.skipped > 0 ? `; skipped=${trace.skipped}` : ''}`,
+    };
+  });
 }
 
 function checkPackageVersionSync(): CheckResult {
@@ -146,12 +183,18 @@ function checkAdapterProjections(): CheckResult[] {
 }
 
 function checkAdapterInventory(): CheckResult[] {
-  return ADAPTERS.map((adapter) => {
+  return [...ADAPTERS.map((adapter): CheckResult => {
     const managedFiles = adapter.buildManagedFiles();
     const managedBlocks = adapter.buildManagedBlocks();
     const capabilities = adapter.capabilities();
     const paths = adapter.paths('~');
     const nativePaths = Object.values(paths).filter(Boolean).length;
+    const enforcement = GUARDED_OPERATIONS.map((op) => {
+      const level = guardedOperationLevel(op);
+      const tier = guardEnforcement(capabilities, op);
+      const surfaces = capabilities.includes('mcp') ? 'cli,mcp' : 'cli';
+      return `${op}:${tier}(${level};${surfaces})`;
+    }).join(',');
     const detail = [
       `status=${adapter.status}`,
       `managedFiles=${managedFiles.length}`,
@@ -159,8 +202,9 @@ function checkAdapterInventory(): CheckResult[] {
       `nativePaths=${nativePaths}`,
       `systemPromptStrategy=${adapter.systemPromptStrategy()}`,
       `mcpConfigStrategy=${adapter.mcpStrategy()}`,
-      'mcpServer=kyro mcp serve',
+      capabilities.includes('mcp') ? 'mcpServer=kyro mcp serve' : 'mcpServer=none',
       `capabilities=${capabilities.length > 0 ? capabilities.join(',') : 'none'}`,
+      `guardrails=${enforcement}`,
     ].join('; ');
 
     if (adapter.status === 'planned') {
@@ -168,7 +212,23 @@ function checkAdapterInventory(): CheckResult[] {
     }
 
     return { status: 'pass', name: `adapter inventory: ${adapter.agent}`, detail };
-  });
+  }), checkMakerCheckerBoundary()];
+}
+
+function checkMakerCheckerBoundary(): CheckResult {
+  const separateCheckerTier = makerCheckerPolicy().requireSeparateChecker ? 'enforced' : 'advisory';
+  return {
+    status: 'pass',
+    name: 'maker/checker boundary',
+    detail: [
+      'evidence-present-on-done=enforced',
+      'criteria-coverage-on-pass=enforced',
+      'principle-gate-on-pass=enforced',
+      'verdict-not-before-evidence=enforced',
+      `separate-checker=${separateCheckerTier}`,
+      'criterion-actually-met=advisory',
+    ].join('; '),
+  };
 }
 
 function readYamlVersion(file: string): string {

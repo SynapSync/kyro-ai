@@ -4,6 +4,62 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.0] - 2026-07-02
+
+Adds a deterministic maker/checker boundary for task evidence and verdicts.
+
+### Added
+
+- Typed task evidence and verdict contracts with tolerant checker validation.
+- `kyro review <task>` tool-owned verdict writer with confirmation guard, safe write, handoff updates, and trace events.
+- Checker findings in `kyro analyze` for missing evidence/verdict, criteria coverage drift, non-negotiable principle pass violations, verdict/evidence timestamp order, and optional self-review blocking.
+- `maker_checker.requireSeparateChecker` policy extension.
+- Maker/checker boundary reporting in `doctor --adapters`.
+- `check:maker-checker` gate and eval fixtures for happy-path review and blocked self-review.
+- `docs/maker-checker.md`.
+
+### Changed
+
+- `close-sprint` now refuses to close while CRITICAL/HIGH analyze findings remain.
+- Sprint execution/review mode docs now route verdict writes through `kyro review`.
+
+## [4.7.0] - 2026-07-02
+
+Adds portable guardrail policy enforcement for dangerous operations across CLI and MCP surfaces.
+
+### Added
+
+- Built-in guardrail policy with fail-safe `.agents/kyro/policy.json` overrides.
+- Shared `evaluateGuard` core for guarded operations.
+- `POLICY_BLOCKED` error code and CLI error-code rendering.
+- `check:guardrails` gate covering zero-write refusals, confirmation, fail-safe merge, trace, and MCP projection.
+- Adapter guardrail enforcement-tier reporting in `doctor --adapters`.
+- Codex MCP config projection for `kyro mcp serve`.
+- Eval cases for `scope set-active` confirmation and blocked policy behavior.
+- `docs/guardrails.md`.
+
+### Changed
+
+- `kyro scope set-active` now requires explicit `--yes` confirmation.
+
+## [4.6.0] - 2026-07-02
+
+Adds append-only trace events for per-scope observability without making trace a source of truth.
+
+### Added
+
+- `kyro trace` command with `--json`, `--tail`, `--type`, and explicit-scope `--clear`.
+- `doctor --trace` informational trace summaries.
+- Append-only best-effort trace core with `KYRO_TRACE=0` kill switch and `KYRO_TRACE_DEBUG` diagnostics.
+- Seven-versioned trace event catalog and golden drift check.
+- `check:trace` conformance gate for append-only writes, non-fatal failures, stdout purity, NDJSON validity, crash-tolerant reads, and no routing reads.
+- Eval cases pinning `close_snapshot` emission and trace kill-switch behavior.
+- `docs/trace.md` with trace-vs-ledger disambiguation.
+
+### Changed
+
+- Eval replay steps now support scoped environment variables for behavioral checks.
+
 ## [4.5.0] - 2026-07-02
 
 Adds a tools-only MCP typed tool surface over Kyro's deterministic CLI core.

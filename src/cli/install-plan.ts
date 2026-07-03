@@ -53,6 +53,7 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
 
   for (const adapter of getInstalledAdapterDefinitions(manifestAgents)) {
     adapter.buildProjection(plan);
+    if (adapter.capabilities().includes('mcp')) adapter.buildMcpProjection(plan);
   }
 
   return plan;

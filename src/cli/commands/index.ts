@@ -3,6 +3,7 @@ export const CLI_COMMANDS = [
   'detect',
   'doctor',
   'analyze',
+  'review',
   'repair',
   'close-sprint',
   'context-pack',
@@ -11,6 +12,7 @@ export const CLI_COMMANDS = [
   'uninstall',
   'eval',
   'mcp',
+  'trace',
 ] as const;
 
 export type CliCommand = (typeof CLI_COMMANDS)[number];

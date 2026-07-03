@@ -1,0 +1,19 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "guard-policy-blocked",
+  "title": "blocked policy refuses scope set-active before write",
+  "kind": "replay",
+  "tags": ["guardrails", "policy"],
+  "agents": ["any"],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": ["scope", "set-active", "demo", "--yes"],
+      "expect": {
+        "exitCode": 1,
+        "stderrIncludes": ["blocked by Kyro policy", "POLICY_BLOCKED"]
+      }
+    }
+  ],
+  "expectFinalState": false
+}

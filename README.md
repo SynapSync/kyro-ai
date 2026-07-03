@@ -31,6 +31,8 @@ Kyro gives agents:
 - **deterministic CLI gates** (`doctor`, `analyze`) so quality is enforced in code, not left to prompt discipline
 - **behavioral evals** (`kyro eval`) that replay agent-facing routing, guardrails, and artifact transitions
 - **typed MCP tools** (`kyro mcp serve`) for hosts that prefer structured tool calls over CLI text
+- **append-only trace events** (`kyro trace`) for audit/debugging without becoming a source of truth
+- **portable guardrails** for dangerous operations across CLI and MCP surfaces
 
 ---
 
@@ -364,6 +366,11 @@ Kyro uses lean runtime loading: command router → `sprint.json` state → one r
 | [Rules Guide](docs/rules-guide.md)               | Persistent learning rules                                |
 | [Context Management](docs/context-management.md) | Handoff routing and cross-session continuity             |
 | [Programmatic Usage](docs/programmatic-usage.md) | Using Kyro instructions from custom LLM apps             |
+| [Behavioral Evals](docs/evals.md)                 | Deterministic regression eval harness                   |
+| [MCP Typed Tools](docs/mcp.md)                     | MCP server/tool contracts for agent hosts               |
+| [Trace Events](docs/trace.md)                      | Append-only runtime audit trace                         |
+| [Portable Guardrails](docs/guardrails.md)          | Policy enforcement across CLI and MCP surfaces          |
+| [Maker/Checker Boundary](docs/maker-checker.md)    | Tool-owned task review and evidence/verdict contracts   |
 
 ---
 
@@ -389,8 +396,3 @@ Kyro uses lean runtime loading: command router → `sprint.json` state → one r
   <br/><br/>
   <sub>Built by <a href="https://github.com/SynapSync">SynapSync</a> — a practical harness for multi-agent software delivery.</sub>
 </p>
-
-## Documentation
-
-- [Behavioral evals](docs/evals.md)
-- [MCP typed tools](docs/mcp.md)

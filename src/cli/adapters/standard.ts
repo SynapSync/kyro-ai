@@ -34,6 +34,8 @@ export const standardAgentsAdapter: AdapterDefinition = {
   },
   buildProjection: addCommandSkillProjection,
   buildRemoval() {},
+  buildMcpProjection() {},
+  buildMcpRemoval() {},
   buildManagedFiles: buildCommandSkillManagedFiles,
   buildManagedBlocks() {
     return [];

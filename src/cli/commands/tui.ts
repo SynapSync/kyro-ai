@@ -41,6 +41,7 @@ function tuiInstallOptions(agent: Agent): CliOptions {
     tokens: false,
     artifacts: false,
     adapters: false,
+    trace: false,
     kyroScope: null,
     task: null,
     json: false,

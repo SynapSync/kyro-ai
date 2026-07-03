@@ -12,6 +12,8 @@ kyro doctor --tokens    # Audit context/token budgets
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
+kyro scope set-active <scope> --yes  # Change active scope with guardrail confirmation
+kyro trace              # Read append-only trace events for a scope
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
@@ -236,7 +238,7 @@ Scope lifecycle helpers:
 ```bash
 kyro scope list
 kyro scope inspect auth-refactor
-kyro scope set-active auth-refactor
+kyro scope set-active auth-refactor --yes
 ```
 
 ## Sync Semantics
@@ -294,3 +296,26 @@ Use `kyro eval` to run deterministic agent-facing regression cases from `fixture
 ## MCP Server
 
 Use `kyro mcp serve` to expose Kyro operations as typed MCP tools over stdio. Use `kyro mcp tools` to print the catalog. See [mcp.md](mcp.md).
+
+
+## Trace events
+
+Use `kyro trace` to inspect append-only per-scope diagnostic events:
+
+```bash
+kyro trace --kyro-scope auth-refactor
+kyro trace --kyro-scope auth-refactor --json --tail 20
+kyro trace --kyro-scope auth-refactor --type close_snapshot
+kyro doctor --trace --kyro-scope auth-refactor
+```
+
+Trace files are audit data only. They are never read for routing or workflow decisions. See [trace.md](trace.md).
+
+
+## Portable guardrails
+
+Kyro evaluates dangerous operations through a shared policy core. `scope set-active` now requires `--yes`; MCP mutating tools use the existing two-phase `confirm: true` protocol. Use `kyro doctor --adapters` to see whether each adapter is `enforced` or `advisory` for guarded operations. See [guardrails.md](guardrails.md).
+
+## Maker/checker review
+
+`kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. See [maker-checker.md](maker-checker.md).

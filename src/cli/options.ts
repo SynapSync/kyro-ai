@@ -11,6 +11,7 @@ export function parseOptions(args: string[]): CliOptions {
   let tokens = false;
   let artifacts = false;
   let adapters = false;
+  let trace = false;
   let kyroScope: string | null = null;
   let task: string | null = null;
   let json = false;
@@ -35,6 +36,8 @@ export function parseOptions(args: string[]): CliOptions {
       artifacts = true;
     } else if (arg === '--adapters') {
       adapters = true;
+    } else if (arg === '--trace') {
+      trace = true;
     } else if (arg === '--json') {
       json = true;
     } else if (arg === '--purge-adapter-assets') {
@@ -106,6 +109,7 @@ export function parseOptions(args: string[]): CliOptions {
     tokens,
     artifacts,
     adapters,
+    trace,
     kyroScope,
     task,
     json,

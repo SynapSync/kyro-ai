@@ -7,7 +7,7 @@ import type { EvalCase } from './types';
 
 const ALLOWED_ROOT_KEYS = new Set(['evalCaseSchemaVersion', 'id', 'title', 'kind', 'tags', 'agents', 'scope', 'route', 'steps', 'expectFinalState']);
 const ALLOWED_ROUTE_KEYS = new Set(['nextAction', 'expectedModes', 'expectedBudgetClass', 'expectedReasoningTier']);
-const ALLOWED_STEP_KEYS = new Set(['run', 'expect']);
+const ALLOWED_STEP_KEYS = new Set(['run', 'env', 'expect']);
 const ALLOWED_EXPECT_KEYS = new Set(['exitCode', 'stdoutIncludes', 'stdoutExcludes', 'stderrIncludes', 'stderrExcludes']);
 const AGENT_VALUES = new Set<string>([...Object.values(AGENT), 'any']);
 const REASONING_VALUES = new Set(['light', 'standard', 'deep']);
@@ -73,7 +73,19 @@ function validateStep(value: unknown, path: string, prefix: string, issues: Vali
   } else if (!isCliCommand(value.run[0])) {
     issues.push({ path, field: `${prefix}.run[0]`, message: `must be a known CLI command, got ${value.run[0]}` });
   }
+  if ('env' in value) validateEnv(value.env, path, `${prefix}.env`, issues);
   validateExpectation(value.expect, path, `${prefix}.expect`, issues);
+}
+
+function validateEnv(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object' });
+    return;
+  }
+  for (const [key, item] of Object.entries(value)) {
+    if (!/^[A-Z0-9_]+$/.test(key)) issues.push({ path, field: `${prefix}.${key}`, message: 'must be an uppercase environment variable name' });
+    if (typeof item !== 'string') issues.push({ path, field: `${prefix}.${key}`, message: 'must be a string' });
+  }
 }
 
 function validateExpectation(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {

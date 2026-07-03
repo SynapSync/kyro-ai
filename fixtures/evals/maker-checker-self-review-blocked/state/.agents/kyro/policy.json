@@ -1,0 +1,8 @@
+{
+  "policyVersion": 1,
+  "operations": {},
+  "allow": [],
+  "maker_checker": {
+    "requireSeparateChecker": true
+  }
+}

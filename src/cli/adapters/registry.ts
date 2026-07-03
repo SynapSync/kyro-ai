@@ -34,6 +34,8 @@ const plannedAdapter = (
   },
   buildProjection() {},
   buildRemoval() {},
+  buildMcpProjection() {},
+  buildMcpRemoval() {},
   buildManagedFiles() {
     return [];
   },
