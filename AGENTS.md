@@ -108,3 +108,16 @@ When bumping version or changing the description:
 4. **Commit with message** containing: "chore: bump version to X.Y.Z" or "docs: update descriptions"
 
 ⚠️ **Important:** All 4 files must be kept in sync. Mismatched versions will cause installation issues.
+
+<!-- kyro-ai:agents-md:start -->
+## Kyro AI
+
+Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-wrap-up`.
+
+Runtime: `~/.agents/kyro/current/`
+Project state: `.agents/kyro/kyro.json`
+Artifacts: `.agents/kyro/scopes/{scope}/`
+Skills: `~/.agents/skills/kyro-*`
+
+Load command routers only when a Kyro skill is invoked. Do not load full Kyro docs unless the router asks for them. Preserve non-Kyro content; Kyro owns only this marked block.
+<!-- kyro-ai:agents-md:end -->

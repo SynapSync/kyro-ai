@@ -65,3 +65,7 @@ Policy denials emit `blocked_reason`; approvals emit `gate_approved`. Trace is b
 
 - `CONFIRMATION_REQUIRED`: operation needs explicit approval.
 - `POLICY_BLOCKED`: operation is blocked by effective policy.
+
+## Maker/checker policy extension
+
+`maker_checker.requireSeparateChecker` can require a separate checker actor for passing task verdicts. See [maker-checker.md](maker-checker.md).

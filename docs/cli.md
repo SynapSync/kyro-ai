@@ -315,3 +315,7 @@ Trace files are audit data only. They are never read for routing or workflow dec
 ## Portable guardrails
 
 Kyro evaluates dangerous operations through a shared policy core. `scope set-active` now requires `--yes`; MCP mutating tools use the existing two-phase `confirm: true` protocol. Use `kyro doctor --adapters` to see whether each adapter is `enforced` or `advisory` for guarded operations. See [guardrails.md](guardrails.md).
+
+## Maker/checker review
+
+`kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. See [maker-checker.md](maker-checker.md).

@@ -1,10 +1,10 @@
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile } from '../artifacts/schema';
+import { asSprintFile, asTaskEvidence, asTaskVerdict } from '../artifacts/schema';
 import { readProjectState } from '../state';
 import type { ActiveSprint, AnalysisFinding, AnalysisSeverity, Phase, Principle, PrincipleCheck, SprintFile, Task } from '../types';
 import { KyroCoreError } from './errors';
-import { policyIssues } from './policy';
+import { makerCheckerPolicy, policyIssues } from './policy';
 import { resolveScope } from './scope-resolution';
 import { emitBlockedReason, emitTraceEvent } from './trace';
 
@@ -83,9 +83,52 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
     const seen = new Set<string>();
     for (const t of tasks) { if (seen.has(t.id)) add('MEDIUM', 'consistency', `duplicate task id "${t.id}"`, 'Task ids must be unique within a sprint.'); seen.add(t.id); }
     for (const d of sprint.debt) if ((d.status === 'open' || d.status === 'in_progress') && typeof d.targetSprint === 'number' && d.targetSprint < active.n) add('HIGH', 'debt', `debt ${d.id} was due in sprint ${d.targetSprint} and is still ${d.status}`, 'Address it this sprint or re-target it explicitly with a reason.');
+    collectCheckerFindings(sprint, principles).forEach((finding) => {
+      n += 1;
+      out.push({ ...finding, id: `A${String(n).padStart(3, '0')}` });
+    });
   }
   if (!Array.isArray(sprint.successCriteria) || sprint.successCriteria.length === 0) add('MEDIUM', 'spec', 'scope has no successCriteria', 'Add 2–5 technology-agnostic, measurable outcomes (see INIT).');
   return out.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+}
+
+export function collectCheckerFindings(sprint: SprintFile, principles: Principle[]): AnalysisFinding[] {
+  const out: AnalysisFinding[] = [];
+  let n = 0;
+  const add = (severity: AnalysisSeverity, detail: string, remedy: string): void => {
+    n += 1;
+    out.push({ id: `CHECKER${String(n).padStart(3, '0')}`, severity, category: 'checker', detail, remedy });
+  };
+  const active = sprint.activeSprint;
+  if (!active) return out;
+  const nonNegotiableViolations = principles.filter((p) => p.check && p.severity === 'non-negotiable' && principleViolated(p.check, sprint));
+  const requireSeparateChecker = makerCheckerPolicy().requireSeparateChecker;
+
+  for (const task of allTasks(active)) {
+    const evidence = asTaskEvidence(task.evidence);
+    const verdict = asTaskVerdict(task.verdict);
+    if (task.status === 'done' && !evidence) {
+      add('CRITICAL', `task ${task.id} is done but has missing or malformed evidence`, 'Record task.evidence with summary, validation, files_changed, by, and recordedAt before review.');
+    }
+    if (task.status === 'done' && !verdict) {
+      add('CRITICAL', `task ${task.id} is done but has missing or malformed verdict`, 'Run kyro review for the task so the tool owns the verdict write.');
+    }
+    if (!verdict || verdict.result !== 'pass') continue;
+    const missingCriteria = missingCheckedCriteria(task.acceptance_criteria, verdict.checked_criteria);
+    if (missingCriteria.length > 0) {
+      add('CRITICAL', `task ${task.id} pass verdict did not check all acceptance_criteria (${missingCriteria.join('; ')})`, 'A pass verdict must include every acceptance_criteria entry in checked_criteria exactly.');
+    }
+    if (nonNegotiableViolations.length > 0) {
+      add('CRITICAL', `task ${task.id} has pass verdict while non-negotiable principle(s) are violated (${nonNegotiableViolations.map((p) => p.id).join(', ')})`, 'A non-negotiable principle violation must fail the review; fix the principle breach before passing the task.');
+    }
+    if (evidence && Date.parse(verdict.reviewedAt) < Date.parse(evidence.recordedAt)) {
+      add('HIGH', `task ${task.id} verdict predates its evidence`, 'Re-run kyro review after recording the current task evidence.');
+    }
+    if (requireSeparateChecker && evidence && verdict.by === evidence.by) {
+      add('CRITICAL', `task ${task.id} pass verdict was self-reviewed by ${verdict.by}`, 'Use a separate checker actor or disable maker_checker.requireSeparateChecker in policy.');
+    }
+  }
+  return out;
 }
 
 function principleViolated(check: PrincipleCheck, sprint: SprintFile): boolean {
@@ -97,7 +140,12 @@ function principleViolated(check: PrincipleCheck, sprint: SprintFile): boolean {
   }
 }
 
-function allTasks(active: ActiveSprint): Task[] {
+function missingCheckedCriteria(acceptanceCriteria: string[], checkedCriteria: string[]): string[] {
+  const checked = new Set(checkedCriteria);
+  return acceptanceCriteria.filter((criterion) => !checked.has(criterion));
+}
+
+export function allTasks(active: ActiveSprint): Task[] {
   const out: Task[] = [];
   for (const phase of active.phases ?? ([] as Phase[])) for (const task of phase.tasks ?? []) out.push(task);
   for (const task of active.emergentTasks ?? []) out.push(task);

@@ -1,0 +1,20 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "maker-checker-happy",
+  "title": "Tool-owned review writes coherent pass verdict",
+  "kind": "replay",
+  "tags": ["maker-checker", "review"],
+  "agents": ["any"],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": ["review", "T1.1", "--kyro-scope", "demo", "--verdict", "pass", "--yes"],
+      "expect": { "exitCode": 0, "stdoutIncludes": ["Task T1.1 reviewed as pass", "Next action: close_sprint"] }
+    },
+    {
+      "run": ["analyze", "--kyro-scope", "demo"],
+      "expect": { "exitCode": 0, "stdoutIncludes": ["no semantic issues"] }
+    }
+  ],
+  "expectFinalState": false
+}

@@ -1,4 +1,4 @@
-import type { KyroProjectState, SprintFile } from '../types';
+import type { KyroProjectState, SprintFile, TaskEvidence, TaskVerdict } from '../types';
 
 export const KYRO_SCOPE_STATUS = {
   PLANNING: 'planning',
@@ -14,6 +14,8 @@ export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'execute_ta
 export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
 export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'] as const;
 export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
+export const TASK_VERDICT_RESULT_VALUES = ['pass', 'fail'] as const;
+export const TASK_VERDICT_FINDING_SEVERITY_VALUES = ['critical', 'warning', 'suggestion'] as const;
 
 export interface ValidationIssue {
   path: string;
@@ -339,6 +341,47 @@ function validateTask(value: unknown, path: string, prefix: string, issues: Vali
   requireString(value, 'title', path, issues, `${prefix}.title`);
   requireString(value, 'description', path, issues, `${prefix}.description`);
   requireLiteralSet(value, 'status', TASK_STATUS_VALUES, path, issues, `${prefix}.status`);
+  if ('files_to_touch' in value) requireStringArrayField(value, 'files_to_touch', path, issues, `${prefix}.files_to_touch`);
+  if ('acceptance_criteria' in value) requireStringArrayField(value, 'acceptance_criteria', path, issues, `${prefix}.acceptance_criteria`);
+  if ('depends_on' in value) requireStringArrayField(value, 'depends_on', path, issues, `${prefix}.depends_on`);
+}
+
+function validateTaskEvidence(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { summary, validation, files_changed, by, recordedAt } or null' });
+    return;
+  }
+  requireNonEmptyString(value, 'summary', path, issues, `${prefix}.summary`);
+  requireNonEmptyString(value, 'validation', path, issues, `${prefix}.validation`);
+  requireStringArrayField(value, 'files_changed', path, issues, `${prefix}.files_changed`);
+  if ('notes' in value && typeof value.notes !== 'string') issues.push({ path, field: `${prefix}.notes`, message: 'must be a string when present' });
+  requireNonEmptyString(value, 'by', path, issues, `${prefix}.by`);
+  requireIsoString(value, 'recordedAt', path, issues, `${prefix}.recordedAt`);
+}
+
+function validateTaskVerdict(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { result, checked_criteria, findings, by, reviewedAt } or null' });
+    return;
+  }
+  requireLiteralSet(value, 'result', TASK_VERDICT_RESULT_VALUES, path, issues, `${prefix}.result`);
+  requireStringArrayField(value, 'checked_criteria', path, issues, `${prefix}.checked_criteria`);
+  if (!Array.isArray(value.findings)) {
+    issues.push({ path, field: `${prefix}.findings`, message: 'must be an array' });
+  } else {
+    value.findings.forEach((finding, index) => validateTaskVerdictFinding(finding, path, `${prefix}.findings[${index}]`, issues));
+  }
+  requireNonEmptyString(value, 'by', path, issues, `${prefix}.by`);
+  requireIsoString(value, 'reviewedAt', path, issues, `${prefix}.reviewedAt`);
+}
+
+function validateTaskVerdictFinding(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { severity, detail }' });
+    return;
+  }
+  requireLiteralSet(value, 'severity', TASK_VERDICT_FINDING_SEVERITY_VALUES, path, issues, `${prefix}.severity`);
+  requireNonEmptyString(value, 'detail', path, issues, `${prefix}.detail`);
 }
 
 function validateDebtItem(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
@@ -497,6 +540,20 @@ export function asSprintFile(value: unknown): SprintFile | null {
   return validateSprintFile(value, 'sprint.json').length === 0 ? value as SprintFile : null;
 }
 
+export function asTaskEvidence(value: unknown): TaskEvidence | null {
+  const issues: ValidationIssue[] = [];
+  if (value === null) return null;
+  validateTaskEvidence(value, 'task.evidence', 'evidence', issues);
+  return issues.length === 0 ? value as TaskEvidence : null;
+}
+
+export function asTaskVerdict(value: unknown): TaskVerdict | null {
+  const issues: ValidationIssue[] = [];
+  if (value === null) return null;
+  validateTaskVerdict(value, 'task.verdict', 'verdict', issues);
+  return issues.length === 0 ? value as TaskVerdict : null;
+}
+
 export function asScopeState(value: unknown): KyroScopeState | null {
   return validateScopeState(value, 'state.json').length === 0 ? value as KyroScopeState : null;
 }
@@ -511,6 +568,14 @@ function requireLiteral(record: Record<string, unknown>, key: string, expected: 
 
 function requireString(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field = key): void {
   if (typeof record[key] !== 'string') issues.push({ path, field, message: 'must be a string' });
+}
+
+function requireNonEmptyString(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field = key): void {
+  if (typeof record[key] !== 'string' || record[key].trim() === '') issues.push({ path, field, message: 'must be a non-empty string' });
+}
+
+function requireIsoString(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field = key): void {
+  if (typeof record[key] !== 'string' || Number.isNaN(Date.parse(record[key]))) issues.push({ path, field, message: 'must be an ISO-8601 timestamp string' });
 }
 
 function requireNullableString(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[]): void {

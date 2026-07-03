@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.0] - 2026-07-02
+
+Adds a deterministic maker/checker boundary for task evidence and verdicts.
+
+### Added
+
+- Typed task evidence and verdict contracts with tolerant checker validation.
+- `kyro review <task>` tool-owned verdict writer with confirmation guard, safe write, handoff updates, and trace events.
+- Checker findings in `kyro analyze` for missing evidence/verdict, criteria coverage drift, non-negotiable principle pass violations, verdict/evidence timestamp order, and optional self-review blocking.
+- `maker_checker.requireSeparateChecker` policy extension.
+- Maker/checker boundary reporting in `doctor --adapters`.
+- `check:maker-checker` gate and eval fixtures for happy-path review and blocked self-review.
+- `docs/maker-checker.md`.
+
+### Changed
+
+- `close-sprint` now refuses to close while CRITICAL/HIGH analyze findings remain.
+- Sprint execution/review mode docs now route verdict writes through `kyro review`.
+
 ## [4.7.0] - 2026-07-02
 
 Adds portable guardrail policy enforcement for dangerous operations across CLI and MCP surfaces.

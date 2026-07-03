@@ -51,17 +51,22 @@
             "status": "done",
             "evidence": {
               "summary": "done",
-              "validation": [
-                "ok"
-              ],
+              "validation": "ok",
               "files_changed": [
                 "src/demo.ts"
               ],
-              "notes": ""
+              "notes": "",
+              "by": "maker",
+              "recordedAt": "2026-07-02T00:00:00.000Z"
             },
             "verdict": {
-              "status": "pass",
-              "notes": "ok"
+              "result": "pass",
+              "checked_criteria": [
+                "Validation passes."
+              ],
+              "findings": [],
+              "by": "checker",
+              "reviewedAt": "2026-07-02T00:01:00.000Z"
             }
           }
         ]

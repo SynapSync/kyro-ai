@@ -1,9 +1,9 @@
 import { readJsonSafely } from '../artifacts/json';
 import { KYRO_PROJECT_ROOT } from '../constants';
-import type { GuardContext, GuardDecision, GuardLevel, GuardedOperation, PolicyDefinition, PolicyIssue } from '../types';
+import type { GuardContext, GuardDecision, GuardLevel, GuardedOperation, MakerCheckerPolicy, PolicyDefinition, PolicyIssue } from '../types';
 
 export const POLICY_PATH = `${KYRO_PROJECT_ROOT}/policy.json`;
-export const GUARDED_OPERATIONS: readonly GuardedOperation[] = ['close_sprint', 'repair_scope', 'scope_set_active', 'clear_active_sprint', 'delete_archive'];
+export const GUARDED_OPERATIONS: readonly GuardedOperation[] = ['close_sprint', 'repair_scope', 'scope_set_active', 'clear_active_sprint', 'delete_archive', 'review_task'];
 export const GUARD_LEVELS: readonly GuardLevel[] = ['tool_owned', 'confirm', 'blocked'];
 
 export const DEFAULT_POLICY: PolicyDefinition = {
@@ -14,8 +14,10 @@ export const DEFAULT_POLICY: PolicyDefinition = {
     scope_set_active: { level: 'confirm' },
     clear_active_sprint: { level: 'blocked' },
     delete_archive: { level: 'blocked' },
+    review_task: { level: 'confirm' },
   },
   allow: [],
+  maker_checker: { requireSeparateChecker: false },
 };
 
 export interface LoadedPolicy {
@@ -66,10 +68,15 @@ export function guardedOperationLevel(op: GuardedOperation): GuardLevel {
   return loadPolicy().policy.operations[op].level;
 }
 
+export function makerCheckerPolicy(): MakerCheckerPolicy {
+  return loadPolicy().policy.maker_checker;
+}
+
 interface PartialPolicy {
   policyVersion?: unknown;
   operations?: Record<string, { level?: unknown }>;
   allow?: unknown[];
+  maker_checker?: { requireSeparateChecker?: unknown };
 }
 
 function mergePolicy(override: PartialPolicy): PolicyDefinition {
@@ -81,6 +88,9 @@ function mergePolicy(override: PartialPolicy): PolicyDefinition {
   }
   for (const item of override.allow ?? []) {
     if (isGuardedOperation(item) && merged.operations[item].level === 'blocked') merged.operations[item] = { level: 'confirm' };
+  }
+  if (override.maker_checker?.requireSeparateChecker === true) {
+    merged.maker_checker = { requireSeparateChecker: true };
   }
   return merged;
 }
@@ -106,6 +116,13 @@ function validatePolicyOverride(value: unknown): PolicyIssue[] {
       for (const [index, item] of value.allow.entries()) {
         if (!isGuardedOperation(item)) issues.push({ field: `allow[${index}]`, message: 'must be a guarded operation' });
       }
+    }
+  }
+  if ('maker_checker' in value) {
+    if (!isRecord(value.maker_checker)) {
+      issues.push({ field: 'maker_checker', message: 'must be an object' });
+    } else if ('requireSeparateChecker' in value.maker_checker && typeof value.maker_checker.requireSeparateChecker !== 'boolean') {
+      issues.push({ field: 'maker_checker.requireSeparateChecker', message: 'must be a boolean' });
     }
   }
   return issues;

@@ -11,6 +11,7 @@ import { uninstall } from './commands/uninstall';
 import { runEval } from './commands/eval';
 import { runMcpCommand } from './commands/mcp';
 import { runTraceCommand } from './commands/trace';
+import { runReviewCommand } from './commands/review';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
 
@@ -39,6 +40,11 @@ export async function runCli(): Promise<void> {
 
   if (command === 'trace') {
     runTraceCommand(args);
+    return;
+  }
+
+  if (command === 'review') {
+    runReviewCommand(args);
     return;
   }
 
