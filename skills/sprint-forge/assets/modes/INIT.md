@@ -43,6 +43,11 @@ Load `../templates/sprint.json`. Fill:
 
 - `scope`, `title`, `status: "planning"`, `objective` (one sentence).
 - `successCriteria: [...]` — 2–5 **technology-agnostic, measurable** outcomes (WHAT/WHY, not HOW). Example: "A user completes checkout in under 2 minutes."
+- `spec` (optional but preferred when the scope has explicit product/business requirements):
+  - `requirements[]`: stable ids (`R1`, `R2`) with technology-agnostic statements, optional `priority` (`must|should|could`), and optional rationale.
+  - `nonGoals[]`: explicit out-of-scope outcomes.
+  - `openQuestions[]`: unresolved requirement-level questions that need `clarify.md`.
+  - `scenarios[]`: start empty here unless the scenario is already unambiguous; `plan-sprint.md` normally adds Given/When/Then scenarios.
 - `roadmap` from the sizing above.
 - `conventions: []` (populated later by `learner.md`), `clarifications: []` (populated by `clarify.md`), `activeSprint: null`.
 - `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write `[NEEDS CLARIFICATION: ...]` markers rather than guessing), otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.

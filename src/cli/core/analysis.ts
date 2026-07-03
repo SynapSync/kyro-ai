@@ -88,8 +88,78 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
       out.push({ ...finding, id: `A${String(n).padStart(3, '0')}` });
     });
   }
+  for (const finding of collectSpecFindings(sprint)) {
+    n += 1;
+    out.push({ ...finding, id: `A${String(n).padStart(3, '0')}` });
+  }
   if (!Array.isArray(sprint.successCriteria) || sprint.successCriteria.length === 0) add('MEDIUM', 'spec', 'scope has no successCriteria', 'Add 2–5 technology-agnostic, measurable outcomes (see INIT).');
   return out.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+}
+
+export function collectSpecFindings(sprint: SprintFile): AnalysisFinding[] {
+  const spec = sprint.spec;
+  if (!spec) return [];
+
+  const out: AnalysisFinding[] = [];
+  let n = 0;
+  const add = (severity: AnalysisSeverity, detail: string, remedy: string): void => {
+    n += 1;
+    out.push({ id: `SPEC${String(n).padStart(3, '0')}`, severity, category: 'spec', detail, remedy });
+  };
+
+  const requirementIds = new Set(spec.requirements.map((requirement) => requirement.id));
+  const scenarioIds = new Set(spec.scenarios.map((scenario) => scenario.id));
+  const tasks = sprint.activeSprint ? allTasks(sprint.activeSprint) : [];
+  const referencedRequirements = new Set<string>();
+  const referencedScenarios = new Set<string>();
+
+  for (const id of duplicateStrings(spec.requirements.map((requirement) => requirement.id))) {
+    add('MEDIUM', `duplicate spec requirement id "${id}"`, 'Requirement ids must be unique within sprint.spec.requirements.');
+  }
+  for (const id of duplicateStrings(spec.scenarios.map((scenario) => scenario.id))) {
+    add('MEDIUM', `duplicate spec scenario id "${id}"`, 'Scenario ids must be unique within sprint.spec.scenarios.');
+  }
+
+  for (const scenario of spec.scenarios) {
+    if (requirementIds.has(scenario.requirement)) {
+      referencedRequirements.add(scenario.requirement);
+    } else {
+      add('HIGH', `scenario ${scenario.id} references missing requirement "${scenario.requirement}"`, 'Fix scenario.requirement or add the missing requirement.');
+    }
+  }
+
+  for (const task of tasks) {
+    for (const scenarioRef of task.scenario_refs ?? []) {
+      if (scenarioIds.has(scenarioRef)) {
+        referencedScenarios.add(scenarioRef);
+      } else {
+        add('HIGH', `task ${task.id} scenario_refs "${scenarioRef}" which does not exist`, 'Fix task.scenario_refs or add the missing scenario.');
+      }
+    }
+  }
+
+  for (const requirement of spec.requirements) {
+    if (!referencedRequirements.has(requirement.id)) {
+      add('MEDIUM', `requirement ${requirement.id} has no scenario coverage`, 'Add at least one scenario that references this requirement, or remove/defer the requirement.');
+    }
+  }
+  for (const scenario of spec.scenarios) {
+    if (!referencedScenarios.has(scenario.id)) {
+      add('MEDIUM', `scenario ${scenario.id} has no task coverage`, 'Add scenario_refs to at least one task, or remove/defer the scenario.');
+    }
+  }
+  if (spec.openQuestions.length > 0) {
+    add('MEDIUM', `${spec.openQuestions.length} spec open question(s) remain`, 'Resolve open questions via clarify before treating the spec as stable.');
+  }
+
+  for (const task of tasks) {
+    const verdict = asTaskVerdict(task.verdict);
+    if (task.status === 'done' && verdict?.result === 'pass' && (task.scenario_refs ?? []).length === 0) {
+      add('MEDIUM', `task ${task.id} shipped without a scenario reference`, 'Add task.scenario_refs so completed work remains traceable to the spec.');
+    }
+  }
+
+  return out;
 }
 
 export function collectCheckerFindings(sprint: SprintFile, principles: Principle[]): AnalysisFinding[] {
@@ -143,6 +213,16 @@ function principleViolated(check: PrincipleCheck, sprint: SprintFile): boolean {
 function missingCheckedCriteria(acceptanceCriteria: string[], checkedCriteria: string[]): string[] {
   const checked = new Set(checkedCriteria);
   return acceptanceCriteria.filter((criterion) => !checked.has(criterion));
+}
+
+function duplicateStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  }
+  return [...duplicates];
 }
 
 export function allTasks(active: ActiveSprint): Task[] {

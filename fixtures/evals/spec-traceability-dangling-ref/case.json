@@ -1,0 +1,48 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "spec-traceability-dangling-ref",
+  "title": "Spec traceability blocks dangling scenario requirement refs",
+  "kind": "replay",
+  "tags": [
+    "spec",
+    "analyze",
+    "guardrail"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "analyze",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 1,
+        "stdoutIncludes": [
+          "HIGH",
+          "missing requirement"
+        ]
+      }
+    },
+    {
+      "run": [
+        "close-sprint",
+        "--kyro-scope",
+        "demo",
+        "--outcome",
+        "shipped",
+        "--yes"
+      ],
+      "expect": {
+        "exitCode": 1,
+        "stderrIncludes": [
+          "BLOCKING_FINDINGS"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}
