@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { scanLines } from './lib/scan.mjs';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const cli = resolve(repo, 'dist/cli.js');
@@ -15,15 +16,8 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function run(command, args, options = {}) {
-  return spawnSync(command, args, { cwd: repo, encoding: 'utf-8', ...options });
-}
-
-function rg(pattern, extra = []) {
-  const result = run('rg', ['-n', pattern, 'src/cli', ...extra]);
-  if (result.status === 1) return [];
-  assert(result.status === 0, `rg failed for ${pattern}: ${result.stderr}`);
-  return result.stdout.trim().split('\n').filter(Boolean);
+function rg(pattern) {
+  return scanLines(pattern, 'src/cli', { cwd: repo });
 }
 
 function rel(line) {

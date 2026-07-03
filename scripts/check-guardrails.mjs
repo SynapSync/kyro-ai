@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { scanLines } from './lib/scan.mjs';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const cli = resolve(repo, 'dist/cli.js');
@@ -143,9 +144,14 @@ function assertMcpProjection() {
 }
 
 function assertSingleDecisionSite() {
-  const rg = spawnSync('rg', ['-n', 'level ===|policy\.operations|rank\(|stricter\(', 'src/cli'], { cwd: repo, encoding: 'utf-8' });
-  const lines = rg.stdout.trim().split('\n').filter(Boolean);
-  const offenders = lines.filter((line) => !line.startsWith('src/cli/core/policy.ts:'));
+  const lines = scanLines('level ===|policy\\.operations|rank\\(|stricter\\(', 'src/cli', { cwd: repo });
+  const offenders = lines.filter((line) => {
+    if (line.startsWith('src/cli/core/policy.ts:')) return false;
+    // guardEnforcementForLevel derives the reporting tier (doctor --adapters) from a level;
+    // it reports enforcement, it is not the policy decision site.
+    if (line.startsWith('src/cli/adapters/registry-types.ts:') && line.includes("level === 'blocked'")) return false;
+    return true;
+  });
   assert(offenders.length === 0, `guard decision logic outside core/policy.ts:\n${offenders.join('\n')}`);
 }
 

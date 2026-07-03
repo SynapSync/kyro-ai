@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFil
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scanLines } from './lib/scan.mjs';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const cli = resolve(repo, 'dist/cli.js');
@@ -145,8 +146,7 @@ function assertReviewRequiresConfirmation() {
 }
 
 function assertSingleDecisionSite() {
-  const rg = spawnSync('rg', ['-n', 'missingCheckedCriteria|principle-gate|nonNegotiableViolations|checked_criteria.*acceptance_criteria', 'src/cli'], { cwd: repo, encoding: 'utf-8' });
-  const lines = rg.stdout.trim().split('\n').filter(Boolean);
+  const lines = scanLines('missingCheckedCriteria|principle-gate|nonNegotiableViolations|checked_criteria.*acceptance_criteria', 'src/cli', { cwd: repo });
   const offenders = lines.filter((line) => {
     if (line.startsWith('src/cli/core/analysis.ts:')) return false;
     if (line.startsWith('src/cli/commands/review.ts:') && line.includes('checked_criteria:')) return false;
