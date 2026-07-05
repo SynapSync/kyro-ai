@@ -23,17 +23,17 @@ export function runScopeCommand(args: string[]): void {
     return;
   }
   if (subcommand === 'inspect') {
-    if (!maybeScope) throw new Error('Usage: kyro scope inspect <scope>');
+    if (!maybeScope) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope inspect <scope>');
     inspectScopeCommand(maybeScope);
     return;
   }
   if (subcommand === 'set-active') {
     const parsed = parseSetActiveArgs(args.slice(1));
-    if (!parsed.scope) throw new Error('Usage: kyro scope set-active <scope> [--yes] [--dry-run]');
+    if (!parsed.scope) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope set-active <scope> [--yes] [--dry-run]');
     setActiveScope(parsed.scope, parsed.yes, parsed.dryRun);
     return;
   }
-  throw new Error(`Unknown scope subcommand: ${subcommand}. Run kyro scope --help.`);
+  throw new KyroCoreError('UNKNOWN_SUBCOMMAND', `Unknown scope subcommand: ${subcommand}.`, 'Run kyro scope --help.');
 }
 
 function listScopes(): void {
@@ -80,8 +80,8 @@ function printScopeSummary(scope: string): void {
 
 function setActiveScope(scope: string, yes: boolean, dryRun: boolean): void {
   const state = readProjectState();
-  if (!state) throw new Error(`Kyro project state not found: ${KYRO_STATE_PATH}`);
-  if (!scopeExists(scope, state)) throw new Error(`Scope not found: ${scope}`);
+  if (!state) throw new KyroCoreError('INVALID_INPUT', `Kyro project state not found: ${KYRO_STATE_PATH}`, 'Run kyro install to create it.');
+  if (!scopeExists(scope, state)) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see available scopes.');
   const guard = evaluateGuard('scope_set_active', { surface: 'cli', scope, confirmed: yes });
   if (guard.kind === 'blocked') {
     emitBlockedReason(scope, guard.message, guard.code);
@@ -111,10 +111,10 @@ function parseSetActiveArgs(args: string[]): { scope: string; yes: boolean; dryR
   let yes = false;
   let dryRun = false;
   for (const arg of args) {
-    if (arg === '--yes' || arg === '-y') yes = true;
+    if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
     else if (arg === '--dry-run') dryRun = true;
     else if (!arg.startsWith('--') && !scope) scope = arg;
-    else throw new Error(`Unknown scope set-active option: ${arg}`);
+    else throw new KyroCoreError('INVALID_INPUT', `Unknown scope set-active option: ${arg}`);
   }
   return { scope, yes, dryRun };
 }
@@ -128,6 +128,6 @@ function printScopeHelp(): void {
   console.log(`Usage:
   kyro scope list
   kyro scope inspect <scope>
-  kyro scope set-active <scope> --yes
+  kyro scope set-active <scope> --yes|--confirm
 `);
 }

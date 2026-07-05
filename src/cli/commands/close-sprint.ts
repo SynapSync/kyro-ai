@@ -72,12 +72,12 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
   // Re-parse the written sprint.json to prove validity (the safe-write verify step).
   const verify = readJsonSafely(sprintJsonPath(scope));
   if (verify.error || !verify.exists) {
-    throw new Error(`Close wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}). The snapshot at ${snapshotPath} preserves the sprint.`);
+    throw new KyroCoreError('INVALID_JSON', `Close wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, `The snapshot at ${snapshotPath} preserves the sprint.`);
   }
   const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
     const detail = issues.map((i) => `${i.field} ${i.message}`).join('; ');
-    throw new Error(`Close wrote sprint.json but it failed validation — ${detail}. The snapshot at ${snapshotPath} preserves the sprint.`);
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Close wrote sprint.json but it failed validation — ${detail}.`, `The snapshot at ${snapshotPath} preserves the sprint.`);
   }
 
   emitTraceEvent({
@@ -390,14 +390,14 @@ function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
     const inline = arg.indexOf('=');
     if (inline !== -1) return [arg.slice(inline + 1), i];
     const value = args[i + 1];
-    if (value === undefined || value.startsWith('--')) throw new Error(`${arg} requires a value`);
+    if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${arg} requires a value`);
     return [value, i + 1];
   };
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--yes' || arg === '-y') yes = true;
+    else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
     else if (arg === '--help' || arg === '-h') help = true;
     else if (arg === '--kyro-scope' || arg.startsWith('--kyro-scope=')) [scope, i] = takeValue(arg, i);
     else if (arg === '--outcome' || arg.startsWith('--outcome=')) [outcome, i] = takeValue(arg, i);
@@ -411,7 +411,7 @@ function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
       const [value, next] = takeValue(arg, i);
       learnings.push(value);
       i = next;
-    } else throw new Error(`Unknown option: ${arg}`);
+    } else throw new KyroCoreError('INVALID_INPUT', `Unknown option: ${arg}`);
   }
 
   return { scope, outcome, note, summary, recommendations, learnings, dryRun, yes, help };
@@ -434,7 +434,7 @@ Options:
   --recommendation <text>  Recommendation for the next sprint (repeatable)
   --learning <text>        Learning to record in the narrative (repeatable)
   --dry-run                Show the plan without writing
-  -y, --yes                Skip confirmation
+  -y, --yes, --confirm     Skip confirmation
   -h, --help               Show this help
 
 Run the narrative/conventions/debt work in the close-sprint mode first; this

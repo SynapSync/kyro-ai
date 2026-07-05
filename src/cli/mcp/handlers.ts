@@ -5,6 +5,7 @@ import { inspectScope } from '../commands/artifact-doctor';
 import { buildContextPack } from '../commands/context-pack';
 import { buildClosePlan, type CloseSprintArgs } from '../commands/close-sprint';
 import { buildRepairPlan } from '../commands/repair';
+import { buildReviewPlan, checkerErrorCode, parseFinding, parseVerdict, type ReviewArgs } from '../commands/review';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile } from '../artifacts/schema';
@@ -13,10 +14,10 @@ import { KyroCoreError, toErrorEnvelope } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { listScopes } from '../core/scopes';
 import { resolveScope } from '../core/scope-resolution';
-import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
+import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, readTrace, traceSnapshotId } from '../core/trace';
 import { getTool } from './tool-catalog';
 import { validateInput } from './input-validation';
-import type { OperationPlan } from '../types';
+import type { OperationPlan, PackVerbosity, TaskVerdictFinding } from '../types';
 
 export interface ToolResult {
   content: Array<{ type: 'text'; text: string }>;
@@ -32,7 +33,7 @@ export function listTools(): unknown {
 export function callTool(name: string, rawArgs: unknown): ToolResult {
   try {
     const tool = getTool(name);
-    if (!tool) throw new KyroCoreError('INVALID_INPUT', `Unknown tool: ${name}`);
+    if (!tool) throw new KyroCoreError('UNKNOWN_TOOL', `Unknown tool: ${name}`);
     const args = validateInput(tool.inputSchema, rawArgs ?? {});
     const data = dispatchTool(name, args);
     return ok(data, summarize(name, data));
@@ -45,7 +46,7 @@ export function callTool(name: string, rawArgs: unknown): ToolResult {
 function dispatchTool(name: string, args: Record<string, unknown>): unknown {
   switch (name) {
     case 'context_pack':
-      return buildContextPack(resolveScope(optionalString(args.scope) ?? null), taskOption(args.task_id));
+      return buildContextPack(resolveScope(optionalString(args.scope) ?? null), taskOption(args.task_id), verbosityOption(args.verbosity));
     case 'doctor_artifacts':
       return { checks: runDoctorChecks(false, true, false, false, optionalString(args.scope) ?? null) };
     case 'analyze_scope':
@@ -58,8 +59,12 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       return closeSprintTool(args);
     case 'repair_scope':
       return repairScopeTool(args);
+    case 'review_task':
+      return reviewTaskTool(args);
+    case 'trace_tail':
+      return traceTailTool(args);
     default:
-      throw new KyroCoreError('INVALID_INPUT', `Unknown tool: ${name}`);
+      throw new KyroCoreError('UNKNOWN_TOOL', `Unknown tool: ${name}`);
   }
 }
 
@@ -121,6 +126,64 @@ function repairScopeTool(args: Record<string, unknown>): unknown {
   return { phase: 'applied', scope, plan };
 }
 
+function reviewTaskTool(args: Record<string, unknown>): unknown {
+  const scope = resolveScope(optionalString(args.scope) ?? null);
+  const reviewArgs: ReviewArgs = {
+    taskId: requiredString(args.task_id, 'task_id'),
+    scope,
+    verdict: args.verdict === undefined ? 'pass' : parseVerdict(requiredString(args.verdict, 'verdict')),
+    checkedCriteria: optionalStringArray(args.checked_criteria),
+    findings: parseFindings(args.findings),
+    by: optionalString(args.by) ?? 'checker',
+    yes: args.confirm === true,
+    dryRun: false,
+    help: false,
+  };
+  const { sprint, plan, findings } = buildReviewPlan(scope, reviewArgs);
+  if (findings.length > 0 && reviewArgs.verdict === 'pass') {
+    const code = checkerErrorCode(findings);
+    emitBlockedReason(scope, `checker refused pass for task ${reviewArgs.taskId}`, code);
+    throw new KyroCoreError(code, `Checker refused pass for task ${reviewArgs.taskId}.`, 'Resolve the checker findings, then re-run review_task.');
+  }
+  const guard = evaluateGuard('review_task', { surface: 'mcp', scope, confirmed: args.confirm === true });
+  if (guard.kind === 'blocked') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
+  }
+  if (args.confirm !== true) return planResult(scope, plan, { verdict: reviewArgs.verdict });
+  if (guard.kind === 'confirmation_required') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
+  }
+  emitToolCommandRun(scope, 'mcp', 'review', { task: reviewArgs.taskId, verdict: reviewArgs.verdict });
+  applyPlan(plan);
+  assertValidSprint(scope);
+  if (reviewArgs.verdict === 'pass') emitGateApproved(scope, 'checker', reviewArgs.taskId);
+  else emitBlockedReason(scope, `checker failed task ${reviewArgs.taskId}`, 'CHECKER_FAILED');
+  return { phase: 'applied', scope, taskId: reviewArgs.taskId, verdict: reviewArgs.verdict, nextAction: sprint.handoff.nextAction };
+}
+
+function traceTailTool(args: Record<string, unknown>): unknown {
+  const scope = resolveScope(optionalString(args.scope) ?? null);
+  const result = readTrace(scope, { tail: parseLimit(args.limit) });
+  return { scope, events: result.events, skipped: result.skipped };
+}
+
+function parseFindings(value: unknown): TaskVerdictFinding[] {
+  return optionalStringArray(value).map((entry) => parseFinding(entry));
+}
+
+function parseLimit(value: unknown): number {
+  if (value === undefined || value === null) return 20;
+  const parsed = Number(optionalString(value) ?? value);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new KyroCoreError('INVALID_INPUT', 'limit must be a non-negative integer', 'Pass a numeric string like "20".');
+  return parsed;
+}
+
+function verbosityOption(value: unknown): PackVerbosity {
+  return value === 'concise' || value === 'detailed' ? value : 'detailed';
+}
+
 function confirmationRequiredResult(scope: string, plan: OperationPlan[], message: string, remedy?: string): unknown {
   return {
     phase: 'plan',
@@ -144,12 +207,60 @@ function assertValidSprint(scope: string, snapshotPath?: string): void {
 }
 
 function ok(data: unknown, text: string): ToolResult {
-  return { isError: false, structuredContent: data, content: [{ type: 'text', text: JSON.stringify(data) || text }] };
+  // ACI: content[].text is the high-signal summary the model reads; the full machine payload
+  // stays in structuredContent.
+  return { isError: false, structuredContent: data, content: [{ type: 'text', text }] };
 }
 
 function summarize(name: string, data: unknown): string {
-  void data;
-  return `${name} completed`;
+  const rec = (data ?? {}) as Record<string, unknown>;
+  switch (name) {
+    case 'context_pack': {
+      const tokens = typeof rec.estimatedTokens === 'number' ? rec.estimatedTokens : '?';
+      return `context_pack: scope=${rec.scope} (${rec.status ?? '—'}), next=${rec.nextAction ?? '—'} ${rec.nextTaskId ?? ''}, ~${tokens} tokens.`.replace(/\s+/g, ' ').trim();
+    }
+    case 'analyze_scope': {
+      const findings = asArray(rec.findings);
+      const crit = findings.filter((f) => f.severity === 'CRITICAL').length;
+      const high = findings.filter((f) => f.severity === 'HIGH').length;
+      const next = findings[0]?.id ? ` Next: ${findings[0].id}.` : '';
+      return `analyze_scope: ${findings.length} finding(s) (${crit} CRITICAL, ${high} HIGH) — ${rec.blocking ? 'BLOCKING' : 'non-blocking'}.${next}`;
+    }
+    case 'doctor_artifacts': {
+      const checks = asArray(rec.checks);
+      return `doctor_artifacts: ${checks.length} check(s), ${countStatus(checks, 'fail')} fail, ${countStatus(checks, 'warn')} warn.`;
+    }
+    case 'scope_inspect': {
+      const checks = asArray(rec.checks);
+      return `scope_inspect: ${rec.scope} — ${checks.length} check(s), ${countStatus(checks, 'fail')} fail.`;
+    }
+    case 'scope_list': {
+      const scopes = Array.isArray(data) ? data : asArray(rec.scopes);
+      return `scope_list: ${scopes.length} scope(s).`;
+    }
+    case 'close_sprint':
+      return rec.phase === 'applied' ? `close_sprint: applied, snapshot=${rec.snapshotPath ?? '?'}.` : `close_sprint: plan ready (${planLen(rec.plan)} ops). Re-call with confirm:true.`;
+    case 'repair_scope':
+      return rec.phase === 'applied' ? `repair_scope: applied to ${rec.scope}.` : `repair_scope: plan ready (${planLen(rec.plan)} ops). Re-call with confirm:true.`;
+    case 'review_task':
+      return rec.phase === 'applied' ? `review_task: ${rec.verdict}, next=${rec.nextAction ?? '—'}.` : `review_task: plan ready (${rec.verdict}). Re-call with confirm:true.`;
+    case 'trace_tail':
+      return `trace_tail: ${asArray(rec.events).length} event(s)${typeof rec.skipped === 'number' && rec.skipped > 0 ? `, ${rec.skipped} skipped` : ''}.`;
+    default:
+      return `${name} completed`;
+  }
+}
+
+function asArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
+}
+
+function countStatus(items: Array<Record<string, unknown>>, status: string): number {
+  return items.filter((item) => item.status === status).length;
+}
+
+function planLen(plan: unknown): number {
+  return Array.isArray(plan) ? plan.length : 0;
 }
 
 function optionalString(value: unknown): string | null {

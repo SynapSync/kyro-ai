@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.0] - 2026-07-05
+
+Sharpens the Agent-Computer Interface (ACI): consistent errors, real verbosity, actionable tool summaries, and a wider MCP surface.
+
+### Added
+
+- `verbosity` (`concise` | `detailed`) end to end: CLI `--verbosity` and MCP `context_pack` param now trim long-form advisory prose in concise mode (default stays `detailed`).
+- `review_task` and `trace_tail` MCP tools, giving agent hosts parity with the CLI `review` and `trace` commands.
+- Actionable one-line summaries in every MCP tool result (`content[].text`), with the full payload preserved in `structuredContent`.
+- CLI `--confirm` alias for `--yes`.
+- Five new typed error codes (`UNKNOWN_COMMAND`, `UNKNOWN_SUBCOMMAND`, `UNKNOWN_TOOL`, `NO_ACTIVE_SPRINT`, `TASK_NOT_FOUND`) and `docs/aci.md`.
+
+### Changed
+
+- Every command/app-layer error now carries a typed `code` (and, where actionable, a `remedy`); plain `throw new Error` is gone from the command surface and gated by `check:mcp`.
+- `check:mcp` now asserts the 9-tool golden catalog, usage guidance in every description, no dead schema params, and the no-plain-error contract.
+
 ## [4.9.0] - 2026-07-03
 
 Adds minimal spec traceability inside `sprint.json`.

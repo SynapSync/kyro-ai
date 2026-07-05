@@ -147,7 +147,7 @@ withWorkspace('kyro-adapter-preflight-', () => {
   } catch (error) {
     failed = true;
     assert(String(error).includes('not implemented yet: claude'), 'preflight: planned adapter failure should name claude');
-    assert(String(error).includes('native projection'), 'preflight: planned adapter failure should mention native projection');
+    assert(error?.remedy?.includes('native projection'), 'preflight: planned adapter failure should mention native projection in remedy');
   }
   assert(failed, 'preflight: expected planned adapter install to fail');
 });
