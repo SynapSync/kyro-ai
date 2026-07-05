@@ -14,6 +14,7 @@ import { runTraceCommand } from './commands/trace';
 import { runReviewCommand } from './commands/review';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
+import { KyroCoreError } from './core/errors';
 
 export async function runCli(): Promise<void> {
   const [command = '', ...args] = process.argv.slice(2);
@@ -101,6 +102,6 @@ export async function runCli(): Promise<void> {
       runEval(options);
       break;
     default:
-      throw new Error(`Unknown command: ${command}. Run kyro --help.`);
+      throw new KyroCoreError('UNKNOWN_COMMAND', `Unknown command: ${command}.`, 'Run kyro --help.');
   }
 }

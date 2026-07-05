@@ -82,3 +82,9 @@ Cursor (`mcp.json`):
   }
 }
 ```
+
+## Ergonomics (ACI)
+
+See [Agent-Computer Interface](aci.md) for the error-code table, `verbosity` contract, result-summary
+format, and the CLI↔MCP parameter naming map. The MCP surface exposes nine tools including
+`review_task` (maker/checker) and `trace_tail` (observability).

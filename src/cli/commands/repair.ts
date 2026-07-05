@@ -45,19 +45,19 @@ export async function repair(options: CliOptions): Promise<void> {
 export function buildRepairPlan(scope: string): OperationPlan[] {
   const root = scopeRoot(scope);
   if (!existsSync(resolveManagedPath(root))) {
-    throw new Error(`Scope not found: ${scope}`);
+    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see available scopes.');
   }
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) {
-    throw new Error(`Cannot repair ${scope}: sprint.json not found. Run /kyro:forge (INIT) to create it.`);
+    throw new KyroCoreError('SCOPE_NOT_FOUND', `Cannot repair ${scope}: sprint.json not found.`, 'Run /kyro:forge (INIT) to create it.');
   }
   if (read.error) {
-    throw new Error(`Cannot repair ${scope}: sprint.json is invalid JSON (${read.error}). Restore from an archive snapshot.`);
+    throw new KyroCoreError('INVALID_JSON', `Cannot repair ${scope}: sprint.json is invalid JSON (${read.error}).`, 'Restore from an archive snapshot.');
   }
   const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
     const detail = issues.map((i) => `${i.field} ${i.message}`).join('; ');
-    throw new Error(`Cannot repair ${scope}: sprint.json has shape drift that needs manual review — ${detail}`);
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot repair ${scope}: sprint.json has shape drift that needs manual review — ${detail}`, 'Fix the reported fields manually.');
   }
   // Valid: normalize formatting (2-space indent + trailing newline).
   return [{ action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(read.value, null, 2)}\n` }];

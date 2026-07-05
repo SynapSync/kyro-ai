@@ -256,6 +256,7 @@ export interface CliOptions {
   kyroScope: string | null;
   task: string | null;
   json: boolean;
+  verbosity: PackVerbosity;
   purgeAdapterAssets: boolean;
   prune: boolean;
   evalCases: string[];
@@ -265,6 +266,8 @@ export interface CliOptions {
 }
 
 export type ContextPackMode = 'scope' | 'task';
+
+export type PackVerbosity = 'concise' | 'detailed';
 
 export type BudgetClassId = 'brief' | 'execute' | 'review' | 'close';
 
@@ -402,6 +405,7 @@ export interface ContextPackConvention {
 export interface ContextPackOutput {
   schemaVersion: 4;
   packMode: ContextPackMode;
+  verbosity: PackVerbosity;
   scope: string;
   status: string | null;
   objective: string | null;

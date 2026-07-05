@@ -43,36 +43,36 @@ function parseTraceArgs(rawArgs: string[]): TraceCommandArgs {
     else if (arg === '--json') args.json = true;
     else if (arg === '--kyro-scope') {
       const value = rawArgs[i + 1];
-      if (!value) throw new Error('--kyro-scope requires a value');
+      if (!value) throw new KyroCoreError('INVALID_INPUT','--kyro-scope requires a value');
       args.scope = value;
       i += 1;
     } else if (arg.startsWith('--kyro-scope=')) args.scope = arg.slice('--kyro-scope='.length);
     else if (arg === '--tail') {
       const value = rawArgs[i + 1];
-      if (!value) throw new Error('--tail requires a value');
+      if (!value) throw new KyroCoreError('INVALID_INPUT','--tail requires a value');
       args.tail = parseTail(value);
       i += 1;
     } else if (arg.startsWith('--tail=')) args.tail = parseTail(arg.slice('--tail='.length));
     else if (arg === '--type') {
       const value = rawArgs[i + 1];
-      if (!value) throw new Error('--type requires a value');
+      if (!value) throw new KyroCoreError('INVALID_INPUT','--type requires a value');
       args.type = parseType(value);
       i += 1;
     } else if (arg.startsWith('--type=')) args.type = parseType(arg.slice('--type='.length));
     else if (arg === '--clear') {
       const value = rawArgs[i + 1];
-      if (!value || value.startsWith('--')) throw new Error('--clear requires an explicit scope');
+      if (!value || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT','--clear requires an explicit scope');
       args.clearScope = value;
       i += 1;
     } else if (!arg.startsWith('--') && args.scope === null) args.scope = arg;
-    else throw new Error(`Unknown trace option: ${arg}`);
+    else throw new KyroCoreError('INVALID_INPUT',`Unknown trace option: ${arg}`);
   }
   return args;
 }
 
 function parseTail(value: string): number {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) throw new Error('--tail must be a non-negative integer');
+  if (!Number.isInteger(parsed) || parsed < 0) throw new KyroCoreError('INVALID_INPUT','--tail must be a non-negative integer');
   return parsed;
 }
 

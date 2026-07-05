@@ -10,7 +10,7 @@ import { emitBlockedReason, emitGateApproved, emitToolCommandRun } from '../core
 import { readProjectState } from '../state';
 import type { AnalysisFinding, OperationPlan, SprintFile, Task, TaskVerdict, TaskVerdictFinding, TaskVerdictFindingSeverity, TaskVerdictResult } from '../types';
 
-interface ReviewArgs {
+export interface ReviewArgs {
   taskId: string;
   scope: string | null;
   verdict: TaskVerdictResult;
@@ -66,11 +66,11 @@ export function runReviewCommand(rawArgs: string[]): void {
   applyPlan(plan);
 
   const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) throw new Error(`Review wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`);
+  if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `Review wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
   const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
     const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new Error(`Review wrote sprint.json but it failed validation — ${detail}.`);
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Review wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
   }
 
   if (args.verdict === 'pass') emitGateApproved(scope, 'checker', args.taskId);
@@ -88,9 +88,9 @@ export function buildReviewPlan(scope: string, args: ReviewArgs): { sprint: Spri
     throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot review ${scope}: sprint.json has shape drift — ${detail}.`, 'Fix sprint.json shape before reviewing.');
   }
   const sprint = asSprintFile(read.value);
-  if (!sprint || !sprint.activeSprint) throw new KyroCoreError('INVALID_INPUT', `Scope "${scope}" has no active sprint to review.`);
+  if (!sprint || !sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint to review.`);
   const located = locateTask(sprint, args.taskId);
-  if (!located) throw new KyroCoreError('INVALID_INPUT', `Task not found: ${args.taskId}`, 'Run kyro context-pack --json to inspect the active sprint tasks.');
+  if (!located) throw new KyroCoreError('TASK_NOT_FOUND', `Task not found: ${args.taskId}`, 'Run kyro context-pack --json to inspect the active sprint tasks.');
 
   const reviewedAt = new Date().toISOString();
   const verdict: TaskVerdict = {
@@ -159,7 +159,7 @@ function parseReviewArgs(rawArgs: string[]): ReviewArgs {
   for (let i = 0; i < rawArgs.length; i += 1) {
     const arg = rawArgs[i];
     if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--yes' || arg === '-y') yes = true;
+    else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
     else if (arg === '--dry-run') dryRun = true;
     else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
     else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
@@ -177,12 +177,12 @@ function parseReviewArgs(rawArgs: string[]): ReviewArgs {
   return { taskId, scope, verdict, checkedCriteria, findings, by, yes, dryRun, help };
 }
 
-function parseVerdict(value: string): TaskVerdictResult {
+export function parseVerdict(value: string): TaskVerdictResult {
   if (value === 'pass' || value === 'fail') return value;
   throw new KyroCoreError('INVALID_INPUT', '--verdict must be pass or fail');
 }
 
-function parseFinding(value: string): TaskVerdictFinding {
+export function parseFinding(value: string): TaskVerdictFinding {
   const [severity, ...detailParts] = value.split(':');
   const detail = detailParts.join(':').trim();
   if (!isFindingSeverity(severity) || detail === '') throw new KyroCoreError('INVALID_INPUT', '--finding must use severity:detail, e.g. warning:Needs docs');
@@ -199,12 +199,12 @@ function requireValue(args: string[], index: number, flag: string): string {
   return value;
 }
 
-function checkerErrorCode(findings: AnalysisFinding[]): 'CHECKER_FAILED' | 'SELF_REVIEW_BLOCKED' {
+export function checkerErrorCode(findings: AnalysisFinding[]): 'CHECKER_FAILED' | 'SELF_REVIEW_BLOCKED' {
   return findings.some((finding) => finding.detail.includes('self-reviewed')) ? 'SELF_REVIEW_BLOCKED' : 'CHECKER_FAILED';
 }
 
 function printReviewHelp(): void {
-  console.log(`Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes]
+  console.log(`Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes|--confirm]
 
 Checks deterministic maker/checker coherence, then writes the task verdict through the Kyro tool.`);
 }
