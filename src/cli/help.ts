@@ -33,10 +33,11 @@ Options:
   --adapters                   Include adapter inventory for doctor
   --trace                      Include trace summary for doctor
   --json                       Print machine-readable output where supported
+  --verbosity <level>          Output depth for context-pack: concise or detailed (default)
   --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
   --prune                      Clean stale runtime versions and orphaned managed files (sync only)
   --dry-run                    Preview changes
-  --yes, -y                    Skip confirmation prompts where available
+  --yes, -y, --confirm         Skip confirmation prompts where available
   --help, -h                   Show help
   --version, -v                Show version
 
@@ -69,7 +70,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'close-sprint') {
     console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {
-    console.log('Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--json]');
+    console.log('Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--verbosity concise|detailed] [--json]');
   } else if (command === 'eval') {
     console.log('Usage: kyro eval [--case <id>] [--tag <tag>] [--agent <name>] [--json] [--list] [--keep-sandbox]');
     console.log('Exit codes: 0 all passed; 1 expectation failed; 2 harness error.');

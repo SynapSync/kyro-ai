@@ -9,7 +9,9 @@ import { scanLines } from './lib/scan.mjs';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const cli = resolve(repo, 'dist/cli.js');
-const allowedTraceReaders = new Set(['src/cli/core/trace.ts', 'src/cli/commands/trace.ts', 'src/cli/commands/doctor.ts']);
+// trace_tail (MCP) is a read-only observability surface, parallel to the `kyro trace` command;
+// it returns raw events to the caller and never feeds routing or any Kyro decision.
+const allowedTraceReaders = new Set(['src/cli/core/trace.ts', 'src/cli/commands/trace.ts', 'src/cli/commands/doctor.ts', 'src/cli/mcp/handlers.ts']);
 const eventTypes = ['route_selected','tool_command_run','validation_result','gate_approved','retry_count','blocked_reason','close_snapshot'];
 
 function assert(condition, message) {

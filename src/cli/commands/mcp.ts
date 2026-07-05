@@ -1,5 +1,6 @@
 import { MCP_TOOLS } from '../mcp/tool-catalog';
 import { serveMcp } from '../mcp/server';
+import { KyroCoreError } from '../core/errors';
 
 export function runMcpCommand(args: string[]): void {
   const [subcommand = ''] = args;
@@ -15,7 +16,7 @@ export function runMcpCommand(args: string[]): void {
     console.log(JSON.stringify({ tools: MCP_TOOLS }, null, 2));
     return;
   }
-  throw new Error(`Unknown mcp subcommand: ${subcommand}. Run kyro mcp --help.`);
+  throw new KyroCoreError('UNKNOWN_SUBCOMMAND', `Unknown mcp subcommand: ${subcommand}.`, 'Run kyro mcp --help.');
 }
 
 function printMcpHelp(): void {

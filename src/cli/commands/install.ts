@@ -2,6 +2,7 @@ import { buildInstallPlan } from '../install-plan';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope, uniqueAgents } from '../options';
 import { readProjectState } from '../state';
+import { KyroCoreError } from '../core/errors';
 import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
 import type { CliOptions } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
@@ -32,7 +33,7 @@ export function sync(options: CliOptions): void {
   assertWorkspaceScope(options.scope);
   const state = readProjectState();
   if (!state) {
-    throw new Error('Kyro is not installed in this workspace. Run kyro install first.');
+    throw new KyroCoreError('INVALID_INPUT', 'Kyro is not installed in this workspace.', 'Run kyro install first.');
   }
   const agents = options.agents.length > 0 ? options.agents : (state.installedAdapters ?? []).map((adapter) => adapter.agent);
   const unique = uniqueAgents(agents);

@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { getAdapterDefinition } from '../adapters/registry';
+import { KyroCoreError } from '../core/errors';
 import type { AdapterDefinition, DetectionResult } from '../adapters/registry-types';
 import type { Agent, OperationPlan } from '../types';
 
@@ -39,7 +40,7 @@ function printAdapterPreflight(command: 'install' | 'sync', results: AdapterPref
 function assertPreflightInstallable(results: AdapterPreflightResult[]): void {
   const planned = results.filter((result) => result.adapter.status === 'planned');
   if (planned.length > 0) {
-    throw new Error(`Agent adapter not implemented yet: ${planned.map((result) => result.adapter.agent).join(', ')}. Planned adapters are visible in detect/preflight but cannot be installed until their native projection is implemented.`);
+    throw new KyroCoreError('INVALID_INPUT', `Agent adapter not implemented yet: ${planned.map((result) => result.adapter.agent).join(', ')}.`, 'Planned adapters are visible in detect/preflight but cannot be installed until their native projection is implemented.');
   }
 }
 

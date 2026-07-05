@@ -9,6 +9,11 @@ export type KyroErrorCode =
   | 'SELF_REVIEW_BLOCKED'
   | 'BLOCKING_FINDINGS'
   | 'INVALID_INPUT'
+  | 'UNKNOWN_COMMAND'
+  | 'UNKNOWN_SUBCOMMAND'
+  | 'UNKNOWN_TOOL'
+  | 'NO_ACTIVE_SPRINT'
+  | 'TASK_NOT_FOUND'
   | 'INTERNAL';
 
 export class KyroCoreError extends Error {

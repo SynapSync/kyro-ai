@@ -7,14 +7,15 @@ import { resolveManagedPath } from '../fs';
 import { listScopeNames } from '../artifacts/scopes';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { emitTraceEvent } from '../core/trace';
-import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, SpecScenario, SprintFile, Task } from '../types';
+import { KyroCoreError } from '../core/errors';
+import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, PackVerbosity, SpecScenario, SprintFile, Task } from '../types';
 
-export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json'>): void {
+export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json' | 'verbosity'>): void {
   const scope = resolveKyroScope(options.kyroScope);
   if (!scopeExists(scope)) {
-    throw new Error(`Scope not found: ${scope}. Run kyro scope list to see available scopes.`);
+    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}.`, 'Run kyro scope list to see available scopes.');
   }
-  const pack = buildContextPack(scope, options.task);
+  const pack = buildContextPack(scope, options.task, options.verbosity);
   if (options.json) {
     console.log(JSON.stringify(pack, null, 2));
     return;
@@ -22,18 +23,18 @@ export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'js
   printContextPackText(pack);
 }
 
-export function buildContextPack(scope: string, taskOption: string | null = null): ContextPackOutput {
+export function buildContextPack(scope: string, taskOption: string | null = null, verbosity: PackVerbosity = 'detailed'): ContextPackOutput {
   const warnings: string[] = [];
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) {
-    throw new Error(`Scope '${scope}' has no sprint.json. Run /kyro:forge (INIT) to create it.`);
+    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope '${scope}' has no sprint.json.`, 'Run /kyro:forge (INIT) to create it.');
   }
   if (read.error) {
-    throw new Error(`sprint.json for '${scope}' is invalid JSON: ${read.error}`);
+    throw new KyroCoreError('INVALID_JSON', `sprint.json for '${scope}' is invalid JSON: ${read.error}`, 'Fix invalid JSON or restore from an archive snapshot.');
   }
   const sprint = asSprintFile(read.value);
   if (!sprint) {
-    throw new Error(`sprint.json for '${scope}' does not match the v4 schema. Run kyro doctor --artifacts --kyro-scope ${scope}.`);
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for '${scope}' does not match the v4 schema.`, `Run kyro doctor --artifacts --kyro-scope ${scope}.`);
   }
 
   const packMode: ContextPackMode = resolvePackMode(taskOption, sprint, warnings);
@@ -51,12 +52,17 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     reasoningTier: routing.reasoningTier,
   });
   const openDebtCount = sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length;
-  const conventions = selectConventions(sprint, packMode, task);
+  const concise = verbosity === 'concise';
+  const conventions = selectConventions(sprint, packMode, task, concise);
   const taskScenarios = resolveTaskScenarios(sprint, task);
 
+  // Concise trims long-form advisory prose (context, budget guidance) an agent does not need to
+  // route/execute; the structured routing/task fields it acts on are always present. Detailed keeps
+  // the full pack. Default is detailed so existing callers see no behavior change.
   const packWithoutTokens: Omit<ContextPackOutput, 'estimatedTokens'> = {
     schemaVersion: 4,
     packMode,
+    verbosity,
     scope,
     status: sprint.status,
     objective: sprint.objective,
@@ -69,7 +75,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     taskTitle: task?.title ?? null,
     taskDescription: task?.description ?? null,
     taskFiles: task?.files_to_touch ?? [],
-    taskContext: task?.context ?? null,
+    taskContext: concise ? null : (task?.context ?? null),
     taskAcceptanceCriteria: task?.acceptance_criteria ?? [],
     specRequirements: sprint.spec?.requirements ?? [],
     specNonGoals: sprint.spec?.nonGoals ?? [],
@@ -83,7 +89,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     budgetClass: routing.budgetClass,
     reasoningTier: routing.reasoningTier as ContextPackOutput['reasoningTier'],
     maxContextTokens: routing.maxContextTokens,
-    budgetGuidance: routing.budgetGuidance,
+    budgetGuidance: concise ? '' : routing.budgetGuidance,
   };
   return { ...packWithoutTokens, estimatedTokens: estimatePackTokens(packWithoutTokens) };
 }
@@ -91,8 +97,8 @@ export function buildContextPack(scope: string, taskOption: string | null = null
 function resolvePackMode(taskOption: string | null, sprint: SprintFile, warnings: string[]): ContextPackMode {
   if (taskOption === null) return 'scope';
   if (taskOption === '') {
-    if (!sprint.activeSprint) throw new Error('No active sprint. Pass --task <id> explicitly or plan a sprint first.');
-    if (!sprint.handoff.nextTaskId) throw new Error('No next task in handoff. Pass --task <id> explicitly.');
+    if (!sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', 'No active sprint.', 'Pass --task <id> explicitly or plan a sprint first.');
+    if (!sprint.handoff.nextTaskId) throw new KyroCoreError('INVALID_INPUT', 'No next task in handoff.', 'Pass --task <id> explicitly.');
     warnings.push(`task id defaulted to handoff.nextTaskId: ${sprint.handoff.nextTaskId}`);
   }
   return 'task';
@@ -100,7 +106,7 @@ function resolvePackMode(taskOption: string | null, sprint: SprintFile, warnings
 
 function resolveTask(sprint: SprintFile, taskOption: string | null, warnings: string[]): Task | null {
   const taskId = taskOption === '' || taskOption === null ? sprint.handoff.nextTaskId : taskOption;
-  if (!taskId) throw new Error('Task id is required for task packs. Use --task <id>.');
+  if (!taskId) throw new KyroCoreError('INVALID_INPUT', 'Task id is required for task packs.', 'Use --task <id>.');
   const task = findTask(sprint.activeSprint, taskId);
   if (!task) {
     warnings.push(`task ${taskId} not found in activeSprint; returning scope-level context`);
@@ -118,9 +124,10 @@ function findTask(activeSprint: ActiveSprint | null, taskId: string): Task | nul
   return activeSprint.emergentTasks.find((t) => t.id === taskId) ?? null;
 }
 
-function selectConventions(sprint: SprintFile, packMode: ContextPackMode, task: Task | null): ContextPackOutput['conventions'] {
-  // Scope packs return all conventions; task packs return testing/architecture/process-tagged ones.
-  const relevant = packMode === 'task'
+function selectConventions(sprint: SprintFile, packMode: ContextPackMode, task: Task | null, concise: boolean): ContextPackOutput['conventions'] {
+  // Task packs (and any concise pack) return only testing/architecture/process-tagged conventions;
+  // detailed scope packs return all of them.
+  const relevant = packMode === 'task' || concise
     ? sprint.conventions.filter((c) => c.tags.some((t) => ['testing', 'architecture', 'process'].includes(t)))
     : sprint.conventions;
   void task;

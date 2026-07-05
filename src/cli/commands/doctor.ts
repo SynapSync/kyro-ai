@@ -4,6 +4,7 @@ import { ARTIFACT_ROOT, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, P
 import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
+import { KyroCoreError } from '../core/errors';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { guardEnforcement } from '../adapters/registry-types';
 import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
@@ -251,7 +252,7 @@ function checkSpecTraceability(): CheckResult {
 function readYamlVersion(file: string): string {
   const text = readPackageText(file);
   const match = text.match(/^version:\s*["']?([^"'\n]+)["']?$/m);
-  if (!match) throw new Error(`Could not parse version from ${file}`);
+  if (!match) throw new KyroCoreError('INTERNAL', `Could not parse version from ${file}`);
   return match[1];
 }
 
