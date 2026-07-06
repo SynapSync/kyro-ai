@@ -206,6 +206,13 @@
             },
             "description": "Acceptance criteria the reviewer checked. Defaults to all on a pass."
           },
+          "waived_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Acceptance criteria waived as \"criterion::reason\". Reason is required."
+          },
           "findings": {
             "type": "array",
             "items": {

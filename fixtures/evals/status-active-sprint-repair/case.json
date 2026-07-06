@@ -1,0 +1,44 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "status-active-sprint-repair",
+  "title": "Repair normalizes stale active sprint status",
+  "kind": "replay",
+  "tags": [
+    "status",
+    "repair"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "analyze",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 1,
+        "stdoutIncludes": [
+          "activeSprint status \"planned\" contradicts task states (should be \"complete\")"
+        ]
+      }
+    },
+    {
+      "run": [
+        "repair",
+        "--kyro-scope",
+        "demo",
+        "--yes"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "sprint.json normalized for scope: demo"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": true
+}

@@ -1,0 +1,37 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "status-review-pending",
+  "title": "Context pack surfaces done tasks awaiting review and their checker debt",
+  "kind": "replay",
+  "tags": [
+    "status",
+    "context-pack",
+    "maker-checker"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "context-pack",
+        "--kyro-scope",
+        "demo",
+        "--task",
+        "T1.1",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "\"reviewPending\": [",
+          "\"T1.1\"",
+          "\"hasPassVerdict\": false",
+          "task T1.1 is done but has missing or malformed verdict"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}

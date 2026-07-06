@@ -12,6 +12,7 @@ export type KyroScopeStatus = (typeof KYRO_SCOPE_STATUS)[keyof typeof KYRO_SCOPE
 export const SCOPE_STATUS_VALUES = ['planning', 'active', 'blocked', 'completed'] as const;
 export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'wrap_up'] as const;
 export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
+export const PHASE_STATUS_VALUES = ['pending', 'active', 'blocked', 'done'] as const;
 export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'] as const;
 export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
 export const TASK_VERDICT_RESULT_VALUES = ['pass', 'fail'] as const;
@@ -401,7 +402,11 @@ function validateTaskEvidence(value: unknown, path: string, prefix: string, issu
     return;
   }
   requireNonEmptyString(value, 'summary', path, issues, `${prefix}.summary`);
-  requireNonEmptyString(value, 'validation', path, issues, `${prefix}.validation`);
+  // validation tolerates a single string or a non-empty array of strings (real runs list many).
+  const validation = value.validation;
+  const validationOk = (typeof validation === 'string' && validation.trim().length > 0)
+    || (Array.isArray(validation) && validation.length > 0 && validation.every((line) => typeof line === 'string'));
+  if (!validationOk) issues.push({ path, field: `${prefix}.validation`, message: 'must be a non-empty string or a non-empty array of strings' });
   requireStringArrayField(value, 'files_changed', path, issues, `${prefix}.files_changed`);
   if ('notes' in value && typeof value.notes !== 'string') issues.push({ path, field: `${prefix}.notes`, message: 'must be a string when present' });
   requireNonEmptyString(value, 'by', path, issues, `${prefix}.by`);
@@ -415,6 +420,18 @@ function validateTaskVerdict(value: unknown, path: string, prefix: string, issue
   }
   requireLiteralSet(value, 'result', TASK_VERDICT_RESULT_VALUES, path, issues, `${prefix}.result`);
   requireStringArrayField(value, 'checked_criteria', path, issues, `${prefix}.checked_criteria`);
+  if ('waived_criteria' in value && value.waived_criteria !== undefined) {
+    if (!Array.isArray(value.waived_criteria)) {
+      issues.push({ path, field: `${prefix}.waived_criteria`, message: 'must be an array when present' });
+    } else {
+      value.waived_criteria.forEach((waiver, index) => {
+        const wp = `${prefix}.waived_criteria[${index}]`;
+        if (!isRecord(waiver)) { issues.push({ path, field: wp, message: 'must be an object { criterion, reason }' }); return; }
+        requireNonEmptyString(waiver, 'criterion', path, issues, `${wp}.criterion`);
+        requireNonEmptyString(waiver, 'reason', path, issues, `${wp}.reason`);
+      });
+    }
+  }
   if (!Array.isArray(value.findings)) {
     issues.push({ path, field: `${prefix}.findings`, message: 'must be an array' });
   } else {

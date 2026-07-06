@@ -5,7 +5,7 @@ import { inspectScope } from '../commands/artifact-doctor';
 import { buildContextPack } from '../commands/context-pack';
 import { buildClosePlan, type CloseSprintArgs } from '../commands/close-sprint';
 import { buildRepairPlan } from '../commands/repair';
-import { buildReviewPlan, checkerErrorCode, parseFinding, parseVerdict, type ReviewArgs } from '../commands/review';
+import { buildReviewPlan, checkerErrorCode, parseFinding, parseVerdict, parseWaiver, type ReviewArgs } from '../commands/review';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile } from '../artifacts/schema';
@@ -133,6 +133,7 @@ function reviewTaskTool(args: Record<string, unknown>): unknown {
     scope,
     verdict: args.verdict === undefined ? 'pass' : parseVerdict(requiredString(args.verdict, 'verdict')),
     checkedCriteria: optionalStringArray(args.checked_criteria),
+    waivedCriteria: optionalStringArray(args.waived_criteria).map(parseWaiver),
     findings: parseFindings(args.findings),
     by: optionalString(args.by) ?? 'checker',
     yes: args.confirm === true,

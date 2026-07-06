@@ -111,7 +111,9 @@ export interface LedgerEntry {
 
 export interface TaskEvidence {
   summary: string;
-  validation: string;
+  // A single validation line, or a list of them. Real runs record multiple validation commands, so
+  // both shapes are accepted; readers must tolerate either (see asValidationLines).
+  validation: string | string[];
   files_changed: string[];
   notes?: string;
   by: string;
@@ -123,9 +125,17 @@ export interface TaskVerdictFinding {
   detail: string;
 }
 
+export interface WaivedCriterion {
+  criterion: string;
+  reason: string;
+}
+
 export interface TaskVerdict {
   result: TaskVerdictResult;
   checked_criteria: string[];
+  // Acceptance criteria that an approved scope change made unmeetable (e.g. the code was deleted).
+  // A waiver requires a reason and is treated as satisfied by the checker; it is archived for audit.
+  waived_criteria?: WaivedCriterion[];
   findings: TaskVerdictFinding[];
   by: string;
   reviewedAt: string;
@@ -402,6 +412,13 @@ export interface ContextPackConvention {
   tags: string[];
 }
 
+export interface NextTaskReview {
+  taskId: string;
+  status: TaskStatus;
+  hasPassVerdict: boolean;
+  checkerFindings: string[];
+}
+
 export interface ContextPackOutput {
   schemaVersion: 4;
   packMode: ContextPackMode;
@@ -426,6 +443,8 @@ export interface ContextPackOutput {
   taskScenarios: SpecScenario[];
   handoffNote: string | null;
   blockers: string[];
+  reviewPending: string[];
+  nextTaskReview: NextTaskReview | null;
   conventions: ContextPackConvention[];
   warnings: string[];
   estimatedTokens: number;

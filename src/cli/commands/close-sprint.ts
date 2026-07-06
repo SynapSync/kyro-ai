@@ -338,6 +338,7 @@ function renderEvidence(evidence: unknown): string[] {
     const out: string[] = ['**Evidence**:'];
     if (typeof e.summary === 'string') out.push(`- Summary: ${e.summary}`);
     if (typeof e.validation === 'string') out.push(`- Validation: ${e.validation}`);
+    else if (Array.isArray(e.validation)) for (const line of e.validation) out.push(`- Validation: ${String(line)}`);
     if (Array.isArray(e.files_changed)) out.push(`- Files changed: ${e.files_changed.map((f) => `\`${String(f)}\``).join(', ')}`);
     if (typeof e.notes === 'string') out.push(`- Notes: ${e.notes}`);
     if (out.length === 1) out.push('- _Recorded (unstructured)._');
@@ -357,7 +358,10 @@ function renderVerdict(verdict: unknown): string {
     const findings = Array.isArray(v.findings) && v.findings.length > 0
       ? ` — ${v.findings.map((f) => String(f)).join('; ')}`
       : '';
-    return `${result}${findings}`;
+    const waived = Array.isArray(v.waived_criteria) && v.waived_criteria.length > 0
+      ? ` (waived: ${v.waived_criteria.map((w) => { const r = w as Record<string, unknown>; return `${String(r.criterion)} — ${String(r.reason)}`; }).join('; ')})`
+      : '';
+    return `${result}${findings}${waived}`;
   }
   return String(verdict);
 }

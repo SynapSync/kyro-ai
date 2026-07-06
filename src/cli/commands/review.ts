@@ -3,18 +3,20 @@ import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import { collectCheckerFindings } from '../core/analysis';
+import { deriveActiveSprintStatus, derivePhaseStatus } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { resolveScope } from '../core/scope-resolution';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun } from '../core/trace';
 import { readProjectState } from '../state';
-import type { AnalysisFinding, OperationPlan, SprintFile, Task, TaskVerdict, TaskVerdictFinding, TaskVerdictFindingSeverity, TaskVerdictResult } from '../types';
+import type { AnalysisFinding, OperationPlan, SprintFile, Task, TaskVerdict, TaskVerdictFinding, TaskVerdictFindingSeverity, TaskVerdictResult, WaivedCriterion } from '../types';
 
 export interface ReviewArgs {
   taskId: string;
   scope: string | null;
   verdict: TaskVerdictResult;
   checkedCriteria: string[];
+  waivedCriteria: WaivedCriterion[];
   findings: TaskVerdictFinding[];
   by: string;
   yes: boolean;
@@ -93,16 +95,24 @@ export function buildReviewPlan(scope: string, args: ReviewArgs): { sprint: Spri
   if (!located) throw new KyroCoreError('TASK_NOT_FOUND', `Task not found: ${args.taskId}`, 'Run kyro context-pack --json to inspect the active sprint tasks.');
 
   const reviewedAt = new Date().toISOString();
+  const waivedSet = new Set(args.waivedCriteria.map((w) => w.criterion));
+  const autoChecked = [...(located.task.acceptance_criteria ?? [])].filter((c) => !waivedSet.has(c));
   const verdict: TaskVerdict = {
     result: args.verdict,
-    checked_criteria: args.checkedCriteria.length > 0 ? args.checkedCriteria : args.verdict === 'pass' ? [...located.task.acceptance_criteria] : [],
+    checked_criteria: args.checkedCriteria.length > 0 ? args.checkedCriteria : args.verdict === 'pass' ? autoChecked : [],
+    ...(args.waivedCriteria.length > 0 ? { waived_criteria: args.waivedCriteria } : {}),
     findings: args.findings,
     by: args.by,
     reviewedAt,
   };
   const nextSprint = withReviewedTask(sprint, located, verdict, reviewedAt);
   const principles = readProjectState()?.principles ?? [];
-  const findings = collectCheckerFindings(nextSprint, principles).filter((finding) => finding.severity === 'CRITICAL' || finding.severity === 'HIGH');
+  // The review GATE only blocks on the task under review. collectCheckerFindings is global (every
+  // done task without a verdict, etc.); if we blocked a pass on all of them, accumulated review debt
+  // could never be paid one task at a time — reviewing T1 would be blocked by unreviewed T2, T3, …
+  // analyze keeps the global view (and close-sprint blocks on it); review is per-task recovery.
+  const findings = scopeFindingsToTask(collectCheckerFindings(nextSprint, principles), args.taskId)
+    .filter((finding) => finding.severity === 'CRITICAL' || finding.severity === 'HIGH');
   const plan = [{ action: 'write' as const, path: sprintJsonPath(scope), content: `${JSON.stringify(nextSprint, null, 2)}\n` }];
   return { sprint: nextSprint, plan, findings };
 }
@@ -115,6 +125,14 @@ function withReviewedTask(sprint: SprintFile, located: LocatedTask, verdict: Tas
     : nextActive.emergentTasks[located.taskIndex];
   task.verdict = verdict;
   if (verdict.result === 'fail') task.status = 'pending';
+
+  // Keep phase.status coherent at the gate that moves task state, so it never becomes an orphan field
+  // that says "pending" while its tasks are done. Emergent tasks have no phase to update.
+  if (located.kind === 'phase') {
+    const phase = nextActive.phases[located.phaseIndex!];
+    phase.status = derivePhaseStatus(phase);
+  }
+  nextActive.status = deriveActiveSprintStatus(nextActive);
 
   const tasks = nextActive.phases.flatMap((phase) => phase.tasks).concat(nextActive.emergentTasks);
   const nextPending = tasks.find((item) => item.status === 'pending' || item.status === 'in_progress');
@@ -151,6 +169,7 @@ function parseReviewArgs(rawArgs: string[]): ReviewArgs {
   let scope: string | null = null;
   let verdict: TaskVerdictResult = 'pass';
   const checkedCriteria: string[] = [];
+  const waivedCriteria: WaivedCriterion[] = [];
   const findings: TaskVerdictFinding[] = [];
   let by = process.env.KYRO_ACTOR ?? 'checker';
   let yes = false;
@@ -167,6 +186,8 @@ function parseReviewArgs(rawArgs: string[]): ReviewArgs {
     else if (arg.startsWith('--verdict=')) verdict = parseVerdict(arg.slice('--verdict='.length));
     else if (arg === '--checked-criterion') { checkedCriteria.push(requireValue(rawArgs, i, arg)); i += 1; }
     else if (arg.startsWith('--checked-criterion=')) checkedCriteria.push(arg.slice('--checked-criterion='.length));
+    else if (arg === '--waive-criterion') { waivedCriteria.push(parseWaiver(requireValue(rawArgs, i, arg))); i += 1; }
+    else if (arg.startsWith('--waive-criterion=')) waivedCriteria.push(parseWaiver(arg.slice('--waive-criterion='.length)));
     else if (arg === '--finding') { findings.push(parseFinding(requireValue(rawArgs, i, arg))); i += 1; }
     else if (arg.startsWith('--finding=')) findings.push(parseFinding(arg.slice('--finding='.length)));
     else if (arg === '--by') { by = requireValue(rawArgs, i, arg); i += 1; }
@@ -174,7 +195,16 @@ function parseReviewArgs(rawArgs: string[]): ReviewArgs {
     else if (!arg.startsWith('--') && !taskId) taskId = arg;
     else throw new KyroCoreError('INVALID_INPUT', `Unknown review option: ${arg}`);
   }
-  return { taskId, scope, verdict, checkedCriteria, findings, by, yes, dryRun, help };
+  return { taskId, scope, verdict, checkedCriteria, waivedCriteria, findings, by, yes, dryRun, help };
+}
+
+export function parseWaiver(value: string): WaivedCriterion {
+  const sep = value.indexOf('::');
+  if (sep === -1) throw new KyroCoreError('INVALID_INPUT', '--waive-criterion must use "criterion::reason"');
+  const criterion = value.slice(0, sep).trim();
+  const reason = value.slice(sep + 2).trim();
+  if (criterion === '' || reason === '') throw new KyroCoreError('INVALID_INPUT', '--waive-criterion must use "criterion::reason" with both non-empty');
+  return { criterion, reason };
 }
 
 export function parseVerdict(value: string): TaskVerdictResult {
@@ -199,12 +229,21 @@ function requireValue(args: string[], index: number, flag: string): string {
   return value;
 }
 
+/**
+ * Keep only checker findings that reference the task under review. Every collectCheckerFindings entry
+ * is per-task and its `detail` starts with `task <id> ` (the trailing space prevents T1.1 matching
+ * T1.10). This is what makes accumulated review debt recoverable one task at a time.
+ */
+export function scopeFindingsToTask(findings: AnalysisFinding[], taskId: string): AnalysisFinding[] {
+  return findings.filter((finding) => finding.detail.includes(`task ${taskId} `));
+}
+
 export function checkerErrorCode(findings: AnalysisFinding[]): 'CHECKER_FAILED' | 'SELF_REVIEW_BLOCKED' {
   return findings.some((finding) => finding.detail.includes('self-reviewed')) ? 'SELF_REVIEW_BLOCKED' : 'CHECKER_FAILED';
 }
 
 function printReviewHelp(): void {
-  console.log(`Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes|--confirm]
+  console.log(`Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--waive-criterion "<criterion>::<reason>"] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes|--confirm]
 
 Checks deterministic maker/checker coherence, then writes the task verdict through the Kyro tool.`);
 }

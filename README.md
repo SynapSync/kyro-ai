@@ -373,6 +373,7 @@ Kyro uses lean runtime loading: command router → `sprint.json` state → one r
 | [Maker/Checker Boundary](docs/maker-checker.md)    | Tool-owned task review and evidence/verdict contracts   |
 | [Spec Traceability](docs/spec-traceability.md)       | Minimal Requirement → Scenario → Task traceability       |
 | [Agent-Computer Interface](docs/aci.md)            | Error codes, verbosity, tool summaries, naming map      |
+| [Status Coherence](docs/status-coherence.md)       | Derived lifecycle status, review-debt surfacing, criteria waivers |
 
 ---
 

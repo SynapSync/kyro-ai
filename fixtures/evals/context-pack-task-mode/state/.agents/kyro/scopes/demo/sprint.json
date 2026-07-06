@@ -45,13 +45,13 @@
     "slug": "demo-sprint",
     "title": "Demo Sprint",
     "objective": "Ship demo sprint.",
-    "status": "executing",
+    "status": "planned",
     "phases": [
       {
         "id": "P1",
         "title": "Demo Phase",
         "objective": "Complete demo work.",
-        "status": "executing",
+        "status": "pending",
         "tasks": [
           {
             "id": "T1.1",
