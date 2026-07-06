@@ -49,6 +49,13 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   addCopyDirectoryPlan(plan, 'skills', `${runtimeRoot}/skills`);
   addCopyFilePlan(plan, 'config.json', `${runtimeRoot}/core/config.json`);
   addCopyFilePlan(plan, 'WORKFLOW.yaml', `${runtimeRoot}/core/WORKFLOW.yaml`);
+
+  // Bundle the CLI itself plus root-layout parity mirrors so PACKAGE_ROOT-relative
+  // reads (readPackageVersion, loadBudgetManifest) resolve identically when the
+  // projected CLI runs from runtimeRoot. See design.md §3 for the asset-parity audit.
+  addCopyDirectoryPlan(plan, 'dist', `${runtimeRoot}/dist`);
+  addCopyFilePlan(plan, 'package.json', `${runtimeRoot}/package.json`);
+  addCopyFilePlan(plan, 'config.json', `${runtimeRoot}/config.json`);
   plan.push({ action: 'symlink', path: KYRO_ROOT, source: runtimeRoot });
 
   for (const adapter of getInstalledAdapterDefinitions(manifestAgents)) {
@@ -108,6 +115,8 @@ function buildManagedFiles(agents: Agent[], runtimeRoot: string): string[] {
   files.push(...listRelativeFiles('agents').map((file) => `${runtimeRoot}/core/agents/${file}`));
   files.push(...listRelativeFiles('commands').map((file) => `${runtimeRoot}/commands/${file}`));
   files.push(...listRelativeFiles('skills').map((file) => `${runtimeRoot}/skills/${file}`));
+  files.push(...listRelativeFiles('dist').map((file) => `${runtimeRoot}/dist/${file}`));
+  files.push(`${runtimeRoot}/package.json`, `${runtimeRoot}/config.json`);
 
   for (const adapter of getInstalledAdapterDefinitions(agents)) {
     files.push(...adapter.buildManagedFiles());
