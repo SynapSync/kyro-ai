@@ -1,14 +1,17 @@
 import { existsSync } from 'node:fs';
 import { readJsonSafely } from '../artifacts/json';
 import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile } from '../artifacts/schema';
+import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
 import { listScopeNames } from '../artifacts/scopes';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { emitTraceEvent } from '../core/trace';
 import { KyroCoreError } from '../core/errors';
-import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, PackVerbosity, SpecScenario, SprintFile, Task } from '../types';
+import { collectCheckerFindings } from '../core/analysis';
+import { scopeFindingsToTask } from './review';
+import { readProjectState } from '../state';
+import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, NextTaskReview, PackVerbosity, SpecScenario, SprintFile, Task } from '../types';
 
 export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json' | 'verbosity'>): void {
   const scope = resolveKyroScope(options.kyroScope);
@@ -55,6 +58,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const concise = verbosity === 'concise';
   const conventions = selectConventions(sprint, packMode, task, concise);
   const taskScenarios = resolveTaskScenarios(sprint, task);
+  const { reviewPending, nextTaskReview } = resolveReviewDebt(sprint, task);
 
   // Concise trims long-form advisory prose (context, budget guidance) an agent does not need to
   // route/execute; the structured routing/task fields it acts on are always present. Detailed keeps
@@ -83,6 +87,8 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     taskScenarios,
     handoffNote: sprint.handoff.note || null,
     blockers: sprint.handoff.blockers ?? [],
+    reviewPending,
+    nextTaskReview,
     conventions,
     warnings,
     routing: { modes: [...routing.modes] },
@@ -134,6 +140,28 @@ function selectConventions(sprint: SprintFile, packMode: ContextPackMode, task: 
   return relevant.map((c) => ({ id: c.id, rule: c.rule, tags: c.tags }));
 }
 
+/**
+ * Surface maker/checker debt on the read path the agent hits every turn: which done tasks still lack a
+ * pass verdict, and — for a task pack — the checker findings scoped to that task. This is the same data
+ * the checker already computes; exposing it here stops the agent from discovering N CRITICALs only at
+ * close. Present in concise and detailed (it is routing-critical, not prose).
+ */
+function resolveReviewDebt(sprint: SprintFile, task: Task | null): { reviewPending: string[]; nextTaskReview: NextTaskReview | null } {
+  const active = sprint.activeSprint;
+  if (!active) return { reviewPending: [], nextTaskReview: null };
+  const allTasks = active.phases.flatMap((phase) => phase.tasks).concat(active.emergentTasks);
+  const hasPass = (t: Task): boolean => asTaskVerdict(t.verdict)?.result === 'pass';
+  const reviewPending = allTasks.filter((t) => t.status === 'done' && !hasPass(t)).map((t) => t.id);
+
+  if (!task) return { reviewPending, nextTaskReview: null };
+  const principles = readProjectState()?.principles ?? [];
+  const checkerFindings = scopeFindingsToTask(collectCheckerFindings(sprint, principles), task.id).map((f) => `[${f.severity}] ${f.detail}`);
+  return {
+    reviewPending,
+    nextTaskReview: { taskId: task.id, status: task.status, hasPassVerdict: hasPass(task), checkerFindings },
+  };
+}
+
 function resolveTaskScenarios(sprint: SprintFile, task: Task | null): SpecScenario[] {
   if (!task || !sprint.spec) return [];
   const scenarioById = new Map(sprint.spec.scenarios.map((scenario) => [scenario.id, scenario]));
@@ -173,6 +201,10 @@ function printContextPackText(pack: ContextPackOutput): void {
     if (pack.taskFiles.length) console.log(`  Files: ${pack.taskFiles.join(', ')}`);
     if (pack.taskAcceptanceCriteria.length) console.log(`  Acceptance: ${pack.taskAcceptanceCriteria.join('; ')}`);
     if (pack.taskScenarios.length) console.log(`  Scenarios: ${pack.taskScenarios.map((s) => `${s.id}: Given ${s.given}; When ${s.when}; Then ${s.then}`).join(' | ')}`);
+  }
+  if (pack.reviewPending.length) console.log(`Awaiting review: ${pack.reviewPending.join(', ')} (${pack.reviewPending.length})`);
+  if (pack.nextTaskReview && pack.nextTaskReview.checkerFindings.length) {
+    console.log(`Checker (${pack.nextTaskReview.taskId}): ${pack.nextTaskReview.checkerFindings.join(' | ')}`);
   }
   if (pack.handoffNote) console.log(`\nResume note: ${pack.handoffNote}`);
   if (pack.conventions.length) console.log(`Conventions: ${pack.conventions.map((c) => c.rule).join(' | ')}`);

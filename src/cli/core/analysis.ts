@@ -6,6 +6,7 @@ import type { ActiveSprint, AnalysisFinding, AnalysisSeverity, Phase, Principle,
 import { KyroCoreError } from './errors';
 import { makerCheckerPolicy, policyIssues } from './policy';
 import { resolveScope } from './scope-resolution';
+import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, normalizeStoredPhaseStatus } from './status';
 import { emitBlockedReason, emitTraceEvent } from './trace';
 
 const SEVERITY_ORDER: AnalysisSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
@@ -87,6 +88,29 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
       n += 1;
       out.push({ ...finding, id: `A${String(n).padStart(3, '0')}` });
     });
+    // Status coherence: a stored phase.status must match what its task leaves imply — the orphan-status
+    // class of bug (a phase left "pending"/"executing" while all its tasks are "done"). This is
+    // advisory (MEDIUM): it is surfaced here and in context-pack, and normalized by review/close/repair,
+    // but it never blocks a user-invoked close — status bookkeeping should not wall a destructive gate.
+    // Synonyms are normalized so vocabulary drift ("executing" ≈ "active") is not mistaken for real drift.
+    for (const phase of active.phases ?? []) {
+      const derived = derivePhaseStatus(phase);
+      if (typeof phase.status === 'string' && normalizeStoredPhaseStatus(phase.status) !== derived) {
+        add('MEDIUM', 'coherence', `phase ${phase.id} status "${phase.status}" contradicts task states (should be "${derived}")`, 'Run kyro review to advance tasks, or kyro repair to normalize phase status.');
+      }
+    }
+    const derivedSprintStatus = deriveActiveSprintStatus(active);
+    if (typeof active.status === 'string' && active.status !== derivedSprintStatus) {
+      add('MEDIUM', 'coherence', `activeSprint status "${active.status}" contradicts task states (should be "${derivedSprintStatus}")`, 'Run kyro repair to normalize active sprint status.');
+    }
+  }
+  // kyro.json scope status is a display cache; drift is MEDIUM (advisory), reconciled by repair.
+  const scopeEntry = readProjectState()?.scopes?.find((entry) => entry.id === sprint.scope);
+  if (scopeEntry) {
+    const derivedScope = deriveScopeStatus(sprint, Boolean(sprint.activeSprint));
+    if (scopeEntry.status !== derivedScope) {
+      add('MEDIUM', 'coherence', `kyro.json scope status "${scopeEntry.status}" is stale (scope is "${derivedScope}")`, 'Run kyro repair to reconcile kyro.json with the sprint.');
+    }
   }
   for (const finding of collectSpecFindings(sprint)) {
     n += 1;
@@ -177,16 +201,22 @@ export function collectCheckerFindings(sprint: SprintFile, principles: Principle
   for (const task of allTasks(active)) {
     const evidence = asTaskEvidence(task.evidence);
     const verdict = asTaskVerdict(task.verdict);
-    if (task.status === 'done' && !evidence) {
+    // A plain non-empty string counts as (minimal) recorded evidence — common for emergent tasks. The
+    // richer checks below (timestamp ordering, separate-checker) need the structured object and simply
+    // do not apply to string evidence; they are skipped rather than treated as failures.
+    const rawEvidence = task.evidence as unknown;
+    const hasEvidence = evidence !== null || (typeof rawEvidence === 'string' && rawEvidence.trim().length > 0);
+    if (task.status === 'done' && !hasEvidence) {
       add('CRITICAL', `task ${task.id} is done but has missing or malformed evidence`, 'Record task.evidence with summary, validation, files_changed, by, and recordedAt before review.');
     }
     if (task.status === 'done' && !verdict) {
       add('CRITICAL', `task ${task.id} is done but has missing or malformed verdict`, 'Run kyro review for the task so the tool owns the verdict write.');
     }
     if (!verdict || verdict.result !== 'pass') continue;
-    const missingCriteria = missingCheckedCriteria(task.acceptance_criteria, verdict.checked_criteria);
+    const waived = (verdict.waived_criteria ?? []).map((w) => w.criterion);
+    const missingCriteria = missingCheckedCriteria(task.acceptance_criteria ?? [], verdict.checked_criteria, waived);
     if (missingCriteria.length > 0) {
-      add('CRITICAL', `task ${task.id} pass verdict did not check all acceptance_criteria (${missingCriteria.join('; ')})`, 'A pass verdict must include every acceptance_criteria entry in checked_criteria exactly.');
+      add('CRITICAL', `task ${task.id} pass verdict did not check all acceptance_criteria (${missingCriteria.join('; ')})`, 'A pass verdict must check or waive (with a reason) every acceptance_criteria entry.');
     }
     if (nonNegotiableViolations.length > 0) {
       add('CRITICAL', `task ${task.id} has pass verdict while non-negotiable principle(s) are violated (${nonNegotiableViolations.map((p) => p.id).join(', ')})`, 'A non-negotiable principle violation must fail the review; fix the principle breach before passing the task.');
@@ -210,9 +240,9 @@ function principleViolated(check: PrincipleCheck, sprint: SprintFile): boolean {
   }
 }
 
-function missingCheckedCriteria(acceptanceCriteria: string[], checkedCriteria: string[]): string[] {
-  const checked = new Set(checkedCriteria);
-  return acceptanceCriteria.filter((criterion) => !checked.has(criterion));
+function missingCheckedCriteria(acceptanceCriteria: string[], checkedCriteria: string[], waivedCriteria: string[] = []): string[] {
+  const satisfied = new Set([...checkedCriteria, ...waivedCriteria]);
+  return acceptanceCriteria.filter((criterion) => !satisfied.has(criterion));
 }
 
 function duplicateStrings(values: string[]): string[] {

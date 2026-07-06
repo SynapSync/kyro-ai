@@ -23,12 +23,17 @@ Report progress from the single source of truth. One read, no summaries.
 | Planned / closed sprints | `roadmap.sprints` + `ledger[]` |
 | Task counts (total/done/blocked/carry-over) | `activeSprint.phases[].tasks` |
 | Open / in_progress / resolved / deferred debt | `debt[]` |
+| Review debt (done tasks without a `pass` verdict) | `activeSprint.phases[].tasks` + `emergentTasks` where `status === 'done'` and `verdict?.result !== 'pass'` |
 | Next action | `handoff.nextAction` + `handoff.nextTaskId` |
 
 ## Output
 
-- `brief`: scope, status, active sprint, next action, task progress, open debt count, next command.
-- `full`: add roadmap health, sprint table, debt trend, and the resume note from `handoff.note`.
+- `brief`: scope, status, active sprint, next action, task progress, open debt count, review debt count, next command.
+- `full`: add roadmap health, sprint table, debt trend, review-debt task ids, and the resume note from `handoff.note`.
+
+`context-pack` exposes the same review debt as `reviewPending` (and `nextTaskReview` for a task pack);
+prefer those fields when reporting from a pack rather than recomputing.
+There is no standalone CLI `status` subcommand; this mode backs the `/kyro:status` slash command.
 
 ## Health check (optional)
 

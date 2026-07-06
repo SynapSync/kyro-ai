@@ -123,6 +123,32 @@ async function main() {
   });
   rmSync(preinit, { recursive: true, force: true });
 
+  const waiverSandbox = makeSandbox('review-waived-criterion');
+  try {
+    await withServer(waiverSandbox, async ({ send, notify }) => {
+      await send('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check-mcp-waiver', version: '1' } });
+      notify('notifications/initialized');
+      const waived = await send('tools/call', {
+        name: 'review_task',
+        arguments: {
+          scope: 'demo',
+          task_id: 'T1.1',
+          verdict: 'pass',
+          waived_criteria: ['Validation passes.::superseded by an approved scope change'],
+          by: 'checker',
+          confirm: true,
+        },
+      });
+      assert(waived.result?.isError === false, `review_task should accept waived_criteria: ${JSON.stringify(waived)}`);
+    });
+    const sprint = JSON.parse(readFileSync(join(waiverSandbox, '.agents/kyro/scopes/demo/sprint.json'), 'utf-8'));
+    const verdict = sprint.activeSprint.phases[0].tasks[0].verdict;
+    assert(verdict?.waived_criteria?.[0]?.criterion === 'Validation passes.', 'MCP review_task should persist waived criterion');
+    assert(verdict.waived_criteria[0].reason === 'superseded by an approved scope change', 'MCP review_task should persist waiver reason');
+  } finally {
+    rmSync(waiverSandbox, { recursive: true, force: true });
+  }
+
   const sandbox = makeSandbox('close-sprint-happy');
   try {
     await withServer(sandbox, async ({ send, notify, raw }) => {

@@ -30,7 +30,7 @@
     "slug": "demo-sprint",
     "title": "Demo Sprint",
     "objective": "Ship demo sprint.",
-    "status": "executing",
+    "status": "planned",
     "phases": [
       {
         "id": "P1",

@@ -3,9 +3,11 @@ import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { applyPlan, printPlan, resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
-import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
-import { validateSprintFile } from '../artifacts/schema';
-import type { CliOptions, OperationPlan } from '../types';
+import { projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
+import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { readProjectState } from '../state';
+import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
+import type { ActiveSprint, CliOptions, OperationPlan, Phase } from '../types';
 import { resolveScope } from '../core/scope-resolution';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
@@ -54,13 +56,56 @@ export function buildRepairPlan(scope: string): OperationPlan[] {
   if (read.error) {
     throw new KyroCoreError('INVALID_JSON', `Cannot repair ${scope}: sprint.json is invalid JSON (${read.error}).`, 'Restore from an archive snapshot.');
   }
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
+  // Lenient-first: normalize status on the raw parsed JSON BEFORE validating, so files whose only
+  // drift is stale/legacy status (e.g. a phase left "executing" while its tasks are done) become
+  // coherent and pass. Genuine shape drift unrelated to status still fails validation after the pass.
+  const normalized = normalizeStatus(read.value);
+  const issues = validateSprintFile(normalized, `${scope}/sprint.json`);
   if (issues.length > 0) {
     const detail = issues.map((i) => `${i.field} ${i.message}`).join('; ');
     throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot repair ${scope}: sprint.json has shape drift that needs manual review — ${detail}`, 'Fix the reported fields manually.');
   }
-  // Valid: normalize formatting (2-space indent + trailing newline).
-  return [{ action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(read.value, null, 2)}\n` }];
+  const plan: OperationPlan[] = [{ action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(normalized, null, 2)}\n` }];
+  const statePlan = buildScopeStatusReconcilePlan(scope, normalized);
+  if (statePlan) plan.push(statePlan);
+  return plan;
+}
+
+/**
+ * Set phase.status and activeSprint.status to their derived values so status fields stop being orphans
+ * the instruction layer forgot to update. Operates defensively on the raw parsed JSON (repair runs
+ * before validation). Does not touch task/evidence/verdict content — only derived status fields.
+ */
+function normalizeStatus(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const clone = JSON.parse(JSON.stringify(value)) as { activeSprint?: { phases?: unknown[]; emergentTasks?: unknown[]; status?: string } };
+  const active = clone.activeSprint;
+  const phases = active?.phases;
+  if (Array.isArray(phases)) {
+    for (const phase of phases) {
+      if (phase && typeof phase === 'object' && Array.isArray((phase as { tasks?: unknown }).tasks)) {
+        (phase as { status?: string }).status = derivePhaseStatus(phase as Phase);
+      }
+    }
+  }
+  if (active && typeof active === 'object' && Array.isArray(active.phases) && Array.isArray(active.emergentTasks)) {
+    active.status = deriveActiveSprintStatus(active as ActiveSprint);
+  }
+  return clone;
+}
+
+/** Reconcile the kyro.json scope-status cache with the derived scope status (also maps legacy values). */
+function buildScopeStatusReconcilePlan(scope: string, normalizedSprint: unknown): OperationPlan | null {
+  const state = readProjectState();
+  if (!state) return null;
+  const entry = state.scopes.find((s) => s.id === scope);
+  if (!entry) return null;
+  const sprint = asSprintFile(normalizedSprint);
+  if (!sprint) return null;
+  const derived = deriveScopeStatus(sprint, Boolean(sprint.activeSprint));
+  if (entry.status === derived) return null;
+  const updated = { ...state, scopes: state.scopes.map((s) => (s.id === scope ? { ...s, status: derived } : s)) };
+  return { action: 'write', path: projectStatePath(), content: `${JSON.stringify(updated, null, 2)}\n` };
 }
 
 

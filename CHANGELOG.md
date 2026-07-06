@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.11.1] - 2026-07-06
+
+Completes the 4.11.0 status-coherence patch so derived status, review waivers, and status-report surfaces behave consistently across CLI and MCP.
+
+### Fixed
+
+- `analyze` now reports stale `activeSprint.status` as an advisory MEDIUM coherence finding.
+- `repair` now normalizes `activeSprint.status` alongside `phase.status` and the `kyro.json` scope-status cache.
+- `review` now recomputes `activeSprint.status` after verdict writes, preventing a fresh review from creating sprint-level status drift.
+- MCP `review_task` now accepts `waived_criteria` entries in the same `"criterion::reason"` format as the CLI and stores structured waiver records.
+- `/kyro:status` router documentation now includes review-debt reporting instead of leaving that behavior only in the full STATUS mode prompt.
+
+## [4.11.0] - 2026-07-06
+
+Status coherence: lifecycle status is derived from task state, review debt is surfaced before close, and accumulated review debt is recoverable one task at a time. Grounded in a real production run of 4.9.0.
+
+### Added
+
+- Derived-status core (`src/cli/core/status.ts`): `derivePhaseStatus`, `deriveActiveSprintStatus`, `deriveScopeStatus` compute lifecycle status from the authoritative leaf (`task.status`), plus `normalizeStoredPhaseStatus` for vocabulary synonyms.
+- `analyze` reports status-coherence findings: a phase whose stored status contradicts its tasks (MEDIUM), and a stale `kyro.json` scope-status cache (MEDIUM). Advisory — they never block a user-invoked close.
+- `context-pack` surfaces maker/checker debt on every pull: `reviewPending` (done tasks lacking a pass verdict) and `nextTaskReview` (the task's checker findings), so the agent sees the gap before the wall at close.
+- `kyro review --waive-criterion "<criterion>::<reason>"`: a pass verdict may waive an acceptance criterion obsoleted by an approved scope change; the reason is required and archived. `TaskVerdict.waived_criteria` added.
+- `PHASE_STATUS_VALUES` constant and `WaivedCriterion` type.
+
+### Changed
+
+- **Review recovery (fixes a latent maker/checker bug):** the review gate now blocks only on checker findings scoped to the task under review, not the global set. Accumulated review debt (several `done` tasks without verdicts) is now payable one task at a time; previously reviewing any task was blocked by every other unreviewed task. `analyze` keeps the global view.
+- `review` recomputes the reviewed task's `phase.status` on write, so phase status stops being an orphan field.
+- `kyro repair` parses leniently, normalizes each `phase.status` to its derived value, reconciles the `kyro.json` scope-status cache, then validates the result. It can now migrate status drift instead of only reformatting already-valid files.
+- `TaskEvidence.validation` accepts a string **or** a string array (real runs record multiple validation lines); the close narrative renders both.
+
 ## [4.10.0] - 2026-07-05
 
 Sharpens the Agent-Computer Interface (ACI): consistent errors, real verbosity, actionable tool summaries, and a wider MCP surface.

@@ -1,0 +1,52 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "review-waived-criterion",
+  "title": "A pass verdict may waive an acceptance criterion obsoleted by an approved scope change",
+  "kind": "replay",
+  "tags": [
+    "review",
+    "maker-checker",
+    "waiver"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "review",
+        "T1.1",
+        "--kyro-scope",
+        "demo",
+        "--verdict",
+        "pass",
+        "--by",
+        "checker",
+        "--waive-criterion",
+        "Validation passes.::superseded by an approved scope change",
+        "--yes"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "Task T1.1 reviewed as pass"
+        ]
+      }
+    },
+    {
+      "run": [
+        "analyze",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutExcludes": [
+          "did not check all acceptance_criteria"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}
