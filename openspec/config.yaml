@@ -1,0 +1,42 @@
+schema: spec-driven
+
+context: |
+  Project: kyro-ai
+  Tech stack: TypeScript (strict), Node.js CLI (engines >=18), compiled with tsc (no bundler)
+  Package: kyro-ai — bin `kyro` / `kyro-ai` -> dist/cli.js
+  Dependencies: none (runtime deps: []); devDependencies: typescript, @types/node
+  Architecture: CLI orchestrator workflow (agents/commands/skills), sprint-based markdown
+    artifacts under .agents/kyro/scopes/{scope}/, persistent rules file at
+    .agents/kyro/scopes/rules.md
+  Testing: No unit test framework (no jest/vitest/mocha). Verification relies on a
+    conformance/check-script suite under scripts/*.mjs orchestrated via `npm run check`,
+    plus a behavioral eval harness invoked as `kyro eval` (see scripts/check-eval.mjs,
+    scripts/check-eval-harness.mjs). Strict TDD (RED-GREEN-REFACTOR unit tests) is not
+    applicable; use `npm run typecheck` for fast iteration and `npm run check` as the
+    full verification gate before merging.
+  Style: TypeScript strict mode, ES module scripts (.mjs) for tooling, markdown-first
+    workflow artifacts
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing code patterns (CLI orchestrator, agents/commands/skills split)
+    - Keep runtime dependencies at zero unless explicitly approved
+    tdd: false           # No unit test runner available; use typecheck + check suite instead
+    test_command: "npm run typecheck"
+  verify:
+    test_command: "npm run check"
+    build_command: "npm run build"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
