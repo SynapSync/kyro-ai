@@ -1,6 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { ARTIFACT_ROOT, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
+import { resolveKyroInvocation } from '../invocation';
 import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
@@ -35,6 +38,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
     checkClaudePlugin(),
     checkProjectState(),
     checkGlobalRuntime(),
+    checkCliInvocation(),
     ...checkAdapterProjections(),
   ];
 
@@ -160,6 +164,27 @@ function checkGlobalRuntime(): CheckResult {
     };
   }
   return { status: 'pass', name: 'global runtime', detail: `${runtimeFiles.length} runtime files present` };
+}
+
+/** Expand a leading `~` to the user's home dir; execFileSync does no shell expansion. */
+function expandHome(segment: string): string {
+  return segment === '~' || segment.startsWith('~/') ? homedir() + segment.slice(1) : segment;
+}
+
+function checkCliInvocation(): CheckResult {
+  const remedy = 'Re-run kyro install (or kyro sync) so the runtime CLI is projected and the invocation is refreshed.';
+  try {
+    // Prefer the persisted invocation; fall back to a live resolve for legacy manifests.
+    const manifest = readManifest();
+    const raw = manifest?.kyroInvocation ?? resolveKyroInvocation().raw;
+    // The invocation is a shell string (e.g. `node ~/.agents/kyro/current/dist/cli.js`), not a
+    // bare binary — split into command + args and expand `~` before exec, which does neither.
+    const [command, ...args] = raw.trim().split(/\s+/).map(expandHome);
+    execFileSync(command, [...args, '--version'], { stdio: 'ignore', timeout: 5000 });
+    return { status: 'pass', name: 'CLI invocation', detail: `${raw} --version runs` };
+  } catch (error: unknown) {
+    return { status: 'fail', name: 'CLI invocation', detail: errorMessage(error), remedy };
+  }
 }
 
 function checkAdapterProjections(): CheckResult[] {

@@ -32,14 +32,21 @@ installation or PATH entry.
 - **THEN** the process exits with code `0`
 - **AND** it prints the installed CLI version
 
-#### Scenario: Projected `dist/` is tracked and removed on uninstall
+#### Scenario: Projected `dist/` is tracked and pruned with its runtime version
 
 - **GIVEN** `kyro` has been installed and `dist/` was projected into
   `~/.agents/kyro/versions/{v}/dist/`
 - **WHEN** `manifest.json` is inspected after install
 - **THEN** every projected file under `dist/` appears in `managedFiles`
-- **WHEN** `kyro uninstall` (or the equivalent uninstall path) is run
-- **THEN** the projected `dist/` directory no longer exists on disk
+- **WHEN** a runtime version becomes stale (superseded) and `kyro sync --prune`
+  is run
+- **THEN** the stale version directory — including its `dist/` — no longer
+  exists on disk
+
+> Note: `kyro uninstall` deliberately PRESERVES the global runtime (it is shared
+> across workspaces and multiple versions); it removes only workspace
+> adapter-owned entrypoints. Runtime `dist/` is reclaimed through the
+> `sync --prune` version-cleanup lifecycle, not through uninstall.
 
 ---
 

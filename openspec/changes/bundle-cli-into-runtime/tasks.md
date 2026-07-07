@@ -93,10 +93,12 @@ Split into three sequential sub-slices because this phase is the largest (14 fil
 
 ## Phase 4 — codex adapter MCP command fix
 
-- [ ] **4.1** Update `src/cli/adapters/codex.ts` `buildMcpProjection` to call `resolveKyroInvocation()` and emit `command = inv.command`, `args = [...inv.args, 'mcp', 'serve']` instead of the static literal `command = "kyro"`.
+- [x] **4.1** Update `src/cli/adapters/codex.ts` `buildMcpProjection` to call `resolveKyroInvocation()` and emit `command = inv.command`, `args = [...inv.args, 'mcp', 'serve']` instead of the static literal `command = "kyro"`.
   - Satisfies: Requirement "The codex MCP adapter SHALL register a runnable command, not a bare kyro reference" (both scenarios)
-- [ ] **4.2** Update `scripts/check-mcp.mjs` and `scripts/check-adapter-fixtures.mjs` golden fixtures to the resolved form; pin/inject the fallback branch (force `kyroOnPath = false`) so the fixture is deterministic across machines (design §9/§12).
+  - Done: TOML built with `JSON.stringify(command)` / `JSON.stringify(args)` per design §6.
+- [x] **4.2** Update the codex MCP golden fixture to the resolved form; pin the fallback branch (force `kyroOnPath = false`) so the fixture is deterministic across machines (design §6).
   - Satisfies: same requirement
+  - Done: the real assertion lives in `scripts/check-guardrails.mjs` `assertMcpProjection` (NOT `check-mcp.mjs`/`check-adapter-fixtures.mjs` as design §6/§10.1 stated — those never assert the MCP TOML content). Pinned determinism by installing with `PATH` set to an empty dir so `isKyroOnPath()` is false; asserts `command = "node"` + `args = ["~/.agents/kyro/current/dist/cli.js","mcp","serve"]`.
 
 **Work unit:** one commit — `fix(codex-adapter): emit resolved kyroInvocation for MCP command instead of literal "kyro"`.
 
@@ -106,8 +108,9 @@ Split into three sequential sub-slices because this phase is the largest (14 fil
 
 ## Phase 5 — doctor `<invocation> --version` self-check
 
-- [ ] **5.1** Add `checkCliInvocation()` to `src/cli/commands/doctor.ts`: read `manifest.kyroInvocation` (fallback to `resolveKyroInvocation().raw` for legacy manifests missing the field), run `<invocation> --version` via `execFileSync` with a short timeout, pass on exit 0 + printed version, fail with remedy `"Re-run kyro install (or kyro sync) so the runtime CLI is projected and the invocation is refreshed."` otherwise. Place after `checkGlobalRuntime()` in the check list.
+- [x] **5.1** Add `checkCliInvocation()` to `src/cli/commands/doctor.ts`: read `manifest.kyroInvocation` (fallback to `resolveKyroInvocation().raw` for legacy manifests missing the field), run `<invocation> --version` via `execFileSync` with a short timeout, pass on exit 0 + printed version, fail with remedy `"Re-run kyro install (or kyro sync) so the runtime CLI is projected and the invocation is refreshed."` otherwise. Place after `checkGlobalRuntime()` in the check list.
   - Satisfies: Requirement "doctor SHALL detect a non-runnable CLI invocation and report an actionable remedy" (both scenarios)
+  - Done: `raw` split on whitespace into command+args, each segment `~`-expanded via `os.homedir()` (execFileSync does no shell expansion), 5s timeout, try/catch → fail (never crashes doctor). Placed after `checkGlobalRuntime()`.
 
 **Work unit:** one commit — `feat(doctor): add CLI invocation self-check with actionable remedy`.
 
@@ -117,8 +120,10 @@ Split into three sequential sub-slices because this phase is the largest (14 fil
 
 ## Phase 6 — Uninstall managedFiles coverage (regression only, no new code path)
 
-- [ ] **6.1** Add a regression assertion (extend an existing uninstall check or add a new one) that installs into a temp HOME, confirms `{runtimeRoot}/dist/**` exists, runs uninstall, and asserts `{runtimeRoot}/dist` no longer exists on disk (relies on Phase 1's `managedFiles` expansion — no uninstall code change expected beyond that).
-  - Satisfies: Requirement "Projected runtime SHALL bundle a runnable CLI" (Scenario: "Projected dist/ is tracked and removed on uninstall")
+- [x] **6.1** Add a regression assertion that a stale runtime version's projected `dist/` is reclaimed by `sync --prune`.
+  - Satisfies: Requirement "Projected runtime SHALL bundle a runnable CLI" (Scenario: "Projected `dist/` is tracked and pruned with its runtime version")
+  - **Finding (drove a spec correction):** the original scenario ("removed on uninstall") was based on a false premise. `uninstall` deliberately PRESERVES the global runtime — `src/cli/commands/uninstall.ts:50` prints "global runtime were preserved" and never consumes `manifest.managedFiles` for the versioned runtime (it removes only adapter-owned workspace entrypoints, or adapter assets under `--purge-adapter-assets`). Reproduced: after `uninstall` the entire `{runtimeRoot}/dist` tree stays intact. `managedFiles` IS complete (`install-plan.ts:134` registers all `dist/**`); uninstall simply does not delete the shared multi-version runtime by design.
+  - **Resolution:** spec scenario rewritten to the real lifecycle — stale runtime versions (including their `dist/`) are reclaimed by `sync --prune`. Regression added to the existing sync-prune case in `scripts/check-adapter-fixtures.mjs`: a stale `versions/0.0.0/dist/cli.js` is seeded and asserted gone after `sync --prune`. No uninstall contract change.
 
 **Work unit:** one commit — `test(uninstall): assert projected dist/ is fully removed on uninstall`.
 

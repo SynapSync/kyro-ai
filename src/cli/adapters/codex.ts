@@ -1,5 +1,6 @@
 import { AGENT, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, KYRO_ROOT } from '../constants';
 import { hasManagedBlock } from '../fs';
+import { resolveKyroInvocation } from '../invocation';
 import { addCommandSkillProjection, buildCommandSkillManagedFiles } from './command-skills';
 import { checkCommandProjection } from './standard';
 import type { AdapterDefinition } from './registry-types';
@@ -47,12 +48,17 @@ export const codexAdapter: AdapterDefinition = {
     plan.push({ action: 'remove-block', path: AGENTS_PATH, blockName: KYRO_AGENTS_BLOCK });
   },
   buildMcpProjection(plan) {
+    // Emit the resolved runnable invocation, not a bare `kyro`: when no `kyro` binary is on
+    // PATH the command becomes `node {runtimeRoot}/dist/cli.js` so the MCP server still starts.
+    const invocation = resolveKyroInvocation();
+    const command = invocation.command;
+    const args = [...invocation.args, 'mcp', 'serve'];
     plan.push({
       action: 'upsert-block',
       path: CODEX_MCP_CONFIG_PATH,
       blockName: KYRO_MCP_BLOCK,
       commentStyle: 'hash',
-      content: '[mcp_servers.kyro]\ncommand = \"kyro\"\nargs = [\"mcp\", \"serve\"]',
+      content: `[mcp_servers.kyro]\ncommand = ${JSON.stringify(command)}\nargs = ${JSON.stringify(args)}`,
     });
   },
   buildMcpRemoval(plan) {

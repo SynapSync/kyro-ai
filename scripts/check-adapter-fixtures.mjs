@@ -495,6 +495,12 @@ withWorkspace('kyro-sync-drift-', (cwd) => {
   const staleDir = join(home, '.agents', 'kyro', 'versions', '0.0.0');
   mkdirSync(staleDir, { recursive: true });
   writeFileSync(join(staleDir, 'stale.txt'), 'stale', 'utf-8');
+  // Phase 6 (tasks.md 6.1 / spec "tracked and pruned with its runtime version"): a stale runtime
+  // version carries a projected dist/ (bundled CLI). Prune must reclaim it with the version dir —
+  // uninstall preserves the runtime by design, so sync --prune is the real dist/ removal path.
+  const staleDistCli = join(staleDir, 'dist', 'cli.js');
+  mkdirSync(join(staleDir, 'dist'), { recursive: true });
+  writeFileSync(staleDistCli, '// stale runtime cli', 'utf-8');
 
   const syncOutput = captureLogs(() => sync(cliOptions({ agents: [codex] })));
   assert(syncOutput.includes('Drift analysis:'), 'sync-drift: missing drift report');
@@ -535,6 +541,8 @@ withWorkspace('kyro-sync-drift-', (cwd) => {
   assert(pruneOutput.includes('~/.config/opencode/opencode.json'), 'sync-prune: shared opencode config should be reported as preserved');
   assert(!pruneOutput.includes('- remove ~/.config/opencode/opencode.json'), 'sync-prune: prune plan should not remove shared opencode config');
   assert(!existsSync(staleDir), 'sync-prune: stale dir 0.0.0 should be removed');
+  assert(!existsSync(staleDistCli), 'sync-prune: stale runtime dist/cli.js should be pruned with its version dir');
+  assert(!existsSync(join(staleDir, 'dist')), 'sync-prune: stale runtime dist/ should be pruned with its version dir');
   assert(!existsSync(staleDir2), 'sync-prune: stale dir 0.0.1 should be removed');
   assert(!existsSync(obsoleteSkill), 'sync-prune: obsolete adapter skill should be removed');
   assert(existsSync(sharedOpenCodeConfig), 'sync-prune: shared opencode config should be preserved');
