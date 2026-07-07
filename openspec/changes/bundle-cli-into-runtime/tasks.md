@@ -133,13 +133,16 @@ Split into three sequential sub-slices because this phase is the largest (14 fil
 
 ## Phase 7 — Temp-HOME integration check + suite wiring + version sync
 
-- [ ] **7.1** Write `scripts/check-cli-bundle.mjs` per design §10.2: build first, `mkdtemp` HOME + workspace, seed a fixture scope with a close-to-close `activeSprint`, install with `PATH` stripped of `kyro` and `HOME=tempHOME`, assert `kyroInvocation` is the node-fallback form in both `manifest.json` and `kyro.json`, assert projected-tree parity (`dist/cli.js`, `package.json`, `config.json`, `skills/...`), assert no `{{KYRO_CLI}}` leak, run `close-sprint --kyro-scope <fixture> --outcome shipped` via the resolved invocation, assert archive `.json`+`.md` written, `ledger[]` appended, `activeSprint === null`, exit `0`. Optionally smoke `--version`.
-  - Satisfies: Requirement "close-sprint SHALL complete end-to-end via the projected CLI without a PATH binary"; Requirement "PACKAGE_ROOT-relative assets SHALL resolve correctly when CLI is bundled" (Scenario: "Every workflow CLI command is asset-parity audited", at least for close-sprint + --version)
-- [ ] **7.2** Add `check:cli-bundle` and `check:no-placeholder` (if not already wired in 3.4) to `package.json` scripts and the aggregate `npm run check`. Ensure both — and `check:eval` — run after `npm run build` (self-run build or sequence in the aggregate script).
+- [x] **7.1** Write `scripts/check-cli-bundle.mjs` per design §10.2: `mkdtemp` HOME + workspace, seed a fixture scope with a close-to-close `activeSprint`, install with `PATH` stripped of `kyro` and `HOME=tempHOME`, assert `kyroInvocation` is the node-fallback form in both `manifest.json` and `kyro.json`, assert projected-tree parity (`dist/cli.js`, `package.json`, `config.json`, `skills/...`), assert no `{{KYRO_CLI}}` leak, run `close-sprint --kyro-scope <fixture> --outcome shipped` via the resolved invocation, assert archive `.json`+`.md` written, `ledger[]` appended, `activeSprint === null`, exit `0`. Smokes `--version`.
+  - Satisfies: Requirement "close-sprint SHALL complete end-to-end via the projected CLI without a PATH binary"; Requirement "PACKAGE_ROOT-relative assets SHALL resolve correctly when CLI is bundled" (close-sprint + --version)
+  - Done: seeds from `fixtures/evals/close-sprint-happy/state`. INSTALL uses a PATH with neither `kyro` nor `node` (forces the persisted fallback); the RUN uses a PATH with `node` present but no `kyro` (a real agent's shell), executing the persisted `node ~/.agents/kyro/current/dist/cli.js` invocation with `~` expanded to the temp HOME.
+- [x] **7.2** Add `check:cli-bundle` to `package.json` scripts and the aggregate `npm run check` (`check:no-placeholder` was already wired in 3.4).
   - Satisfies: Verification section of spec
-- [ ] **7.3** Version-sync the 4 metadata files per CLAUDE.md checklist (`package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `WORKFLOW.yaml`) and add the CHANGELOG entry from design §9 ("Bundled runtime CLI... Action required once: run npx kyro-ai@<version> install...").
-  - Satisfies: backward-compatibility notes in design §9 (release hygiene, not a spec requirement but required for shipping)
-- [ ] **7.4** Run full `npm run check` and `npm run typecheck` end-to-end and confirm all new/updated checks pass.
+  - Done: aggregate order keeps the build-then-check convention already relied on by `check:eval`/`check:cli-bundle-assets`; `check-cli-bundle.mjs` asserts `dist/cli.js` exists with a build hint if not.
+- [x] **7.3** Version-sync the metadata files per CLAUDE.md checklist and add the CHANGELOG entry from design §9.
+  - Satisfies: backward-compatibility notes in design §9 (release hygiene)
+  - Done: bumped `package.json`, `.claude-plugin/plugin.json`, `WORKFLOW.yaml`, and `package-lock.json` to `4.12.0` (minor — new capability, backward-compatible with a one-time re-install). `marketplace.json` has no version field (only descriptions — left as-is; capability copy unchanged). CHANGELOG `[4.12.0]` entry added with the design §9 "Action required once" wording.
+- [x] **7.4** Run full `npm run check` and `npm run typecheck` end-to-end and confirm all new/updated checks pass.
   - Satisfies: Verification section of spec
 
 **Work unit split:**

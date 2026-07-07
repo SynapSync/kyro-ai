@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.0] - 2026-07-07
+
+**Bundled runtime CLI.** The Kyro CLI now ships inside the projected runtime, so workflow steps (`close-sprint`, `analyze`, …) run without a `kyro` binary on PATH. Agents installed via `npx kyro-ai install` previously received the markdown runtime but no executable and blocked at CLI-owned steps; the runtime is now self-contained.
+
+**Action required once:** run `npx kyro-ai@4.12.0 install` (or `kyro sync` if you have a global install) to re-project the runtime with the bundled CLI. Existing scopes and artifacts are preserved.
+
+### Added
+
+- Projected `dist/` (plus root `package.json`/`config.json`) into `~/.agents/kyro/versions/{v}/`, mirroring the npm layout so PACKAGE_ROOT-relative assets resolve when the CLI runs from the runtime.
+- `kyroInvocation` resolver: resolves to `kyro` when on PATH, else `node ~/.agents/kyro/current/dist/cli.js`; persisted to `manifest.json` and `kyro.json`.
+- `{{KYRO_CLI}}` placeholder substituted into projected skill/agent markdown at install/sync time, so projected CLI references always resolve to a runnable invocation.
+- `doctor` CLI-invocation self-check: runs `<invocation> --version` and reports an actionable remedy when the runtime CLI can't execute.
+- End-to-end `check:cli-bundle` proving `close-sprint` completes via the projected CLI with no PATH binary.
+
+### Fixed
+
+- Codex MCP registration now emits the resolved runnable command instead of a bare `command = "kyro"`, so the MCP server starts when no `kyro` binary is on PATH.
+
 ## [4.11.1] - 2026-07-06
 
 Completes the 4.11.0 status-coherence patch so derived status, review waivers, and status-report surfaces behave consistently across CLI and MCP.
