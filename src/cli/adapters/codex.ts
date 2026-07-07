@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { AGENT, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, KYRO_ROOT } from '../constants';
 import { hasManagedBlock } from '../fs';
 import { resolveKyroInvocation } from '../invocation';
@@ -50,9 +51,12 @@ export const codexAdapter: AdapterDefinition = {
   buildMcpProjection(plan) {
     // Emit the resolved runnable invocation, not a bare `kyro`: when no `kyro` binary is on
     // PATH the command becomes `node {runtimeRoot}/dist/cli.js` so the MCP server still starts.
+    // Codex spawns this command itself (not via a shell), so a literal `~` in the args would NOT
+    // expand — expand it to an absolute path here (this TOML is written into the user's own
+    // ~/.codex/config.toml, so an absolute home path is correct and machine-appropriate).
     const invocation = resolveKyroInvocation();
-    const command = invocation.command;
-    const args = [...invocation.args, 'mcp', 'serve'];
+    const command = expandHome(invocation.command);
+    const args = [...invocation.args.map(expandHome), 'mcp', 'serve'];
     plan.push({
       action: 'upsert-block',
       path: CODEX_MCP_CONFIG_PATH,
@@ -92,6 +96,11 @@ export const codexAdapter: AdapterDefinition = {
     return { status: 'pass', name: 'Codex adapter', detail: 'projected Kyro command skills and root AGENTS.md block present' };
   },
 };
+
+/** Expand a leading `~` to the user's home dir; codex spawns the MCP command without a shell. */
+function expandHome(segment: string): string {
+  return segment === '~' || segment.startsWith('~/') ? homedir() + segment.slice(1) : segment;
+}
 
 function buildAgentsBlock(): string {
   return `## Kyro AI\n\nUse installed Kyro command skills: \`kyro-forge\`, \`kyro-status\`, \`kyro-wrap-up\`, \`kyro-task-context\`.\n\nRuntime: \`${KYRO_ROOT}/\`\nProject state: \`.agents/kyro/kyro.json\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\nSkills: \`${AGENT_SKILLS_ROOT}/kyro-*\`\n\nLoad command routers only when a Kyro skill is invoked. Do not load full Kyro docs unless the router asks for them. Preserve non-Kyro content; Kyro owns only this marked block.\n`;
