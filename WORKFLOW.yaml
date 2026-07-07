@@ -15,6 +15,7 @@ commands:
   - forge # Full cycle: Analyze → Plan → Implement → Review → Commit
   - status # Project progress and technical debt summary
   - wrap-up # End-of-session closure ritual with quality check
+  - task-context # Fresh-context prompt generation for continuation
 
 agents:
   - orchestrator # Full cycle coordination — analysis, review, debugging, and sprint execution

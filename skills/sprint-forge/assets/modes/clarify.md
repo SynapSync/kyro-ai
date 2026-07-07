@@ -53,7 +53,7 @@ Set `handoff.nextAction` via safe-write:
 ## Rules
 
 - Never invent an answer to dodge a question — that is exactly the failure this mode prevents.
-- `kyro doctor --artifacts` (and `kyro analyze`) **fail** while any `[NEEDS CLARIFICATION]` marker
+- `{{KYRO_CLI}} doctor --artifacts` (and `{{KYRO_CLI}} analyze`) **fail** while any `[NEEDS CLARIFICATION]` marker
   remains. Do not route to `plan_sprint`/`execute_task` with markers still in the file.
 - `spec.openQuestions[]` are visible analyze warnings. Drain them as the answers become stable
   requirements; do not leave resolved questions in the queue.

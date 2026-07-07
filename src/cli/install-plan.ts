@@ -13,7 +13,7 @@ import {
 import { getAdapterDefinition, getInstalledAdapterDefinitions } from './adapters/registry';
 import { addCopyDirectoryPlan, addCopyFilePlan, listRelativeFiles } from './fs';
 import { readPackageVersion } from './help';
-import { resolveKyroInvocation } from './invocation';
+import { KYRO_CLI_PLACEHOLDER, resolveKyroInvocation } from './invocation';
 import { readProjectState } from './state';
 import type { Agent, InstallScope, KyroManifest, KyroProjectState, OperationPlan } from './types';
 
@@ -49,9 +49,13 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
     { action: 'write', path: `${runtimeRoot}/KYRO.md`, content: buildKyroBootstrap(runtimeRoot) },
   ];
 
-  addCopyDirectoryPlan(plan, 'agents', `${runtimeRoot}/core/agents`);
+  // Markdown-bearing copies carry the {{KYRO_CLI}} substitution map (design.md §5.3) so every
+  // projected occurrence resolves to the runnable invocation. `commands/` references only slash
+  // commands, never the CLI binary (audit-phase0.md §1), so it stays verbatim.
+  const substitutions = { [KYRO_CLI_PLACEHOLDER]: kyroInvocation };
+  addCopyDirectoryPlan(plan, 'agents', `${runtimeRoot}/core/agents`, substitutions);
   addCopyDirectoryPlan(plan, 'commands', `${runtimeRoot}/commands`);
-  addCopyDirectoryPlan(plan, 'skills', `${runtimeRoot}/skills`);
+  addCopyDirectoryPlan(plan, 'skills', `${runtimeRoot}/skills`, substitutions);
   addCopyFilePlan(plan, 'config.json', `${runtimeRoot}/core/config.json`);
   addCopyFilePlan(plan, 'WORKFLOW.yaml', `${runtimeRoot}/core/WORKFLOW.yaml`);
 

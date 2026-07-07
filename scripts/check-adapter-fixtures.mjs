@@ -104,8 +104,10 @@ function assertCommonPlan(plan, name) {
   assert(plan.includes('- symlink ~/.agents/kyro/current'), `${name}: missing current symlink`);
 }
 
+const EXPECTED_COMMAND_SKILLS = ['forge', 'status', 'wrap-up', 'task-context'];
+
 function assertStandardCommandSkills(plan, name) {
-  for (const command of ['forge', 'status', 'wrap-up']) {
+  for (const command of EXPECTED_COMMAND_SKILLS) {
     assert(plan.includes(`- write ~/.agents/skills/kyro-${command}/SKILL.md`), `${name}: missing ${command} command skill`);
   }
 }
@@ -284,7 +286,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   captureLogs(() => install(cliOptions({ agents: [codex] })));
 
   const home = join(installDir, '.home');
-  for (const command of ['forge', 'status', 'wrap-up']) {
+  for (const command of EXPECTED_COMMAND_SKILLS) {
     const skillPath = join(home, '.agents', 'skills', `kyro-${command}`, 'SKILL.md');
     assert(existsSync(skillPath), `install: missing projected skill ${skillPath}`);
   }
@@ -335,7 +337,7 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
 
   captureLogs(() => install(cliOptions({ agents: [opencode] })));
 
-  for (const command of ['forge', 'status', 'wrap-up']) {
+  for (const command of EXPECTED_COMMAND_SKILLS) {
     const skillPath = join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md');
     const commandPath = join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`);
     assert(existsSync(skillPath), `opencode install: missing native skill ${skillPath}`);
@@ -363,7 +365,7 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   assert(settings.agent.existing.model === 'kept', 'opencode uninstall: did not preserve existing agent');
   assert(!settings.agent['kyro-orchestrator'], 'opencode uninstall: Kyro orchestrator overlay still present');
   assert(settings.mcp['user-server'].command[1] === 'server.js', 'opencode uninstall: did not preserve existing MCP config');
-  for (const command of ['forge', 'status', 'wrap-up']) {
+  for (const command of EXPECTED_COMMAND_SKILLS) {
     assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode uninstall: should preserve native skill ${command} without purge`);
     assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode uninstall: should preserve native command ${command} without purge`);
   }
@@ -378,7 +380,7 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   assert(purgeDryRunOutput.includes('Dry run complete. No files changed.'), 'opencode purge dry-run: should report no file changes');
   settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
   assert(settings.agent['kyro-orchestrator'], 'opencode purge dry-run: Kyro orchestrator overlay should remain');
-  for (const command of ['forge', 'status', 'wrap-up']) {
+  for (const command of EXPECTED_COMMAND_SKILLS) {
     assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode purge dry-run: native skill ${command} should remain`);
     assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode purge dry-run: native command ${command} should remain`);
   }
@@ -391,7 +393,7 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   assert(settings.model === 'user/model', 'opencode purge: did not preserve root setting');
   assert(settings.agent.existing.model === 'kept', 'opencode purge: did not preserve existing agent');
   assert(!settings.agent['kyro-orchestrator'], 'opencode purge: Kyro orchestrator overlay still present');
-  for (const command of ['forge', 'status', 'wrap-up']) {
+  for (const command of EXPECTED_COMMAND_SKILLS) {
     assert(!existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode purge: native skill ${command} still present`);
     assert(!existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode purge: native command ${command} still present`);
     assert(!existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`)), `opencode purge: empty skill directory ${command} still present`);

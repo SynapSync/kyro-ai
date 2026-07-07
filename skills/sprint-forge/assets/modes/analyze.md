@@ -1,13 +1,13 @@
 # Analyze Mode
 
 Run a semantic cross-check of the scope before a gate (sprint close, milestone, or on demand). Where
-`kyro doctor` validates the SHAPE of `sprint.json`, `kyro analyze` validates its MEANING. Read-only —
+`{{KYRO_CLI}} doctor` validates the SHAPE of `sprint.json`, `{{KYRO_CLI}} analyze` validates its MEANING. Read-only —
 it writes nothing.
 
 ## How to run
 
 ```
-kyro analyze --kyro-scope {scope} [--json]
+{{KYRO_CLI}} analyze --kyro-scope {scope} [--json]
 ```
 
 The command reports severity-triaged findings and exits non-zero when any **CRITICAL** or **HIGH**
@@ -22,7 +22,7 @@ finding exists:
 
 ## When to use it
 
-- **Gate before `close_sprint`**: run `kyro analyze` first. Do not close while CRITICAL/HIGH findings
+- **Gate before `close_sprint`**: run `{{KYRO_CLI}} analyze` first. Do not close while CRITICAL/HIGH findings
   remain — fix them (or route to `clarify` for markers), then close.
 - **During `recover`**: use it to locate what is inconsistent.
 - **On demand / `STATUS`**: a quick health read of the active scope.

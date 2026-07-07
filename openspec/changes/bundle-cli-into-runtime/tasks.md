@@ -57,11 +57,12 @@ Legend: `[P]` = safe to run in parallel with sibling `[P]` tasks in the same pha
 
 Split into three sequential sub-slices because this phase is the largest (14 files, plus new plumbing, plus a new check):
 
-- [ ] **3.1** Extend `OperationPlan` (`src/cli/types.ts`) with optional `substitutions?: Record<string, string>`; extend `addCopyDirectoryPlan`/`addCopyFilePlan` (`src/cli/fs.ts`) with an optional `substitutions` param, threaded from `buildInstallPlan` for `skills/` (and any adapter markdown copy) only — `dist/`, `package.json`, `config.json`, `WORKFLOW.yaml` stay verbatim.
+- [x] **3.1** Extend `OperationPlan` (`src/cli/types.ts`) with optional `substitutions?: Record<string, string>`; extend `addCopyDirectoryPlan`/`addCopyFilePlan` (`src/cli/fs.ts`) with an optional `substitutions` param, threaded from `buildInstallPlan` for `skills/` (and any adapter markdown copy) only — `dist/`, `package.json`, `config.json`, `WORKFLOW.yaml` stay verbatim.
   - Satisfies: Requirement "All projected CLI references SHALL resolve to a runnable invocation"
-- [ ] **3.2** Implement the copy-step substitution branch in `src/cli/pipeline/operation-steps.ts`: when `operation.substitutions` is present, read → `String.prototype.split(token).join(value)` for each entry → write; otherwise copy verbatim as today.
+  - Done: `agents/` (→ `core/agents`) also carries substitutions (orchestrator.md has 1 occurrence); `commands/` stays verbatim.
+- [x] **3.2** Implement the copy-step substitution branch in `src/cli/pipeline/operation-steps.ts`: when `operation.substitutions` is present, read → `String.prototype.split(token).join(value)` for each entry → write; otherwise copy verbatim as today.
   - Satisfies: same requirement
-- [ ] **3.3** Re-enumerate (Read-tool, not grep — RTK mangles `.replace(` output) each of the 14 files from design §5.2 and convert literal `kyro <subcommand>` → `{{KYRO_CLI}} <subcommand>` (33 occurrences). Do NOT touch `commands/{forge,status,wrap-up}.md` (those reference slash commands, not the CLI binary). `[P]` — each file edit is independent once 3.1/3.2 land:
+- [x] **3.3** Re-enumerate (Read-tool, not grep — RTK mangles `.replace(` output) each of the 14 files from design §5.2 and convert literal `kyro <subcommand>` → `{{KYRO_CLI}} <subcommand>` (35 occurrences per audit-phase0.md, not 33 — analyze.md and clarify.md each had one extra inline occurrence). Do NOT touch `commands/{forge,status,wrap-up}.md` (those reference slash commands, not the CLI binary). `[P]` — each file edit is independent once 3.1/3.2 land:
   - `[P]` `agents/orchestrator.md`
   - `[P]` `skills/qa-review/SKILL.md`
   - `[P]` `skills/sprint-forge/SKILL.md`
@@ -77,8 +78,9 @@ Split into three sequential sub-slices because this phase is the largest (14 fil
   - `[P]` `skills/sprint-forge/assets/modes/STATUS.md`
   - `[P]` `skills/sprint-forge/assets/templates/archive-sprint.md`
   - Satisfies: Requirement "All projected CLI references SHALL resolve to a runnable invocation" (Scenario: "Source files keep the literal placeholder")
-- [ ] **3.4** Write `scripts/check-no-placeholder.mjs`: install into a temp HOME, assert zero `{{KYRO_CLI}}` matches under projected `{runtimeRoot}/{skills,commands,agents}/**`, and assert the inverse on source (`skills/**`, `agents/**` as shipped must contain the placeholder and must NOT contain a bare literal `kyro <subcommand>` invocation). Wire into `package.json` `check:*` scripts and the aggregate `npm run check`.
+- [x] **3.4** Write `scripts/check-no-placeholder.mjs`: install into a temp HOME, assert zero `{{KYRO_CLI}}` matches under projected `{runtimeRoot}/{skills,commands,agents}/**`, and assert the inverse on source (`skills/**`, `agents/**` as shipped must contain the placeholder and must NOT contain a bare literal `kyro <subcommand>` invocation). Wire into `package.json` `check:*` scripts and the aggregate `npm run check`.
   - Satisfies: Requirement "All projected CLI references SHALL resolve to a runnable invocation" (Scenario: "No projected file leaks the raw placeholder")
+  - Done: wired as `check:no-placeholder` in the aggregate `npm run check`; verified manually with a PATH-isolated temp-HOME install (node fallback form) — zero leaks, all 14 source files carry the placeholder.
 
 **Work unit split (work-unit-commits):**
 - Commit A: `feat(fs): add optional substitutions param to copy operations` (3.1 + 3.2, includes the plumbing).

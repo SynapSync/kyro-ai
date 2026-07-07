@@ -2,7 +2,7 @@
 
 Close a sprint by snapshotting it verbatim, recording a one-line ledger entry, then clearing `activeSprint`. Zero loss: the full structured record is preserved in the archive snapshot.
 
-**The destructive step is NOT done by hand. It is owned by the CLI.** You prepare the additive work (narrative, conventions, debt); then a single command — `kyro close-sprint` — snapshots `activeSprint` to `archive/` and only then clears it, atomically, and re-parses to verify. This is non-negotiable: a hand-edited close is how Sprint data has been lost before. Do **not** manually null `activeSprint` or hand-write the ledger entry.
+**The destructive step is NOT done by hand. It is owned by the CLI.** You prepare the additive work (narrative, conventions, debt); then a single command — `{{KYRO_CLI}} close-sprint` — snapshots `activeSprint` to `archive/` and only then clears it, atomically, and re-parses to verify. This is non-negotiable: a hand-edited close is how Sprint data has been lost before. Do **not** manually null `activeSprint` or hand-write the ledger entry.
 
 Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse).
 
@@ -14,7 +14,7 @@ Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Cont
 
 ## Workflow
 
-1. Run the pre-close quality checkpoint. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason). **Run `kyro analyze --kyro-scope {scope}` and do not proceed while any CRITICAL or HIGH finding remains** — resolve them first (route to `clarify` for `[NEEDS CLARIFICATION]` markers).
+1. Run the pre-close quality checkpoint. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason). **Run `{{KYRO_CLI}} analyze --kyro-scope {scope}` and do not proceed while any CRITICAL or HIGH finding remains** — resolve them first (route to `clarify` for `[NEEDS CLARIFICATION]` markers).
 2. Fill the retro reasoning: went well, did not go well, surprises, new debt. Capture recommendations for Sprint N+1 (you will pass them to the close command).
 3. **Additive writes first (safe-write).** These must happen before the close command, because the command re-serializes the current `sprint.json`:
    - Extract learned rules as `conventions[]` objects via `../helpers/learner.md` — each `{ id, rule, tags, addedSprint }`. Append to `sprint.json.conventions[]`.
@@ -26,7 +26,7 @@ Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Cont
 Run:
 
 ```
-kyro close-sprint --kyro-scope {scope} --outcome {shipped|partial|...} \
+{{KYRO_CLI}} close-sprint --kyro-scope {scope} --outcome {shipped|partial|...} \
   [--note "handoff note for next session"] \
   [--summary "one-line previousSprint summary"] \
   [--learning "..."]          # repeatable — recorded in the narrative

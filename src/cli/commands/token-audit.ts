@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { AGENT_SKILLS_ROOT, PACKAGE_ROOT } from '../constants';
+import { AGENT_SKILLS_ROOT, COMMAND_NAMES, PACKAGE_ROOT } from '../constants';
 import { resolveManagedPath } from '../fs';
 import type { CheckResult } from '../types';
 
@@ -27,6 +27,7 @@ const TOKEN_BUDGET = {
   runtimeForgePlanTokens: 3600,
   runtimeForgeCloseTokens: 4200,
   runtimeForgeInitTokens: 3500,
+  runtimeTaskContextTokens: 2200,
 } as const;
 
 const RISK_LEVEL = {
@@ -47,9 +48,11 @@ interface RuntimePathDefinition {
   name: string;
   budget: number;
   files: string[];
-  projectedSkill?: 'forge' | 'status' | 'wrap-up';
+  projectedSkill?: CommandName;
   forbiddenFiles?: string[];
 }
+
+type CommandName = (typeof COMMAND_NAMES)[number];
 
 interface SizingDecisionFixture {
   recommendedSprintCount: number;
@@ -83,7 +86,7 @@ export function runTokenAuditChecks(): CheckResult[] {
 }
 
 function checkCommandRouters(): CheckResult[] {
-  return ['commands/forge.md', 'commands/status.md', 'commands/wrap-up.md'].map((file) => {
+  return COMMAND_NAMES.map((command) => `commands/${command}.md`).map((file) => {
     const weighted = weightPackageFile(file);
     if (weighted.words > TOKEN_BUDGET.commandRouterWords) {
       return warn('token budget: command router', `${file} has ${weighted.words} words`, 'Keep command files as routers; move details into mode/helper files.');
@@ -130,7 +133,7 @@ function checkRuntimeAssetBudget(file: string, budget: number, label: string): C
 }
 
 function checkProjectedSkills(): CheckResult {
-  const skillFiles = ['kyro-forge/SKILL.md', 'kyro-status/SKILL.md', 'kyro-wrap-up/SKILL.md'].map((file) => `${AGENT_SKILLS_ROOT}/${file}`);
+  const skillFiles = COMMAND_NAMES.map((command) => `${AGENT_SKILLS_ROOT}/kyro-${command}/SKILL.md`);
   const existing = skillFiles.filter((file) => existsSync(resolveManagedPath(file)));
   if (existing.length === 0) {
     return warn('token budget: projected skills', 'global Kyro skills are not installed', 'Run kyro install, then kyro doctor --tokens again.');
@@ -292,6 +295,13 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       files: ['commands/wrap-up.md', 'agents/orchestrator.md', 'skills/sprint-forge/SKILL.md', 'skills/sprint-forge/assets/helpers/handoff.md'],
       forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md'],
     },
+    {
+      name: 'runtime path: kyro-task-context',
+      budget: TOKEN_BUDGET.runtimeTaskContextTokens,
+      projectedSkill: 'task-context',
+      files: ['commands/task-context.md', 'agents/orchestrator.md'],
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
+    },
   ];
 }
 
@@ -300,10 +310,10 @@ function heaviestAnalysisHelperPath(): string | null {
   return helper?.path ?? null;
 }
 
-function weightProjectedCommandSkill(command: 'forge' | 'status' | 'wrap-up'): WeightedFile {
+function weightProjectedCommandSkill(command: CommandName): WeightedFile {
   const managedPath = `${AGENT_SKILLS_ROOT}/kyro-${command}/SKILL.md`;
   if (existsSync(resolveManagedPath(managedPath))) return weightManagedFile(managedPath);
-  const title = command === 'wrap-up' ? 'Kyro Wrap-Up' : `Kyro ${command}`;
+  const title = command === 'wrap-up' ? 'Kyro Wrap-Up' : command === 'task-context' ? 'Kyro Task Context' : `Kyro ${command}`;
   const text = `---\nname: kyro-${command}\ndescription: Kyro command stub\n---\n# ${title}\nRead the Kyro command router, then load only the files requested by that router. Do not ask the user to restate the workflow.`;
   return buildWeightedFile(`projected:${command}`, text);
 }

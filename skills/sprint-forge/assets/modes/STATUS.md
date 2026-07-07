@@ -37,7 +37,7 @@ There is no standalone CLI `status` subcommand; this mode backs the `/kyro:statu
 
 ## Health check (optional)
 
-For a deeper read than counts, run `kyro analyze --kyro-scope {scope}` — it surfaces clarity,
+For a deeper read than counts, run `{{KYRO_CLI}} analyze --kyro-scope {scope}` — it surfaces clarity,
 coverage, dependency, and overdue-debt issues with severity. Read-only.
 
 ## Rules

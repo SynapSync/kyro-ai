@@ -103,7 +103,7 @@ Within each scope directory, expect a single source of truth:
 - `archive/sprint-NNN-slug.md` + `archive/sprint-NNN-slug.json` — write-only history of closed sprints
 - `findings/` — INIT analysis evidence
 
-When reviewing, always check that `sprint.json` is present, valid, and synchronized with the code (run `kyro doctor --artifacts`).
+When reviewing, always check that `sprint.json` is present, valid, and synchronized with the code (run `{{KYRO_CLI}} doctor --artifacts`).
 
 Junior development agents (Claude, OpenCode, Codex, or other implementation agents) are expected to update sprint-forge artifacts as the project progresses.
 

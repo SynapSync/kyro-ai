@@ -302,6 +302,8 @@ export interface OperationPlan {
   content?: string;
   blockName?: string;
   jsonPath?: string;
+  /** Literal token -> value replacements applied to `copy` operations at apply time (e.g. `{{KYRO_CLI}}`). */
+  substitutions?: Record<string, string>;
 }
 
 

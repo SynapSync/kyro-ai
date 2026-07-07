@@ -22,6 +22,7 @@ Invoke the command-like skills:
 - `kyro-forge` — route analyze/plan/execute/review/close
 - `kyro-status` — summary-first progress and debt report
 - `kyro-wrap-up` — close session and refresh handoff context
+- `kyro-task-context` — generate a copy-paste prompt for a fresh context
 
 The skills read command routers from `~/.agents/kyro/current/commands/` and then load only the routed mode/helper/template.
 
