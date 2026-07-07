@@ -39,12 +39,13 @@ Legend: `[P]` = safe to run in parallel with sibling `[P]` tasks in the same pha
 
 ## Phase 2 — Invocation resolver + manifest/kyro.json persistence
 
-- [ ] **2.1** Create `src/cli/invocation.ts`: `KYRO_CLI_PLACEHOLDER` const, `KyroInvocation` interface, pure `buildInvocation(kyroOnPath, kyroRoot)`, infra-isolated `isKyroOnPath()` (POSIX `command -v` / win32 `where`, swallow errors), and `resolveKyroInvocation()`.
+- [x] **2.1** Create `src/cli/invocation.ts`: `KYRO_CLI_PLACEHOLDER` const, `KyroInvocation` interface, pure `buildInvocation(kyroOnPath, kyroRoot)`, infra-isolated `isKyroOnPath()` (POSIX `command -v` / win32 `where`, swallow errors), and `resolveKyroInvocation()`.
   - Satisfies: Requirement "All projected CLI references SHALL resolve to a runnable invocation"
-- [ ] **2.2** Extend `src/cli/types.ts`: `KyroManifest.kyroInvocation: string` (schemaVersion stays 1, additive) and `KyroProjectState.kyroInvocation?: string`.
+- [x] **2.2** Extend `src/cli/types.ts`: `KyroManifest.kyroInvocation: string` (schemaVersion stays 1, additive) and `KyroProjectState.kyroInvocation?: string`.
   - Satisfies: same requirement — persistence contract
-- [ ] **2.3** Wire `resolveKyroInvocation()` into `buildInstallPlan` (called once) and `mergeProjectState`, so `manifest.json.kyroInvocation` and `kyro.json.kyroInvocation` are set/refreshed on every install and sync (including upgrades of pre-existing installs).
+- [x] **2.3** Wire `resolveKyroInvocation()` into `buildInstallPlan` (called once) and `mergeProjectState`, so `manifest.json.kyroInvocation` and `kyro.json.kyroInvocation` are set/refreshed on every install and sync (including upgrades of pre-existing installs).
   - Satisfies: Requirement "All projected CLI references SHALL resolve to a runnable invocation" (both resolution scenarios)
+  - Done: `resolveKyroInvocation()` probed once in `buildInstallPlan`, threaded into `mergeProjectState` and the manifest object; `scripts/check-cli-bundle-assets.mjs` extended to assert both persisted fields match and shape-check (`kyro` or `node .../dist/cli.js`).
 
 **Work unit:** one commit — `feat(cli): add kyroInvocation resolver and persist to manifest/kyro.json`. Include a small script or `check:*` snippet asserting the persisted field is present and matches PATH-present vs PATH-absent expectations (design §10.2 step 4 can be stubbed here and completed in Phase 7).
 

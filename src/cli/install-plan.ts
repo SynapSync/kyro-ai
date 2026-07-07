@@ -13,6 +13,7 @@ import {
 import { getAdapterDefinition, getInstalledAdapterDefinitions } from './adapters/registry';
 import { addCopyDirectoryPlan, addCopyFilePlan, listRelativeFiles } from './fs';
 import { readPackageVersion } from './help';
+import { resolveKyroInvocation } from './invocation';
 import { readProjectState } from './state';
 import type { Agent, InstallScope, KyroManifest, KyroProjectState, OperationPlan } from './types';
 
@@ -20,7 +21,10 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   const now = new Date().toISOString();
   const packageVersion = readPackageVersion();
   const runtimeRoot = getKyroRuntimeRoot(packageVersion);
-  const state = mergeProjectState(agents, scope, now, packageVersion);
+  // Probed once per install/sync — projected markdown is static, so the invocation must be
+  // known at copy time. Reused for manifest.json, kyro.json, and (Phase 3+) substitution.
+  const kyroInvocation = resolveKyroInvocation().raw;
+  const state = mergeProjectState(agents, scope, now, packageVersion, kyroInvocation);
   const manifestAgents = state.installedAdapters.map((adapter) => adapter.agent);
   const adapters = state.installedAdapters;
   const managedFiles = buildManagedFiles(manifestAgents, runtimeRoot);
@@ -34,6 +38,7 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
     managedFiles,
     managedBlocks,
     adapters,
+    kyroInvocation,
   };
 
   const plan: OperationPlan[] = [
@@ -66,7 +71,13 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   return plan;
 }
 
-function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: string, runtimeVersion: string): KyroProjectState {
+function mergeProjectState(
+  agents: Agent[],
+  scope: InstallScope,
+  installedAt: string,
+  runtimeVersion: string,
+  kyroInvocation: string,
+): KyroProjectState {
   const existing = readProjectState();
   const defaults: KyroProjectState = {
     schemaVersion: 4,
@@ -100,6 +111,7 @@ function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: st
     runtimeVersion,
     runtimePath: KYRO_ROOT,
     installedAdapters: [...adaptersByAgent.values()].sort((a, b) => a.agent.localeCompare(b.agent)),
+    kyroInvocation,
   };
 }
 
