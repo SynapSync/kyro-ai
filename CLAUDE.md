@@ -18,10 +18,11 @@ User Command (/kyro:forge, /kyro:status, /kyro:wrap-up)
 kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
-├── commands/         # 3 slash commands
+├── commands/         # 4 slash commands
 │   ├── forge.md      # /kyro:forge — full cycle with gates
 │   ├── status.md     # /kyro:status — progress and debt summary
-│   └── wrap-up.md    # /kyro:wrap-up — session closure ritual
+│   ├── wrap-up.md    # /kyro:wrap-up — session closure ritual
+│   └── debate.md     # /kyro:debate — idea maturation pre-scope (optional)
 ├── skills/           # 2 skills
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
@@ -40,6 +41,7 @@ kyro-ai/
 
 - **Rules file**: `.agents/kyro/scopes/rules.md` — persistent learned rules for this project
 - **Sprint output**: `{cwd}/.agents/kyro/scopes/{scope}/` — per-scope sprint documents (where `{scope}` is the work topic, e.g., `oauth-implementation`, `ui-redesign`)
+- **Matured-idea documents**: `.agents/kyro/{docType}/{date}-{slug}.md` — optional pre-scope briefs from `/kyro:debate` (`docType` is one of `plan`, `analysis`, `constitution`). Write-only, never routed. Kept explicitly separate from `kyro.json.principles[]`.
 - **Checkpoint-per-phase**: Sprint file saved after each phase completes
 - **Debt never disappears**: Items are only closed when explicitly resolved
 - **Gates require approval**: Never proceed past a validation gate without user confirmation
