@@ -56,9 +56,9 @@ Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Cont
 
 ## Step 6 — Update kyro.json
 
-**If `.agents/kyro/kyro.json` exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }` (never a bare string — `kyro doctor` fails it). Set `activeScope` if none is active. Use the Artifact Write Contract.
+**If `.agents/kyro/kyro.json` exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }` (never a bare string — `{{KYRO_CLI}} doctor` fails it). Set `activeScope` if none is active. Use the Artifact Write Contract.
 
-**If it does NOT exist:** create it with the COMPLETE v4 shape — every required field, not just `scopes`/`activeScope` (a partial file is flagged by `kyro doctor`). Write exactly:
+**If it does NOT exist:** create it with the COMPLETE v4 shape — every required field, not just `scopes`/`activeScope` (a partial file is flagged by `{{KYRO_CLI}} doctor`). Write exactly:
 
 ```json
 {
@@ -72,12 +72,12 @@ Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Cont
 }
 ```
 
-After creating it, recommend running `kyro install` once to populate `installedAdapters` and runtime paths.
+After creating it, recommend running `{{KYRO_CLI}} install` once to populate `installedAdapters` and runtime paths.
 
 **Optional — seed `principles[]`:** if the user states non-negotiable project rules, add them to
 `kyro.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
 `check` (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`)
-when it maps to the rule, so `kyro analyze` enforces it deterministically.
+when it maps to the rule, so `{{KYRO_CLI}} analyze` enforces it deterministically.
 
 ## Output
 

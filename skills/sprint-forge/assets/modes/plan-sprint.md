@@ -30,7 +30,7 @@ Using the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate
 ## Principles gate (before generating tasks)
 
 - Read `kyro.json.principles[]`. No task may violate a `non-negotiable` principle. For free-text
-  principles, confirm compliance explicitly; for principles with a `check`, `kyro analyze` enforces
+  principles, confirm compliance explicitly; for principles with a `check`, `{{KYRO_CLI}} analyze` enforces
   them and will FAIL on violation. If a principle genuinely must bend, amend it explicitly — never
   ignore it silently.
 
@@ -38,8 +38,8 @@ Using the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate
 
 - If any design-affecting detail is unknown, write `[NEEDS CLARIFICATION: <what is missing>]` in the
   relevant field instead of guessing, and set `handoff.nextAction: "clarify"` to resolve it first.
-- Do NOT generate or finalize tasks while `[NEEDS CLARIFICATION]` markers remain — `kyro doctor` and
-  `kyro analyze` fail on them. Resolve via `clarify.md`, then return here.
+- Do NOT generate or finalize tasks while `[NEEDS CLARIFICATION]` markers remain — `{{KYRO_CLI}} doctor` and
+  `{{KYRO_CLI}} analyze` fail on them. Resolve via `clarify.md`, then return here.
 
 ## Rules
 

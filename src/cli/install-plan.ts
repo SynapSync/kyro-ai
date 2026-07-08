@@ -13,6 +13,7 @@ import {
 import { getAdapterDefinition, getInstalledAdapterDefinitions } from './adapters/registry';
 import { addCopyDirectoryPlan, addCopyFilePlan, listRelativeFiles } from './fs';
 import { readPackageVersion } from './help';
+import { KYRO_CLI_PLACEHOLDER, resolveKyroInvocation } from './invocation';
 import { readProjectState } from './state';
 import type { Agent, InstallScope, KyroManifest, KyroProjectState, OperationPlan } from './types';
 
@@ -20,7 +21,10 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   const now = new Date().toISOString();
   const packageVersion = readPackageVersion();
   const runtimeRoot = getKyroRuntimeRoot(packageVersion);
-  const state = mergeProjectState(agents, scope, now, packageVersion);
+  // Probed once per install/sync — projected markdown is static, so the invocation must be
+  // known at copy time. Reused for manifest.json, kyro.json, and (Phase 3+) substitution.
+  const kyroInvocation = resolveKyroInvocation().raw;
+  const state = mergeProjectState(agents, scope, now, packageVersion, kyroInvocation);
   const manifestAgents = state.installedAdapters.map((adapter) => adapter.agent);
   const adapters = state.installedAdapters;
   const managedFiles = buildManagedFiles(manifestAgents, runtimeRoot);
@@ -34,6 +38,7 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
     managedFiles,
     managedBlocks,
     adapters,
+    kyroInvocation,
   };
 
   const plan: OperationPlan[] = [
@@ -44,11 +49,22 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
     { action: 'write', path: `${runtimeRoot}/KYRO.md`, content: buildKyroBootstrap(runtimeRoot) },
   ];
 
-  addCopyDirectoryPlan(plan, 'agents', `${runtimeRoot}/core/agents`);
+  // Markdown-bearing copies carry the {{KYRO_CLI}} substitution map (design.md §5.3) so every
+  // projected occurrence resolves to the runnable invocation. `commands/` references only slash
+  // commands, never the CLI binary (audit-phase0.md §1), so it stays verbatim.
+  const substitutions = { [KYRO_CLI_PLACEHOLDER]: kyroInvocation };
+  addCopyDirectoryPlan(plan, 'agents', `${runtimeRoot}/core/agents`, substitutions);
   addCopyDirectoryPlan(plan, 'commands', `${runtimeRoot}/commands`);
-  addCopyDirectoryPlan(plan, 'skills', `${runtimeRoot}/skills`);
+  addCopyDirectoryPlan(plan, 'skills', `${runtimeRoot}/skills`, substitutions);
   addCopyFilePlan(plan, 'config.json', `${runtimeRoot}/core/config.json`);
   addCopyFilePlan(plan, 'WORKFLOW.yaml', `${runtimeRoot}/core/WORKFLOW.yaml`);
+
+  // Bundle the CLI itself plus root-layout parity mirrors so PACKAGE_ROOT-relative
+  // reads (readPackageVersion, loadBudgetManifest) resolve identically when the
+  // projected CLI runs from runtimeRoot. See design.md §3 for the asset-parity audit.
+  addCopyDirectoryPlan(plan, 'dist', `${runtimeRoot}/dist`);
+  addCopyFilePlan(plan, 'package.json', `${runtimeRoot}/package.json`);
+  addCopyFilePlan(plan, 'config.json', `${runtimeRoot}/config.json`);
   plan.push({ action: 'symlink', path: KYRO_ROOT, source: runtimeRoot });
 
   for (const adapter of getInstalledAdapterDefinitions(manifestAgents)) {
@@ -59,7 +75,13 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   return plan;
 }
 
-function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: string, runtimeVersion: string): KyroProjectState {
+function mergeProjectState(
+  agents: Agent[],
+  scope: InstallScope,
+  installedAt: string,
+  runtimeVersion: string,
+  kyroInvocation: string,
+): KyroProjectState {
   const existing = readProjectState();
   const defaults: KyroProjectState = {
     schemaVersion: 4,
@@ -93,6 +115,7 @@ function mergeProjectState(agents: Agent[], scope: InstallScope, installedAt: st
     runtimeVersion,
     runtimePath: KYRO_ROOT,
     installedAdapters: [...adaptersByAgent.values()].sort((a, b) => a.agent.localeCompare(b.agent)),
+    kyroInvocation,
   };
 }
 
@@ -108,6 +131,8 @@ function buildManagedFiles(agents: Agent[], runtimeRoot: string): string[] {
   files.push(...listRelativeFiles('agents').map((file) => `${runtimeRoot}/core/agents/${file}`));
   files.push(...listRelativeFiles('commands').map((file) => `${runtimeRoot}/commands/${file}`));
   files.push(...listRelativeFiles('skills').map((file) => `${runtimeRoot}/skills/${file}`));
+  files.push(...listRelativeFiles('dist').map((file) => `${runtimeRoot}/dist/${file}`));
+  files.push(`${runtimeRoot}/package.json`, `${runtimeRoot}/config.json`);
 
   for (const adapter of getInstalledAdapterDefinitions(agents)) {
     files.push(...adapter.buildManagedFiles());

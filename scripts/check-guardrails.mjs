@@ -124,13 +124,22 @@ function assertMcpProjection() {
   mkdirSync(root, { recursive: true });
   mkdirSync(join(root, '.home'), { recursive: true });
   try {
-    const install = run(['install', '--agent', 'codex', '--scope', 'workspace', '--yes'], root);
+    // Pin the invocation to the node fallback: install with a PATH that has no `kyro` binary so
+    // `isKyroOnPath()` is deterministically false, making the projected MCP command stable across
+    // machines (a dev box with a global `kyro` would otherwise emit `command = "node"` vs "kyro").
+    const noKyroPath = join(root, '.home');
+    const install = run(['install', '--agent', 'codex', '--scope', 'workspace', '--yes'], root, { PATH: noKyroPath });
     assert(install.status === 0, `codex install should pass: ${install.stderr || install.stdout}`);
     const configPath = join(root, '.home/.codex/config.toml');
     const first = readFileSync(configPath, 'utf-8');
     assert(first.includes('# kyro-ai:mcp-server-kyro:start'), 'codex MCP block should use TOML-safe hash markers');
-    assert(first.includes('[mcp_servers.kyro]') && first.includes('args = ["mcp", "serve"]'), 'codex MCP block should register kyro mcp serve');
-    const reinstall = run(['install', '--agent', 'codex', '--scope', 'workspace', '--yes'], root);
+    assert(first.includes('[mcp_servers.kyro]'), 'codex MCP block should declare mcp_servers.kyro');
+    assert(first.includes('command = "node"'), 'codex MCP block should register the node fallback command when kyro is off PATH');
+    // The `~` in the invocation is expanded to an absolute path for the MCP registration: codex
+    // spawns the command without a shell, so a literal `~` would not expand and cli.js would not resolve.
+    const expectedCli = join(root, '.home', '.agents/kyro/current/dist/cli.js');
+    assert(first.includes(`args = [${JSON.stringify(expectedCli)},"mcp","serve"]`), `codex MCP block should register the ~-expanded runtime cli.js mcp serve invocation (expected ${expectedCli})`);
+    const reinstall = run(['install', '--agent', 'codex', '--scope', 'workspace', '--yes'], root, { PATH: noKyroPath });
     assert(reinstall.status === 0, 'codex reinstall should pass');
     const second = readFileSync(configPath, 'utf-8');
     assert(second.split('# kyro-ai:mcp-server-kyro:start').length - 1 === 1, 'codex MCP projection should be idempotent');

@@ -1,6 +1,6 @@
 # Commands Reference
 
-Kyro provides 3 slash commands. Each command is now a thin router: it reads structured state first, then loads only the mode/helper/template required for the current action.
+Kyro provides 4 slash commands. Each command is now a thin router: it reads structured state first, then loads only the mode/helper/template required for the current action.
 
 ## Cost-Aware Routing
 
@@ -132,3 +132,19 @@ The status command reads structured state first:
 - `{scope}/sprint.json` for roadmap, active sprint progress, and debt
 
 All metrics come directly from `sprint.json` fields — there are no separate summary files to keep in sync.
+
+---
+
+## /kyro:wrap-up
+
+**Close the current session and refresh `sprint.json.handoff`.**
+
+Reads `.agents/kyro/kyro.json`, resolves the active scope, audits workspace changes, and updates `handoff.nextAction`, `handoff.nextTaskId`, blockers, and the resume note. It asks before commits or user-owned rewrites.
+
+---
+
+## /kyro:task-context
+
+**Generate a copy-paste prompt for continuing Kyro work in a fresh context.**
+
+Reads the active scope, `kyro context-pack`, the current git status, and referenced task/sprint artifacts. It is read-only: it returns one fenced prompt and does not mutate `sprint.json`.

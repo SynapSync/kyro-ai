@@ -24,14 +24,24 @@ export function printPlan(title: string, plan: OperationPlan[]): void {
   }
 }
 
-export function addCopyDirectoryPlan(plan: OperationPlan[], sourceDir: string, targetDir: string): void {
+export function addCopyDirectoryPlan(
+  plan: OperationPlan[],
+  sourceDir: string,
+  targetDir: string,
+  substitutions?: Record<string, string>,
+): void {
   for (const file of listRelativeFiles(sourceDir)) {
-    addCopyFilePlan(plan, `${sourceDir}/${file}`, `${targetDir}/${file}`);
+    addCopyFilePlan(plan, `${sourceDir}/${file}`, `${targetDir}/${file}`, substitutions);
   }
 }
 
-export function addCopyFilePlan(plan: OperationPlan[], source: string, target: string): void {
-  plan.push({ action: 'copy', source, path: target });
+export function addCopyFilePlan(
+  plan: OperationPlan[],
+  source: string,
+  target: string,
+  substitutions?: Record<string, string>,
+): void {
+  plan.push({ action: 'copy', source, path: target, ...(substitutions ? { substitutions } : {}) });
 }
 
 export function listRelativeFiles(sourceDir: string): string[] {

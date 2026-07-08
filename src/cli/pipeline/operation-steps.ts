@@ -80,7 +80,16 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
   } else if (operation.action === 'copy') {
     if (!operation.source) throw new Error(`Copy operation missing source for ${operation.path}`);
     mkdirSync(dirname(target), { recursive: true });
-    copyFileSync(resolve(context.packageRoot, operation.source), target);
+    const src = resolve(context.packageRoot, operation.source);
+    if (operation.substitutions) {
+      let text = readFileSync(src, 'utf-8');
+      for (const [token, value] of Object.entries(operation.substitutions)) {
+        text = text.split(token).join(value);
+      }
+      writeFileSync(target, text, 'utf-8');
+    } else {
+      copyFileSync(src, target);
+    }
   } else if (operation.action === 'remove') {
     rmSync(target, { recursive: true, force: true });
   } else if (operation.action === 'rmdir-if-empty') {

@@ -41,5 +41,5 @@ Conventions are already in context — every mode reads `sprint.json`, which con
 - Never add duplicates. Check existing `conventions[]` before proposing.
 - Conventions must be specific and actionable.
 - Conventions from user corrections have higher confidence than proactive suggestions.
-- Keep the list lean — consolidate overlapping rules rather than accumulating noise (token budget is enforced by `kyro doctor`).
-- A bare string in `conventions[]` is schema drift and `kyro doctor` will fail it.
+- Keep the list lean — consolidate overlapping rules rather than accumulating noise (token budget is enforced by `{{KYRO_CLI}} doctor`).
+- A bare string in `conventions[]` is schema drift and `{{KYRO_CLI}} doctor` will fail it.

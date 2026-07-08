@@ -49,6 +49,8 @@ export interface KyroProjectState {
   installedAdapters: KyroInstalledAdapter[];
   /** Optional project-level principles (v4.1+). Absent in pre-4.1 files. */
   principles?: Principle[];
+  /** Resolved CLI invocation (v4.2+). Absent in pre-4.2 files until the next install/sync. */
+  kyroInvocation?: string;
 }
 
 // --- v4 sprint.json model (single source of truth per scope) ---
@@ -251,6 +253,7 @@ export interface KyroManifest {
   managedFiles: string[];
   managedBlocks: string[];
   adapters: KyroInstalledAdapter[];
+  kyroInvocation: string;
 }
 
 export interface CliOptions {
@@ -299,6 +302,8 @@ export interface OperationPlan {
   content?: string;
   blockName?: string;
   jsonPath?: string;
+  /** Literal token -> value replacements applied to `copy` operations at apply time (e.g. `{{KYRO_CLI}}`). */
+  substitutions?: Record<string, string>;
 }
 
 

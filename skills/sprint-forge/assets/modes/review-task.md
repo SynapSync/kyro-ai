@@ -14,8 +14,8 @@ Validate completed work and record the verdict through the Kyro checker tool.
 2. Run the relevant checks for the touched area.
 3. Classify findings as critical, warning, or suggestion. Critical issues block completion.
 4. Let the tool own the verdict write:
-   - Passing review: `kyro review <task-id> --kyro-scope <scope> --verdict pass --yes`
-   - Failing review: `kyro review <task-id> --kyro-scope <scope> --verdict fail --finding critical:"<detail>" --yes`
+   - Passing review: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict pass --yes`
+   - Failing review: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict fail --finding critical:"<detail>" --yes`
    - Use `--by <actor-id>` when the checker actor id is known.
 5. If the tool refuses a pass, treat the refusal as a blocking checker finding and route back to execution.
 
@@ -23,7 +23,7 @@ Validate completed work and record the verdict through the Kyro checker tool.
 
 - Before passing a task, confirm its change does not violate a `non-negotiable` principle in
   `kyro.json.principles[]`. A violation is a `fail` finding, not a suggestion.
-- `kyro review` deterministically vetoes a pass when evidence is malformed, checked criteria do
+- `{{KYRO_CLI}} review` deterministically vetoes a pass when evidence is malformed, checked criteria do
   not cover the task acceptance criteria, a non-negotiable principle gate is violated, the verdict
   predates evidence, or policy forbids self-review.
 

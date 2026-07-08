@@ -36,7 +36,7 @@ export function getCommandSkillPathForRoot(command: KyroCommandName, skillsRoot:
 }
 
 function buildCommandSkill(command: KyroCommandName): string {
-  const title = command === 'wrap-up' ? 'Kyro Wrap-Up' : `Kyro ${capitalize(command)}`;
+  const title = getCommandTitle(command);
   const description = getCommandDescription(command);
   return `---\nname: kyro-${command}\ndescription: ${description}\nlicense: Apache-2.0\nmetadata:\n  author: synapsync\n  version: "1.0"\n  scope: [root]\n---\n\n# ${title}\n\nCommand stub. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`, then load only the files that router requests.\n\nRuntime: \`${KYRO_ROOT}/\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nDo not ask the user to restate this workflow in natural language.\n`;
 }
@@ -44,9 +44,12 @@ function buildCommandSkill(command: KyroCommandName): string {
 function getCommandDescription(command: KyroCommandName): string {
   if (command === 'forge') return 'Run the Kyro forge workflow through the installed workspace harness';
   if (command === 'status') return 'Show Kyro project status through the installed workspace harness';
-  return 'Close the Kyro session through the installed workspace harness';
+  if (command === 'wrap-up') return 'Close the Kyro session through the installed workspace harness';
+  return 'Generate a fresh-context prompt for continuing Kyro work';
 }
 
-function capitalize(value: string): string {
-  return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
+function getCommandTitle(command: KyroCommandName): string {
+  if (command === 'wrap-up') return 'Kyro Wrap-Up';
+  if (command === 'task-context') return 'Kyro Task Context';
+  return `Kyro ${command.slice(0, 1).toUpperCase()}${command.slice(1)}`;
 }

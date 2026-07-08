@@ -21,6 +21,6 @@ Execute the active sprint task by task, recording evidence directly into `sprint
 
 - One safe-write per task transition; never partial-edit the JSON.
 - Evidence lives on the task object in `sprint.json`; create no other files.
-- Do not write `task.verdict` as the maker. The checker verdict is tool-owned by `kyro review`.
+- Do not write `task.verdict` as the maker. The checker verdict is tool-owned by `{{KYRO_CLI}} review`.
 - Do not introduce new project patterns without justification.
 - If task analysis reveals the plan is wrong, set the task `blocked`, note the mismatch, and set `handoff.nextAction: "plan_sprint"` to route back.

@@ -12,3 +12,4 @@ dist/
 /.agents/
 .claude-plugin/
 .cursor/
+openspec/
