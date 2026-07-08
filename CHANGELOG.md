@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [4.13.0] - 2026-07-08
+
+### Changed
+
+- Installer/runtime projection now keeps a single active runtime at `~/.agents/kyro/current/`.
+  Reinstalling or syncing replaces that runtime and removes the retired
+  `~/.agents/kyro/versions/` layout instead of retaining multiple bundled CLI copies.
+- `kyro sync --prune` now focuses on obsolete adapter-owned entrypoint files; legacy
+  versioned runtime directories are cleaned automatically by install/sync.
+
 ## [4.12.0] - 2026-07-07
 
 **Bundled runtime CLI.** The Kyro CLI now ships inside the projected runtime, so workflow steps (`close-sprint`, `analyze`, …) run without a `kyro` binary on PATH. Agents installed via `npx kyro-ai install` previously received the markdown runtime but no executable and blocked at CLI-owned steps; the runtime is now self-contained.

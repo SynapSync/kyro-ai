@@ -295,7 +295,7 @@ export interface BudgetClassDefinition {
 export type BudgetManifest = Record<BudgetClassId, BudgetClassDefinition>;
 
 export interface OperationPlan {
-  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'symlink' | 'merge-json' | 'remove-json-key';
+  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'merge-json' | 'remove-json-key';
   commentStyle?: 'html' | 'hash';
   path: string;
   source?: string;

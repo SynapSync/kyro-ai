@@ -15,8 +15,6 @@ import { join, resolve } from 'node:path';
 
 const repo = resolve(new URL('..', import.meta.url).pathname);
 const require = createRequire(import.meta.url);
-const packageJson = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf-8'));
-const version = packageJson.version;
 
 const PLACEHOLDER = '{{KYRO_CLI}}';
 // Matches a backtick- or code-fence-wrapped bare `kyro <subcommand>` invocation. Deliberately
@@ -90,11 +88,11 @@ withWorkspace('kyro-no-placeholder-', (cwd) => {
   );
 
   const home = join(cwd, '.home');
-  const versionDir = join(home, '.agents', 'kyro', 'versions', version);
+  const runtimeDir = join(home, '.agents', 'kyro', 'current');
   const projectedRoots = [
-    join(versionDir, 'skills'),
-    join(versionDir, 'commands'),
-    join(versionDir, 'core', 'agents'),
+    join(runtimeDir, 'skills'),
+    join(runtimeDir, 'commands'),
+    join(runtimeDir, 'core', 'agents'),
   ];
 
   for (const root of projectedRoots) {

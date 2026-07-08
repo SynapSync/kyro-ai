@@ -96,11 +96,6 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
     if (existsSync(target) && lstatSync(target).isDirectory() && readdirSync(target).length === 0) {
       rmdirSync(target);
     }
-  } else if (operation.action === 'symlink') {
-    if (!operation.source) throw new Error(`Symlink operation missing source for ${operation.path}`);
-    mkdirSync(dirname(target), { recursive: true });
-    rmSync(target, { recursive: true, force: true });
-    symlinkSync(context.resolveManagedPath(operation.source), target, 'dir');
   } else if (operation.action === 'upsert-block') {
     if (!operation.blockName) throw new Error(`Block operation missing blockName for ${operation.path}`);
     mkdirSync(dirname(target), { recursive: true });

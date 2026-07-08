@@ -56,7 +56,7 @@ export function sync(options: CliOptions): void {
         console.log('  No prunable drift found. Shared config was preserved.');
       }
     } else if (hasPrunableDrift(drift)) {
-      console.log('  Tip: run with --prune to clean stale versions and orphaned files.');
+      console.log('  Tip: run with --prune to clean obsolete adapter-owned files.');
     }
   }
 

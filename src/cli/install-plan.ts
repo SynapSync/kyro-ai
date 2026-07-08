@@ -3,12 +3,12 @@ import {
   ARTIFACT_ROOT,
   KYRO_COMMANDS_ROOT,
   KYRO_CORE_ROOT,
+  KYRO_LEGACY_VERSIONS_ROOT,
   KYRO_MANIFEST_PATH,
   KYRO_ROOT,
   KYRO_SKILLS_ROOT,
   KYRO_STATE_PATH,
   WORKFLOW_NAME,
-  getKyroRuntimeRoot,
 } from './constants';
 import { getAdapterDefinition, getInstalledAdapterDefinitions } from './adapters/registry';
 import { addCopyDirectoryPlan, addCopyFilePlan, listRelativeFiles } from './fs';
@@ -20,7 +20,7 @@ import type { Agent, InstallScope, KyroManifest, KyroProjectState, OperationPlan
 export function buildInstallPlan(agents: Agent[], scope: InstallScope): OperationPlan[] {
   const now = new Date().toISOString();
   const packageVersion = readPackageVersion();
-  const runtimeRoot = getKyroRuntimeRoot(packageVersion);
+  const runtimeRoot = KYRO_ROOT;
   // Probed once per install/sync — projected markdown is static, so the invocation must be
   // known at copy time. Reused for manifest.json, kyro.json, and (Phase 3+) substitution.
   const kyroInvocation = resolveKyroInvocation().raw;
@@ -44,9 +44,12 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   const plan: OperationPlan[] = [
     { action: 'mkdir', path: ARTIFACT_ROOT },
     { action: 'write', path: KYRO_STATE_PATH, content: `${JSON.stringify(state, null, 2)}\n` },
+    // Single-active runtime: replace the active runtime directory on every install/sync so
+    // re-installs are idempotent and untracked files from older package layouts cannot accumulate.
+    { action: 'remove', path: runtimeRoot },
     { action: 'mkdir', path: runtimeRoot },
     { action: 'write', path: `${runtimeRoot}/manifest.json`, content: `${JSON.stringify(manifest, null, 2)}\n` },
-    { action: 'write', path: `${runtimeRoot}/KYRO.md`, content: buildKyroBootstrap(runtimeRoot) },
+    { action: 'write', path: `${runtimeRoot}/KYRO.md`, content: buildKyroBootstrap(packageVersion, runtimeRoot) },
   ];
 
   // Markdown-bearing copies carry the {{KYRO_CLI}} substitution map (design.md §5.3) so every
@@ -65,7 +68,8 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   addCopyDirectoryPlan(plan, 'dist', `${runtimeRoot}/dist`);
   addCopyFilePlan(plan, 'package.json', `${runtimeRoot}/package.json`);
   addCopyFilePlan(plan, 'config.json', `${runtimeRoot}/config.json`);
-  plan.push({ action: 'symlink', path: KYRO_ROOT, source: runtimeRoot });
+  // Clean the retired multi-version runtime root. Kyro now keeps only one active runtime.
+  plan.push({ action: 'remove', path: KYRO_LEGACY_VERSIONS_ROOT });
 
   for (const adapter of getInstalledAdapterDefinitions(manifestAgents)) {
     adapter.buildProjection(plan);
@@ -141,8 +145,8 @@ function buildManagedFiles(agents: Agent[], runtimeRoot: string): string[] {
   return [...new Set(files)].sort();
 }
 
-function buildKyroBootstrap(runtimeRoot: string): string {
-  return `# Kyro Global Runtime\n\nThis directory is managed by Kyro.\n\n- Runtime version path: \`${runtimeRoot}/\`\n- Current runtime: \`${KYRO_ROOT}/\`\n- Core assets: \`${KYRO_CORE_ROOT}/\`\n- Commands: \`${KYRO_COMMANDS_ROOT}/\`\n- Skills: \`${KYRO_SKILLS_ROOT}/\`\n- Global command skills: \`${AGENT_SKILLS_ROOT}/\`\n- Project state: \`${KYRO_STATE_PATH}\` in the active project\n\nUse installed global command skills when available. Do not require users to invoke Kyro workflows through natural-language fallbacks unless the host agent has no native command or skill mechanism.\n`;
+function buildKyroBootstrap(packageVersion: string, runtimeRoot: string): string {
+  return `# Kyro Global Runtime\n\nThis directory is managed by Kyro.\n\n- Package version: \`${packageVersion}\`\n- Runtime path: \`${runtimeRoot}/\`\n- Core assets: \`${KYRO_CORE_ROOT}/\`\n- Commands: \`${KYRO_COMMANDS_ROOT}/\`\n- Skills: \`${KYRO_SKILLS_ROOT}/\`\n- Global command skills: \`${AGENT_SKILLS_ROOT}/\`\n- Project state: \`${KYRO_STATE_PATH}\` in the active project\n\nUse installed global command skills when available. Do not require users to invoke Kyro workflows through natural-language fallbacks unless the host agent has no native command or skill mechanism.\n`;
 }
 
 function buildManagedBlocks(agents: Agent[]): string[] {

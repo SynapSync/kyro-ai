@@ -79,29 +79,34 @@ If the host exposes slash commands, the equivalent public command namespace is:
 
 Kyro separates global runtime from project state. Runtime files live in your user-level agents directory; project files keep only state and artifacts.
 
-Global runtime:
+Global runtime (single active version only):
 
 ```text
 ~/.agents/
 ├── kyro/
-│   ├── versions/
-│   │   └── {version}/
-│   │       ├── core/
-│   │       │   ├── agents/
-│   │       │   ├── config.json
-│   │       │   └── WORKFLOW.yaml
-│   │       ├── commands/
-│   │       ├── skills/
-│   │       │   ├── sprint-forge/
-│   │       │   └── qa-review/
-│   │       ├── KYRO.md
-│   │       └── manifest.json
-│   └── current -> versions/{version}
+│   └── current/
+│       ├── core/
+│       │   ├── agents/
+│       │   ├── config.json
+│       │   └── WORKFLOW.yaml
+│       ├── commands/
+│       ├── skills/
+│       │   ├── sprint-forge/
+│       │   └── qa-review/
+│       ├── dist/
+│       ├── package.json
+│       ├── config.json
+│       ├── KYRO.md
+│       └── manifest.json
 └── skills/
     ├── kyro-forge/SKILL.md
     ├── kyro-status/SKILL.md
     └── kyro-wrap-up/SKILL.md
 ```
+
+Installing or syncing a new package version replaces `~/.agents/kyro/current/`
+and removes the retired `~/.agents/kyro/versions/` layout. Kyro does not keep a
+local history of runtime versions or old bundled binaries.
 
 Project state and artifacts (v4 — one `sprint.json` per scope):
 

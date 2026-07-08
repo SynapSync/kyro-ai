@@ -1,30 +1,30 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { KYRO_GLOBAL_ROOT } from './constants';
+import { KYRO_LEGACY_VERSIONS_ROOT } from './constants';
 import { resolveManagedPath } from './fs';
 import { readManifest } from './state';
 import type { KyroManifest, OperationPlan } from './types';
 
 export interface DriftReport {
   currentVersion: string;
-  staleVersions: StaleVersion[];
+  legacyRuntimeDirs: LegacyRuntimeDir[];
   orphanedFiles: string[];
   preservedSharedConfig: string[];
 }
 
-export interface StaleVersion {
-  version: string;
+export interface LegacyRuntimeDir {
+  name: string;
   path: string;
 }
 
 export function analyzeDrift(currentVersion: string, currentManagedFiles: string[]): DriftReport {
   const oldManifest = readManifest();
-  const staleVersions = detectStaleVersions(currentVersion);
+  const legacyRuntimeDirs = detectLegacyRuntimeDirs();
   const orphaned = oldManifest ? detectOrphanedFiles(oldManifest, currentManagedFiles) : { prunable: [], preservedSharedConfig: [] };
 
   return {
     currentVersion,
-    staleVersions,
+    legacyRuntimeDirs,
     orphanedFiles: orphaned.prunable,
     preservedSharedConfig: orphaned.preservedSharedConfig,
   };
@@ -38,21 +38,21 @@ export function managedFilesFromInstallPlan(plan: OperationPlan[]): string[] {
 }
 
 export function hasDrift(report: DriftReport): boolean {
-  return report.staleVersions.length > 0 || report.orphanedFiles.length > 0 || report.preservedSharedConfig.length > 0;
+  return report.legacyRuntimeDirs.length > 0 || report.orphanedFiles.length > 0 || report.preservedSharedConfig.length > 0;
 }
 
 export function hasPrunableDrift(report: DriftReport): boolean {
-  return report.staleVersions.length > 0 || report.orphanedFiles.length > 0;
+  return report.orphanedFiles.length > 0;
 }
 
 export function printDriftReport(report: DriftReport): void {
   if (!hasDrift(report)) return;
 
   console.log('Drift analysis:');
-  if (report.staleVersions.length > 0) {
-    console.log(`  Stale runtime versions (use --prune to clean):`);
-    for (const stale of report.staleVersions) {
-      console.log(`    - ${stale.version} at ${stale.path}`);
+  if (report.legacyRuntimeDirs.length > 0) {
+    console.log(`  Legacy versioned runtime directories (cleaned automatically by install/sync):`);
+    for (const legacy of report.legacyRuntimeDirs) {
+      console.log(`    - ${legacy.name} at ${legacy.path}`);
     }
   }
   if (report.orphanedFiles.length > 0) {
@@ -78,10 +78,6 @@ export function printDriftReport(report: DriftReport): void {
 export function buildPrunePlan(report: DriftReport): OperationPlan[] {
   const plan: OperationPlan[] = [];
 
-  for (const stale of report.staleVersions) {
-    plan.push({ action: 'remove', path: stale.path });
-  }
-
   const dirsToClean = new Set<string>();
   for (const file of report.orphanedFiles) {
     plan.push({ action: 'remove', path: file });
@@ -106,23 +102,23 @@ export function printPrunePlan(plan: OperationPlan[]): void {
   }
 }
 
-function detectStaleVersions(currentVersion: string): StaleVersion[] {
-  const versionsDir = resolveManagedPath(`${KYRO_GLOBAL_ROOT}/versions`);
+function detectLegacyRuntimeDirs(): LegacyRuntimeDir[] {
+  const versionsDir = resolveManagedPath(KYRO_LEGACY_VERSIONS_ROOT);
   if (!existsSync(versionsDir)) return [];
 
   const entries = readdirSync(versionsDir).filter((entry) => {
     const fullPath = `${versionsDir}/${entry}`;
     try {
-      return statSync(fullPath).isDirectory() && entry !== currentVersion;
+      return statSync(fullPath).isDirectory();
     } catch {
       return false;
     }
   });
 
-  return entries.map((version) => ({
-    version,
-    path: `${KYRO_GLOBAL_ROOT}/versions/${version}`,
-  })).sort((a, b) => b.version.localeCompare(a.version));
+  return entries.map((name) => ({
+    name,
+    path: `${KYRO_LEGACY_VERSIONS_ROOT}/${name}`,
+  })).sort((a, b) => b.name.localeCompare(a.name));
 }
 
 function detectOrphanedFiles(oldManifest: KyroManifest, currentManagedFiles: string[]): { prunable: string[]; preservedSharedConfig: string[] } {
