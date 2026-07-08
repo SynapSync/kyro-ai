@@ -13,8 +13,8 @@ export interface KyroInvocation {
 
 /**
  * Pure: no I/O. Given whether `kyro` resolves on PATH and the runtime root to fall back to,
- * produces the invocation value. `kyroRoot` should be the `current` symlink path (never a
- * pinned `versions/{v}` path) so persisted invocations survive version bumps.
+ * produces the invocation value. `kyroRoot` is the single active runtime path, so persisted
+ * invocations survive package updates without pinning historical version directories.
  */
 export function buildInvocation(kyroOnPath: boolean, kyroRoot: string): KyroInvocation {
   if (kyroOnPath) {

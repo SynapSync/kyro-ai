@@ -40,10 +40,14 @@ function main() {
   cpSync(resolve(repo, 'fixtures/evals/close-sprint-happy/state'), workspace, { recursive: true });
 
   // Install pins the fallback: a PATH with neither `kyro` nor `node` makes `isKyroOnPath()` false.
-  const installEnv = { HOME: home, PATH: noKyroBin, NODE_ENV: process.env.NODE_ENV ?? '' };
+  const inheritedEnv = {
+    NODE_ENV: process.env.NODE_ENV ?? '',
+    ...(process.env.OPENSSL_CONF ? { OPENSSL_CONF: process.env.OPENSSL_CONF } : {}),
+  };
+  const installEnv = { ...inheritedEnv, HOME: home, PATH: noKyroBin };
   // The workflow run needs `node` resolvable (as a real agent's shell has), but crucially NO
   // `kyro` binary — so the projected `node {runtimeRoot}/dist/cli.js` invocation is what runs.
-  const runEnv = { HOME: home, PATH: `${dirname(process.execPath)}:${noKyroBin}`, NODE_ENV: process.env.NODE_ENV ?? '' };
+  const runEnv = { ...inheritedEnv, HOME: home, PATH: `${dirname(process.execPath)}:${noKyroBin}` };
 
   try {
     // 1. Install from the built package with a PATH stripped of `kyro`.
@@ -55,7 +59,7 @@ function main() {
     assert(install.status === 0, `check-cli-bundle: install should exit 0: ${install.stderr || install.stdout}`);
 
     // 2. kyroInvocation must be the node fallback form in BOTH manifest and kyro.json.
-    const runtimeRoot = join(home, '.agents', 'kyro', 'versions', version);
+    const runtimeRoot = join(home, '.agents', 'kyro', 'current');
     const manifest = JSON.parse(readFileSync(join(runtimeRoot, 'manifest.json'), 'utf-8'));
     const state = JSON.parse(readFileSync(join(workspace, '.agents', 'kyro', 'kyro.json'), 'utf-8'));
     const fallbackShape = /^node .+\/dist\/cli\.js$/;
@@ -66,6 +70,7 @@ function main() {
     for (const relative of ['dist/cli.js', 'package.json', 'config.json', 'skills/sprint-forge/SKILL.md']) {
       assert(existsSync(join(runtimeRoot, relative)), `check-cli-bundle: missing projected ${relative}`);
     }
+    assert(!existsSync(join(home, '.agents', 'kyro', 'versions')), 'check-cli-bundle: legacy versions root should not remain after install');
     // 4. No projected file leaks the raw placeholder.
     assertNoPlaceholderLeak(runtimeRoot);
 

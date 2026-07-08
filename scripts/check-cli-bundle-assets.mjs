@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -9,8 +9,6 @@ import { join, resolve } from 'node:path';
 
 const repo = resolve(new URL('..', import.meta.url).pathname);
 const require = createRequire(import.meta.url);
-const packageJson = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf-8'));
-const version = packageJson.version;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -62,23 +60,24 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
   );
 
   const home = join(cwd, '.home');
-  const versionDir = join(home, '.agents', 'kyro', 'versions', version);
-  const manifestPath = join(versionDir, 'manifest.json');
+  const runtimeDir = join(home, '.agents', 'kyro', 'current');
+  const manifestPath = join(runtimeDir, 'manifest.json');
   assert(existsSync(manifestPath), `check-cli-bundle-assets: missing ${manifestPath}`);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
 
   const projected = ['dist/cli.js', 'package.json', 'config.json'];
   for (const relative of projected) {
-    const absolute = join(versionDir, relative);
+    const absolute = join(runtimeDir, relative);
     assert(existsSync(absolute), `check-cli-bundle-assets: missing projected ${relative}`);
   }
+  assert(!existsSync(join(home, '.agents', 'kyro', 'versions')), 'check-cli-bundle-assets: legacy versions root should not remain after install');
 
   const managedRelative = ['package.json', 'config.json'];
   for (const relative of managedRelative) {
-    const managedPath = `~/.agents/kyro/versions/${version}/${relative}`;
+    const managedPath = `~/.agents/kyro/current/${relative}`;
     assert(manifest.managedFiles.includes(managedPath), `check-cli-bundle-assets: manifest.managedFiles missing ${managedPath}`);
   }
-  const managedDistCli = `~/.agents/kyro/versions/${version}/dist/cli.js`;
+  const managedDistCli = `~/.agents/kyro/current/dist/cli.js`;
   assert(manifest.managedFiles.includes(managedDistCli), `check-cli-bundle-assets: manifest.managedFiles missing ${managedDistCli}`);
 
   // Phase 2 (design.md §4 / tasks.md 2.x): kyroInvocation must be persisted to both
@@ -93,6 +92,32 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
   const state = JSON.parse(readFileSync(statePath, 'utf-8'));
   assert(typeof state.kyroInvocation === 'string', 'check-cli-bundle-assets: kyro.json missing kyroInvocation');
   assert(state.kyroInvocation === manifest.kyroInvocation, 'check-cli-bundle-assets: kyro.json.kyroInvocation does not match manifest.json.kyroInvocation');
+
+  const strayRuntimeFile = join(runtimeDir, 'stray-old-binary.js');
+  const legacyVersionDir = join(home, '.agents', 'kyro', 'versions', '0.0.0');
+  writeFileSync(strayRuntimeFile, '// stale untracked runtime file', 'utf-8');
+  mkdirSync(legacyVersionDir, { recursive: true });
+  writeFileSync(join(legacyVersionDir, 'dist-cli.js'), '// stale versioned binary', 'utf-8');
+
+  captureLogs(() =>
+    install({
+      agents: [],
+      scope: 'workspace',
+      dryRun: false,
+      yes: true,
+      help: false,
+      tokens: false,
+      artifacts: false,
+      adapters: false,
+      kyroScope: null,
+      json: false,
+      purgeAdapterAssets: false,
+      prune: false,
+    }),
+  );
+  assert(!existsSync(strayRuntimeFile), 'check-cli-bundle-assets: reinstall should replace active runtime instead of accumulating stray files');
+  assert(!existsSync(legacyVersionDir), 'check-cli-bundle-assets: reinstall should remove legacy versioned runtime directories');
+  assert(existsSync(manifestPath), 'check-cli-bundle-assets: manifest should still exist after reinstall');
 });
 
 console.log('check:cli-bundle-assets — dist/package.json/config.json are projected and managed');

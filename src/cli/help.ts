@@ -35,7 +35,7 @@ Options:
   --json                       Print machine-readable output where supported
   --verbosity <level>          Output depth for context-pack: concise or detailed (default)
   --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
-  --prune                      Clean stale runtime versions and orphaned managed files (sync only)
+  --prune                      Clean obsolete adapter-owned files during sync
   --dry-run                    Preview changes
   --yes, -y, --confirm         Skip confirmation prompts where available
   --help, -h                   Show help

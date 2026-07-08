@@ -34,8 +34,14 @@ Global runtime:
 ├── commands/
 ├── core/
 ├── skills/
+├── dist/
+├── package.json
+├── config.json
 └── manifest.json
 ```
+
+Kyro keeps only this active runtime. Reinstalling or upgrading replaces
+`current/`; old versioned runtime folders are cleaned instead of retained.
 
 Global command skills:
 

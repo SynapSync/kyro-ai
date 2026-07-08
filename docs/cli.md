@@ -65,19 +65,24 @@ See [`docs/release-checklist.md`](release-checklist.md) for the maintainer-facin
 
 The default install scope is `workspace`, but Kyro now separates global runtime from project state.
 
-Global runtime files are installed once per Kyro version:
+Global runtime files are installed as a single active runtime:
 
 ```text
 ~/.agents/kyro/
-├── versions/
-│   └── {version}/
-│       ├── core/
-│       ├── commands/
-│       ├── skills/
-│       ├── KYRO.md
-│       └── manifest.json
-└── current -> versions/{version}
+└── current/
+    ├── core/
+    ├── commands/
+    ├── skills/
+    ├── dist/
+    ├── package.json
+    ├── config.json
+    ├── KYRO.md
+    └── manifest.json
 ```
+
+Installing or syncing replaces `~/.agents/kyro/current/` with the current
+package assets and removes the retired `~/.agents/kyro/versions/` layout. Kyro
+does not keep local runtime-version history or old bundled binaries.
 
 Global command skills are installed for agent discovery:
 
@@ -257,9 +262,12 @@ kyro sync --agent codex --dry-run
 
 ### Drift And Prune
 
-`kyro sync` reports drift when old manifests point to stale runtime versions or obsolete Kyro-owned adapter entrypoint files.
+`kyro sync` reports drift when a retired versioned runtime layout is still on
+disk or old manifests point to obsolete Kyro-owned adapter entrypoint files.
+Retired runtime directories are removed automatically by install/sync because
+Kyro keeps only one active runtime.
 
-Use prune to clean drift during sync:
+Use prune to clean obsolete adapter-owned files during sync:
 
 ```bash
 kyro sync --prune
@@ -267,7 +275,6 @@ kyro sync --prune
 
 `--prune` may remove:
 
-- stale runtime version directories under `~/.agents/kyro/versions/`, except the current package version.
 - obsolete Kyro-owned adapter entrypoint files previously declared by old manifests:
   - `~/.agents/skills/kyro-*`
   - `~/.config/opencode/skills/kyro-*`
@@ -281,7 +288,7 @@ kyro sync --prune
 
 If an old manifest lists shared config, sync reports it under `Shared config preserved` instead of pruning it.
 
-`--prune` is different from `kyro uninstall --purge-adapter-assets`. Prune cleans sync drift by comparing old manifests against the current install plan. Purge removes adapter entrypoint files during uninstall for adapters recorded in the installed project state. Neither mode removes shared user config.
+`--prune` is different from `kyro uninstall --purge-adapter-assets`. Prune cleans adapter-file drift by comparing old manifests against the current install plan. Purge removes adapter entrypoint files during uninstall for adapters recorded in the installed project state. Neither mode removes shared user config.
 
 ## Claude Plugin Support
 

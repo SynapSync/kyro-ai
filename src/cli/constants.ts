@@ -24,12 +24,9 @@ export const KYRO_STATE_PATH = `${KYRO_PROJECT_ROOT}/kyro.json`;
 export const GLOBAL_AGENTS_ROOT = '~/.agents';
 export const KYRO_GLOBAL_ROOT = `${GLOBAL_AGENTS_ROOT}/kyro`;
 export const KYRO_ROOT = `${KYRO_GLOBAL_ROOT}/current`;
+export const KYRO_LEGACY_VERSIONS_ROOT = `${KYRO_GLOBAL_ROOT}/versions`;
 export const KYRO_CORE_ROOT = `${KYRO_ROOT}/core`;
 export const KYRO_COMMANDS_ROOT = `${KYRO_ROOT}/commands`;
 export const KYRO_SKILLS_ROOT = `${KYRO_ROOT}/skills`;
 export const AGENT_SKILLS_ROOT = `${GLOBAL_AGENTS_ROOT}/skills`;
 export const KYRO_MANIFEST_PATH = `${KYRO_ROOT}/manifest.json`;
-
-export function getKyroRuntimeRoot(version: string): string {
-  return `${KYRO_GLOBAL_ROOT}/versions/${version}`;
-}
