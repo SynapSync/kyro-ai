@@ -174,9 +174,14 @@ function expandHome(segment: string): string {
 function checkCliInvocation(): CheckResult {
   const remedy = 'Re-run kyro install (or kyro sync) so the runtime CLI is projected and the invocation is refreshed.';
   try {
-    // Prefer the persisted invocation; fall back to a live resolve for legacy manifests.
     const manifest = readManifest();
-    const raw = manifest?.kyroInvocation ?? resolveKyroInvocation().raw;
+    if (!manifest) {
+      // No manifest → no installed runtime. checkGlobalRuntime already reports this as a
+      // warning. Don't speculate with resolveKyroInvocation() — the path won't exist.
+      return { status: 'warn', name: 'CLI invocation', detail: `${KYRO_MANIFEST_PATH} not found`, remedy };
+    }
+    // Prefer the persisted invocation; fall back to a live resolve for legacy manifests.
+    const raw = manifest.kyroInvocation ?? resolveKyroInvocation().raw;
     // The invocation is a shell string (e.g. `node ~/.agents/kyro/current/dist/cli.js`), not a
     // bare binary — split into command + args and expand `~` before exec, which does neither.
     const [command, ...args] = raw.trim().split(/\s+/).map(expandHome);
