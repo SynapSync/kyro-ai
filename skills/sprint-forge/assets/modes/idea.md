@@ -1,12 +1,12 @@
-# Debate Mode — Idea Maturation Pre-Scope
+# Idea Mode — Idea Maturation Pre-Scope
 
 Mature a rough idea into a structured brief through a bounded, one-at-a-time conversation. Unlike `clarify.md` (which resolves ambiguity in an *existing* scope's `sprint.json`), this mode runs *before* any scope exists and produces one standalone markdown document as evidence, never touching `sprint.json` or `kyro.json`.
 
-Routed when `/kyro:debate` is invoked (pre-scope, direct command route — not a `handoff.nextAction` value).
+Routed when `/kyro:idea` is invoked (pre-scope, direct command route — not a `handoff.nextAction` value).
 
 ## Inputs
 
-1. A rough one-line idea from the user (argument passed by `commands/debate.md`).
+1. A rough one-line idea from the user (argument passed by `commands/idea.md`).
 2. No prior files to read (no scope, no `sprint.json`, no `kyro.json`).
 
 ## The maturation loop

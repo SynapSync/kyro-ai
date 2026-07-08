@@ -16,7 +16,7 @@ commands:
   - status # Project progress and technical debt summary
   - wrap-up # End-of-session closure ritual with quality check
   - task-context # Fresh-context prompt generation for continuation
-  - debate # Optional idea maturation before starting a scope
+  - idea # Optional idea maturation before starting a scope
 
 agents:
   - orchestrator # Full cycle coordination — analysis, review, debugging, and sprint execution

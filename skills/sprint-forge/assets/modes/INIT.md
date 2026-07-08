@@ -7,7 +7,7 @@ Use INIT when a scope has no `sprint.json`. Produces exactly two things: a new `
 - User request and current repository path.
 - `.agents/kyro/kyro.json` if present (to know existing scopes).
 - One work-type helper under `../helpers/analysis/` after work-type detection.
-- **Optional:** if the user references a previously written matured-idea document (e.g. `.agents/kyro/plan/2026-07-08-mario-kart-game.md`, produced by `/kyro:debate`), read it and use its `## Problem / Motivation`, `## Who it's for`, and `## What success looks like` sections as richer source material for Step 5's `objective`, `successCriteria[]`, and `spec.requirements[]`. Treat it like any other input the user hands you; if no such document is referenced, proceed exactly as before with only the one-line idea.
+- **Optional:** if the user references a previously written matured-idea document (e.g. `.agents/kyro/plan/2026-07-08-mario-kart-game.md`, produced by `/kyro:idea`), read it and use its `## Problem / Motivation`, `## Who it's for`, and `## What success looks like` sections as richer source material for Step 5's `objective`, `successCriteria[]`, and `spec.requirements[]`. Treat it like any other input the user hands you; if no such document is referenced, proceed exactly as before with only the one-line idea.
 
 ## Step 1 — Resolve scope
 

@@ -92,9 +92,9 @@ Templates are loaded only immediately before writing their artifact.
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.md` | Human narrative at close (write-only) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |
 | `.agents/kyro/scopes/{scope}/findings/NN-slug.md` | INIT analysis evidence (write-only) |
-| `.agents/kyro/{docType}/{date}-{slug}.md` | Optional pre-scope matured-idea brief from `/kyro:debate` (write-only, never read to route; project-level, not per-scope) |
+| `.agents/kyro/{docType}/{date}-{slug}.md` | Optional pre-scope matured-idea brief from `/kyro:idea` (write-only, never read to route; project-level, not per-scope) |
 
-The only per-scope files are `sprint.json` and the write-only `archive/` + `findings/`. Nothing else is created or read. Project-level matured-idea documents (from `/kyro:debate`) live at `.agents/kyro/{docType}/` alongside `scopes/`, outside the scope-routing system.
+The only per-scope files are `sprint.json` and the write-only `archive/` + `findings/`. Nothing else is created or read. Project-level matured-idea documents (from `/kyro:idea`) live at `.agents/kyro/{docType}/` alongside `scopes/`, outside the scope-routing system.
 
 ## Boundaries
 
