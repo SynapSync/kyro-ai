@@ -17,6 +17,7 @@ export function parseOptions(args: string[]): CliOptions {
   let task: string | null = null;
   let json = false;
   let verbosity: PackVerbosity = 'detailed';
+  let verbose = false;
   let purgeAdapterAssets = false;
   let prune = false;
   const evalCases: string[] = [];
@@ -42,6 +43,8 @@ export function parseOptions(args: string[]): CliOptions {
       trace = true;
     } else if (arg === '--json') {
       json = true;
+    } else if (arg === '--verbose') {
+      verbose = true;
     } else if (arg === '--verbosity') {
       const value = args[i + 1];
       if (!value) throw new KyroCoreError('INVALID_INPUT', '--verbosity requires a value', 'Use --verbosity concise|detailed.');
@@ -123,6 +126,7 @@ export function parseOptions(args: string[]): CliOptions {
     task,
     json,
     verbosity,
+    verbose,
     purgeAdapterAssets,
     prune,
     evalCases,

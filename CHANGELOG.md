@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.14.0] - 2026-07-08
+
+### Added
+
+- `kyro install --verbose` and `kyro sync --verbose` now print the full operation plan
+  only when explicitly requested, keeping normal installs compact.
+
+### Changed
+
+- `kyro install` no longer prints every projected path by default; it now shows the plan
+  summary plus the completion footer (`Kyro has been installed.`, `Version`, `State`,
+  `Runtime`).
+
+### Fixed
+
+- `kyro install` and `kyro sync` now preserve existing project state fields such as
+  `principles` and future top-level metadata while refreshing runtime fields.
+
 ## [4.13.0] - 2026-07-08
 
 ### Changed

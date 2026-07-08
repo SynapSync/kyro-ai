@@ -33,6 +33,7 @@ Options:
   --adapters                   Include adapter inventory for doctor
   --trace                      Include trace summary for doctor
   --json                       Print machine-readable output where supported
+  --verbose                    Show detailed install/sync operation plans
   --verbosity <level>          Output depth for context-pack: concise or detailed (default)
   --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
   --prune                      Clean obsolete adapter-owned files during sync

@@ -112,6 +112,7 @@ function mergeProjectState(
   }
 
   return {
+    ...base,
     schemaVersion: 4,
     artifactRoot: ARTIFACT_ROOT,
     scopes: [...base.scopes],

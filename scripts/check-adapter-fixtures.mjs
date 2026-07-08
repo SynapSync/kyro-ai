@@ -304,6 +304,59 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(countIncludes(agentsText, '<!-- kyro-ai:agents-md:end -->') === 1, 'sync: duplicated Kyro end marker');
   assert(agentsText.includes('Keep this user content.'), 'sync: user AGENTS.md content was not preserved');
 
+  const statePath = join(installDir, '.agents', 'kyro', 'kyro.json');
+  const expectedVersion = require(join(repo, 'package.json')).version;
+  const stateBeforeUpgrade = JSON.parse(readFileSync(statePath, 'utf-8'));
+  const staleCodexInstalledAt = '2000-01-01T00:00:00.000Z';
+  const staleStandardInstalledAt = '2001-01-01T00:00:00.000Z';
+  stateBeforeUpgrade.principles = [
+    {
+      id: 'preserve-principles',
+      rule: 'Project principles must survive install and sync.',
+      severity: 'strong',
+      rationale: 'Install and sync are runtime projection commands, not project policy reset commands.',
+    },
+  ];
+  stateBeforeUpgrade.customMetadata = { owner: 'fixture', preserve: true };
+  stateBeforeUpgrade.scopes = [{ id: 'upgrade-scope', title: 'Upgrade Scope', status: 'active' }];
+  stateBeforeUpgrade.activeScope = 'upgrade-scope';
+  stateBeforeUpgrade.installedAdapters = [
+    { ...stateBeforeUpgrade.installedAdapters[0], installedAt: staleCodexInstalledAt },
+    {
+      agent: 'standard',
+      scope: 'workspace',
+      installedAt: staleStandardInstalledAt,
+      corePath: '~/.agents/kyro/current',
+    },
+  ];
+  writeFileSync(statePath, `${JSON.stringify(stateBeforeUpgrade, null, 2)}\n`, 'utf-8');
+
+  captureLogs(() => sync(cliOptions({ agents: [codex] })));
+  const stateAfterSync = JSON.parse(readFileSync(statePath, 'utf-8'));
+  assert(JSON.stringify(stateAfterSync.principles) === JSON.stringify(stateBeforeUpgrade.principles), 'sync: principles were not preserved');
+  assert(JSON.stringify(stateAfterSync.customMetadata) === JSON.stringify(stateBeforeUpgrade.customMetadata), 'sync: custom metadata was not preserved');
+  assert(JSON.stringify(stateAfterSync.scopes) === JSON.stringify(stateBeforeUpgrade.scopes), 'sync: scopes were not preserved');
+  assert(stateAfterSync.activeScope === 'upgrade-scope', 'sync: activeScope was not preserved');
+  assert(stateAfterSync.runtimeVersion === expectedVersion, 'sync: runtimeVersion should match package version');
+  const syncedCodex = stateAfterSync.installedAdapters.find((adapter) => adapter.agent === 'codex');
+  const syncedStandard = stateAfterSync.installedAdapters.find((adapter) => adapter.agent === 'standard');
+  assert(syncedCodex.installedAt !== staleCodexInstalledAt, 'sync: selected adapter installedAt was not refreshed');
+  assert(syncedStandard.installedAt === staleStandardInstalledAt, 'sync: unselected adapter installedAt should be preserved');
+
+  const staleReinstallInstalledAt = '2002-01-01T00:00:00.000Z';
+  syncedCodex.installedAt = staleReinstallInstalledAt;
+  writeFileSync(statePath, `${JSON.stringify(stateAfterSync, null, 2)}\n`, 'utf-8');
+  captureLogs(() => install(cliOptions({ agents: [codex] })));
+  const stateAfterReinstall = JSON.parse(readFileSync(statePath, 'utf-8'));
+  const reinstalledCodex = stateAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
+  const reinstalledStandard = stateAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
+  assert(JSON.stringify(stateAfterReinstall.principles) === JSON.stringify(stateBeforeUpgrade.principles), 'reinstall: principles were not preserved');
+  assert(JSON.stringify(stateAfterReinstall.customMetadata) === JSON.stringify(stateBeforeUpgrade.customMetadata), 'reinstall: custom metadata was not preserved');
+  assert(JSON.stringify(stateAfterReinstall.scopes) === JSON.stringify(stateBeforeUpgrade.scopes), 'reinstall: scopes were not preserved');
+  assert(stateAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
+  assert(reinstalledCodex.installedAt !== staleReinstallInstalledAt, 'reinstall: selected adapter installedAt was not refreshed');
+  assert(reinstalledStandard.installedAt === staleStandardInstalledAt, 'reinstall: unselected adapter installedAt should be preserved');
+
   captureLogs(() => uninstall(cliOptions()));
   agentsText = readFileSync(join(installDir, 'AGENTS.md'), 'utf-8');
   assert(!agentsText.includes('<!-- kyro-ai:agents-md:start -->'), 'uninstall: Kyro start marker still present');
