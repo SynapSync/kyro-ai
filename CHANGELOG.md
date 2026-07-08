@@ -19,6 +19,11 @@ All notable changes to this project are documented here. The format is based on
   summary plus the completion footer (`Kyro has been installed.`, `Version`, `State`,
   `Runtime`).
 
+### Fixed
+
+- `kyro install` and `kyro sync` now preserve existing project state fields such as
+  `principles` and future top-level metadata while refreshing runtime fields.
+
 ## [4.13.0] - 2026-07-08
 
 ### Changed
