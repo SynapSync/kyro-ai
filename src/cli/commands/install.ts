@@ -14,9 +14,12 @@ export function install(options: CliOptions): void {
   const agents = options.agents.length > 0 ? options.agents : [AGENT.STANDARD];
   runAdapterPreflight('install', agents);
 
+  const packageVersion = readPackageVersion();
   const plan = buildInstallPlan(agents, options.scope);
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
-  printPlan('Install plan', plan);
+  if (options.dryRun || options.trace || options.verbose) {
+    printPlan('Install plan', plan);
+  }
 
   if (options.dryRun) {
     console.log('Dry run complete. No files changed.');
@@ -25,6 +28,7 @@ export function install(options: CliOptions): void {
 
   applyPlan(plan);
   console.log('Kyro has been installed.');
+  console.log(`Version: ${packageVersion}`);
   console.log(`State: ${KYRO_STATE_PATH}`);
   console.log(`Runtime: ${KYRO_ROOT}/`);
 }
@@ -43,7 +47,9 @@ export function sync(options: CliOptions): void {
   const plan = buildInstallPlan(unique, SCOPE.WORKSPACE);
   const drift = analyzeDrift(currentVersion, managedFilesFromInstallPlan(plan));
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
-  printPlan('Sync plan', plan);
+  if (options.dryRun || options.trace || options.verbose) {
+    printPlan('Sync plan', plan);
+  }
 
   if (hasDrift(drift)) {
     printDriftReport(drift);

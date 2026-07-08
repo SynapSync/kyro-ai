@@ -270,6 +270,7 @@ export interface CliOptions {
   task: string | null;
   json: boolean;
   verbosity: PackVerbosity;
+  verbose: boolean;
   purgeAdapterAssets: boolean;
   prune: boolean;
   evalCases: string[];
