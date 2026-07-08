@@ -20,6 +20,8 @@ export function parseOptions(args: string[]): CliOptions {
   let verbose = false;
   let purgeAdapterAssets = false;
   let prune = false;
+  let initWorkspace = false;
+  let noInitWorkspace = false;
   const evalCases: string[] = [];
   const evalTags: string[] = [];
   let evalList = false;
@@ -56,6 +58,10 @@ export function parseOptions(args: string[]): CliOptions {
       purgeAdapterAssets = true;
     } else if (arg === '--prune') {
       prune = true;
+    } else if (arg === '--init-workspace') {
+      initWorkspace = true;
+    } else if (arg === '--no-init-workspace') {
+      noInitWorkspace = true;
     } else if (arg === '--list') {
       evalList = true;
     } else if (arg === '--keep-sandbox') {
@@ -112,6 +118,10 @@ export function parseOptions(args: string[]): CliOptions {
     }
   }
 
+  if (initWorkspace && noInitWorkspace) {
+    throw invalidInput('Cannot combine --init-workspace and --no-init-workspace.', 'Choose one workspace initialization mode.');
+  }
+
   return {
     agents: uniqueAgents(agents),
     scope,
@@ -129,6 +139,8 @@ export function parseOptions(args: string[]): CliOptions {
     verbose,
     purgeAdapterAssets,
     prune,
+    initWorkspace,
+    noInitWorkspace,
     evalCases,
     evalTags,
     evalList,

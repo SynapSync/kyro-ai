@@ -9,7 +9,7 @@ export function printHelp(): void {
 
 Usage:
   kyro                         Open interactive TUI
-  kyro install                 Install Kyro standard .agents assets
+  kyro install                 Install/update the global Kyro runtime
   kyro detect                  Detect local agent adapters
   kyro doctor                  Check package/workspace health
   kyro analyze [options]       Semantic cross-check of a scope (clarity, coverage, deps, debt)
@@ -37,6 +37,8 @@ Options:
   --verbosity <level>          Output depth for context-pack: concise or detailed (default)
   --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
   --prune                      Clean obsolete adapter-owned files during sync
+  --init-workspace             Initialize Kyro in this workspace during install
+  --no-init-workspace          Install runtime only; never initialize a new workspace
   --dry-run                    Preview changes
   --yes, -y, --confirm         Skip confirmation prompts where available
   --help, -h                   Show help
@@ -44,6 +46,7 @@ Options:
 
 Examples:
   kyro install --scope workspace --dry-run
+  kyro install --init-workspace
   kyro detect --json
   kyro doctor --tokens --artifacts
   kyro repair --kyro-scope auth-refactor --dry-run
@@ -57,7 +60,7 @@ Examples:
 
 export function printCommandHelp(command: string): void {
   if (command === 'install') {
-    console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--dry-run] [--yes]');
+    console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--init-workspace|--no-init-workspace] [--dry-run] [--yes]');
   } else if (command === 'detect') {
     console.log('Usage: kyro detect [--agent standard|opencode|codex|claude|cursor] [--json]');
   } else if (command === 'doctor') {

@@ -51,7 +51,7 @@ function main() {
 
   try {
     // 1. Install from the built package with a PATH stripped of `kyro`.
-    const install = spawnSync(process.execPath, [cli, 'install', '--scope', 'workspace', '--yes'], {
+    const install = spawnSync(process.execPath, [cli, 'install', '--scope', 'workspace', '--init-workspace', '--yes'], {
       cwd: workspace,
       env: installEnv,
       encoding: 'utf-8',

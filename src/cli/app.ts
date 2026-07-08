@@ -78,7 +78,7 @@ export async function runCli(): Promise<void> {
 
   switch (command) {
     case 'install':
-      install(options);
+      await install(options);
       break;
     case 'detect':
       detect(options);

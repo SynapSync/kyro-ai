@@ -12,12 +12,16 @@ All notable changes to this project are documented here. The format is based on
 
 - `kyro install --verbose` and `kyro sync --verbose` now print the full operation plan
   only when explicitly requested, keeping normal installs compact.
+- `kyro install --init-workspace` and `kyro install --no-init-workspace` now make
+  workspace initialization explicit when installing the global runtime.
 
 ### Changed
 
 - `kyro install` no longer prints every projected path by default; it now shows the plan
   summary plus the completion footer (`Kyro has been installed.`, `Version`, `State`,
   `Runtime`).
+- `kyro install` now always refreshes the global runtime but skips creating
+  `.agents/kyro/**` in new workspaces unless initialization is explicitly requested.
 
 ### Fixed
 

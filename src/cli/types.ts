@@ -273,6 +273,8 @@ export interface CliOptions {
   verbose: boolean;
   purgeAdapterAssets: boolean;
   prune: boolean;
+  initWorkspace: boolean;
+  noInitWorkspace: boolean;
   evalCases: string[];
   evalTags: string[];
   evalList: boolean;
