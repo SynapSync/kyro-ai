@@ -7,7 +7,7 @@ Routed when `/kyro:idea` is invoked (pre-scope, direct command route — not a `
 ## Inputs
 
 1. A rough one-line idea from the user (argument passed by `commands/idea.md`).
-2. No prior files to read (no scope, no `sprint.json`, no `kyro.json`).
+2. No prior files to read. **Never resolve, read, create, or load a scope, `kyro.json`, or `sprint.json` — not even to check whether they exist.** This mode is pre-scope by definition; it does not go through the orchestrator and does not route on `handoff.nextAction`.
 
 ## The maturation loop
 
@@ -37,7 +37,7 @@ Ask questions sequentially, cherry-picked for relevance to the idea:
 
 Stop asking and move to Step 4 (write the document) if **any** of these is true:
 
-- **User signals done explicitly.** Common signals: "listo", "eso es", "write it", "hazlo", "let's go", "good enough", vamos a eso".
+- **User signals done explicitly.** Common signals: "listo", "eso es", "write it", "hazlo", "let's go", "good enough", "vamos a eso".
 - **Six questions asked.** At question 6, propose writing instead of continuing: "I think we've got the core idea solid. Ready for me to write it, or do you want to refine anything else?"
 - **Ten conversational turns reached.** Hard stop — write the document with whatever is known, flagging unknowns as `[OPEN QUESTION: ...]`.
 - **You judge the idea now has a clear trajectory.** Problem + audience + rough scope boundary + at least one success signal = enough to write. If you sense that continuing will just add marginal detail (not material shape changes), offer the write option.
@@ -59,7 +59,7 @@ Wait for the user's confirmation or override before proceeding to Step 5.
 
 Once confirmed, perform exactly **one file write** to `.agents/kyro/{docType}/{date}-{slug}.md`:
 
-- **Path structure:** `.agents/kyro/` must exist (the Kyro directory root); if not, create it. Then create the `{docType}` subdirectory if it doesn't exist (e.g. `plan/`, `analysis/`, `constitution/`). Write the file inside.
+- **Path structure:** create the `.agents/kyro/{docType}/` directory if it doesn't exist (e.g. `plan/`, `analysis/`, `constitution/`) and write the file inside. Create directories **only** — never create `kyro.json`, a `scopes/` directory, or any scope. If `.agents/kyro/` does not exist yet, creating the `{docType}` subdirectory materializes it; that is the only side effect, and it is not a scope.
 - **Filename:** `{YYYY-MM-DD}-{slug}.md` where date is today (in `YYYY-MM-DD` format, e.g. `2026-07-08`) and slug is a kebab-case 3–6 word summary of the idea (e.g. `mario-kart-game`, `llm-training-viability`).
 - **Template:** use `skills/sprint-forge/assets/templates/matured-idea.md`, filling in all fields and sections from the conversation.
   - If a section has no answer (e.g. "Explicitly out of scope" was never discussed), write "`[NOT DISCUSSED]`" instead of inventing.
@@ -72,7 +72,7 @@ After the write succeeds, output: "Written to `.agents/kyro/{docType}/{date}-{sl
 
 After the write, suggest the natural next step in one paragraph:
 
-> "You now have a matured brief. When you're ready, run `/kyro:forge mario-kart-game` (or `/kyro:forge` and then reference `.agents/kyro/plan/2026-07-08-mario-kart-game.md` as the seed for your scope's objective). Kyro's INIT mode will read your brief and use it as richer context than a one-liner. You can also skip `/kyro:debate` altogether and go straight to `/kyro:forge` if you prefer — both paths are equally valid."
+> "You now have a matured brief. When you're ready, run `/kyro:forge mario-kart-game` (or `/kyro:forge` and then reference `.agents/kyro/plan/2026-07-08-mario-kart-game.md` as the seed for your scope's objective). Kyro's INIT mode will read your brief and use it as richer context than a one-liner. You can also skip `/kyro:idea` altogether and go straight to `/kyro:forge` if you prefer — both paths are equally valid."
 
 ## Rules
 
