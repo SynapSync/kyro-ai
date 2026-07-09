@@ -28,13 +28,13 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task
 
 # Kyro Sprint Forge — Runtime Contract (v4)
 
-One scope = one `sprint.json`. Agents read `kyro.json` (registry) + the scope's `sprint.json`, then route on `handoff.nextAction`. No other agent-facing files.
+One scope = one `sprint.json`. Agents read `kyro.json` + the scope's `sprint.json`, then route on `handoff.nextAction`. No other agent-facing files.
 
 ## Core Invariants
 
 1. `sprint.json` is the single source of truth. Two reads to start (`kyro.json` + `sprint.json`), one file to update per action.
 2. Route on `sprint.json.handoff.nextAction` — never infer state from file presence.
-3. Generate one sprint at a time; never pre-generate future sprints.
+3. Generate one sprint; never pre-generate.
 4. Tasks are self-contained: every task carries `description`, `files_to_touch`, `context`, `acceptance_criteria`.
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
 6. Closing a sprint (snapshot-then-clear of `activeSprint`) is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
@@ -60,7 +60,7 @@ Irreversible or schema-critical operations are done deterministically by the CLI
 | `{{KYRO_CLI}} analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, deps, debt, principles), severity-triaged; non-zero on CRITICAL/HIGH. Gate before close. |
 | `{{KYRO_CLI}} repair --kyro-scope <scope>` | Normalizes `sprint.json` formatting. |
 
-In Claude Code a `PreToolUse` hook blocks any hand edit that nulls `activeSprint`; other harnesses rely on this contract directly.
+Claude Code's `PreToolUse` hook blocks edits nulling `activeSprint`; others rely on this contract.
 
 ## Routing (handoff.nextAction → mode)
 
@@ -94,7 +94,7 @@ Templates are loaded only immediately before writing their artifact.
 | `.agents/kyro/scopes/{scope}/findings/NN-slug.md` | INIT analysis evidence (write-only) |
 | `.agents/kyro/{docType}/{date}-{slug}.md` | Optional pre-scope matured-idea brief from `/kyro:idea` (write-only, never read to route; project-level, not per-scope) |
 
-The only per-scope files are `sprint.json` and the write-only `archive/` + `findings/`. Nothing else is created or read. Project-level matured-idea documents (from `/kyro:idea`) live at `.agents/kyro/{docType}/` alongside `scopes/`, outside the scope-routing system.
+The only per-scope files are `sprint.json` and the write-only `archive/` + `findings/`. Project-level matured-idea documents (from `/kyro:idea`) live at `.agents/kyro/{docType}/` alongside `scopes/`, outside the scope-routing system.
 
 ## Boundaries
 
