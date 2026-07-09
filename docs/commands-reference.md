@@ -1,12 +1,46 @@
 # Commands Reference
 
-Kyro provides 4 slash commands. Each command is now a thin router: it reads structured state first, then loads only the mode/helper/template required for the current action.
+Kyro provides 5 slash commands. Four are thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. The fifth, `/kyro:idea`, is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid.
 
 ## Cost-Aware Routing
 
 Kyro command paths are audited by `kyro doctor --tokens`. Brief status never opens sprint Markdown when summaries exist; forge execution never loads planning, debt, or re-entry helpers by default; closeout is the normal materialization point for full documentation.
 
 For scope resume outside slash commands, use `kyro context-pack --kyro-scope <scope>` to emit the same summary-first routing bundle that agents would otherwise assemble manually.
+
+---
+
+## /kyro:idea
+
+**Mature a rough idea into a structured brief before starting a scope. Optional and pre-scope.**
+
+### Syntax
+
+```
+/kyro:idea <rough idea>
+```
+
+### Arguments
+
+A one-line idea to flesh out (e.g. `quiero hacer un juego de mario kart`). If omitted, the command asks for it.
+
+### What it does
+
+Runs a bounded, one-question-at-a-time conversation to turn a vague idea into a well-formed brief, then writes exactly one markdown document:
+
+```
+.agents/kyro/{docType}/{date}-{slug}.md
+```
+
+`docType` is inferred from the conversation and confirmed with you before writing — one of `plan` (default, something to build), `analysis` (exploratory/comparative), or `constitution` (durable project ground rules, kept distinct from `kyro.json.principles[]`). The loop stops on an explicit done-signal, a soft limit of 6 questions, or a hard limit of 10 turns.
+
+### Routing
+
+`/kyro:idea` does **not** go through the orchestrator and does **not** route on `sprint.json.handoff.nextAction`. It loads `skills/sprint-forge/assets/modes/idea.md` directly. It never reads, resolves, or creates a scope, `.agents/kyro/kyro.json`, or any `sprint.json` — the matured-idea document is write-only evidence, sibling to `.agents/kyro/scopes/`, and no CLI validator (`doctor`, `analyze`) touches it.
+
+### After maturing
+
+The mode suggests running `/kyro:forge <slug>` (or `/kyro:forge` referencing the document) so INIT can seed the scope's `objective`, `successCriteria[]`, and `spec.requirements[]` from the brief instead of a one-liner.
 
 ---
 

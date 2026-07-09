@@ -10,19 +10,49 @@
 </p>
 
 <p align="center">
-  <b>Multi-agent sprint harness for AI coding agents.</b><br/>
+  <b>The sprint workflow your AI coding agents share — install once, every agent picks it up.</b><br/>
   One install command &bull; portable markdown core &bull; command skills &bull; project-local state &bull; agent adapters
 </p>
 
 ---
 
-## What Kyro AI Does
+## The problem
 
-Kyro AI installs a project-local workflow harness that helps AI coding agents analyze, plan, execute, review, and close software work through repeatable sprint cycles.
+You use more than one AI coding agent. Claude one day, Cursor the next, Codex or OpenCode when it fits. And every single one starts from zero:
 
-It is designed for teams that switch between agents and do not want every agent to relearn the workflow from a giant prompt.
+- You **re-explain your workflow** in a 2,000-line prompt, or paste it again, and again.
+- Between sessions the agent **forgets where it was** — which sprint, what's done, what's blocked.
+- "Quality" is whatever the model felt like doing that run. **No real gate** stops a half-finished task from being called done.
 
-Kyro gives agents:
+Kyro fixes this. You install one project-local harness, and any agent that opens the project runs the **same** sprint workflow against the **same** source of truth — with deterministic checks enforced in code, not in prompt goodwill.
+
+---
+
+## See it work
+
+A full cycle is one command. The agent routes itself through the phases and stops at each gate for your call:
+
+```text
+you ›  /kyro:forge add JWT auth to the API
+
+kyro ›  INIT      analyzed the module, wrote objective + success criteria
+        ─ gate ─  proceed / adjust / cancel?         ← you decide
+        PLAN      broke the work into a 6-task sprint
+        ─ gate ─  proceed / adjust / cancel?
+        EXECUTE   task 1/6 … evidence recorded on the task
+        REVIEW    tool-owned check, not self-grading
+        CLOSE     verbatim snapshot archived, learnings kept
+
+state ›  .agents/kyro/scopes/jwt-auth/sprint.json      ← single source of truth
+```
+
+Everything the agent knows about that work — objective, roadmap, the active sprint, technical debt, conventions, and where to resume — lives in **one** `sprint.json`. Close a session with `/kyro:wrap-up`, come back tomorrow (or from a different agent), and it picks up exactly where it left off.
+
+---
+
+## What you get
+
+Under the hood, one install gives your agents:
 
 - a **managed core** with orchestrator, command, skill, and template instructions
 - **command-like skills** such as `kyro-forge`, `kyro-status`, and `kyro-wrap-up`
@@ -38,248 +68,83 @@ Kyro gives agents:
 
 ## Quick Start
 
-Install Kyro AI into the current project:
-
 ```bash
 npx kyro-ai install --agent opencode,codex --scope workspace --yes
 npx kyro-ai doctor
 ```
 
-Use one agent only if needed:
-
-```bash
-npx kyro-ai install --agent opencode --scope workspace --yes
-npx kyro-ai install --agent codex --scope workspace --yes
-```
-
-After install, open your agent and invoke the installed Kyro command skill:
+Then open your agent and start a cycle:
 
 ```text
-kyro-forge auth-refactor
+/kyro:forge add JWT auth to the API
 ```
 
-Other installed command skills:
+That's it. No prompt to paste, no workflow to explain.
 
-```text
-kyro-status
-kyro-wrap-up
-```
-
-If the host exposes slash commands, the equivalent public command namespace is:
-
-```text
-/kyro:forge
-/kyro:status
-/kyro:wrap-up
-```
+> **On Claude?** Kyro ships as a first-class plugin — see [Claude plugin](#claude-plugin) below.
 
 ---
 
-## Installed Layout
+## The commands
 
-Kyro separates global runtime from project state. Runtime files live in your user-level agents directory; project files keep only state and artifacts.
+Five slash commands, one job each. All are thin routers over `sprint.json` — they read structured state first, then load only what the current step needs.
 
-Global runtime (single active version only):
+| Command             | What it does                                                                 |
+| ------------------- | ---------------------------------------------------------------------------- |
+| `/kyro:forge`       | Full cycle: analyze → plan → execute → review → close, with a gate per phase  |
+| `/kyro:status`      | Progress bars, roadmap health, and technical-debt summary (`brief`/`full`/`debt`) |
+| `/kyro:wrap-up`     | Close the session, refresh handoff routing, preserve learnings               |
+| `/kyro:idea`        | **Optional** pre-scope step: mature a rough idea into a structured brief before any scope exists |
+| `/kyro:task-context`| Emit a copy-paste prompt to continue the work in a fresh context             |
 
-```text
-~/.agents/
-├── kyro/
-│   └── current/
-│       ├── core/
-│       │   ├── agents/
-│       │   ├── config.json
-│       │   └── WORKFLOW.yaml
-│       ├── commands/
-│       ├── skills/
-│       │   ├── sprint-forge/
-│       │   └── qa-review/
-│       ├── dist/
-│       ├── package.json
-│       ├── config.json
-│       ├── KYRO.md
-│       └── manifest.json
-└── skills/
-    ├── kyro-forge/SKILL.md
-    ├── kyro-status/SKILL.md
-    └── kyro-wrap-up/SKILL.md
-```
-
-Installing or syncing a new package version replaces `~/.agents/kyro/current/`
-and removes the retired `~/.agents/kyro/versions/` layout. Kyro does not keep a
-local history of runtime versions or old bundled binaries.
-
-Project state and artifacts (v4 — one `sprint.json` per scope):
-
-```text
-<project>/
-└── .agents/
-    └── kyro/
-        ├── kyro.json                    # registry: scopes[], activeScope, principles[]
-        └── scopes/
-            └── {scope}/
-                ├── sprint.json          # single source of truth
-                ├── archive/             # write-only, at sprint close
-                │   ├── sprint-001-slug.json   # verbatim zero-loss snapshot
-                │   └── sprint-001-slug.md      # human narrative
-                └── findings/            # write-only INIT analysis evidence
-                    └── 01-slug.md
-```
-
-Important invariant: `kyro install` creates the root project state at `.agents/kyro/kyro.json`. Each scope's `sprint.json` is created by `/kyro:forge` (INIT). The only per-scope files are `sprint.json` plus the write-only `archive/` and `findings/`.
-
-## Who Invokes Whom
-
-```text
-User
-  ↓
-kyro / kyro-ai CLI
-  ↓
-installs managed core + adapter projections
-  ↓
-agent opens the project
-  ↓
-agent discovers AGENTS.md and/or ~/.agents/skills
-  ↓
-user invokes kyro-forge / kyro-status / kyro-wrap-up
-  ↓
-projected skill reads ~/.agents/kyro/current/commands/*.md
-  ↓
-orchestrator reads ~/.agents/kyro/current/core/agents/orchestrator.md
-  ↓
-sprint-forge skill assets guide the workflow
-  ↓
-artifacts are written under <project>/.agents/kyro/scopes/{scope}/
-```
-
-The user should not have to explain the workflow in natural language. If an agent cannot discover the installed command skills, that agent needs a better adapter.
+On hosts without slash commands, the CLI projects the equivalent skills `kyro-forge`, `kyro-status`, `kyro-wrap-up`, and `kyro-task-context` into `~/.agents/skills/`.
 
 ---
 
-## CLI Reference
+## How it works
 
-Kyro AI exposes two equivalent bins:
-
-```bash
-kyro
-kyro-ai
-```
-
-Commands:
-
-| Command             | Purpose                                                                        |
-| ------------------- | ------------------------------------------------------------------------------ |
-| `kyro`              | Open the basic interactive configuration TUI                                   |
-| `kyro install`      | Install managed core and selected agent adapters                               |
-| `kyro doctor`       | Validate package health, workspace state, artifacts, and adapters              |
-| `kyro analyze`      | Semantic cross-check of a scope (clarity, coverage, dependencies, debt, principles) |
-| `kyro close-sprint` | Snapshot + close the active sprint (zero-loss, tool-owned)                      |
-| `kyro repair`       | Validate and normalize a scope's `sprint.json`                                 |
-| `kyro context-pack` | Emit a summary-first context package for a scope                               |
-| `kyro scope`        | List, inspect, or set the active Kyro scope                                    |
-| `kyro sync`         | Refresh managed assets without rewriting unmanaged files                       |
-| `kyro uninstall`    | Remove managed workspace assets                                                |
-
-Common usage:
-
-```bash
-kyro install --agent opencode,codex --scope workspace --yes
-kyro doctor --tokens --artifacts
-kyro analyze --kyro-scope auth-refactor
-kyro close-sprint --kyro-scope auth-refactor --outcome shipped --learning "..."
-kyro sync --agent codex --dry-run
-```
-
-Supported install adapters today:
-
-| Adapter    | Status                            | What it installs                                                      |
-| ---------- | --------------------------------- | --------------------------------------------------------------------- |
-| `opencode` | Implemented                       | `~/.agents/skills/kyro-*` command skill projections                     |
-| `codex`    | Implemented                       | `~/.agents/skills/kyro-*` plus a managed Kyro block in root `AGENTS.md` |
-| `claude`   | Planned for CLI workspace install | Claude plugin remains first-class through `.claude-plugin/`           |
-| `cursor`   | Planned                           | Not installed by the CLI yet                                          |
-
-There is intentionally no `generic` adapter. Cross-agent instructions belong in root `AGENTS.md`; install adapters should target concrete agent capabilities.
-
----
-
-
-## Artifact Integrity
-
-Kyro treats the repo as the system of record. Validate and repair the knowledge contract with:
-
-```bash
-kyro doctor --artifacts
-kyro analyze --kyro-scope <scope>
-kyro repair --kyro-scope <scope> --yes
-kyro scope inspect <scope>
-```
-
-`doctor --artifacts` validates `sprint.json` shape, zero-loss snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. `analyze` adds a severity-triaged semantic pass (coverage, dependencies, overdue debt, principle violations). `repair` re-parses and normalizes `sprint.json` without rewriting user-authored archives.
-
-## Core Workflow
-
-Kyro has three stable workflow intents:
-
-| Intent  | Skill / command                  | What it does                                                    |
-| ------- | -------------------------------- | --------------------------------------------------------------- |
-| Forge   | `kyro-forge` / `/kyro:forge`     | Analyze, plan, execute, review, and close a sprint cycle        |
-| Status  | `kyro-status` / `/kyro:status`   | Report project progress, roadmap health, and technical debt     |
-| Wrap-up | `kyro-wrap-up` / `/kyro:wrap-up` | Close a session, update handoff context, and preserve learnings |
-
-Forge is routed deterministically by state, not by guesswork:
+Kyro is deliberately **one sprint at a time** and **single-source**. `/kyro:forge` never guesses the next move — it derives it from state:
 
 ```text
 read kyro.json + scopes/{scope}/sprint.json
   → route on sprint.json.handoff.nextAction
     (init → clarify → plan → execute → review → close, or recover)
   → load only the selected mode/helper/template
-  → one safe-write back to sprint.json
+  → one safe write back to sprint.json
 ```
 
-Kyro is intentionally sprint-by-sprint and single-source. It loads two files to start (`kyro.json` + `sprint.json`) and updates one file per action — it never pre-loads every roadmap, sprint, helper, and template just to decide the next move. Unknowns are surfaced as `[NEEDS CLARIFICATION]` markers and resolved by the `clarify` mode before planning — the agent admits what it does not know instead of guessing.
+It loads two files to start and updates one per action — it never pre-loads every roadmap, helper, and template just to decide what's next. Unknowns become explicit `[NEEDS CLARIFICATION]` markers resolved before planning: the agent admits what it doesn't know instead of inventing it.
 
 ---
 
-## Architecture
+## Why it's different
 
-The source package is organized around portable markdown instructions plus a small deterministic CLI:
-
-```text
-kyro-ai/
-├── src/cli/                 # installer, doctor, sync, uninstall, adapters
-├── agents/                  # orchestrator instruction
-├── commands/                # forge, status, wrap-up command definitions
-├── skills/
-│   ├── sprint-forge/        # main workflow skill and assets
-│   └── qa-review/           # senior QA review skill
-├── docs/                    # architecture, CLI, adapter, and command docs
-├── rules/                   # reusable operating rules
-├── templates/               # context templates
-├── .claude-plugin/          # Claude plugin adapter packaging
-├── WORKFLOW.yaml
-└── config.json
-```
-
-Runtime contract:
-
-| Layer           | Responsibility                                                                |
-| --------------- | ----------------------------------------------------------------------------- |
-| CLI             | Install, sync, uninstall, validate, and project managed files                 |
-| Adapter         | Translate Kyro into each agent's native/compatible instruction surface        |
-| Projected skill | Give the agent a short command entrypoint without duplicating lifecycle prose |
-| Orchestrator    | Coordinate phases, gates, review, debugging, and handoff                      |
-| Sprint Forge skill | Define workflow modes, helpers, templates, and discipline rules |
-| Artifacts       | Persist objective, roadmap, active sprint, debt, conventions, and handoff in one `sprint.json` per scope, plus write-only archives |
+- **Deterministic gates, not prompt discipline.** `kyro doctor` and `kyro analyze` validate `sprint.json` shape, zero-loss snapshots, coverage, dependencies, and overdue debt — in code. Quality doesn't depend on the model behaving.
+- **One source of truth per scope.** No scattered notes to keep in sync. Objective, roadmap, active sprint, debt, conventions, and handoff all live in one `sprint.json`.
+- **Zero-loss archives.** Every closed sprint is snapshotted verbatim before it's cleared. History is never overwritten.
+- **Portable by design.** The workflow is markdown the agent reads, plus a small deterministic CLI. Adapters translate it into each agent's native surface — no agent-specific lock-in.
+- **Claude stays first-class.** Multi-agent support never means retiring the Claude plugin.
 
 ---
 
-## Claude Plugin Support
+## Adapters
 
-Claude remains first-class.
+The CLI installs the harness into concrete agents. There is intentionally no `generic` adapter — cross-agent instructions belong in root `AGENTS.md`.
 
-The Claude plugin adapter lives in `.claude-plugin/` and is shipped with the package. The CLI workspace installer does not replace the Claude plugin; it complements it for agents that need workspace-local command skills and `AGENTS.md` instructions.
+| Adapter    | Status                            | What it installs                                                       |
+| ---------- | --------------------------------- | ---------------------------------------------------------------------- |
+| `opencode` | Implemented                       | `~/.agents/skills/kyro-*` command-skill projections                     |
+| `codex`    | Implemented                       | `~/.agents/skills/kyro-*` plus a managed Kyro block in root `AGENTS.md` |
+| `claude`   | First-class via plugin            | Ships in `.claude-plugin/`; CLI workspace install planned              |
+| `cursor`   | Planned                           | Not installed by the CLI yet                                           |
 
-Claude plugin install:
+See [Agent Adapters](docs/agent-adapters.md) for host-specific setup.
+
+---
+
+## Claude plugin
+
+Claude gets the full workflow as a native plugin:
 
 ```bash
 /plugin marketplace add SynapSync/kyro-ai
@@ -290,112 +155,64 @@ Local plugin development:
 
 ```bash
 git clone https://github.com/SynapSync/kyro-ai.git
-cd kyro-ai
-npm install
-npm run build
+cd kyro-ai && npm install && npm run build
 claude --plugin-dir /path/to/kyro-ai
 ```
 
 ---
 
-## Development
-
-Requirements:
-
-- Node.js 18+
-- npm
-
-Useful commands:
-
-```bash
-npm ci
-npm run check
-npm run build
-npm pack --dry-run
-```
-
-`npm run check` runs:
-
-- TypeScript typecheck
-- package/plugin/workflow version validation
-- relative markdown link validation
-- runtime-artifact gate (runtime must speak only the `sprint.json` model)
-- `dist/` freshness, budget-manifest, and v4 sprint-doctor fixtures
-
-Release tags publish to npm through GitHub Actions when the tag matches `package.json.version`:
-
-```bash
-git tag v4.1.0
-git push origin v4.1.0
-```
-
-The release workflow expects the repository secret `NPM_TOKEN`.
-
----
-
-## Generated Artifacts and Release Process
-
-`dist/` is a generated artifact built from `src/` by `npm run build`. It must stay in sync with source, so releases cannot pack stale generated output.
-
-Before committing or releasing:
-
-```bash
-npm run check      # includes check:dist
-npm run build
-npm run check:adapters
-npm pack --dry-run
-```
-
-- `npm run check:dist` proves the committed `dist/` matches a fresh build.
-- `npm run check:adapters` validates adapter projections against the built runtime.
-- `npm pack --dry-run` simulates the published tarball only after the gates above pass.
-
-See [`docs/release-checklist.md`](docs/release-checklist.md) for the full maintainer checklist and CI gate ordering.
-
----
-
-
-## Cost Model
-
-Kyro uses lean runtime loading: command router → `sprint.json` state → one routed mode → only required helpers. Task evidence is recorded directly on the task object in `sprint.json`; at sprint close the CLI writes the verbatim snapshot and a human narrative to `archive/`. See [docs/cost-model.md](docs/cost-model.md).
-
 ## Documentation
+
+The README is the 30-second tour. Everything deep lives in `docs/`:
 
 | Guide                                            | Description                                              |
 | ------------------------------------------------ | -------------------------------------------------------- |
-| [CLI](docs/cli.md)                               | Installer, doctor, sync, uninstall, and adapter commands |
-| [Commands Reference](docs/commands-reference.md) | `/kyro:*` command semantics                              |
-| [Architecture](docs/architecture.md)             | System architecture and data flow                        |
-| [Agent Adapters](docs/agent-adapters.md)         | Adapter setup and host-specific notes                    |
 | [Getting Started](docs/getting-started.md)       | Introductory workflow guide                              |
-| [Rules Guide](docs/rules-guide.md)               | Persistent learning rules                                |
+| [Commands Reference](docs/commands-reference.md) | Full `/kyro:*` command semantics                         |
+| [CLI](docs/cli.md)                               | Installer, doctor, analyze, sync, uninstall, adapters    |
+| [Architecture](docs/architecture.md)             | System architecture, layout, and data flow               |
+| [Agent Adapters](docs/agent-adapters.md)         | Adapter setup and host-specific notes                    |
 | [Context Management](docs/context-management.md) | Handoff routing and cross-session continuity             |
+| [Cost Model](docs/cost-model.md)                 | Lean runtime loading and token budgets                   |
+| [Behavioral Evals](docs/evals.md)               | Deterministic regression eval harness                    |
+| [MCP Typed Tools](docs/mcp.md)                   | MCP server/tool contracts for agent hosts                |
+| [Trace Events](docs/trace.md)                    | Append-only runtime audit trace                          |
+| [Portable Guardrails](docs/guardrails.md)        | Policy enforcement across CLI and MCP surfaces           |
+| [Maker/Checker Boundary](docs/maker-checker.md)  | Tool-owned task review and evidence/verdict contracts    |
+| [Spec Traceability](docs/spec-traceability.md)   | Requirement → Scenario → Task traceability               |
+| [Rules Guide](docs/rules-guide.md)               | Persistent learning rules                                |
 | [Programmatic Usage](docs/programmatic-usage.md) | Using Kyro instructions from custom LLM apps             |
-| [Behavioral Evals](docs/evals.md)                 | Deterministic regression eval harness                   |
-| [MCP Typed Tools](docs/mcp.md)                     | MCP server/tool contracts for agent hosts               |
-| [Trace Events](docs/trace.md)                      | Append-only runtime audit trace                         |
-| [Portable Guardrails](docs/guardrails.md)          | Policy enforcement across CLI and MCP surfaces          |
-| [Maker/Checker Boundary](docs/maker-checker.md)    | Tool-owned task review and evidence/verdict contracts   |
-| [Spec Traceability](docs/spec-traceability.md)       | Minimal Requirement → Scenario → Task traceability       |
-| [Agent-Computer Interface](docs/aci.md)            | Error codes, verbosity, tool summaries, naming map      |
-| [Status Coherence](docs/status-coherence.md)       | Derived lifecycle status, review-debt surfacing, criteria waivers |
+| [Release Checklist](docs/release-checklist.md)   | Maintainer release and CI gate ordering                  |
+
+---
+
+## Development
+
+```bash
+npm ci
+npm run check   # typecheck, version sync, links, dist freshness, evals, guardrails
+npm run build
+npm pack --dry-run
+```
+
+`dist/` is generated from `src/` and must stay in sync — `npm run check:dist` proves the committed build matches source, so releases can't ship stale output. Release tags matching `package.json.version` publish to npm via GitHub Actions (requires the `NPM_TOKEN` secret).
 
 ---
 
 ## Philosophy
 
-1. **Commands over prose** — users should invoke workflows, not explain them repeatedly.
-2. **Markdown remains the collaboration layer** — humans and agents can inspect the same artifacts.
-3. **The CLI owns deterministic checks** — package health should not depend on prompt discipline.
-4. **Adapters are concrete** — each supported agent gets the files it actually knows how to use.
-5. **One sprint at a time** — each cycle adapts from evidence, retro, and technical debt.
-6. **Claude stays first-class** — multi-agent support does not mean retiring the Claude plugin.
+1. **Commands over prose** — invoke a workflow, don't re-explain it every time.
+2. **Markdown is the collaboration layer** — humans and agents inspect the same artifacts.
+3. **The CLI owns deterministic checks** — health can't depend on prompt discipline.
+4. **Adapters are concrete** — each agent gets files it actually knows how to use.
+5. **One sprint at a time** — each cycle adapts from evidence, retro, and debt.
+6. **Claude stays first-class** — multi-agent support never retires the plugin.
 
 ---
 
 <p align="center">
   <br/>
-  <b>If this helps your AI coding workflow, star the repo so other builders can find it.</b>
+  <b>If Kyro helps your AI coding workflow, star the repo so other builders can find it.</b>
   <br/><br/>
   <a href="https://github.com/SynapSync/kyro-ai/stargazers"><img src="https://img.shields.io/github/stars/SynapSync/kyro-ai?style=for-the-badge&logo=github&color=D97757&labelColor=1e1e2e" alt="Stars"/></a>
   <br/><br/>

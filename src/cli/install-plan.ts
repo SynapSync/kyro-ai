@@ -18,15 +18,27 @@ import { readProjectState } from './state';
 import type { Agent, InstallScope, KyroManifest, KyroProjectState, OperationPlan } from './types';
 
 export function buildInstallPlan(agents: Agent[], scope: InstallScope): OperationPlan[] {
+  return buildInstallPlanForMode(agents, scope, { includeWorkspace: true });
+}
+
+export function buildRuntimeInstallPlan(scope: InstallScope): OperationPlan[] {
+  return buildInstallPlanForMode([], scope, { includeWorkspace: false });
+}
+
+function buildInstallPlanForMode(
+  agents: Agent[],
+  scope: InstallScope,
+  options: { includeWorkspace: boolean },
+): OperationPlan[] {
   const now = new Date().toISOString();
   const packageVersion = readPackageVersion();
   const runtimeRoot = KYRO_ROOT;
   // Probed once per install/sync — projected markdown is static, so the invocation must be
   // known at copy time. Reused for manifest.json, kyro.json, and (Phase 3+) substitution.
   const kyroInvocation = resolveKyroInvocation().raw;
-  const state = mergeProjectState(agents, scope, now, packageVersion, kyroInvocation);
-  const manifestAgents = state.installedAdapters.map((adapter) => adapter.agent);
-  const adapters = state.installedAdapters;
+  const state = options.includeWorkspace ? mergeProjectState(agents, scope, now, packageVersion, kyroInvocation) : null;
+  const manifestAgents = state?.installedAdapters.map((adapter) => adapter.agent) ?? [];
+  const adapters = state?.installedAdapters ?? [];
   const managedFiles = buildManagedFiles(manifestAgents, runtimeRoot);
   const managedBlocks = buildManagedBlocks(manifestAgents);
   const manifest: KyroManifest = {
@@ -42,8 +54,6 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   };
 
   const plan: OperationPlan[] = [
-    { action: 'mkdir', path: ARTIFACT_ROOT },
-    { action: 'write', path: KYRO_STATE_PATH, content: `${JSON.stringify(state, null, 2)}\n` },
     // Single-active runtime: replace the active runtime directory on every install/sync so
     // re-installs are idempotent and untracked files from older package layouts cannot accumulate.
     { action: 'remove', path: runtimeRoot },
@@ -51,6 +61,13 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
     { action: 'write', path: `${runtimeRoot}/manifest.json`, content: `${JSON.stringify(manifest, null, 2)}\n` },
     { action: 'write', path: `${runtimeRoot}/KYRO.md`, content: buildKyroBootstrap(packageVersion, runtimeRoot) },
   ];
+
+  if (state) {
+    plan.unshift(
+      { action: 'mkdir', path: ARTIFACT_ROOT },
+      { action: 'write', path: KYRO_STATE_PATH, content: `${JSON.stringify(state, null, 2)}\n` },
+    );
+  }
 
   // Markdown-bearing copies carry the {{KYRO_CLI}} substitution map (design.md §5.3) so every
   // projected occurrence resolves to the runnable invocation. `commands/` references only slash
@@ -71,9 +88,11 @@ export function buildInstallPlan(agents: Agent[], scope: InstallScope): Operatio
   // Clean the retired multi-version runtime root. Kyro now keeps only one active runtime.
   plan.push({ action: 'remove', path: KYRO_LEGACY_VERSIONS_ROOT });
 
-  for (const adapter of getInstalledAdapterDefinitions(manifestAgents)) {
-    adapter.buildProjection(plan);
-    if (adapter.capabilities().includes('mcp')) adapter.buildMcpProjection(plan);
+  if (state) {
+    for (const adapter of getInstalledAdapterDefinitions(manifestAgents)) {
+      adapter.buildProjection(plan);
+      if (adapter.capabilities().includes('mcp')) adapter.buildMcpProjection(plan);
+    }
   }
 
   return plan;

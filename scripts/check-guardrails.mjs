@@ -128,7 +128,7 @@ function assertMcpProjection() {
     // `isKyroOnPath()` is deterministically false, making the projected MCP command stable across
     // machines (a dev box with a global `kyro` would otherwise emit `command = "node"` vs "kyro").
     const noKyroPath = join(root, '.home');
-    const install = run(['install', '--agent', 'codex', '--scope', 'workspace', '--yes'], root, { PATH: noKyroPath });
+    const install = run(['install', '--agent', 'codex', '--scope', 'workspace', '--init-workspace', '--yes'], root, { PATH: noKyroPath });
     assert(install.status === 0, `codex install should pass: ${install.stderr || install.stdout}`);
     const configPath = join(root, '.home/.codex/config.toml');
     const first = readFileSync(configPath, 'utf-8');

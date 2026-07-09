@@ -56,6 +56,16 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
       json: false,
       purgeAdapterAssets: false,
       prune: false,
+      initWorkspace: true,
+      noInitWorkspace: false,
+      trace: false,
+      task: null,
+      verbosity: 'detailed',
+      verbose: false,
+      evalCases: [],
+      evalTags: [],
+      evalList: false,
+      keepSandbox: false,
     }),
   );
 
@@ -113,6 +123,16 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
       json: false,
       purgeAdapterAssets: false,
       prune: false,
+      initWorkspace: false,
+      noInitWorkspace: false,
+      trace: false,
+      task: null,
+      verbosity: 'detailed',
+      verbose: false,
+      evalCases: [],
+      evalTags: [],
+      evalList: false,
+      keepSandbox: false,
     }),
   );
   assert(!existsSync(strayRuntimeFile), 'check-cli-bundle-assets: reinstall should replace active runtime instead of accumulating stray files');

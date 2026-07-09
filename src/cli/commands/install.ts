@@ -1,22 +1,43 @@
-import { buildInstallPlan } from '../install-plan';
+import { createInterface } from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
+import { buildInstallPlan, buildRuntimeInstallPlan } from '../install-plan';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope, uniqueAgents } from '../options';
 import { readProjectState } from '../state';
 import { KyroCoreError } from '../core/errors';
 import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
-import type { CliOptions } from '../types';
+import type { Agent, CliOptions } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
 import { analyzeDrift, buildPrunePlan, hasDrift, hasPrunableDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
 import { readPackageVersion } from '../help';
 
-export function install(options: CliOptions): void {
+export function install(options: CliOptions): void | Promise<void> {
   assertWorkspaceScope(options.scope);
   const agents = options.agents.length > 0 ? options.agents : [AGENT.STANDARD];
   runAdapterPreflight('install', agents);
 
   const packageVersion = readPackageVersion();
-  const plan = buildInstallPlan(agents, options.scope);
+  const existingState = readProjectState();
+  const workspaceDecision = shouldInstallWorkspace(options, existingState !== null);
+  if (workspaceDecision instanceof Promise) {
+    return workspaceDecision.then((shouldInitializeWorkspace) => {
+      runInstallPlan(options, agents, packageVersion, shouldInitializeWorkspace);
+    });
+  }
+  runInstallPlan(options, agents, packageVersion, workspaceDecision);
+}
+
+function runInstallPlan(
+  options: CliOptions,
+  agents: Agent[],
+  packageVersion: string,
+  shouldInitializeWorkspace: boolean,
+): void {
+  const plan = shouldInitializeWorkspace ? buildInstallPlan(agents, options.scope) : buildRuntimeInstallPlan(options.scope);
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
+  if (!shouldInitializeWorkspace && options.dryRun) {
+    console.log('Workspace: skipped');
+  }
   if (options.dryRun || options.trace || options.verbose) {
     printPlan('Install plan', plan);
   }
@@ -29,7 +50,11 @@ export function install(options: CliOptions): void {
   applyPlan(plan);
   console.log('Kyro has been installed.');
   console.log(`Version: ${packageVersion}`);
-  console.log(`State: ${KYRO_STATE_PATH}`);
+  if (shouldInitializeWorkspace) {
+    console.log(`State: ${KYRO_STATE_PATH}`);
+  } else {
+    console.log('Workspace: skipped');
+  }
   console.log(`Runtime: ${KYRO_ROOT}/`);
 }
 
@@ -37,7 +62,7 @@ export function sync(options: CliOptions): void {
   assertWorkspaceScope(options.scope);
   const state = readProjectState();
   if (!state) {
-    throw new KyroCoreError('INVALID_INPUT', 'Kyro is not installed in this workspace.', 'Run kyro install first.');
+    throw new KyroCoreError('INVALID_INPUT', 'Kyro is not installed in this workspace.', 'Run kyro install --init-workspace.');
   }
   const agents = options.agents.length > 0 ? options.agents : (state.installedAdapters ?? []).map((adapter) => adapter.agent);
   const unique = uniqueAgents(agents);
@@ -72,4 +97,27 @@ export function sync(options: CliOptions): void {
   }
   applyPlan(plan);
   console.log(`Kyro synced for: ${unique.join(', ')}`);
+}
+
+function shouldInstallWorkspace(options: CliOptions, hasWorkspaceState: boolean): boolean | Promise<boolean> {
+  if (hasWorkspaceState) return true;
+  if (options.noInitWorkspace) return false;
+  if (options.initWorkspace) return true;
+  if (options.dryRun) return false;
+  if (!isInteractiveTerminal()) return false;
+  return confirmWorkspaceInit();
+}
+
+function isInteractiveTerminal(): boolean {
+  return input.isTTY === true && output.isTTY === true;
+}
+
+async function confirmWorkspaceInit(): Promise<boolean> {
+  const rl = createInterface({ input, output });
+  try {
+    const answer = await rl.question('Initialize Kyro in this workspace? [y/N] ');
+    return answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes';
+  } finally {
+    rl.close();
+  }
 }

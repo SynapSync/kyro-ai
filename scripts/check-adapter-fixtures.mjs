@@ -68,6 +68,13 @@ function cliOptions(overrides = {}) {
     json: false,
     purgeAdapterAssets: false,
     prune: false,
+    initWorkspace: false,
+    noInitWorkspace: false,
+    trace: false,
+    task: null,
+    verbosity: 'detailed',
+    verbose: false,
+    keepSandbox: false,
     ...overrides,
   };
 }
@@ -77,7 +84,7 @@ function dryRunPlan(agentArg) {
     const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
     const { install } = require(join(repo, 'dist/cli/commands/install.js'));
     const agents = agentArg.split(',').map((agent) => parseAgent(agent));
-    return captureLogs(() => install(cliOptions({ agents, dryRun: true })));
+    return captureLogs(() => install(cliOptions({ agents, dryRun: true, initWorkspace: true })));
   });
 }
 
@@ -139,6 +146,41 @@ assert(openCodePlan.includes('- merge-json ~/.config/opencode/opencode.json'), '
 assert(!openCodePlan.includes('- write ~/.agents/skills/kyro-forge/SKILL.md'), 'opencode: should not use standard global command skill projection');
 assert(countIncludes(combinedPlan, '- write ~/.agents/skills/kyro-forge/SKILL.md') === 1, 'combined: forge skill should be projected once');
 assert(countIncludes(combinedPlan, '- upsert-block AGENTS.md # agents-md') === 1, 'combined: AGENTS.md block should be projected once');
+
+withWorkspace('kyro-runtime-only-install-', (cwd) => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install, sync } = require(join(repo, 'dist/cli/commands/install.js'));
+  const codex = parseAgent('codex');
+  const home = join(cwd, '.home');
+  const statePath = join(cwd, '.agents', 'kyro', 'kyro.json');
+
+  const runtimeDryRun = captureLogs(() => install(cliOptions({ agents: [codex], dryRun: true })));
+  assert(runtimeDryRun.includes('Workspace: skipped'), 'runtime-only dry-run: should report skipped workspace');
+  assert(runtimeDryRun.includes('- remove ~/.agents/kyro/current'), 'runtime-only dry-run: should update runtime');
+  assert(!runtimeDryRun.includes('- write .agents/kyro/kyro.json'), 'runtime-only dry-run: should not write workspace state');
+  assert(!existsSync(statePath), 'runtime-only dry-run: should not create workspace state');
+
+  const runtimeOutput = captureLogs(() => install(cliOptions({ agents: [codex] })));
+  assert(runtimeOutput.includes('Workspace: skipped'), 'runtime-only install: should report skipped workspace');
+  assert(existsSync(join(home, '.agents', 'kyro', 'current', 'manifest.json')), 'runtime-only install: should write runtime manifest');
+  assert(!existsSync(statePath), 'runtime-only install: should not create workspace state');
+
+  captureLogs(() => install(cliOptions({ agents: [codex], noInitWorkspace: true })));
+  assert(!existsSync(statePath), 'no-init-workspace: should not create workspace state');
+
+  let syncFailed = false;
+  try {
+    captureLogs(() => sync(cliOptions({ agents: [codex] })));
+  } catch (error) {
+    syncFailed = true;
+    assert(String(error).includes('Kyro is not installed in this workspace'), 'sync without workspace: wrong error message');
+    assert(error?.remedy === 'Run kyro install --init-workspace.', 'sync without workspace: wrong remedy');
+  }
+  assert(syncFailed, 'sync without workspace: expected failure');
+
+  captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
+  assert(existsSync(statePath), 'init-workspace: should create workspace state');
+});
 
 withWorkspace('kyro-adapter-preflight-', () => {
   const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
@@ -283,7 +325,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const codex = parseAgent('codex');
   writeFileSync(join(installDir, 'AGENTS.md'), '# Workspace Notes\n\nKeep this user content.\n', 'utf-8');
 
-  captureLogs(() => install(cliOptions({ agents: [codex] })));
+  captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
 
   const home = join(installDir, '.home');
   for (const command of EXPECTED_COMMAND_SKILLS) {
@@ -346,7 +388,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const staleReinstallInstalledAt = '2002-01-01T00:00:00.000Z';
   syncedCodex.installedAt = staleReinstallInstalledAt;
   writeFileSync(statePath, `${JSON.stringify(stateAfterSync, null, 2)}\n`, 'utf-8');
-  captureLogs(() => install(cliOptions({ agents: [codex] })));
+  captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
   const stateAfterReinstall = JSON.parse(readFileSync(statePath, 'utf-8'));
   const reinstalledCodex = stateAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
   const reinstalledStandard = stateAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
@@ -388,7 +430,7 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
     }
   }`, 'utf-8');
 
-  captureLogs(() => install(cliOptions({ agents: [opencode] })));
+  captureLogs(() => install(cliOptions({ agents: [opencode], initWorkspace: true })));
 
   for (const command of EXPECTED_COMMAND_SKILLS) {
     const skillPath = join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md');
@@ -425,7 +467,7 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
 
   assert(!existsSync(join(home, '.agents', 'skills', 'kyro-forge', 'SKILL.md')), 'opencode install: should not install standard global skill projection');
 
-  captureLogs(() => install(cliOptions({ agents: [opencode] })));
+  captureLogs(() => install(cliOptions({ agents: [opencode], initWorkspace: true })));
   const purgeDryRunOutput = captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true, dryRun: true })));
   assert(purgeDryRunOutput.includes('purgeAdapterAssets=yes'), 'opencode purge dry-run: summary should report purge enabled');
   assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/skills/kyro-forge/SKILL.md'), 'opencode purge dry-run: plan should include native skill removal');
@@ -526,7 +568,7 @@ withWorkspace('kyro-sync-drift-', (cwd) => {
   const codex = parseAgent('codex');
   const home = join(cwd, '.home');
 
-  captureLogs(() => install(cliOptions({ agents: [codex] })));
+  captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
 
   const runtimeDir = join(home, '.agents', 'kyro', 'current');
   assert(existsSync(runtimeDir), 'sync-drift: active runtime dir should exist after install');
@@ -605,7 +647,7 @@ withWorkspace('kyro-sync-shared-config-only-', (cwd) => {
   const codex = parseAgent('codex');
   const home = join(cwd, '.home');
 
-  captureLogs(() => install(cliOptions({ agents: [codex] })));
+  captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
 
   const runtimeDir = join(home, '.agents', 'kyro', 'current');
   const sharedOpenCodeConfig = join(home, '.config', 'opencode', 'opencode.json');

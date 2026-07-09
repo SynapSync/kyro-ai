@@ -16,11 +16,11 @@ export async function runTui(): Promise<void> {
     console.log('5) Exit');
     const answer = await rl.question('Select an option: ');
     if (answer.trim() === '1') {
-      install(tuiInstallOptions(AGENT.STANDARD));
+      await install(tuiInstallOptions(AGENT.STANDARD));
     } else if (answer.trim() === '2') {
-      install(tuiInstallOptions(AGENT.OPENCODE));
+      await install(tuiInstallOptions(AGENT.OPENCODE));
     } else if (answer.trim() === '3') {
-      install(tuiInstallOptions(AGENT.CODEX));
+      await install(tuiInstallOptions(AGENT.CODEX));
     } else if (answer.trim() === '4') {
       doctor();
     } else {
@@ -49,6 +49,8 @@ function tuiInstallOptions(agent: Agent): CliOptions {
     verbose: false,
     purgeAdapterAssets: false,
     prune: false,
+    initWorkspace: true,
+    noInitWorkspace: false,
     evalCases: [],
     evalTags: [],
     evalList: false,
