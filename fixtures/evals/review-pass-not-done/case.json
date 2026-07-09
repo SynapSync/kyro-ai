@@ -1,0 +1,16 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "review-pass-not-done",
+  "title": "review refuses a pass verdict on a task that is not done",
+  "kind": "replay",
+  "tags": ["maker-checker", "review"],
+  "agents": ["any"],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": ["review", "T1.1", "--kyro-scope", "demo", "--verdict", "pass", "--yes"],
+      "expect": { "exitCode": 1, "stderrIncludes": ["not done"] }
+    }
+  ],
+  "expectFinalState": false
+}
