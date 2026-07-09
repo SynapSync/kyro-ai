@@ -75,7 +75,7 @@ Once confirmed, perform exactly **one file write** to `.agents/kyro/{docType}/{d
 
 - **Path structure:** create the `.agents/kyro/{docType}/` directory if it doesn't exist (e.g. `plan/`, `analysis/`, `constitution/`) and write the file inside. Create directories **only** — never create `kyro.json`, a `scopes/` directory, or any scope. If `.agents/kyro/` does not exist yet, creating the `{docType}` subdirectory materializes it; that is the only side effect, and it is not a scope.
 - **Filename:** `{YYYY-MM-DD}-{slug}.md` where date is today (in `YYYY-MM-DD` format, e.g. `2026-07-08`) and slug is a kebab-case 3–6 word summary of the idea (e.g. `mario-kart-game`, `llm-training-viability`).
-- **Template:** use `skills/sprint-forge/assets/templates/matured-idea.md`, filling in all fields and sections from the conversation.
+- **Template:** use `skills/seedbed/assets/templates/matured-idea.md`, filling in all fields and sections from the conversation.
   - If a section has no answer (e.g. "Explicitly out of scope" was never discussed), write "`[NOT DISCUSSED]`" instead of inventing.
   - If a question is unresolved (hard-limit exit), mark it as "`[OPEN QUESTION: <what was unclear>]`" in the relevant section or in a dedicated `## Open questions` section.
   - Never write to `kyro.json` or touch `principles[]` — this is evidence, not a schema mutation.

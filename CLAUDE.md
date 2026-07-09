@@ -18,13 +18,15 @@ User Command (/kyro:forge, /kyro:status, /kyro:wrap-up)
 kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
-├── commands/         # 4 slash commands
+├── commands/         # 5 slash commands
 │   ├── forge.md      # /kyro:forge — full cycle with gates
 │   ├── status.md     # /kyro:status — progress and debt summary
 │   ├── wrap-up.md    # /kyro:wrap-up — session closure ritual
-│   └── idea.md       # /kyro:idea — idea maturation pre-scope (optional)
-├── skills/           # 2 skills
+│   ├── idea.md       # /kyro:idea — idea maturation pre-scope (optional)
+│   └── task-context.md # /kyro:task-context — fresh-context continuation prompt
+├── skills/           # 3 skills
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+│   ├── seedbed/           # Idea maturation pre-scope — matures a rough idea into a structured brief (loaded only via /kyro:idea)
 │   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 ├── .claude-plugin/   # Claude Code adapter packaging
 │   ├── plugin.json   # Plugin manifest (version must match package.json)

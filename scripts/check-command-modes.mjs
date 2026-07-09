@@ -11,8 +11,8 @@ import { fileURLToPath } from 'node:url';
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const commandsDir = resolve(repo, 'commands');
 
-// Matches repo-root-relative references into the sprint-forge asset tree.
-const assetRe = /skills\/sprint-forge\/assets\/(?:modes|helpers|templates)\/[A-Za-z0-9_./-]+\.md/g;
+// Matches repo-root-relative references into any skill's asset tree.
+const assetRe = /skills\/[a-z][a-z0-9-]*\/assets\/(?:modes|helpers|templates)\/[A-Za-z0-9_./-]+\.md/g;
 
 const failures = [];
 let referenceCount = 0;
