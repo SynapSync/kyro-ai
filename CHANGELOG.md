@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.16.2] - 2026-07-09
+
+### Fixed
+
+- `kyro review --verdict pass` no longer accepts a pass verdict on a task that is not
+  `status: done`. Every checker finding was gated behind `status === 'done'`, so a pass
+  written onto a still-pending task produced zero findings and the review gate never fired —
+  leaving the sprint in an inconsistent state (pass verdict + pending status + a handoff stuck
+  on the same task). A new CRITICAL checker finding now blocks that pass and also surfaces the
+  inconsistency in `kyro analyze`. Combined with the existing done-without-evidence check, a
+  pass verdict now requires the task to be executed (done with valid evidence) first.
+- `kyro analyze` malformed-evidence findings now name the exact failing field (e.g.
+  `evidence.notes must be a string when present`) instead of only the generic "missing or
+  malformed evidence", reusing the schema validator so hand-fixing evidence no longer requires
+  guessing the contract.
+
 ## [4.16.1] - 2026-07-08
 
 ### Added

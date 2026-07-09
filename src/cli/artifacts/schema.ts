@@ -413,6 +413,17 @@ function validateTaskEvidence(value: unknown, path: string, prefix: string, issu
   requireIsoString(value, 'recordedAt', path, issues, `${prefix}.recordedAt`);
 }
 
+/**
+ * Per-field reasons a task.evidence value fails the schema, e.g. `evidence.notes must be a string
+ * when present`. Reuses validateTaskEvidence so analyze/review can name the exact malformed field
+ * instead of the generic "missing or malformed evidence".
+ */
+export function taskEvidenceIssues(value: unknown, prefix = 'evidence'): string[] {
+  const issues: ValidationIssue[] = [];
+  validateTaskEvidence(value, prefix, prefix, issues);
+  return issues.map((issue) => `${issue.field} ${issue.message}`);
+}
+
 function validateTaskVerdict(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
   if (!isRecord(value)) {
     issues.push({ path, field: prefix, message: 'must be an object { result, checked_criteria, findings, by, reviewedAt } or null' });

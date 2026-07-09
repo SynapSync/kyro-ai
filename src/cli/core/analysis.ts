@@ -1,6 +1,6 @@
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, asTaskEvidence, asTaskVerdict } from '../artifacts/schema';
+import { asSprintFile, asTaskEvidence, asTaskVerdict, taskEvidenceIssues } from '../artifacts/schema';
 import { readProjectState } from '../state';
 import type { ActiveSprint, AnalysisFinding, AnalysisSeverity, Phase, Principle, PrincipleCheck, SprintFile, Task } from '../types';
 import { KyroCoreError } from './errors';
@@ -207,12 +207,27 @@ export function collectCheckerFindings(sprint: SprintFile, principles: Principle
     const rawEvidence = task.evidence as unknown;
     const hasEvidence = evidence !== null || (typeof rawEvidence === 'string' && rawEvidence.trim().length > 0);
     if (task.status === 'done' && !hasEvidence) {
-      add('CRITICAL', `task ${task.id} is done but has missing or malformed evidence`, 'Record task.evidence with summary, validation, files_changed, by, and recordedAt before review.');
+      // Name the exact failing field(s) when evidence is a malformed object; keep the base wording
+      // for null/absent evidence (validateTaskEvidence's "must be an object … or null" message is
+      // misleading there). The substring "missing or malformed evidence" is preserved either way —
+      // check:maker-checker asserts on it.
+      const malformedObject = typeof rawEvidence === 'object' && rawEvidence !== null;
+      const detail = malformedObject
+        ? `task ${task.id} is done but has missing or malformed evidence: ${taskEvidenceIssues(rawEvidence).join('; ')}`
+        : `task ${task.id} is done but has missing or malformed evidence`;
+      add('CRITICAL', detail, 'Record task.evidence with summary, validation, files_changed, by, and recordedAt before review.');
     }
     if (task.status === 'done' && !verdict) {
       add('CRITICAL', `task ${task.id} is done but has missing or malformed verdict`, 'Run kyro review for the task so the tool owns the verdict write.');
     }
     if (!verdict || verdict.result !== 'pass') continue;
+    // A pass verdict is only meaningful on an executed task. Without this, a pass written onto a
+    // still-pending task produces no finding (every check below is done-gated), so review's own gate
+    // never fires and the sprint lands in the inconsistent state pass+pending+handoff-stuck.
+    if (task.status !== 'done') {
+      add('CRITICAL', `task ${task.id} has a pass verdict but status is "${task.status}", not done`, 'A task must be executed (status done with recorded evidence) before it can be pass-reviewed. Run execute-task first, then kyro review.');
+      continue;
+    }
     const waived = (verdict.waived_criteria ?? []).map((w) => w.criterion);
     const missingCriteria = missingCheckedCriteria(task.acceptance_criteria ?? [], verdict.checked_criteria, waived);
     if (missingCriteria.length > 0) {
