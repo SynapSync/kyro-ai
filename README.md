@@ -117,16 +117,6 @@ It loads two files to start and updates one per action — it never pre-loads ev
 
 ---
 
-## Why it's different
-
-- **Deterministic gates, not prompt discipline.** `kyro doctor` and `kyro analyze` validate `sprint.json` shape, zero-loss snapshots, coverage, dependencies, and overdue debt — in code. Quality doesn't depend on the model behaving.
-- **One source of truth per scope.** No scattered notes to keep in sync. Objective, roadmap, active sprint, debt, conventions, and handoff all live in one `sprint.json`.
-- **Zero-loss archives.** Every closed sprint is snapshotted verbatim before it's cleared. History is never overwritten.
-- **Portable by design.** The workflow is markdown the agent reads, plus a small deterministic CLI. Adapters translate it into each agent's native surface — no agent-specific lock-in.
-- **Claude stays first-class.** Multi-agent support never means retiring the Claude plugin.
-
----
-
 ## Adapters
 
 The CLI installs the harness into concrete agents. There is intentionally no `generic` adapter — cross-agent instructions belong in root `AGENTS.md`.

@@ -1,6 +1,6 @@
 {
   "name": "kyro-ai",
-  "version": "4.15.0",
+  "version": "4.16.0",
   "description": "Claude Code adapter for Kyro, a portable sprint workflow kit for AI coding agents with optional idea maturation",
   "author": {
     "name": "SynapSync",
@@ -31,6 +31,7 @@
   ],
   "skills": [
     "./skills/sprint-forge",
+    "./skills/seedbed",
     "./skills/qa-review"
   ],
   "agents": [

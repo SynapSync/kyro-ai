@@ -12,12 +12,12 @@ Refine a vague idea into a structured brief through a bounded conversation, writ
 ## Startup
 
 1. Take the rough idea from `$ARGUMENTS`. If empty, ask the user for a one-line idea: "What's the rough idea?"
-2. Load `skills/sprint-forge/assets/modes/idea.md` directly (no `kyro.json`, no `sprint.json`, no scope resolution). That mode is the whole workflow.
+2. Load `skills/seedbed/assets/modes/idea.md` directly (no `kyro.json`, no `sprint.json`, no scope resolution). That mode is the whole workflow.
 3. Pass the idea to the mode and begin the maturation loop.
 
 ## Rules
 
 - Do not read, create, or resolve `.agents/kyro/kyro.json`, `.agents/kyro/scopes/`, or any `sprint.json`. The only file this command's mode ever writes is one matured-idea document under `.agents/kyro/{docType}/`.
-- Do not load `agents/orchestrator.md` or any other mode/helper — only `skills/sprint-forge/assets/modes/idea.md`, plus the `matured-idea.md` template immediately before the final write.
+- Do not load `agents/orchestrator.md` or any other mode/helper — only `skills/seedbed/assets/modes/idea.md`, plus the `matured-idea.md` template immediately before the final write.
 - When the mode signals done (user confirmation or soft/hard limit reached), it writes exactly one markdown file to `.agents/kyro/{docType}/{date}-{slug}.md` and proposes next steps.
 - Never invent an answer to dodge a question — that is exactly the failure this pre-scope maturation prevents.

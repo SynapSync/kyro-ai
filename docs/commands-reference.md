@@ -36,7 +36,7 @@ Runs a bounded, one-question-at-a-time conversation to turn a vague idea into a 
 
 ### Routing
 
-`/kyro:idea` does **not** go through the orchestrator and does **not** route on `sprint.json.handoff.nextAction`. It loads `skills/sprint-forge/assets/modes/idea.md` directly. It never reads, resolves, or creates a scope, `.agents/kyro/kyro.json`, or any `sprint.json` — the matured-idea document is write-only evidence, sibling to `.agents/kyro/scopes/`, and no CLI validator (`doctor`, `analyze`) touches it.
+`/kyro:idea` does **not** go through the orchestrator and does **not** route on `sprint.json.handoff.nextAction`. It loads `skills/seedbed/assets/modes/idea.md` directly. It never reads, resolves, or creates a scope, `.agents/kyro/kyro.json`, or any `sprint.json` — the matured-idea document is write-only evidence, sibling to `.agents/kyro/scopes/`, and no CLI validator (`doctor`, `analyze`) touches it.
 
 ### After maturing
 

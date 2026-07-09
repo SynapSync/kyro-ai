@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-07-08
+
+### Changed
+
+- Idea maturation is now its own skill, `seedbed`, instead of a mode inside
+  `sprint-forge`. `skills/sprint-forge/assets/modes/idea.md` and the `matured-idea`
+  template moved to `skills/seedbed/assets/`. This keeps the pre-scope idea workflow
+  fully decoupled from the sprint cycle: `seedbed` loads only when `/kyro:idea` is
+  invoked and shares no state with `sprint-forge`.
+- `check:command-modes` now validates command→asset references across all skills, not
+  just `sprint-forge`.
+
+### Notes
+
+- No user-facing change: `/kyro:idea` behaves identically (same bounded conversation,
+  same pre-scope guarantees, same output path). Only the internal skill location changed.
+
 ## [4.15.0] - 2026-07-08
 
 ### Added
