@@ -50,7 +50,8 @@ Global command skills:
 ├── kyro-forge/SKILL.md
 ├── kyro-status/SKILL.md
 ├── kyro-wrap-up/SKILL.md
-└── kyro-task-context/SKILL.md
+├── kyro-task-context/SKILL.md
+└── kyro-idea/SKILL.md
 ```
 
 OpenCode installs equivalent native entrypoints:

@@ -97,7 +97,7 @@ Five slash commands, one job each. All are thin routers over `sprint.json` — t
 | `/kyro:idea`        | **Optional** pre-scope step: mature a rough idea into a structured brief before any scope exists |
 | `/kyro:task-context`| Emit a copy-paste prompt to continue the work in a fresh context             |
 
-On hosts without slash commands, the CLI projects the equivalent skills `kyro-forge`, `kyro-status`, `kyro-wrap-up`, and `kyro-task-context` into `~/.agents/skills/`.
+On hosts without slash commands, the CLI projects the equivalent skills `kyro-forge`, `kyro-status`, `kyro-wrap-up`, `kyro-task-context`, and `kyro-idea` into `~/.agents/skills/`.
 
 ---
 

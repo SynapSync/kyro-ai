@@ -91,7 +91,8 @@ Global command skills are installed for agent discovery:
 ├── kyro-forge/SKILL.md
 ├── kyro-status/SKILL.md
 ├── kyro-wrap-up/SKILL.md
-└── kyro-task-context/SKILL.md
+├── kyro-task-context/SKILL.md
+└── kyro-idea/SKILL.md
 ```
 
 The project keeps only state and artifacts:
@@ -139,6 +140,7 @@ Projected skills:
 - `kyro-status`
 - `kyro-wrap-up`
 - `kyro-task-context`
+- `kyro-idea`
 
 Each projected skill references the managed Kyro runtime in `~/.agents/kyro/current/` instead of duplicating long workflow instructions.
 
