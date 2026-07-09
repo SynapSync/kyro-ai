@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.16.1] - 2026-07-08
+
+### Added
+
+- `/kyro:idea` is now projected to CLI hosts (opencode, codex) as the `kyro-idea`
+  command skill. Idea maturation previously shipped only on the Claude plugin; the CLI
+  installer's command set omitted it, so `kyro install --agent opencode/codex` never
+  surfaced it. `idea` is now part of `COMMAND_NAMES` and installs alongside `kyro-forge`,
+  `kyro-status`, `kyro-wrap-up`, and `kyro-task-context`.
+
+### Notes
+
+- Existing installs must re-run `kyro install` (or `kyro sync`) to project the new
+  `kyro-idea` skill; `kyro doctor` flags it as missing until then.
+- Naming stays consistent with the `forge`/`sprint-forge` pattern: the public command is
+  `idea` (`kyro-idea`), backed by the internal `seedbed` skill — the skill name is never
+  projected, exactly like `sprint-forge` sits behind `kyro-forge`.
+
 ## [4.16.0] - 2026-07-08
 
 ### Changed

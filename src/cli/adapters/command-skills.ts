@@ -45,11 +45,13 @@ function getCommandDescription(command: KyroCommandName): string {
   if (command === 'forge') return 'Run the Kyro forge workflow through the installed workspace harness';
   if (command === 'status') return 'Show Kyro project status through the installed workspace harness';
   if (command === 'wrap-up') return 'Close the Kyro session through the installed workspace harness';
+  if (command === 'idea') return 'Mature a rough idea into a structured pre-scope brief before starting a Kyro scope (optional)';
   return 'Generate a fresh-context prompt for continuing Kyro work';
 }
 
 function getCommandTitle(command: KyroCommandName): string {
   if (command === 'wrap-up') return 'Kyro Wrap-Up';
   if (command === 'task-context') return 'Kyro Task Context';
+  if (command === 'idea') return 'Kyro Idea';
   return `Kyro ${command.slice(0, 1).toUpperCase()}${command.slice(1)}`;
 }
