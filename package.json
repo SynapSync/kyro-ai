@@ -61,7 +61,7 @@
     "type": "git",
     "url": "git+https://github.com/SynapSync/kyro-ai.git"
   },
-  "homepage": "https://synapsync.dev/cognitives/kyro-ai",
+  "homepage": "https://github.com/SynapSync",
   "skills": [
     "./skills/sprint-forge",
     "./skills/qa-review"
