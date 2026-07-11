@@ -55,7 +55,7 @@ Everything the agent knows about that work — objective, roadmap, the active sp
 Under the hood, one install gives your agents:
 
 - a **managed core** with orchestrator, command, skill, and template instructions
-- **command-like skills** such as `kyro-forge`, `kyro-status`, and `kyro-wrap-up`
+- **command-like skills** such as `kyro-forge`, `kyro-status`, `kyro-qa`, and `kyro-wrap-up`
 - **a single source of truth per scope** — one `sprint.json` holding objective, success criteria, roadmap, the active sprint, debt, conventions, and handoff routing
 - **zero-loss archives** — every closed sprint is snapshotted verbatim before it is cleared
 - **deterministic CLI gates** (`doctor`, `analyze`) so quality is enforced in code, not left to prompt discipline
@@ -87,7 +87,7 @@ That's it. No prompt to paste, no workflow to explain.
 
 ## The commands
 
-Five slash commands, one job each. All are thin routers over `sprint.json` — they read structured state first, then load only what the current step needs.
+Six slash commands, one job each. All are thin routers over `sprint.json` — they read structured state first, then load only what the current step needs.
 
 | Command             | What it does                                                                 |
 | ------------------- | ---------------------------------------------------------------------------- |
@@ -95,9 +95,10 @@ Five slash commands, one job each. All are thin routers over `sprint.json` — t
 | `/kyro:status`      | Progress bars, roadmap health, and technical-debt summary (`brief`/`full`/`debt`) |
 | `/kyro:wrap-up`     | Close the session, refresh handoff routing, preserve learnings               |
 | `/kyro:idea`        | **Optional** pre-scope step: mature a rough idea into a structured brief before any scope exists |
+| `/kyro:qa`          | **Independent certification audit**: validate scope implementation, architecture, security, testing, and planning against spec |
 | `/kyro:task-context`| Emit a copy-paste prompt to continue the work in a fresh context             |
 
-On hosts without slash commands, the CLI projects the equivalent skills `kyro-forge`, `kyro-status`, `kyro-wrap-up`, `kyro-task-context`, and `kyro-idea` into `~/.agents/skills/`.
+On hosts without slash commands, the CLI projects the equivalent skills `kyro-forge`, `kyro-status`, `kyro-wrap-up`, `kyro-task-context`, `kyro-idea`, and `kyro-qa` into `~/.agents/skills/`.
 
 ---
 

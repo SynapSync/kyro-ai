@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.17.1] - 2026-07-11
+
+### Fixed
+
+- `/kyro:qa` command is now properly registered in adapter fixtures (standard, OpenCode, Codex). The kyro-qa command skill was missing from the list of expected command skills projected for adapters, preventing it from being discovered in non-Claude environments.
+
 ## [4.17.0] - 2026-07-11
 
 ### Added
