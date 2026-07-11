@@ -46,6 +46,7 @@ function getCommandDescription(command: KyroCommandName): string {
   if (command === 'status') return 'Show Kyro project status through the installed workspace harness';
   if (command === 'wrap-up') return 'Close the Kyro session through the installed workspace harness';
   if (command === 'idea') return 'Mature a rough idea into a structured pre-scope brief before starting a Kyro scope (optional)';
+  if (command === 'qa') return 'Certify a scope\'s implementation and planning against its full specification (independent audit)';
   return 'Generate a fresh-context prompt for continuing Kyro work';
 }
 
@@ -53,5 +54,6 @@ function getCommandTitle(command: KyroCommandName): string {
   if (command === 'wrap-up') return 'Kyro Wrap-Up';
   if (command === 'task-context') return 'Kyro Task Context';
   if (command === 'idea') return 'Kyro Idea';
+  if (command === 'qa') return 'Kyro QA';
   return `Kyro ${command.slice(0, 1).toUpperCase()}${command.slice(1)}`;
 }
