@@ -111,7 +111,7 @@ function assertCommonPlan(plan, name) {
   assert(!plan.includes('- symlink ~/.agents/kyro/current'), `${name}: should not create a current symlink`);
 }
 
-const EXPECTED_COMMAND_SKILLS = ['forge', 'status', 'wrap-up', 'task-context', 'idea'];
+const EXPECTED_COMMAND_SKILLS = ['forge', 'status', 'wrap-up', 'task-context', 'idea', 'qa'];
 
 function assertStandardCommandSkills(plan, name) {
   for (const command of EXPECTED_COMMAND_SKILLS) {
