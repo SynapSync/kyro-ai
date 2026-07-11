@@ -14,7 +14,7 @@ This command is **independent of the forge cycle** — use it anytime to validat
 1. Read `.agents/kyro/kyro.json`.
 2. Resolve scope from `$ARGUMENTS`, `kyro.json.activeScope`, or prompt the user to select from `.agents/kyro/scopes/`.
 3. Read the scope's `sprint.json`. Verify it exists and is valid.
-4. Run `{{KYRO_CLI}} doctor --artifacts` to validate sprint.json is present, parseable, and synchronized with code.
+4. Validate sprint.json is present, parseable, and synchronized with code (per the qa-review skill's validation step at `SKILL.md:106`).
 5. Load `skills/qa-review/SKILL.md` to prepare the audit framework.
 
 ## Audit Scope
