@@ -7,8 +7,8 @@ Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based p
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/kyro:forge, /kyro:status, /kyro:wrap-up, /kyro:task-context)
-  └── Agent (orchestrator)
+User Command (/kyro:forge, /kyro:status, /kyro:wrap-up, /kyro:task-context, /kyro:qa, /kyro:idea)
+  └── Agent (orchestrator, or direct skill load for qa and idea)
         └── Skill (core)
 ```
 
@@ -18,13 +18,16 @@ User Command (/kyro:forge, /kyro:status, /kyro:wrap-up, /kyro:task-context)
 kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
-├── commands/         # 4 slash commands
+├── commands/         # 6 slash commands
 │   ├── forge.md      # /kyro:forge — full cycle with gates
 │   ├── status.md     # /kyro:status — progress and debt summary
 │   ├── wrap-up.md    # /kyro:wrap-up — session closure ritual
-│   └── task-context.md # /kyro:task-context — fresh-context prompt generation
-├── skills/           # 2 skills
+│   ├── task-context.md # /kyro:task-context — fresh-context prompt generation
+│   ├── idea.md       # /kyro:idea — idea maturation pre-scope (optional)
+│   └── qa.md         # /kyro:qa — certification audit (independent)
+├── skills/           # 3 skills
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
+│   ├── seedbed/           # Idea maturation pre-scope — matures a rough idea into a structured brief
 │   └── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 ├── .claude-plugin/  # Claude Code adapter packaging
 │   ├── plugin.json   # Plugin manifest (version must match package.json)
@@ -113,7 +116,7 @@ When bumping version or changing the description:
 <!-- kyro-ai:agents-md:start -->
 ## Kyro AI
 
-Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-wrap-up`, `kyro-task-context`.
+Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-wrap-up`, `kyro-task-context`, `kyro-qa`, `kyro-idea`.
 
 Runtime: `~/.agents/kyro/current/`
 Project state: `.agents/kyro/kyro.json`

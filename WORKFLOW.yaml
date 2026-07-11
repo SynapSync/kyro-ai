@@ -1,6 +1,6 @@
 name: kyro-ai
 type: workflow
-version: "4.16.2"
+version: "4.17.0"
 description: >
   Portable sprint workflow kit for AI coding agents, with markdown artifacts,
   adapter guides, adaptive per-project learning, and formal validation gates.
@@ -17,6 +17,7 @@ commands:
   - wrap-up # End-of-session closure ritual with quality check
   - task-context # Fresh-context prompt generation for continuation
   - idea # Optional idea maturation before starting a scope
+  - qa # Certification audit — code, architecture, security, testing, planning sync (independent of forge cycle)
 
 agents:
   - orchestrator # Full cycle coordination — analysis, review, debugging, and sprint execution
