@@ -14,7 +14,8 @@ This command is **independent of the forge cycle** — use it anytime to validat
 1. Read `.agents/kyro/kyro.json`.
 2. Resolve scope from `$ARGUMENTS`, `kyro.json.activeScope`, or prompt the user to select from `.agents/kyro/scopes/`.
 3. Read the scope's `sprint.json`. Verify it exists and is valid.
-4. Load `skills/qa-review/SKILL.md` to prepare the audit framework.
+4. Run `{{KYRO_CLI}} doctor --artifacts` to validate sprint.json is present, parseable, and synchronized with code.
+5. Load `skills/qa-review/SKILL.md` to prepare the audit framework.
 
 ## Audit Scope
 
@@ -31,7 +32,7 @@ The QA review will validate:
 
 ## Output
 
-The review will produce one of four verdicts:
+The review will produce one of four verdicts (these are QA report conclusions and do not get written into `sprint.json` task verdicts, which use a separate `pass`/`fail` schema for `/kyro:forge`'s gate system):
 
 - **APPROVED** — implementation is correct and ready to ship/merge
 - **APPROVED WITH NOTES** — acceptable with non-blocking recommendations
@@ -46,11 +47,15 @@ The review will include:
 - Planning artifact verification
 - Final decision and blockers
 
+This verdict is the QA report's own conclusion. It does not replace the binary `pass`/`fail` task-level verdicts used by `/kyro:forge`'s `review_task` step.
+
 ## Rules
 
-- QA is independent — can be run at any point, not just at phase gates
-- The audit is strict but pragmatic — it protects architecture and maintainability
-- If implementation contradicts the spec, that is a REJECTED or CHANGES REQUIRED verdict
-- If planning artifacts are stale or misleading, that blocks approval regardless of code quality
-- If testing is missing and required, that is a blocking issue
-- The verdict is not a suggestion — it is a certification decision
+- `/kyro:qa` is read-only. It never writes to `sprint.json`, `kyro.json`, or any scope artifact — the review is a markdown report only, per `skills/qa-review/SKILL.md`'s output format.
+- `/kyro:qa` never loads `agents/orchestrator.md` — it loads `skills/qa-review/SKILL.md` directly and stands outside the forge gate lifecycle.
+- QA is independent — can be run at any point, not just at phase gates.
+- The audit is strict but pragmatic — it protects architecture and maintainability.
+- If implementation contradicts the spec, that is a REJECTED or CHANGES REQUIRED verdict.
+- If planning artifacts are stale or misleading, that blocks approval regardless of code quality.
+- If testing is missing and required, that is a blocking issue.
+- The verdict is not a suggestion — it is a certification decision.

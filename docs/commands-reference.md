@@ -1,6 +1,6 @@
 # Commands Reference
 
-Kyro provides 5 slash commands. Four are thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. The fifth, `/kyro:idea`, is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid.
+Kyro provides 6 slash commands. Five are thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. `/kyro:idea` is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid. `/kyro:qa` is an independent **certification audit** that can be run anytime to validate a scope against its specification, standing outside the forge gate lifecycle.
 
 ## Cost-Aware Routing
 
@@ -182,3 +182,49 @@ Reads `.agents/kyro/kyro.json`, resolves the active scope, audits workspace chan
 **Generate a copy-paste prompt for continuing Kyro work in a fresh context.**
 
 Reads the active scope, `kyro context-pack`, the current git status, and referenced task/sprint artifacts. It is read-only: it returns one fenced prompt and does not mutate `sprint.json`.
+
+---
+
+## /kyro:qa
+
+**Certify a scope's implementation and planning against its full specification.**
+
+### Syntax
+
+```
+/kyro:qa [scope-name]
+```
+
+### Arguments
+
+Optional scope name. If omitted, the active scope from `kyro.json.activeScope` is used, or you are prompted to select from available scopes.
+
+### What it does
+
+Runs a complete audit of code, architecture, security, testing, and planning artifacts against the scope's specification. The review validates:
+
+- Functional correctness (does it satisfy the task spec?)
+- Architecture alignment (follows project patterns?)
+- Security (credentials, injections, authorization?)
+- Code quality (clear, maintainable, free of unnecessary debt?)
+- Testing (sufficient coverage and validation?)
+- Reliability (error cases handled, failure modes make sense?)
+- Performance (N+1 queries, unbounded operations, scaling issues?)
+- Planning synchronization (`sprint.json`, roadmap, task verdicts, handoff in sync with code?)
+
+### Verdict Scale
+
+The review produces one of four verdicts:
+
+| Verdict | Meaning |
+|---------|---------|
+| `APPROVED` | Implementation is correct and ready to ship/merge |
+| `APPROVED WITH NOTES` | Acceptable with non-blocking recommendations |
+| `CHANGES REQUIRED` | Close but needs fixes before approval |
+| `REJECTED` | Does not meet standards; requires redesign |
+
+**Important:** These are QA report conclusions. They do not get written into `sprint.json` task verdicts (which use a binary `pass`/`fail` schema for `/kyro:forge`'s gate system). The QA verdict is independent and complementary.
+
+### Routing
+
+`/kyro:qa` bypasses the orchestrator entirely — it does not load `agents/orchestrator.md` and stands outside the forge gate lifecycle. It can be run anytime: during active sprints, after completion, or as a one-off validation check.

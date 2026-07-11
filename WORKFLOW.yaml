@@ -17,6 +17,7 @@ commands:
   - wrap-up # End-of-session closure ritual with quality check
   - task-context # Fresh-context prompt generation for continuation
   - idea # Optional idea maturation before starting a scope
+  - qa # Certification audit — code, architecture, security, testing, planning sync (independent of forge cycle)
 
 agents:
   - orchestrator # Full cycle coordination — analysis, review, debugging, and sprint execution
