@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.17.0] - 2026-07-11
+
+### Added
+
+- `/kyro:qa` is now available as a dedicated slash command. It exposes the `qa-review` skill to run certification audits on any scope, independent of the forge cycle. The QA command validates code quality, architecture alignment, security, testing, reliability, performance, and planning artifact synchronization against the scope specification. Audit verdicts (APPROVED, APPROVED WITH NOTES, CHANGES REQUIRED, REJECTED) are review-level conclusions and do not get written into `sprint.json` task verdicts, which continue to use the binary `pass`/`fail` schema for the forge gate system. QA can be run anytime — during active sprints, after completion, or as a one-off validation check.
+
+### Changed
+
+- Command documentation now lists 6 slash commands (was 5, now includes `/kyro:qa`).
+- `AGENTS.md` updated to report accurate counts: 6 commands, 3 skills (was understated as 4 commands, 2 skills).
+- Marketplace description updated to mention independent QA certification.
+
+### Fixed
+
+- `/kyro:qa` command now includes all required declarative rules matching sibling command patterns (read-only rule, orchestrator-bypass rule, {{KYRO_CLI}} doctor --artifacts reference).
+- QA verdict vocabulary clearly separated from `sprint.json` task verdict schema to prevent confusion.
+
 ## [4.16.2] - 2026-07-09
 
 ### Fixed
