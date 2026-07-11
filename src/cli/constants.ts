@@ -13,7 +13,7 @@ export const SCOPE = {
   GLOBAL: 'global',
 } as const;
 
-export const COMMAND_NAMES = ['forge', 'status', 'wrap-up', 'task-context', 'idea'] as const;
+export const COMMAND_NAMES = ['forge', 'status', 'wrap-up', 'task-context', 'idea', 'qa'] as const;
 
 export const PACKAGE_ROOT = resolve(__dirname, '../..');
 export const WORKSPACE_ROOT = process.cwd();
