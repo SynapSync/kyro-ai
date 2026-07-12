@@ -24,7 +24,7 @@ Use the installed commands or command-like skills:
 - `/kyro/status` or `kyro-status` — summary-first progress and debt report
 - `/kyro/wrap-up` or `kyro-wrap-up` — close session and refresh handoff context
 - `/kyro/task-context` or `kyro-task-context` — generate a copy-paste prompt for a fresh context
-- `/kyro/idea` or `kyro-idea` — mature a rough idea into a structured brief before starting a scope (optional, pre-scope)
+- `/kyro/idea` or `kyro-idea` — mature a rough or developed idea into an evidence-grounded, execution-ready plan (optional, pre-scope)
 
 Each skill is intentionally tiny. It loads the command router first, then only the mode/helper/template needed for the current step.
 

@@ -1,0 +1,24 @@
+{
+  "id": "closed-decisions",
+  "lane": "mature",
+  "input": {
+    "summary": "Use local read-only parsing for offline use; accept duplicated parsing in v1.",
+    "dimensions": {
+      "problem": true,
+      "audience": false,
+      "success": false,
+      "boundaries": true,
+      "decisions": true,
+      "evidence": false,
+      "constraints": false
+    },
+    "references": [],
+    "solutionOnly": false
+  },
+  "materialGap": null,
+  "expected": [
+    "retain-rationale",
+    "retain-tradeoff",
+    "do-not-reask"
+  ]
+}

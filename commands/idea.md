@@ -1,23 +1,27 @@
 ---
-description: Mature a rough idea into a written brief before starting a Kyro scope (optional, no scope required)
-argument-hint: <rough idea>
+description: Mature a rough or mature idea into an evidence-grounded, execution-ready brief (optional, pre-scope)
+argument-hint: <idea or reference>
 ---
 
 # /kyro:idea — Router
 
-Refine a vague idea into a structured brief through a bounded conversation, write it to a predictable path, then suggest starting a Kyro scope seeded with it.
+Turn an idea into a decision-complete, plan-grade artifact that can seed `/kyro:forge` or stand alone as an implementation handoff.
 
-**Non-negotiable — this command is pre-scope by definition.** NEVER read, resolve, create, or load a scope, `.agents/kyro/kyro.json`, or any `sprint.json` — not even to check whether they exist. This command does not go through the orchestrator and does not participate in `handoff.nextAction` routing. It is fully optional: skipping it and going straight to `/kyro:forge` is equally valid.
+## Hard boundary
+
+This command is pre-scope and read-only toward Kyro state. Never read, resolve, create, or modify `.agents/kyro/kyro.json`, `.agents/kyro/scopes/`, any `sprint.json`, or the installed runtime. It may read user-provided references and explicitly relevant project evidence. It uses one confirmed document path under `.agents/kyro/{docType}/`: one initial write plus at most one corrective overwrite after failed verification.
 
 ## Startup
 
-1. Take the rough idea from `$ARGUMENTS`. If empty, ask the user for a one-line idea: "What's the rough idea?"
-2. Load `skills/seedbed/assets/modes/idea.md` directly (no `kyro.json`, no `sprint.json`, no scope resolution). That mode is the whole workflow.
-3. Pass the idea to the mode and begin the maturation loop.
+1. Take the idea and referenced paths from `$ARGUMENTS` and the conversation. If neither exists, ask one question: "What idea or reference should we mature?" Then stop.
+2. Load `skills/seedbed/assets/modes/idea.md` directly. Do not load the orchestrator.
+3. Let the mode classify the input as `rough` or `mature`, gather permitted evidence, and run its sufficiency and quality gates.
+4. Load only the Seedbed helpers named by the mode, and load `skills/seedbed/assets/templates/matured-idea.md` immediately before drafting.
 
 ## Rules
 
-- Do not read, create, or resolve `.agents/kyro/kyro.json`, `.agents/kyro/scopes/`, or any `sprint.json`. The only file this command's mode ever writes is one matured-idea document under `.agents/kyro/{docType}/`.
-- Do not load `agents/orchestrator.md` or any other mode/helper — only `skills/seedbed/assets/modes/idea.md`, plus the `matured-idea.md` template immediately before the final write.
-- When the mode signals done (user confirmation or soft/hard limit reached), it writes exactly one markdown file to `.agents/kyro/{docType}/{date}-{slug}.md` and proposes next steps.
-- Never invent an answer to dodge a question — that is exactly the failure this pre-scope maturation prevents.
+- Ask at most one question per turn and never re-ask facts already present in references or evidence.
+- Ask only about a material gap that changes scope, behavior, architecture, validation, or success.
+- Expose contradictions and assumptions. Never invent a material decision.
+- Before writing, confirm the inferred `docType` and path. After writing, re-read that one file only to validate its structure and quality gate.
+- If the artifact cannot reach the quality threshold because a material decision is unresolved, keep maturing it; do not persist a deceptively complete brief.

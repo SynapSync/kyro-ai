@@ -94,7 +94,7 @@ Six slash commands, one job each. All are thin routers over `sprint.json` — th
 | `/kyro:forge`       | Full cycle: analyze → plan → execute → review → close, with a gate per phase  |
 | `/kyro:status`      | Progress bars, roadmap health, and technical-debt summary (`brief`/`full`/`debt`) |
 | `/kyro:wrap-up`     | Close the session, refresh handoff routing, preserve learnings               |
-| `/kyro:idea`        | **Optional** pre-scope step: mature a rough idea into a structured brief before any scope exists |
+| `/kyro:idea`        | **Optional** pre-scope step: mature a rough or developed idea into an evidence-grounded, execution-ready plan |
 | `/kyro:qa`          | **Independent certification audit**: validate scope implementation, architecture, security, testing, and planning against spec |
 | `/kyro:task-context`| Emit a copy-paste prompt to continue the work in a fresh context             |
 

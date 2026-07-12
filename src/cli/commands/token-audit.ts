@@ -18,6 +18,9 @@ const TOKEN_BUDGET = {
   initHappyPathTokens: 2000,
   orchestratorWords: 800,
   sprintForgeSkillWords: 800,
+  seedbedSkillWords: 700,
+  seedbedModeWords: 900,
+  seedbedHelperWords: 450,
   runtimeStatusBriefTokens: 1500,
   // Path budgets reflect the real footprint of the lean runtime (orchestrator + SKILL + the routed
   // mode/helpers) plus ~10% headroom. They stay a meaningful ceiling: exceeding them means a mode or
@@ -27,7 +30,11 @@ const TOKEN_BUDGET = {
   runtimeForgePlanTokens: 3600,
   runtimeForgeCloseTokens: 4200,
   runtimeForgeInitTokens: 3500,
+  // Seedbed-backed INIT adds one lazy mapping helper to the normal INIT route. The ceiling keeps
+  // roughly 10% headroom over the measured router + orchestrator + skill + mode + analysis + mapping path.
+  runtimeForgeInitSeedbedTokens: 4000,
   runtimeTaskContextTokens: 2200,
+  runtimeIdeaTokens: 5200,
 } as const;
 
 const RISK_LEVEL = {
@@ -69,7 +76,10 @@ export function runTokenAuditChecks(): CheckResult[] {
   checks.push(...checkCommandRouters());
   checks.push(checkRuntimeAssetBudget('agents/orchestrator.md', TOKEN_BUDGET.orchestratorWords, 'orchestrator agent'));
   checks.push(checkRuntimeAssetBudget('skills/sprint-forge/SKILL.md', TOKEN_BUDGET.sprintForgeSkillWords, 'sprint-forge skill'));
+  checks.push(checkRuntimeAssetBudget('skills/seedbed/SKILL.md', TOKEN_BUDGET.seedbedSkillWords, 'seedbed skill'));
   checks.push(...checkModeFiles());
+  checks.push(checkRuntimeAssetBudget('skills/seedbed/assets/modes/idea.md', TOKEN_BUDGET.seedbedModeWords, 'seedbed mode'));
+  checks.push(...checkSeedbedHelperBudgets());
   checks.push(checkInitModeBudget());
   checks.push(...checkAnalysisHelperBudgets());
   // v4 has no ROADMAP.md / REENTRY-PROMPTS.md templates; sprint.json is the single source of truth.
@@ -122,6 +132,12 @@ function checkAnalysisHelperBudgets(): CheckResult[] {
     }
     return pass('token budget: analysis helper', `${file} ${weighted.words}/${TOKEN_BUDGET.analysisHelperWords} words`);
   });
+}
+
+function checkSeedbedHelperBudgets(): CheckResult[] {
+  return listPackageFiles('skills/seedbed/assets/helpers', '.md').map((file) =>
+    checkRuntimeAssetBudget(file, TOKEN_BUDGET.seedbedHelperWords, 'seedbed helper'),
+  );
 }
 
 function checkRuntimeAssetBudget(file: string, budget: number, label: string): CheckResult {
@@ -254,6 +270,18 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md'],
     },
     {
+      name: 'runtime path: kyro-forge:init-seedbed',
+      budget: TOKEN_BUDGET.runtimeForgeInitSeedbedTokens,
+      projectedSkill: 'forge',
+      files: [
+        ...commonForge,
+        'skills/sprint-forge/assets/modes/INIT.md',
+        heaviestAnalysisHelperPath(),
+        'skills/sprint-forge/assets/helpers/seedbed-init-mapping.md',
+      ].filter(isString),
+      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md'],
+    },
+    {
       name: 'runtime path: kyro-forge:plan',
       budget: TOKEN_BUDGET.runtimeForgePlanTokens,
       projectedSkill: 'forge',
@@ -294,6 +322,21 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       projectedSkill: 'wrap-up',
       files: ['commands/wrap-up.md', 'agents/orchestrator.md', 'skills/sprint-forge/SKILL.md', 'skills/sprint-forge/assets/helpers/handoff.md'],
       forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md'],
+    },
+    {
+      name: 'runtime path: kyro-idea',
+      budget: TOKEN_BUDGET.runtimeIdeaTokens,
+      projectedSkill: 'idea',
+      files: [
+        'commands/idea.md',
+        'skills/seedbed/SKILL.md',
+        'skills/seedbed/assets/modes/idea.md',
+        'skills/seedbed/assets/helpers/classification-and-synthesis.md',
+        'skills/seedbed/assets/helpers/material-questions.md',
+        'skills/seedbed/assets/helpers/quality-rubric.md',
+        'skills/seedbed/assets/templates/matured-idea.md',
+      ],
+      forbiddenFiles: ['agents/orchestrator.md', 'skills/sprint-forge/assets/modes/SPRINT.md'],
     },
     {
       name: 'runtime path: kyro-task-context',
@@ -394,6 +437,7 @@ function reportHeaviestFiles(): CheckResult {
     ...listPackageFiles('commands', '.md'),
     ...listPackageFiles('agents', '.md'),
     ...listPackageFiles('skills/sprint-forge', '.md'),
+    ...listPackageFiles('skills/seedbed', '.md'),
   ].map(weightPackageFile).sort((a, b) => b.words - a.words).slice(0, 8);
   return pass('token audit: heaviest files', formatWeightedList(files));
 }

@@ -1,35 +1,51 @@
 ---
 name: seedbed
-description: Mature a rough idea into a structured pre-scope brief through a bounded conversation, before any Kyro scope exists
+description: "Trigger: mature rough or mature ideas before scope creation. Produce evidence-grounded, decision-complete, execution-ready briefs."
 license: Apache-2.0
 metadata:
   author: synapsync
-  version: "1.0"
+  version: "2.0"
   scope: [root]
-  auto_invoke:
-    - "Mature an idea into a brief"
-    - "Help me shape a rough idea before starting"
-    - "Madurar una idea antes de arrancar"
-    - "Convertir una idea vaga en un brief"
 ---
 
-# Kyro Seedbed — Idea Maturation (pre-scope)
+## Activation Contract
 
-Seedbed turns a rough idea into one structured brief a strong team could act on — *before* any scope, `sprint.json`, or `kyro.json` exists. It is fully optional and agnostic: it never reads, resolves, or creates scope state, and going straight to `/kyro:forge` without it is equally valid.
+Use for `/kyro:idea` or when the user wants to deepen an idea before creating a Kyro scope. Accept a one-line concept, mature brief, reference document, or authorized project evidence.
 
-## When to Use This Skill
+## Hard Rules
 
-- The user has a vague idea and wants to think it through before committing to build.
-- Invoked directly by the `/kyro:idea` command.
+- Remain pre-scope: never read or mutate `kyro.json`, `scopes/`, `sprint.json`, or runtime state.
+- Read only user-provided references and relevant read-only project evidence; distinguish evidence from inference.
+- Ask one question per turn, only when its answer materially changes the result. Never re-ask known facts.
+- Never hide contradictions, invent decisions, or present an unresolved material choice as settled.
+- Use one confirmed `.agents/kyro/{docType}/{date}-{slug}.md` path: one initial write and, only after failed verification, at most one corrective overwrite of that path.
+- Persist only after the 90/100 quality gate passes.
 
-Do **not** load this skill during an active forge/sprint cycle — it is pre-scope only and shares no state with `sprint-forge`.
+## Decision Gates
 
-## Workflow
+| Signal | Route |
+| --- | --- |
+| Lane not established | Apply only the algorithm in `classification-and-synthesis.md` |
+| Material contradiction or decision gap remains | Ask one highest-impact question |
+| Sufficiency gate and quality gate pass | Confirm path, write, validate |
 
-Load `assets/modes/idea.md` — that mode is the whole maturation loop (bounded, one question at a time). It writes exactly one markdown document to `.agents/kyro/{docType}/{date}-{slug}.md` using `assets/templates/matured-idea.md`, then suggests seeding a scope with `/kyro:forge`.
+## Execution Steps
 
-## Boundaries
+1. Load `assets/modes/idea.md` and follow its adaptive workflow.
+2. Load classification, question, and quality helpers only when the mode requests them.
+3. Load `assets/templates/matured-idea.md` immediately before drafting.
+4. Confirm the path, write once, re-read the output, and report the score and any explicit non-blocking unknowns.
+5. Offer `/kyro:forge` as governed execution while keeping the artifact independently actionable.
 
-- Never reads, creates, or resolves a scope, `kyro.json`, or any `sprint.json` — not even to check existence.
-- Never touches `kyro.json.principles[]`; the matured-idea document is write-only evidence, never re-read to route.
-- No CLI validator (`doctor`, `analyze`) inspects seedbed output.
+## Output Contract
+
+Return the written path, detected lane, quality score with criterion totals, evidence sources, and recommended next action. If blocked, return the single material decision needed next instead of a file.
+
+## References
+
+- `assets/modes/idea.md` — adaptive workflow.
+- `assets/helpers/classification-and-synthesis.md` — evidence model and synthesis.
+- `assets/helpers/material-questions.md` — question selection.
+- `assets/helpers/quality-rubric.md` — persistence gate.
+- `assets/references/weak-to-strong.md` — transformation examples.
+- `assets/templates/matured-idea.md` — output contract.

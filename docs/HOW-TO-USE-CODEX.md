@@ -23,7 +23,7 @@ Invoke the command-like skills:
 - `kyro-status` — summary-first progress and debt report
 - `kyro-wrap-up` — close session and refresh handoff context
 - `kyro-task-context` — generate a copy-paste prompt for a fresh context
-- `kyro-idea` — mature a rough idea into a structured brief before starting a scope (optional, pre-scope)
+- `kyro-idea` — mature a rough or developed idea into an evidence-grounded, execution-ready plan (optional, pre-scope)
 
 The skills read command routers from `~/.agents/kyro/current/commands/` and then load only the routed mode/helper/template.
 

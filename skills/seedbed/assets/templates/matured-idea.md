@@ -1,46 +1,80 @@
 ---
 docType: plan
-date: 2026-07-08
-slug: example-idea
-title: Example Idea Brief
-maturedFrom: debate
+date: YYYY-MM-DD
+slug: kebab-case-idea
+title: Human-readable title
+maturedFrom: rough
 agents: []
 ---
 
 # [Title]
 
-Replace `[Title]` with a human-readable name for the idea (e.g. "Mario Kart Game", "LLM Training Viability Analysis").
+## Core thesis
+
+One decisive statement connecting the problem, user value, and governing product promise.
 
 ## Problem / Motivation
 
-Why does this idea exist? What problem does it solve, or what itch does it scratch? What prompted this conversation?
+Explain the causal problem, current-state gap, consequences, and why it matters now.
+
+## Current-state evidence
+
+List grounded facts with source paths or user-provided references. Separate observed evidence from hypotheses.
 
 ## Who it's for
 
-Who is the intended user, audience, or stakeholder? End users, internal team, yourself, investors, other?
+Name primary users, secondary stakeholders, their situations, and the decisions this artifact must enable.
 
 ## What success looks like
 
-How will you know this succeeded? What is the win condition? What are the key metrics or signals?
+State observable, falsifiable outcomes. Include both positive proof and how false success would be detected.
 
-## Scope (in)
+## Product laws / invariants
 
-What are you committing to do? What is explicitly included in this idea's boundary?
+List non-negotiable behavioral truths and the failure each prevents.
 
-## Explicitly out of scope
+## Observable success and failure guarantees
 
-What are you *not* doing? What did we discuss but decided to leave out, defer, or exclude?
+Define expected behavior for success, empty state, partial data, degraded dependencies, invalid input, and unrecoverable failure when applicable.
 
-## Constraints & tradeoffs discussed
+## Outcome-based scope
 
-What are the hard limits or tradeoffs? Budget, timeline, team size, tech choices, compliance, performance, UX tradeoffs — anything that shapes the approach.
+### In
 
-## Open questions
+Commit to user- or system-observable outcomes, not an ungrounded file list.
 
-Include only if the idea left unresolved questions (common after a hard-limit exit from the debate loop). List each as `[OPEN QUESTION: ...]`.
+### Explicitly out
 
-If all critical questions were answered during the debate, omit this section entirely.
+Record exclusions and why they are deferred or rejected.
 
-## Suggested next step
+## Closed decisions with rationale
 
-Run `/kyro:forge` and reference this document as the seed objective, or invoke `/kyro:forge <scope-slug>` directly if you've chosen your scope name. Kyro's INIT mode will read this brief and use it as richer context for planning your first sprint.
+For each decision include: decision, evidence/rationale, tradeoff, and consequence. Distinguish chosen outcomes from implementation hypotheses.
+
+## Constraints and tradeoffs
+
+Capture compatibility, performance, security, operational, time, team, and technology boundaries that materially shape delivery.
+
+## Risks, failure modes and degradation
+
+For each material risk include trigger, user/system impact, prevention or containment, and observable signal.
+
+## Material open questions and decision impact
+
+Include only unresolved questions that would change scope, behavior, architecture, or acceptance. State what each answer changes. Omit this section when none remain.
+
+## Execution blueprint
+
+Define ordered workstreams with objective, grounded inputs, deliverables, dependencies, validation gate, and completion proof. Do not invent symbols or paths.
+
+## Acceptance and validation matrix
+
+Map every success outcome and invariant to an acceptance scenario, evidence required, and validation method.
+
+## Forge handoff
+
+Provide the proposed scope objective, requirement candidates, non-goals, dependencies, ordering constraints, and any non-blocking follow-up. This section must be sufficient for INIT without re-interviewing the user.
+
+## Quality gate
+
+Record the eight criterion scores, total out of 100, evidence sources reviewed, and confirmation that no material contradiction remains.

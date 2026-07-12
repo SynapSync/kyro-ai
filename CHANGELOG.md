@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.18.0] - 2026-07-12
+
+### Changed
+
+- Refactored `/kyro:idea` and the Seedbed skill into a plan-grade pre-scope flow with rough/mature lanes, evidence grounding, a material-question gate, and a Forge-compatible handoff. Documentation and adapter metadata were synced to describe the new behavior, and `check:seedbed` now covers the Seedbed contract fixtures.
+
 ## [4.17.1] - 2026-07-11
 
 ### Fixed

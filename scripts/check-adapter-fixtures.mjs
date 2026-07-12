@@ -332,6 +332,9 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
     const skillPath = join(home, '.agents', 'skills', `kyro-${command}`, 'SKILL.md');
     assert(existsSync(skillPath), `install: missing projected skill ${skillPath}`);
   }
+  const ideaSkill = readFileSync(join(home, '.agents', 'skills', 'kyro-idea', 'SKILL.md'), 'utf-8');
+  assert(ideaSkill.includes('rough or mature idea'), 'install: kyro-idea skill missing adaptive input description');
+  assert(ideaSkill.includes('execution-ready pre-scope plan'), 'install: kyro-idea skill missing plan-grade outcome');
   assert(existsSync(join(home, '.agents', 'kyro', 'current', 'manifest.json')), 'install: missing runtime manifest');
   assert(existsSync(join(home, '.agents', 'kyro', 'current')), 'install: missing active runtime');
 
@@ -440,6 +443,10 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
     const commandText = readFileSync(commandPath, 'utf-8');
     assert(commandText.includes(`kyro-${command}/SKILL.md`), `opencode install: command ${command} should route to native skill`);
   }
+  const openCodeIdeaCommand = readFileSync(join(home, '.config', 'opencode', 'commands', 'kyro', 'idea.md'), 'utf-8');
+  const openCodeIdeaSkill = readFileSync(join(home, '.config', 'opencode', 'skills', 'kyro-idea', 'SKILL.md'), 'utf-8');
+  assert(openCodeIdeaCommand.includes('rough or mature idea'), 'opencode install: idea command missing adaptive input description');
+  assert(openCodeIdeaSkill.includes('execution-ready pre-scope plan'), 'opencode install: idea skill missing plan-grade outcome');
 
   let settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
   assert(settings.model === 'user/model', 'opencode install: did not preserve root setting');

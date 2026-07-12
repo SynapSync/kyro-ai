@@ -1,0 +1,28 @@
+{
+  "id": "mature-reference",
+  "lane": "mature",
+  "input": {
+    "summary": "Use the supplied product brief with users, outcomes, and constraints.",
+    "dimensions": {
+      "problem": true,
+      "audience": true,
+      "success": true,
+      "boundaries": true,
+      "decisions": false,
+      "evidence": false
+    },
+    "references": [
+      {
+        "path": "product-brief.md",
+        "readable": true
+      }
+    ],
+    "solutionOnly": false
+  },
+  "materialGap": null,
+  "expected": [
+    "read-reference-first",
+    "preserve-decisions",
+    "synthesize-implications"
+  ]
+}

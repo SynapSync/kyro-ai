@@ -1,0 +1,27 @@
+{
+  "id": "unreadable-reference",
+  "lane": "rough",
+  "input": {
+    "summary": "Use /missing/product-brief.md as the source.",
+    "dimensions": {
+      "problem": true,
+      "audience": false,
+      "success": false,
+      "boundaries": false,
+      "decisions": false,
+      "evidence": true
+    },
+    "references": [
+      {
+        "path": "/missing/product-brief.md",
+        "readable": false
+      }
+    ],
+    "solutionOnly": false
+  },
+  "materialGap": "grounding source unavailable",
+  "expected": [
+    "report-unreadable-source",
+    "mark-dependent-claims-ungrounded"
+  ]
+}
