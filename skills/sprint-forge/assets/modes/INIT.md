@@ -7,7 +7,7 @@ Use INIT when a scope has no `sprint.json`. Produces exactly two things: a new `
 - User request and current repository path.
 - `.agents/kyro/kyro.json` if present (to know existing scopes).
 - One work-type helper under `../helpers/analysis/` after work-type detection.
-- **Optional:** if the user references a previously written matured-idea document (e.g. `.agents/kyro/plan/2026-07-08-mario-kart-game.md`, produced by `/kyro:idea`), read it and use its `## Problem / Motivation`, `## Who it's for`, and `## What success looks like` sections as richer source material for Step 5's `objective`, `successCriteria[]`, and `spec.requirements[]`. Treat it like any other input the user hands you; if no such document is referenced, proceed exactly as before with only the one-line idea.
+- **Optional:** if the user references a matured-idea document, consume its plan-grade sections using the exact schema-safe mapping in Step 5. For legacy briefs, fall back to `Problem / Motivation`, `Who it's for`, and `What success looks like`. Never re-interview the user for facts or decisions already captured there.
 
 ## Step 1 — Resolve scope
 
@@ -53,7 +53,9 @@ Load `../templates/sprint.json`. Fill:
 - `conventions: []` (populated later by `learner.md`), `clarifications: []` (populated by `clarify.md`), `activeSprint: null`.
 - `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write `[NEEDS CLARIFICATION: ...]` markers rather than guessing), otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.
 
-Write to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`. Create `archive/` and `findings/` directories alongside it.
+**Plan-grade Seedbed mapping:** when a matured-idea document is referenced, load `../helpers/seedbed-init-mapping.md` and apply its exact schema-safe mapping. Account for every material item before writing. Do not load this helper on the normal one-line INIT path.
+
+Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`: read the current target when present, serialize the complete v4 document, write atomically, then re-read and parse it before continuing. Create `archive/` and `findings/` beside it. Do not update `kyro.json` until this verification succeeds.
 
 ## Step 6 — Update kyro.json
 

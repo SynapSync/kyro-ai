@@ -1,0 +1,23 @@
+{
+  "id": "contradictory-context",
+  "lane": "mature",
+  "input": {
+    "summary": "The system must be offline-only and must always fetch live cloud state.",
+    "dimensions": {
+      "problem": true,
+      "audience": false,
+      "success": false,
+      "boundaries": false,
+      "decisions": true,
+      "evidence": true,
+      "constraints": false
+    },
+    "references": [],
+    "solutionOnly": false
+  },
+  "materialGap": "conflicting source-of-truth requirement",
+  "expected": [
+    "surface-contradiction",
+    "block-persistence"
+  ]
+}

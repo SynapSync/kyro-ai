@@ -97,7 +97,7 @@ function buildOpenCodeCommand(command: KyroCommandName): string {
       : command === 'wrap-up'
         ? 'Close the Kyro session'
         : command === 'idea'
-          ? 'Mature a rough idea into a brief before starting a scope'
+          ? 'Mature a rough or mature idea into an execution-ready plan before starting a scope'
           : 'Generate a fresh-context prompt';
   return `---\ndescription: ${description}\n---\n\nLoad \`${OPENCODE_SKILLS_ROOT}/kyro-${command}/SKILL.md\` and follow it. The skill must read \`${KYRO_COMMANDS_ROOT}/${command}.md\` first, then load only the routed Kyro mode/helper files.\n\nRuntime: \`${KYRO_ROOT}/\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nDo not inline the full Kyro workflow or ask the user to restate it.\n`;
 }

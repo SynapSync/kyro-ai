@@ -1,6 +1,6 @@
 name: kyro-ai
 type: workflow
-version: "4.17.1"
+version: "4.18.0"
 description: >
   Portable sprint workflow kit for AI coding agents, with markdown artifacts,
   adapter guides, adaptive per-project learning, and formal validation gates.
@@ -16,7 +16,7 @@ commands:
   - status # Project progress and technical debt summary
   - wrap-up # End-of-session closure ritual with quality check
   - task-context # Fresh-context prompt generation for continuation
-  - idea # Optional idea maturation before starting a scope
+  - idea # Optional evidence-grounded idea maturation before starting a scope
   - qa # Certification audit — code, architecture, security, testing, planning sync (independent of forge cycle)
 
 agents:
@@ -24,7 +24,7 @@ agents:
 
 skills:
   - sprint-forge # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
-  - seedbed # Idea maturation pre-scope — matures a rough idea into a structured brief (loaded only via /kyro:idea)
+  - seedbed # Evidence-grounded planning for rough or mature ideas (loaded only via /kyro:idea)
   - qa-review # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 
 artifacts:

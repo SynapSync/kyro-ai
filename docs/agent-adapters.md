@@ -42,7 +42,7 @@ There is intentionally no generic adapter. Root `AGENTS.md` is the standard cros
 | status | `kyro-status` | `/kyro:status` |
 | wrap-up | `kyro-wrap-up` | `/kyro:wrap-up` |
 | task context | `kyro-task-context` | `/kyro:task-context` |
-| idea | `kyro-idea` | `/kyro:idea` |
+| idea maturation and executable planning | `kyro-idea` | `/kyro:idea` |
 
 Each skill loads its command router first. The router then names the exact mode/helper/template needed for the current step.
 

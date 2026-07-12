@@ -1,0 +1,24 @@
+{
+  "id": "partial-and-empty",
+  "lane": "mature",
+  "input": {
+    "summary": "Canonical files may be absent, partial, malformed, or temporarily unreadable.",
+    "dimensions": {
+      "problem": true,
+      "audience": false,
+      "success": true,
+      "boundaries": false,
+      "decisions": false,
+      "evidence": true,
+      "constraints": false
+    },
+    "references": [],
+    "solutionOnly": false
+  },
+  "materialGap": null,
+  "expected": [
+    "define-empty-state",
+    "define-partial-state",
+    "define-fatal-state"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "rough-one-line",
+  "lane": "rough",
+  "input": {
+    "summary": "Build a tool that helps teams plan releases.",
+    "dimensions": {
+      "problem": true,
+      "audience": false,
+      "success": false,
+      "boundaries": false,
+      "decisions": false,
+      "evidence": false
+    },
+    "references": [],
+    "solutionOnly": false
+  },
+  "materialGap": "primary user and observable decision",
+  "expected": [
+    "ask-one-material-question",
+    "no-write-before-sufficient"
+  ]
+}

@@ -12,35 +12,35 @@ For scope resume outside slash commands, use `kyro context-pack --kyro-scope <sc
 
 ## /kyro:idea
 
-**Mature a rough idea into a structured brief before starting a scope. Optional and pre-scope.**
+**Mature a rough or developed idea into an evidence-grounded, execution-ready plan. Optional and pre-scope.**
 
 ### Syntax
 
 ```
-/kyro:idea <rough idea>
+/kyro:idea <idea or reference>
 ```
-
-### Arguments
-
-A one-line idea to flesh out (e.g. `quiero hacer un juego de mario kart`). If omitted, the command asks for it.
 
 ### What it does
 
-Runs a bounded, one-question-at-a-time conversation to turn a vague idea into a well-formed brief, then writes exactly one markdown document:
+Seedbed automatically selects a `rough` discovery lane or a `mature` critical-synthesis lane. It may read references supplied by the user and explicitly relevant project evidence, but it never reads or mutates Kyro scope state. It classifies claims as evidence, outcomes, invariants, decisions, constraints, hypotheses, or unknowns; asks one material question at a time; and never repeats facts already grounded in evidence.
+
+Before persistence it builds a causal thesis, observable success and failure guarantees, outcome boundaries, decision rationale, failure modes, an ordered execution blueprint, and an acceptance matrix. A deterministic 100-point rubric requires at least 90 points and no unresolved material contradiction. The command confirms the path, writes one document, then re-reads that document to validate it.
+
+Repository `check:seedbed` is a deterministic structural contract test: it validates the canonical classifier, assertion vocabulary, routing markers, compatibility mappings, and eight adversarial scenario fixtures. It does not execute or score model-generated documents; comparative model-quality benchmarking remains a separate manual or evaluation-harness activity.
 
 ```
 .agents/kyro/{docType}/{date}-{slug}.md
 ```
 
-`docType` is inferred from the conversation and confirmed with you before writing — one of `plan` (default, something to build), `analysis` (exploratory/comparative), or `constitution` (durable project ground rules, kept distinct from `kyro.json.principles[]`). The loop stops on an explicit done-signal, a soft limit of 6 questions, or a hard limit of 10 turns.
+`docType` is `plan` by default, `analysis` for viability/comparison without a build commitment, or `constitution` for durable project rules. The public path and legacy frontmatter remain stable.
 
-### Routing
+### Routing and safety
 
-`/kyro:idea` does **not** go through the orchestrator and does **not** route on `sprint.json.handoff.nextAction`. It loads `skills/seedbed/assets/modes/idea.md` directly. It never reads, resolves, or creates a scope, `.agents/kyro/kyro.json`, or any `sprint.json` — the matured-idea document is write-only evidence, sibling to `.agents/kyro/scopes/`, and no CLI validator (`doctor`, `analyze`) touches it.
+`/kyro:idea` bypasses the orchestrator and loads `skills/seedbed/assets/modes/idea.md` directly. It must not read or modify `.agents/kyro/kyro.json`, `.agents/kyro/scopes/`, any `sprint.json`, secrets, or installed runtime state. User-provided documents and authorized read-only source, tests, schemas, manifests, docs, and history are valid grounding sources.
 
 ### After maturing
 
-The mode suggests running `/kyro:forge <slug>` (or `/kyro:forge` referencing the document) so INIT can seed the scope's `objective`, `successCriteria[]`, and `spec.requirements[]` from the brief instead of a one-liner.
+The resulting artifact can seed `/kyro:forge` or serve directly as an implementation handoff. INIT consumes its extended plan-grade sections when available and falls back to the legacy `Problem / Motivation`, `Who it's for`, and `What success looks like` headings for older briefs.
 
 ---
 

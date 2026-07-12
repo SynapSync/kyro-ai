@@ -1,0 +1,23 @@
+{
+  "id": "technical-without-product",
+  "lane": "rough",
+  "input": {
+    "summary": "Use TypeScript, SQLite, workers, and a React dashboard.",
+    "dimensions": {
+      "problem": false,
+      "audience": false,
+      "success": false,
+      "boundaries": false,
+      "decisions": false,
+      "evidence": false,
+      "constraints": true
+    },
+    "references": [],
+    "solutionOnly": true
+  },
+  "materialGap": "causal problem and beneficiary",
+  "expected": [
+    "recover-product-need",
+    "treat-stack-as-hypothesis"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "early-exit",
+  "lane": "rough",
+  "input": {
+    "summary": "Make a deployment assistant. Good enough, write it.",
+    "dimensions": {
+      "problem": true,
+      "audience": false,
+      "success": false,
+      "boundaries": false,
+      "decisions": false,
+      "evidence": false
+    },
+    "references": [],
+    "solutionOnly": false
+  },
+  "materialGap": "success and scope boundaries",
+  "expected": [
+    "respect-sufficiency-gate",
+    "return-blocked-report"
+  ]
+}
