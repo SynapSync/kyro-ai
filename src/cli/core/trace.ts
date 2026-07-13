@@ -1,4 +1,5 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { assertStateWriterLeaseHealthyIfHeld } from '../pipeline/state-writer-lock';
 import { basename } from 'node:path';
 import { resolveManagedPath } from '../fs';
 import { traceDir, traceEventsPath } from '../artifacts/paths';
@@ -28,9 +29,12 @@ export function emitTraceEvent(event: TraceEvent): void {
   if (traceDisabled()) return;
   try {
     const safe = sanitizeTraceEvent(event);
+    assertStateWriterLeaseHealthyIfHeld();
     mkdirSync(resolveManagedPath(traceDir(safe.scope)), { recursive: true });
+    assertStateWriterLeaseHealthyIfHeld();
     appendFileSync(resolveManagedPath(traceEventsPath(safe.scope)), `${JSON.stringify(safe)}\n`, 'utf-8');
   } catch (error: unknown) {
+    if ((error as { code?: string })?.code === 'CHECKPOINT_CONFLICT') throw error;
     if (process.env.KYRO_TRACE_DEBUG === '1' || process.env.KYRO_TRACE_DEBUG === 'true') {
       process.stderr.write(`kyro trace disabled for this event: ${error instanceof Error ? error.message : String(error)}\n`);
     }

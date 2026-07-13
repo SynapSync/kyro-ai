@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.19.0] - 2026-07-13
+
+### Added
+
+- Sprint close now dual-writes the compatible verbatim ActiveSprint snapshot and an immutable `SprintCloseCheckpointV1` containing complete scope state before and intended after close, affected project scope state, frozen close inputs, and canonical SHA-256 digests.
+- Artifact doctor classifies checkpoint transactions as `PREPARED`, `PARTIAL`, `APPLIED`, `DIVERGED`, `CORRUPT`, or `UNSUPPORTED_VERSION`, including when live `sprint.json` is missing or invalid.
+
+### Changed
+
+- Sprint close uses a dedicated durable transaction with exclusive checkpoint publication, atomic mutable replacements, compare-and-swap reconciliation, idempotent resume, and scope-entry-only `kyro.json` patching.
+- All official Kyro state writers share one serialization lock; checkpoint publication and mutable replacements fsync their parent directories, and managed checkpoint paths reject workspace escapes and symlinked ancestors.
+- Checkpoint validation derives the authorized intended-after transition from the before image and frozen inputs. Doctor compares live state only with the latest transaction while validating older checkpoints as historical records.
+- Recovery guidance now distinguishes versioned lossless scope checkpoints from legacy sprint-level snapshots; historical archives are never backfilled with invented state.
+
 ## [4.18.0] - 2026-07-12
 
 ### Changed
@@ -411,14 +425,14 @@ agent-rendered prose.
 
 ### Added
 
-- **`kyro close-sprint`** — deterministic, zero-loss sprint close. Writes the verbatim JSON snapshot
+- **`kyro close-sprint`** — deterministic sprint close. Writes the verbatim ActiveSprint JSON snapshot
   to `archive/` **before** clearing `activeSprint`, renders the human narrative `.md` (title sourced
   from `roadmap.sprints[]`, so it can never be `undefined`), appends the `ledger[]` entry, updates
   `previousSprint`/`roadmap`/`handoff`, and flips the `kyro.json` scope status on the last sprint.
   Refuses to run if a snapshot already exists (double-close protection). New `--learning` flag.
 - **PreToolUse guard** (Claude Code) that blocks any hand edit nulling `activeSprint`, redirecting to
   `kyro close-sprint`.
-- **`kyro doctor --artifacts`** now audits zero-loss snapshots, archive narratives (catches
+- **`kyro doctor --artifacts`** now audits verbatim ActiveSprint snapshots, archive narratives (catches
   `Sprint N: undefined`), `activeSprint.title`, and non-object task `evidence`.
 - Runtime-artifact verification gate and doctor fixtures wired into `npm run check`.
 

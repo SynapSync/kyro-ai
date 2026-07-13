@@ -159,6 +159,7 @@ async function main() {
 
       const list = await send('tools/list');
       assert(list.result?.tools?.length === 9, 'tools/list should return 9 tools');
+      assert(list.result.tools.find((tool) => tool.name === 'close_sprint')?.annotations?.idempotentHint === true, 'close_sprint must advertise idempotent retries');
       assert(JSON.stringify(list.result.tools) === JSON.stringify(golden.tools), 'tool catalog differs from golden');
 
       const ping = await send('ping');
@@ -195,14 +196,17 @@ async function main() {
       assert(dry.result?.isError === false && dry.result.structuredContent?.phase === 'plan', 'close_sprint without confirm should return plan');
       const afterDry = fileSig(sprintPath);
       assert(before.bytes === afterDry.bytes && before.mtimeMs === afterDry.mtimeMs, 'close_sprint dry-run must not write');
+      assert(!existsSync(join(sandbox, '.agents/kyro/scopes/demo/archive/sprint-001-demo-sprint.checkpoint.json')), 'close_sprint without confirm must not publish a checkpoint');
 
       const applied = await send('tools/call', { name: 'close_sprint', arguments: { scope: 'demo', outcome: 'shipped', confirm: true } });
       assert(applied.result?.isError === false && applied.result.structuredContent?.phase === 'applied', 'close_sprint confirm should apply');
       assert(existsSync(join(sandbox, '.agents/kyro/scopes/demo/archive/sprint-001-demo-sprint.json')), 'close_sprint confirm should write snapshot');
+      assert(existsSync(join(sandbox, '.agents/kyro/scopes/demo/archive/sprint-001-demo-sprint.checkpoint.json')), 'close_sprint confirm should write lossless checkpoint');
+      assert(typeof applied.result.structuredContent?.checkpointId === 'string', 'close_sprint should return additive checkpointId');
 
       const doubleClose = await send('tools/call', { name: 'close_sprint', arguments: { scope: 'demo', outcome: 'shipped', confirm: true } });
-      assert(doubleClose.result?.isError === true, 'double close should be a tool error');
-      assert(doubleClose.result.structuredContent?.code === 'SNAPSHOT_EXISTS', 'double close should expose SNAPSHOT_EXISTS');
+      assert(doubleClose.result?.isError === false, 'matching close retry should be idempotent');
+      assert(doubleClose.result.structuredContent?.resumed === true, 'matching close retry should report resumed=true');
 
       const malformed = await raw('{not json');
       assert(malformed.error?.code === -32700, 'malformed JSON should return parse error');

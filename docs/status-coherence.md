@@ -78,9 +78,12 @@ The stored verdict shape remains structured: `{ "criterion": "...", "reason": ".
 
 ## Status surfaces
 
-There is no standalone `kyro status` CLI subcommand. Status is surfaced through:
+Kyro exposes status through both agent routers and a read-only CLI path:
 
-- `/kyro:status` (`commands/status.md`) for read-only brief/full reports.
-- `skills/sprint-forge/assets/modes/STATUS.md` for the full status report shape.
-- `context-pack` fields `reviewPending` and `nextTaskReview` for agent routing.
-- `analyze` findings for status drift and checker debt.
+- `kyro status [brief|full|debt]` reads `.agents/kyro/scopes/<scope>/sprint.json` directly and never emits trace events. The default is brief; `--json` returns stable machine fields for scope, derived status, active sprint, next action/task, blockers, open debt, and pending review count.
+- `/kyro:status` (`commands/status.md`) remains the agent-facing router for read-only brief/full reports.
+- `skills/sprint-forge/assets/modes/STATUS.md` remains the full agent report shape.
+- `context-pack` fields `reviewPending` and `nextTaskReview` remain available for agent routing; unlike `kyro status`, `context-pack` also records route-selection trace events.
+- `analyze` findings report status drift and checker debt.
+
+The CLI status command is intentionally read-only. Mutating debt intents such as `kyro status debt-add`, `kyro status debt-resolve`, and `kyro status debt-escalate` fail with `INVALID_INPUT`; debt changes belong in the workflow artifacts/gates, not the status renderer.

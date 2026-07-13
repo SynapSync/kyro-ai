@@ -5,7 +5,7 @@ export function normalizeSprintJson(value: unknown, sandboxRoot: string): unknow
 function normalizeValue(value: unknown, sandboxRoot: string, path: string[]): unknown {
   const field = path[path.length - 1];
   if (typeof value === 'string') {
-    if (field === 'lastUpdated' || field === 'closedAt' || field === 'date') return '<NORMALIZED>';
+    if (field === 'lastUpdated' || field === 'closedAt' || field === 'date' || field === 'checkpointSha256') return '<NORMALIZED>';
     return sandboxRoot ? value.replaceAll(sandboxRoot, '<SANDBOX>') : value;
   }
   if (Array.isArray(value)) return value.map((item, index) => normalizeValue(item, sandboxRoot, [...path, String(index)]));

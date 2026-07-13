@@ -108,8 +108,69 @@ export interface LedgerEntry {
   archive: string;
   /** Path to the verbatim JSON snapshot of the closed activeSprint (write-only audit trail). */
   snapshot?: string;
+  /** Path to the immutable, versioned full-scope close checkpoint. */
+  checkpoint?: string;
+  /** External SHA-256 commitment to the checkpoint payload, anchored in live scope state. */
+  checkpointSha256?: string;
   recommendations?: string[];
 }
+
+export const SPRINT_CLOSE_CHECKPOINT_KIND = 'kyro.sprint-close-checkpoint' as const;
+export const SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION = 1 as const;
+
+export interface SprintCloseIdentity {
+  scope: string;
+  sprintN: number;
+  sprintSlug: string;
+}
+
+export interface SprintCloseInputs {
+  outcome: string;
+  note: string | null;
+  summary: string | null;
+  recommendations: string[];
+  learnings: string[];
+}
+
+export interface SprintClosePaths {
+  legacySnapshot: string;
+  narrative: string;
+}
+
+export interface SprintCloseDigests {
+  beforeClose: string;
+  intendedAfterClose: string;
+  projectScopeBefore: string;
+  projectScopeAfter: string;
+  legacySnapshot: string;
+  narrative: string;
+}
+
+/** Immutable transaction record used to resume and audit a sprint close without losing scope state. */
+export interface SprintCloseCheckpointV1 {
+  schemaVersion: typeof SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION;
+  kind: typeof SPRINT_CLOSE_CHECKPOINT_KIND;
+  checkpointId: string;
+  createdAt: string;
+  identity: SprintCloseIdentity;
+  close: SprintCloseInputs;
+  paths: SprintClosePaths;
+  beforeClose: SprintFile;
+  intendedAfterClose: SprintFile;
+  projectScopeBefore: KyroScopeEntry;
+  projectScopeAfter: KyroScopeEntry;
+  digests: SprintCloseDigests;
+}
+
+export const SPRINT_CLOSE_TRANSACTION_STATUS = {
+  PREPARED: 'PREPARED',
+  PARTIAL: 'PARTIAL',
+  APPLIED: 'APPLIED',
+  DIVERGED: 'DIVERGED',
+  CORRUPT: 'CORRUPT',
+  UNSUPPORTED_VERSION: 'UNSUPPORTED_VERSION',
+} as const;
+export type SprintCloseTransactionStatus = (typeof SPRINT_CLOSE_TRANSACTION_STATUS)[keyof typeof SPRINT_CLOSE_TRANSACTION_STATUS];
 
 export interface TaskEvidence {
   summary: string;

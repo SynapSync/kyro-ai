@@ -2,7 +2,7 @@
 name: sprint-forge
 description: >
   Adaptive sprint workflow with a single source of truth per scope (sprint.json),
-  lean context loading, formal debt tracking, and zero-loss sprint-close archival.
+  lean context loading, formal debt tracking, and lossless sprint-close checkpoints.
 license: Apache-2.0
 metadata:
   author: synapsync
@@ -55,8 +55,8 @@ Irreversible or schema-critical operations are done deterministically by the CLI
 
 | Command | What it owns |
 |---------|--------------|
-| `{{KYRO_CLI}} close-sprint --kyro-scope <scope> --outcome <...>` | Zero-loss close: snapshots `activeSprint` to `archive/` **before** clearing it, renders the narrative `.md` (title from `roadmap.sprints[]`), appends the `ledger[]` entry, updates `previousSprint`/`roadmap`/`handoff`, flips `kyro.json` status. Refuses on double-close. |
-| `{{KYRO_CLI}} doctor --artifacts --kyro-scope <scope>` | Validates shape drift, missing snapshots, and unresolved `[NEEDS CLARIFICATION]`. |
+| `{{KYRO_CLI}} close-sprint --kyro-scope <scope> --outcome <...>` | Lossless close: publishes the immutable full-scope checkpoint first, retains the legacy ActiveSprint snapshot, renders the narrative, reconciles live state, and safely resumes matching retries. |
+| `{{KYRO_CLI}} doctor --artifacts --kyro-scope <scope>` | Validates shape drift, checkpoint state/digests/artifacts, legacy snapshots, and unresolved `[NEEDS CLARIFICATION]`. |
 | `{{KYRO_CLI}} analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, deps, debt, principles), severity-triaged; non-zero on CRITICAL/HIGH. Gate before close. |
 | `{{KYRO_CLI}} repair --kyro-scope <scope>` | Normalizes `sprint.json` formatting. |
 
@@ -91,6 +91,7 @@ Templates are loaded only immediately before writing their artifact.
 | `.agents/kyro/scopes/{scope}/sprint.json` | Single source of truth (see template) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.md` | Human narrative at close (write-only) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |
+| `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.checkpoint.json` | Versioned lossless scope checkpoint with before/intended-after state (write-only) |
 | `.agents/kyro/scopes/{scope}/findings/NN-slug.md` | INIT analysis evidence (write-only) |
 
 The only per-scope files are `sprint.json` and the write-only `archive/` + `findings/`.

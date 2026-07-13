@@ -41,7 +41,7 @@ kyro ›  INIT      analyzed the module, wrote objective + success criteria
         ─ gate ─  proceed / adjust / cancel?
         EXECUTE   task 1/6 … evidence recorded on the task
         REVIEW    tool-owned check, not self-grading
-        CLOSE     verbatim snapshot archived, learnings kept
+        CLOSE     lossless scope checkpoint archived, learnings kept
 
 state ›  .agents/kyro/scopes/jwt-auth/sprint.json      ← single source of truth
 ```
@@ -57,7 +57,7 @@ Under the hood, one install gives your agents:
 - a **managed core** with orchestrator, command, skill, and template instructions
 - **command-like skills** such as `kyro-forge`, `kyro-status`, `kyro-qa`, and `kyro-wrap-up`
 - **a single source of truth per scope** — one `sprint.json` holding objective, success criteria, roadmap, the active sprint, debt, conventions, and handoff routing
-- **zero-loss archives** — every closed sprint is snapshotted verbatim before it is cleared
+- **lossless scope checkpoints** — every close preserves complete scope state before and after the transition, while retaining the legacy verbatim ActiveSprint snapshot
 - **deterministic CLI gates** (`doctor`, `analyze`) so quality is enforced in code, not left to prompt discipline
 - **behavioral evals** (`kyro eval`) that replay agent-facing routing, guardrails, and artifact transitions
 - **typed MCP tools** (`kyro mcp serve`) for hosts that prefer structured tool calls over CLI text
@@ -168,6 +168,7 @@ The README is the 30-second tour. Everything deep lives in `docs/`:
 | [Behavioral Evals](docs/evals.md)               | Deterministic regression eval harness                    |
 | [MCP Typed Tools](docs/mcp.md)                   | MCP server/tool contracts for agent hosts                |
 | [Trace Events](docs/trace.md)                    | Append-only runtime audit trace                          |
+| [Sprint-close Checkpoints](docs/sprint-close-checkpoints.md) | Lossless archive and recovery contract          |
 | [Portable Guardrails](docs/guardrails.md)        | Policy enforcement across CLI and MCP surfaces           |
 | [Maker/Checker Boundary](docs/maker-checker.md)  | Tool-owned task review and evidence/verdict contracts    |
 | [Spec Traceability](docs/spec-traceability.md)   | Requirement → Scenario → Task traceability               |

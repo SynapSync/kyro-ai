@@ -331,6 +331,12 @@ function validateLedgerEntry(value: unknown, path: string, prefix: string, issue
   if ('snapshot' in value && typeof value.snapshot !== 'string') {
     issues.push({ path, field: `${prefix}.snapshot`, message: 'must be a string when present' });
   }
+  if ('checkpoint' in value && typeof value.checkpoint !== 'string') {
+    issues.push({ path, field: `${prefix}.checkpoint`, message: 'must be a string when present' });
+  }
+  if ('checkpointSha256' in value && (typeof value.checkpointSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.checkpointSha256))) {
+    issues.push({ path, field: `${prefix}.checkpointSha256`, message: 'must be a SHA-256 hex digest when present' });
+  }
 }
 
 /** Roadmap sprint entries are consumed by close-sprint (`s.n`, `s.state`) and narrative render (`s.title`). */

@@ -95,7 +95,8 @@ Kyro keeps a single source of truth per scope: `sprint.json` holds the objective
     └── {scope}/
         ├── sprint.json          # single source of truth
         ├── archive/             # write-only, at sprint close
-        │   ├── sprint-001-slug.json  # verbatim zero-loss snapshot
+        │   ├── sprint-001-slug.checkpoint.json # versioned lossless scope checkpoint
+        │   ├── sprint-001-slug.json  # legacy verbatim ActiveSprint snapshot
         │   └── sprint-001-slug.md    # human narrative
         └── findings/            # write-only INIT analysis evidence
 ```

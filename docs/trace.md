@@ -14,7 +14,7 @@ Each line is one JSON event. The file is written best-effort: trace failures nev
 
 `trace/events.ndjson` and `sprint.json.ledger[]` are different contracts:
 
-- `sprint.json.ledger[]` is the durable sprint-close record and points to zero-loss archive snapshots.
+- `sprint.json.ledger[]` is the durable sprint-close index and points to the versioned lossless scope checkpoint plus the legacy verbatim ActiveSprint snapshot.
 - `trace/events.ndjson` is diagnostic audit data for humans and post-hoc tooling.
 
 Do not call the trace a ledger in code or docs. Do not read it to decide what Kyro should do next.
@@ -35,7 +35,7 @@ All events include this envelope:
 | `gate_approved` | A gate/review passed. | `gate`, `taskId` |
 | `retry_count` | A retry round was recorded. | `round`, `limit`, `blocked` |
 | `blocked_reason` | A scope/task became blocked. | `reason`, `code` |
-| `close_snapshot` | `close-sprint` wrote a zero-loss snapshot and passed post-write validation. | `sprintN`, `snapshotId`, `outcome` |
+| `close_snapshot` | `close-sprint` verified the lossless checkpoint transaction and its legacy snapshot. | `sprintN`, `snapshotId`, `outcome` |
 
 Payloads are bounded: long strings are truncated, arrays are capped, args are scalar-only, and newlines are sanitized.
 

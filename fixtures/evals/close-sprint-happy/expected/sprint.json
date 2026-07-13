@@ -28,7 +28,9 @@
       "outcome": "shipped",
       "closedAt": "<NORMALIZED>",
       "archive": "archive/sprint-001-demo-sprint.md",
-      "snapshot": "archive/sprint-001-demo-sprint.json"
+      "snapshot": "archive/sprint-001-demo-sprint.json",
+      "checkpoint": "archive/sprint-001-demo-sprint.checkpoint.json",
+      "checkpointSha256": "<NORMALIZED>"
     }
   ],
   "previousSprint": {
