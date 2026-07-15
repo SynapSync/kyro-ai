@@ -4,6 +4,7 @@ import { AGENT, SCOPE } from '../constants';
 import { doctor } from './doctor';
 import { install } from './install';
 import type { Agent, CliOptions } from '../types';
+import { withStateWriterLockAsync } from '../pipeline/state-writer-lock';
 
 export async function runTui(): Promise<void> {
   const rl = createInterface({ input, output });
@@ -16,11 +17,11 @@ export async function runTui(): Promise<void> {
     console.log('5) Exit');
     const answer = await rl.question('Select an option: ');
     if (answer.trim() === '1') {
-      await install(tuiInstallOptions(AGENT.STANDARD));
+      await runLockedInstall(AGENT.STANDARD);
     } else if (answer.trim() === '2') {
-      await install(tuiInstallOptions(AGENT.OPENCODE));
+      await runLockedInstall(AGENT.OPENCODE);
     } else if (answer.trim() === '3') {
-      await install(tuiInstallOptions(AGENT.CODEX));
+      await runLockedInstall(AGENT.CODEX);
     } else if (answer.trim() === '4') {
       doctor();
     } else {
@@ -29,6 +30,10 @@ export async function runTui(): Promise<void> {
   } finally {
     rl.close();
   }
+}
+
+async function runLockedInstall(agent: Agent): Promise<void> {
+  await withStateWriterLockAsync(() => install(tuiInstallOptions(agent)));
 }
 
 function tuiInstallOptions(agent: Agent): CliOptions {

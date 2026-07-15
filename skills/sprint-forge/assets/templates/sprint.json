@@ -16,6 +16,8 @@
 
   "conventions": [],
 
+  "adrs": [],
+
   "roadmap": {
     "plannedSprintCount": 0,
     "sizingRationale": "",

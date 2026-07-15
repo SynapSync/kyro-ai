@@ -61,9 +61,9 @@ export const MCP_TOOLS = [
   {
     name: 'close_sprint',
     title: 'Close active Kyro sprint',
-    description: 'Build or apply the deterministic zero-loss close-sprint plan. Use when every sprint task passed review and the sprint is ready to close. Without confirm:true it returns the plan and writes nothing.',
+    description: 'Build or apply the deterministic lossless scope-checkpoint close plan. Use when every sprint task passed review and the sprint is ready to close. Without confirm:true it returns the plan and writes nothing.',
     inputSchema: { type: 'object', properties: { scope, outcome: { type: 'string', enum: ['shipped', 'partial', 'aborted'], description: 'Sprint outcome.' }, note: { type: 'string' }, summary: { type: 'string' }, recommendations: { type: 'array', items: { type: 'string' } }, learnings: { type: 'array', items: { type: 'string' } }, confirm }, required: ['outcome'], additionalProperties: false },
-    annotations: { destructiveHint: true, idempotentHint: false },
+    annotations: { destructiveHint: true, idempotentHint: true },
   },
   {
     name: 'repair_scope',

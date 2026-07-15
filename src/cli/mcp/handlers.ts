@@ -4,6 +4,7 @@ import { runDoctorChecks } from '../commands/doctor';
 import { inspectScope } from '../commands/artifact-doctor';
 import { buildContextPack } from '../commands/context-pack';
 import { buildClosePlan, type CloseSprintArgs } from '../commands/close-sprint';
+import { applySprintCloseTransaction } from '../checkpoints/sprint-close';
 import { buildRepairPlan } from '../commands/repair';
 import { buildReviewPlan, checkerErrorCode, parseFinding, parseVerdict, parseWaiver, type ReviewArgs } from '../commands/review';
 import { readJsonSafely } from '../artifacts/json';
@@ -18,6 +19,7 @@ import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent
 import { getTool } from './tool-catalog';
 import { validateInput } from './input-validation';
 import type { OperationPlan, PackVerbosity, TaskVerdictFinding } from '../types';
+import { withStateWriterLock } from '../pipeline/state-writer-lock';
 
 export interface ToolResult {
   content: Array<{ type: 'text'; text: string }>;
@@ -35,12 +37,16 @@ export function callTool(name: string, rawArgs: unknown): ToolResult {
     const tool = getTool(name);
     if (!tool) throw new KyroCoreError('UNKNOWN_TOOL', `Unknown tool: ${name}`);
     const args = validateInput(tool.inputSchema, rawArgs ?? {});
-    const data = dispatchTool(name, args);
+    const data = isConfirmedMutator(name, args) ? withStateWriterLock(() => dispatchTool(name, args)) : dispatchTool(name, args);
     return ok(data, summarize(name, data));
   } catch (error: unknown) {
     const envelope = toErrorEnvelope(error);
     return { isError: true, structuredContent: envelope, content: [{ type: 'text', text: JSON.stringify(envelope) }] };
   }
+}
+
+function isConfirmedMutator(name: string, args: Record<string, unknown>): boolean {
+  return args.confirm === true && ['close_sprint', 'repair_scope', 'review_task'].includes(name);
 }
 
 function dispatchTool(name: string, args: Record<string, unknown>): unknown {
@@ -81,31 +87,31 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
     yes: true,
     help: false,
   };
-  const { sprint, plan, snapshotPath } = buildClosePlan(scope, closeArgs);
+  const { sprint, plan, snapshotPath, checkpointPath, transaction } = buildClosePlan(scope, closeArgs);
   const guard = evaluateGuard('close_sprint', { surface: 'mcp', scope, confirmed: args.confirm === true });
   if (guard.kind === 'blocked') {
     emitBlockedReason(scope, guard.message, guard.code);
     throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
   }
-  if (args.confirm !== true) return planResult(scope, plan, { snapshotPath, activeSprint: sprint.activeSprint });
+  if (args.confirm !== true) return planResult(scope, plan, { snapshotPath, checkpointPath, checkpointId: transaction.checkpoint.checkpointId, activeSprint: sprint.activeSprint });
   if (guard.kind === 'confirmation_required') {
     emitBlockedReason(scope, guard.message, guard.code);
     throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
   }
   emitGateApproved(scope, 'close_sprint');
   emitToolCommandRun(scope, 'mcp', 'close_sprint', { outcome: closeArgs.outcome });
-  applyPlan(plan);
+  const applied = applySprintCloseTransaction(transaction);
   assertValidSprint(scope, snapshotPath);
   emitTraceEvent({
     v: 1,
     ts: new Date().toISOString(),
     scope,
     type: 'close_snapshot',
-    sprintN: sprint.activeSprint!.n,
+    sprintN: transaction.checkpoint.identity.sprintN,
     snapshotId: traceSnapshotId(snapshotPath),
     outcome: normalizeTraceCloseOutcome(closeArgs.outcome),
   });
-  return { phase: 'applied', scope, snapshotPath, plan };
+  return { phase: 'applied', scope, snapshotPath, checkpointPath, checkpointId: applied.checkpointId, resumed: applied.resumed, plan };
 }
 
 function repairScopeTool(args: Record<string, unknown>): unknown {

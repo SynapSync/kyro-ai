@@ -9,6 +9,9 @@ kyro                    # Open the interactive TUI
 kyro install            # Install standard .agents assets by default
 kyro doctor             # Read-only package/workspace health check
 kyro doctor --tokens    # Audit context/token budgets
+kyro status             # Read-only brief status for the active Kyro scope
+kyro status full        # Read-only phase/task summary and review debt
+kyro status debt        # Read-only debt grouped by status and priority
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
@@ -202,6 +205,21 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 
 Warnings mean Kyro still works, but the harness is becoming expensive to load. Failing sizing checks mean INIT can no longer prove its sprint boundaries.
 
+## Status
+
+Use `kyro status` when a human or script needs a read-only progress snapshot without loading agent routing context:
+
+```bash
+kyro status
+kyro status brief --kyro-scope auth-refactor --json
+kyro status full --kyro-scope auth-refactor
+kyro status debt --kyro-scope auth-refactor --json
+```
+
+The command reads `.agents/kyro/scopes/<scope>/sprint.json` directly and derives display status from task state. It does not call `context-pack`, so it does not emit trace events. Brief JSON includes stable fields for scope, status, objective, active sprint, next action, next task, blockers, open debt count, and pending review count. Full mode adds phase/task summaries, review debt, ADR status counts, and recent ADRs. Debt mode groups debt by status and priority.
+
+`kyro status` is not a mutation surface: `debt-add`, `debt-resolve`, and `debt-escalate` fail with `INVALID_INPUT`. Update debt through the workflow artifacts/gates, then re-run status to inspect it.
+
 ## Context Pack
 
 Use `kyro context-pack` when an agent needs the minimal routing context for a scope without opening full Markdown files:
@@ -219,7 +237,7 @@ The command reads the scope's structured artifact first:
 
 - `sprint.json`
 
-It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, warnings, machine-checkable routing (`routing.modes`), budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
+It emits scope status, next action, roadmap and sprint summaries, next task, artifact paths, compact rule summaries, ADRs, warnings, machine-checkable routing (`routing.modes`), budget routing (`budgetClass`, `reasoningTier`, `maxContextTokens`, `budgetGuidance`), and an estimated token total. Missing summaries produce warnings but still return a partial pack when possible. Unknown scopes fail with an actionable error.
 
 Prefer `context-pack` over manual file selection at session start, after compaction, or when resuming a scope through summary-first routing.
 
@@ -233,7 +251,7 @@ kyro doctor --tokens --artifacts
 kyro doctor --artifacts --kyro-scope auth-refactor
 ```
 
-The audit validates project state in `kyro.json`, scoped `sprint.json` shape, zero-loss archive snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. Missing archives warn; invalid JSON and broken `sprint.json` references fail.
+The audit validates project state, scoped `sprint.json` shape including ADR records, versioned lossless checkpoints, legacy ActiveSprint snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. It also reports resumable and divergent close transactions.
 
 Repair and normalize a scope's `sprint.json` without rewriting user-authored archives:
 

@@ -29,6 +29,19 @@ const validSprintJson = {
   successCriteria: ['The doctor reports the file as valid.'],
   clarifications: [],
   conventions: [{ id: 'c-1', rule: 'Run build before close.', tags: ['build'], addedSprint: 1 }],
+  adrs: [
+    {
+      id: 'ADR-0001',
+      title: 'Use sprint.json for scope state',
+      status: 'accepted',
+      date: '2026-07-15',
+      context: 'Scope state must be inspectable and recoverable from one structured artifact.',
+      decision: 'Keep durable architectural decisions in sprint.json.adrs[].',
+      consequences: ['Doctor can validate ADR shape together with the rest of sprint.json.'],
+      alternatives: ['Create markdown ADR files per scope.'],
+      links: { docs: ['docs/architecture.md'] },
+    },
+  ],
   roadmap: {
     plannedSprintCount: 1,
     sizingRationale: 'Single sprint.',
@@ -138,6 +151,60 @@ assertCase(
   'ledger[0].snapshot must be a string',
 );
 
+// 5. Malformed ADRs fail through the same sprint.json doctor validation path.
+assertCase(
+  'bad-adr-status',
+  validKyroJson,
+  { ...validSprintJson, adrs: [{ ...validSprintJson.adrs[0], status: 'approved' }] },
+  1,
+  'adrs[0].status must be one of',
+);
+
+// 6. ADR ids must be unique per scope.
+assertCase(
+  'duplicate-adr-id',
+  validKyroJson,
+  { ...validSprintJson, adrs: [validSprintJson.adrs[0], { ...validSprintJson.adrs[0], title: 'Duplicate ADR' }] },
+  1,
+  'duplicate ADR id ADR-0001',
+);
+
+// 7. ADR links to other ADRs must resolve inside the same scope.
+assertCase(
+  'bad-adr-reference',
+  validKyroJson,
+  { ...validSprintJson, adrs: [{ ...validSprintJson.adrs[0], links: { supersedes: ['ADR-9999'] } }] },
+  1,
+  'unknown ADR id ADR-9999',
+);
+
+// 8. ADR ids must use the canonical ADR-0001 style.
+assertCase(
+  'bad-adr-id',
+  validKyroJson,
+  { ...validSprintJson, adrs: [{ ...validSprintJson.adrs[0], id: 'ADR-1' }] },
+  1,
+  'adrs[0].id must match ADR-0001 format',
+);
+
+// 9. ADR dates must be real YYYY-MM-DD dates.
+assertCase(
+  'bad-adr-date',
+  validKyroJson,
+  { ...validSprintJson, adrs: [{ ...validSprintJson.adrs[0], date: '2026-02-31' }] },
+  1,
+  'adrs[0].date must be a YYYY-MM-DD date string',
+);
+
+// 10. ADR narrative fields must be meaningful, not empty placeholders.
+assertCase(
+  'empty-adr-narrative',
+  validKyroJson,
+  { ...validSprintJson, adrs: [{ ...validSprintJson.adrs[0], context: '', consequences: [] }] },
+  1,
+  'adrs[0].context must be a non-empty string',
+);
+
 // A closed sprint whose snapshot exists but whose narrative .md needs validation.
 const closedSprintJson = {
   ...validSprintJson,
@@ -156,7 +223,7 @@ const goodSnapshot = '{"n":1,"slug":"demo"}\n';
 const brokenNarrative = "---\ntitle: 'demo — Sprint 1: undefined'\n---\n\n# Sprint 1: undefined\n\n## Objective\n\nx\n";
 const goodNarrative = "---\ntitle: 'demo — Sprint 1: Demo work'\n---\n\n# Sprint 1: Demo work\n\n## Objective\n\nx\n";
 
-// 5. A narrative rendered with an undefined title fails and names the sprint.
+// 11. A narrative rendered with an undefined title fails and names the sprint.
 assertCase(
   'broken-narrative',
   validKyroJson,
@@ -166,7 +233,7 @@ assertCase(
   { 'archive/sprint-001-demo.json': goodSnapshot, 'archive/sprint-001-demo.md': brokenNarrative },
 );
 
-// 6. A well-formed narrative passes.
+// 12. A well-formed narrative passes.
 assertCase(
   'good-narrative',
   validKyroJson,
@@ -176,7 +243,7 @@ assertCase(
   { 'archive/sprint-001-demo.json': goodSnapshot, 'archive/sprint-001-demo.md': goodNarrative },
 );
 
-// 7. An incomplete kyro.json (missing required v4 fields) must produce a CLEAN fail, not a crash.
+// 13. An incomplete kyro.json (missing required v4 fields) must produce a CLEAN fail, not a crash.
 //    A crash would print "Cannot read properties of undefined" instead of the diagnostic message.
 assertCase(
   'incomplete-kyro-json',
@@ -186,7 +253,7 @@ assertCase(
   'is incomplete',
 );
 
-// 8. An unresolved [NEEDS CLARIFICATION] marker must FAIL — the deterministic clarify gate.
+// 14. An unresolved [NEEDS CLARIFICATION] marker must FAIL — the deterministic clarify gate.
 assertCase(
   'unresolved-clarification',
   validKyroJson,
@@ -195,7 +262,7 @@ assertCase(
   'unresolved [NEEDS CLARIFICATION]',
 );
 
-// 9. REGRESSION (schema/runtime contract): an activeSprint missing a field the runtime consumes
+// 15. REGRESSION (schema/runtime contract): an activeSprint missing a field the runtime consumes
 //    (definitionOfDone — close-sprint reads `.length`) must FAIL the doctor, never PASS and then
 //    crash close-sprint. If the doctor says PASS, no downstream command may explode.
 const { definitionOfDone: _dod, ...activeWithoutDod } = validSprintJson.activeSprint;
@@ -207,7 +274,7 @@ assertCase(
   'activeSprint.definitionOfDone',
 );
 
-// 10. Same contract for tasks: a task missing `title` (consumed by the narrative render) must FAIL.
+// 16. Same contract for tasks: a task missing `title` (consumed by the narrative render) must FAIL.
 const taskWithoutTitle = { ...validSprintJson.activeSprint.phases[0].tasks[0] };
 delete taskWithoutTitle.title;
 assertCase(

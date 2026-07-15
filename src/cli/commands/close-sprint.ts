@@ -1,7 +1,7 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { applyPlan, printPlan, resolveManagedPath } from '../fs';
+import { printPlan, resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { collectFindings } from '../core/analysis';
@@ -11,18 +11,26 @@ import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import type { ActiveSprint, LedgerEntry, OperationPlan, SprintFile } from '../types';
+import {
+  applySprintCloseTransaction,
+  buildSprintCloseCheckpoint,
+  canonicalJson,
+  deriveSprintCloseTransition,
+  readSprintCloseCheckpoint,
+  type SprintCloseTransaction,
+} from '../checkpoints/sprint-close';
+import type { ActiveSprint, OperationPlan, SprintCloseCheckpointV1, SprintCloseInputs, SprintFile } from '../types';
+import { assertSafeManagedPath, assertSafePathSegment, withStateWriterLock } from '../pipeline/state-writer-lock';
 
 /**
- * Deterministic, zero-loss sprint close. The TOOL — not the agent — owns the destructive step.
+ * Deterministic, lossless scope close. The TOOL — not the agent — owns the destructive step.
  *
- * Guarantee: the verbatim JSON snapshot of `activeSprint` is written to `archive/` BEFORE the live
- * `activeSprint` is ever cleared. A model cannot skip the snapshot or do a partial string edit here;
- * the whole `sprint.json` is re-serialized and re-parsed to verify. If a snapshot for this sprint
- * number already exists, the command refuses to run (double-close / audit-trail protection).
+ * Guarantee: an immutable full-scope checkpoint is published before any mutable state changes.
+ * The legacy ActiveSprint snapshot remains available for compatible readers. A matching checkpoint
+ * makes retries idempotent; conflicting content or divergent live state is never overwritten.
  *
- * The agent still owns the *judgment* work (narrative .md, conventions, debt extraction) — all of
- * which is additive. Only the irreversible snapshot+clear lives here.
+ * The agent still owns additive judgment work (conventions and debt extraction). The CLI owns the
+ * checkpoint, narrative, compatible snapshot, and compare-and-swap live-state transition.
  */
 export interface CloseSprintArgs {
   scope: string | null;
@@ -44,22 +52,33 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
   }
 
   const scope = resolveKyroScope(args.scope);
-  const { sprint, plan, snapshotPath } = buildClosePlan(scope, args);
-  printPlan(`Close sprint ${sprint.activeSprint!.n} (${sprint.activeSprint!.slug}) — zero-loss`, plan);
-  console.log(`\nSnapshot (written first, never overwritten): ${snapshotPath}`);
+  const prepared = buildClosePlan(scope, args);
+  const { plan, snapshotPath, checkpointPath, transaction } = prepared;
+  const identity = transaction.checkpoint.identity;
+  printPlan(`Close sprint ${identity.sprintN} (${identity.sprintSlug}) — lossless scope checkpoint`, plan);
+  console.log(`\nCheckpoint (written first, immutable complete scope state): ${checkpointPath}`);
+  console.log(`Legacy ActiveSprint snapshot (never overwritten): ${snapshotPath}`);
 
   if (args.dryRun) {
     console.log('Dry run complete. No files changed.');
     return;
   }
   if (!args.yes) {
-    const confirmed = await confirm(`Snapshot and close sprint ${sprint.activeSprint!.n} in scope "${scope}"? [y/N] `);
+    const confirmed = await confirm(`Checkpoint and close sprint ${identity.sprintN} in scope "${scope}"? [y/N] `);
     if (!confirmed) {
       console.log('No changes made.');
       return;
     }
   }
 
+  // Rebuild under the writer lock. The displayed plan is advisory; no stale pre-prompt state is
+  // ever applied after another mutator has had a chance to run.
+  withStateWriterLock(() => executeConfirmedClose(scope, args));
+}
+
+function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
+  const fresh = buildClosePlan(scope, args);
+  const identity = fresh.transaction.checkpoint.identity;
   emitToolCommandRun(scope, 'cli', 'close-sprint', { outcome: args.outcome });
   const guard = evaluateGuard('close_sprint', { surface: 'cli', scope, confirmed: true });
   if (guard.kind === 'blocked') {
@@ -67,45 +86,48 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
     throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
   }
   emitGateApproved(scope, 'close_sprint');
-  applyPlan(plan);
+  applySprintCloseTransaction(fresh.transaction);
 
-  // Re-parse the written sprint.json to prove validity (the safe-write verify step).
   const verify = readJsonSafely(sprintJsonPath(scope));
   if (verify.error || !verify.exists) {
-    throw new KyroCoreError('INVALID_JSON', `Close wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, `The snapshot at ${snapshotPath} preserves the sprint.`);
+    throw new KyroCoreError('INVALID_JSON', `Close wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, `The snapshot at ${fresh.snapshotPath} preserves the sprint.`);
   }
   const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
     const detail = issues.map((i) => `${i.field} ${i.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Close wrote sprint.json but it failed validation — ${detail}.`, `The snapshot at ${snapshotPath} preserves the sprint.`);
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Close wrote sprint.json but it failed validation — ${detail}.`, `The snapshot at ${fresh.snapshotPath} preserves the sprint.`);
   }
-
   emitTraceEvent({
     v: 1,
     ts: new Date().toISOString(),
     scope,
     type: 'close_snapshot',
-    sprintN: sprint.activeSprint!.n,
-    snapshotId: traceSnapshotId(snapshotPath),
+    sprintN: identity.sprintN,
+    snapshotId: traceSnapshotId(fresh.snapshotPath),
     outcome: normalizeTraceCloseOutcome(args.outcome),
   });
-
-  console.log(`\nSprint ${sprint.activeSprint!.n} closed. activeSprint cleared; ledger entry + snapshot recorded.`);
+  console.log(`\nSprint ${identity.sprintN} closed. activeSprint cleared; ledger entry, snapshot, and checkpoint recorded.`);
   console.log(`Next action: ${(verify.value as SprintFile).handoff.nextAction}.`);
 }
 
 export function buildClosePlan(
   scope: string,
   args: CloseSprintArgs,
-): { sprint: SprintFile; plan: OperationPlan[]; snapshotPath: string } {
+): { sprint: SprintFile; plan: OperationPlan[]; snapshotPath: string; checkpointPath: string; transaction: SprintCloseTransaction } {
   const root = scopeRoot(scope);
+  assertSafePathSegment(scope, 'Scope');
+  assertSafeManagedPath(root);
+  assertSafeManagedPath(sprintJsonPath(scope));
   if (!existsSync(resolveManagedPath(root))) {
     throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see available scopes.');
   }
 
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) {
-    throw new KyroCoreError('SCOPE_NOT_FOUND', `Cannot close ${scope}: sprint.json not found. Run /kyro:forge (INIT) to create it.`);
+    const recovered = findLatestCheckpoint(scope);
+    if (!recovered) throw new KyroCoreError('SCOPE_NOT_FOUND', `Cannot close ${scope}: sprint.json not found and no checkpoint can resume it. Run recovery or /kyro:forge (INIT).`);
+    assertMatchingCloseInputs(recovered.checkpoint.close, args, recovered.path);
+    return closePlanResult(recovered.checkpoint.intendedAfterClose, transactionFromExisting(recovered.path, recovered.checkpoint));
   }
   if (read.error) {
     throw new KyroCoreError('INVALID_JSON', `Cannot close ${scope}: sprint.json is invalid JSON (${read.error}). Restore from an archive snapshot.`);
@@ -123,15 +145,22 @@ export function buildClosePlan(
   const active = sprint.activeSprint;
   if (!active) {
     const latest = sprint.ledger[sprint.ledger.length - 1];
+    if (latest?.checkpoint) {
+      const checkpointPath = `${root}/${latest.checkpoint}`;
+      const checkpoint = readSprintCloseCheckpoint(checkpointPath);
+      if (!checkpoint) throw new KyroCoreError('CHECKPOINT_CORRUPT', `Ledger references missing checkpoint ${checkpointPath}.`, 'Restore the checkpoint before retrying the close.');
+      assertMatchingCloseInputs(checkpoint.close, args, checkpointPath);
+      const priorActive = checkpoint.beforeClose.activeSprint;
+      if (!priorActive) throw new KyroCoreError('CHECKPOINT_CORRUPT', `Checkpoint ${checkpointPath} has no beforeClose.activeSprint.`);
+      const transaction = transactionFromExisting(checkpointPath, checkpoint);
+      return closePlanResult(sprint, transaction);
+    }
     if (latest?.snapshot) {
-      throw new KyroCoreError(
-        'SNAPSHOT_EXISTS',
-        `Cannot close ${scope}: activeSprint is null and the latest ledger entry already has snapshot ${latest.snapshot}.`,
-        'This scope appears already closed for the latest sprint; do not double-close it.',
-      );
+      throw new KyroCoreError('SNAPSHOT_EXISTS', `Cannot close ${scope}: activeSprint is null and the latest ledger entry has only legacy snapshot ${latest.snapshot}.`, 'This sprint is already closed. Legacy archives cannot be upgraded into a full checkpoint without inventing historical state.');
     }
     throw new KyroCoreError('INVALID_INPUT', `Cannot close ${scope}: activeSprint is null (no sprint in progress). Nothing to snapshot.`);
   }
+  assertSafePathSegment(active.slug, 'Sprint slug');
   const principles = readProjectState()?.principles ?? [];
   const blockingFindings = collectFindings(sprint, principles).filter((finding) => finding.severity === 'CRITICAL' || finding.severity === 'HIGH');
   if (blockingFindings.length > 0) {
@@ -145,12 +174,13 @@ export function buildClosePlan(
   const nnn = String(active.n).padStart(3, '0');
   const snapshotPath = `${archiveDir(scope)}/sprint-${nnn}-${active.slug}.json`;
   const narrativePath = `${archiveDir(scope)}/sprint-${nnn}-${active.slug}.md`;
-  const archiveMdPath = `archive/sprint-${nnn}-${active.slug}.md`;
-  const snapshotRel = `archive/sprint-${nnn}-${active.slug}.json`;
+  const checkpointPath = `${archiveDir(scope)}/sprint-${nnn}-${active.slug}.checkpoint.json`;
+  for (const path of [snapshotPath, narrativePath, checkpointPath, sprintJsonPath(scope), projectStatePath()]) assertSafeManagedPath(path);
 
   // Audit-trail protection: never overwrite an existing snapshot. A collision means this sprint
   // number was already closed — exactly the double-close that destroyed Sprint 1 data before.
-  if (existsSync(resolveManagedPath(snapshotPath))) {
+  const existingCheckpoint = readSprintCloseCheckpoint(checkpointPath);
+  if (existsSync(resolveManagedPath(snapshotPath)) && !existingCheckpoint) {
     throw new KyroCoreError(
       'SNAPSHOT_EXISTS',
       `Refusing to close: snapshot already exists at ${snapshotPath}. Sprint ${active.n} appears already closed; overwriting would destroy the audit trail.`,
@@ -158,73 +188,42 @@ export function buildClosePlan(
     );
   }
 
-  const closedAt = new Date().toISOString().slice(0, 10);
-  const closed = applyClose(sprint, active, args, archiveMdPath, snapshotRel, closedAt);
-
-  const plan: OperationPlan[] = [
-    // 1. Snapshot FIRST — the verbatim, zero-loss record. Written before any mutation.
-    { action: 'write', path: snapshotPath, content: `${JSON.stringify(active, null, 2)}\n` },
-    // 2. Render the human narrative deterministically (title from roadmap — never undefined).
-    { action: 'write', path: narrativePath, content: renderNarrative(sprint, active, args, closedAt) },
-    // 3. Overwrite the whole sprint.json with activeSprint cleared.
-    { action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(closed, null, 2)}\n` },
-  ];
-
-  // 3. If this was the last sprint, flip the scope status in kyro.json (single, additive field).
-  const remaining = closed.roadmap.sprints.filter((s) => s.state !== 'closed').length;
-  if (remaining === 0) {
-    const statePlan = buildScopeCompletedPlan(scope);
-    if (statePlan) plan.push(statePlan);
+  if (existingCheckpoint) {
+    assertMatchingCloseInputs(existingCheckpoint.close, args, checkpointPath);
+    if (existingCheckpoint.identity.scope !== scope || existingCheckpoint.identity.sprintN !== active.n || existingCheckpoint.identity.sprintSlug !== active.slug) {
+      throw new KyroCoreError('CHECKPOINT_CONFLICT', `Checkpoint identity at ${checkpointPath} does not match the active sprint.`, 'Do not overwrite the checkpoint; reconcile the conflicting sprint identity.');
+    }
+    return closePlanResult(sprint, transactionFromExisting(checkpointPath, existingCheckpoint));
   }
 
-  return { sprint, plan, snapshotPath };
-}
-
-function applyClose(
-  sprint: SprintFile,
-  active: ActiveSprint,
-  args: CloseSprintArgs,
-  archiveMdPath: string,
-  snapshotRel: string,
-  closedAt: string,
-): SprintFile {
-  const ledgerEntry: LedgerEntry = {
-    n: active.n,
-    slug: active.slug,
-    outcome: args.outcome,
-    closedAt,
-    archive: archiveMdPath,
-    snapshot: snapshotRel,
-    ...(args.recommendations.length > 0 ? { recommendations: args.recommendations } : {}),
-  };
-
-  const roadmapSprints = sprint.roadmap.sprints.map((s) =>
-    s.n === active.n ? { ...s, state: 'closed' } : s,
-  );
-  const remaining = roadmapSprints.filter((s) => s.state !== 'closed').length;
-
-  return {
-    ...sprint,
-    status: remaining === 0 ? 'completed' : sprint.status,
-    ledger: [...sprint.ledger, ledgerEntry],
-    previousSprint: {
-      n: active.n,
-      slug: active.slug,
-      outcome: args.outcome,
-      summary: args.summary ?? active.objective,
-    },
-    activeSprint: null,
-    roadmap: { ...sprint.roadmap, sprints: roadmapSprints },
-    handoff: {
-      ...sprint.handoff,
-      nextAction: remaining > 0 ? 'plan_sprint' : 'wrap_up',
-      nextTaskId: null,
-      note:
-        args.note ??
-        `Sprint ${active.n} (${active.slug}) closed as ${args.outcome}. ${remaining > 0 ? `${remaining} sprint(s) remain.` : 'No sprints remain — scope objective met.'}`,
-      lastUpdated: closedAt,
-    },
-  };
+  const state = readProjectState();
+  const projectScopeBefore = state?.scopes.find((entry) => entry.id === scope);
+  if (!state || !projectScopeBefore) {
+    throw new KyroCoreError('STATE_DIVERGED', `Cannot checkpoint ${scope}: its KyroScopeEntry is missing from kyro.json.`, 'Repair kyro.json before closing so the checkpoint can preserve scope state.');
+  }
+  const createdAt = new Date().toISOString();
+  const closedAt = createdAt.slice(0, 10);
+  const closeInputs = frozenCloseInputs(args);
+  const transition = deriveSprintCloseTransition(sprint, projectScopeBefore, closeInputs, createdAt, snapshotPath, narrativePath, checkpointPath);
+  const closed = transition.intendedAfterClose;
+  const projectScopeAfter = transition.projectScopeAfter;
+  const legacySnapshotContent = `${JSON.stringify(active, null, 2)}\n`;
+  const narrativeContent = renderNarrative(sprint, active, closeInputs, closedAt);
+  const transaction = buildSprintCloseCheckpoint(checkpointPath, {
+    scope,
+    active,
+    createdAt,
+    close: closeInputs,
+    legacySnapshotPath: snapshotPath,
+    narrativePath,
+    beforeClose: sprint,
+    intendedAfterClose: closed,
+    projectScopeBefore,
+    projectScopeAfter,
+    legacySnapshotContent,
+    narrativeContent,
+  });
+  return closePlanResult(sprint, transaction);
 }
 
 /**
@@ -233,7 +232,7 @@ function applyClose(
  * `Sprint N: undefined`, the failure that hand-rendered narratives produced. The agent supplies
  * only judgment text (learnings, recommendations) via args; structure comes from the snapshot.
  */
-function renderNarrative(sprint: SprintFile, active: ActiveSprint, args: CloseSprintArgs, closedAt: string): string {
+function renderNarrative(sprint: SprintFile, active: ActiveSprint, args: SprintCloseInputs, closedAt: string): string {
   const roadmapTitle = sprint.roadmap.sprints.find((s) => s.n === active.n)?.title;
   const title = roadmapTitle ?? active.title ?? active.objective;
   const nextN = active.n + 1;
@@ -366,16 +365,59 @@ function renderVerdict(verdict: unknown): string {
   return String(verdict);
 }
 
-function buildScopeCompletedPlan(scope: string): OperationPlan | null {
-  const state = readProjectState();
-  if (!state) return null;
-  const entry = state.scopes.find((s) => s.id === scope);
-  if (!entry || entry.status === 'completed') return null;
-  const updated = {
-    ...state,
-    scopes: state.scopes.map((s) => (s.id === scope ? { ...s, status: 'completed' as const } : s)),
-  };
-  return { action: 'write', path: projectStatePath(), content: `${JSON.stringify(updated, null, 2)}\n` };
+function closePlanResult(sprint: SprintFile, transaction: SprintCloseTransaction): { sprint: SprintFile; plan: OperationPlan[]; snapshotPath: string; checkpointPath: string; transaction: SprintCloseTransaction } {
+  const checkpoint = transaction.checkpoint;
+  const plan: OperationPlan[] = [
+    { action: 'write', path: transaction.checkpointPath, content: transaction.checkpointContent },
+    { action: 'write', path: checkpoint.paths.legacySnapshot, content: transaction.legacySnapshotContent },
+    { action: 'write', path: checkpoint.paths.narrative, content: transaction.narrativeContent },
+    { action: 'write', path: sprintJsonPath(checkpoint.identity.scope), content: `${JSON.stringify(checkpoint.intendedAfterClose, null, 2)}\n` },
+  ];
+  if (canonicalJson(checkpoint.projectScopeBefore) !== canonicalJson(checkpoint.projectScopeAfter)) {
+    plan.push({ action: 'write', path: projectStatePath() });
+  }
+  return { sprint, plan, snapshotPath: checkpoint.paths.legacySnapshot, checkpointPath: transaction.checkpointPath, transaction };
+}
+
+function transactionFromExisting(checkpointPath: string, checkpoint: SprintCloseTransaction['checkpoint']): SprintCloseTransaction {
+  const active = checkpoint.beforeClose.activeSprint;
+  if (!active) throw new KyroCoreError('CHECKPOINT_CORRUPT', `Checkpoint ${checkpointPath} has no beforeClose.activeSprint.`);
+  const legacySnapshotContent = `${JSON.stringify(active, null, 2)}\n`;
+  const narrativeContent = renderNarrative(checkpoint.beforeClose, active, checkpoint.close, checkpoint.createdAt.slice(0, 10));
+  return { checkpointPath, checkpoint, checkpointContent: `${JSON.stringify(checkpoint, null, 2)}\n`, legacySnapshotContent, narrativeContent };
+}
+
+function frozenCloseInputs(args: CloseSprintArgs): SprintCloseInputs {
+  return { outcome: args.outcome, note: args.note, summary: args.summary, recommendations: [...args.recommendations], learnings: [...args.learnings] };
+}
+
+function assertMatchingCloseInputs(expected: SprintCloseInputs, args: CloseSprintArgs, checkpointPath: string): void {
+  if (canonicalJson(expected) !== canonicalJson(frozenCloseInputs(args))) {
+    throw new KyroCoreError('CHECKPOINT_CONFLICT', `Close inputs conflict with frozen metadata in ${checkpointPath}.`, 'Retry with exactly the outcome, note, summary, recommendations, and learnings stored in the checkpoint.');
+  }
+}
+
+function findLatestCheckpoint(scope: string): { path: string; checkpoint: SprintCloseCheckpointV1 } | null {
+  const directory = archiveDir(scope);
+  assertSafeManagedPath(directory);
+  const absolute = resolveManagedPath(directory);
+  if (!existsSync(absolute)) return null;
+  const candidates = readdirSync(absolute)
+    .filter((name) => name.endsWith('.checkpoint.json'));
+  const parsed: Array<{ path: string; checkpoint: SprintCloseCheckpointV1 }> = [];
+  for (const name of candidates) {
+    const path = `${directory}/${name}`;
+    const checkpoint = readSprintCloseCheckpoint(path);
+    if (checkpoint) parsed.push({ path, checkpoint });
+  }
+  parsed.sort((left, right) => compareCheckpointRecency(right.checkpoint, left.checkpoint));
+  return parsed[0] ?? null;
+}
+
+export function compareCheckpointRecency(left: SprintCloseCheckpointV1, right: SprintCloseCheckpointV1): number {
+  return left.identity.sprintN - right.identity.sprintN
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.checkpointId.localeCompare(right.checkpointId);
 }
 
 
@@ -422,10 +464,10 @@ function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
 }
 
 function printCloseSprintHelp(): void {
-  console.log(`kyro close-sprint — deterministic, zero-loss sprint close
+  console.log(`kyro close-sprint — deterministic, lossless scope close
 
-The tool snapshots activeSprint to archive/ BEFORE clearing it, then records the
-ledger entry. The snapshot is never overwritten (double-close protection).
+The tool publishes a versioned full-scope checkpoint BEFORE changing live state,
+preserves the legacy ActiveSprint snapshot, and safely resumes matching retries.
 
 Usage:
   kyro close-sprint [--kyro-scope <scope>] [options]
@@ -442,7 +484,7 @@ Options:
   -h, --help               Show this help
 
 Run the narrative/conventions/debt work in the close-sprint mode first; this
-command owns only the irreversible snapshot + activeSprint clear.`);
+command owns the durable checkpoint transaction and activeSprint clear.`);
 }
 
 async function confirm(question: string): Promise<boolean> {

@@ -1,7 +1,7 @@
 {
   "evalCaseSchemaVersion": 1,
   "id": "close-sprint-corruption",
-  "title": "Doctor catches missing zero-loss snapshot",
+  "title": "Doctor catches missing verbatim active-sprint snapshot",
   "kind": "replay",
   "tags": [
     "guardrail",
@@ -23,7 +23,7 @@
         "exitCode": 1,
         "stdoutIncludes": [
           "[FAIL]",
-          "closed sprint(s) without a zero-loss snapshot"
+          "closed sprint(s) without a verbatim active-sprint snapshot"
         ]
       }
     }

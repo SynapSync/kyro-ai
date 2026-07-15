@@ -103,7 +103,7 @@
     {
       "name": "close_sprint",
       "title": "Close active Kyro sprint",
-      "description": "Build or apply the deterministic zero-loss close-sprint plan. Use when every sprint task passed review and the sprint is ready to close. Without confirm:true it returns the plan and writes nothing.",
+      "description": "Build or apply the deterministic lossless scope-checkpoint close plan. Use when every sprint task passed review and the sprint is ready to close. Without confirm:true it returns the plan and writes nothing.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -150,7 +150,7 @@
       },
       "annotations": {
         "destructiveHint": true,
-        "idempotentHint": false
+        "idempotentHint": true
       }
     },
     {

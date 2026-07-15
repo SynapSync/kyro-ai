@@ -11,7 +11,7 @@ import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
 import { scopeFindingsToTask } from './review';
 import { readProjectState } from '../state';
-import type { ActiveSprint, CliOptions, ContextPackMode, ContextPackOutput, NextTaskReview, PackVerbosity, SpecScenario, SprintFile, Task } from '../types';
+import type { ActiveSprint, AdrRecord, CliOptions, ContextPackMode, ContextPackOutput, NextTaskReview, PackVerbosity, SpecScenario, SprintFile, Task } from '../types';
 
 export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json' | 'verbosity'>): void {
   const scope = resolveKyroScope(options.kyroScope);
@@ -57,6 +57,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const openDebtCount = sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length;
   const concise = verbosity === 'concise';
   const conventions = selectConventions(sprint, packMode, task, concise);
+  const adrs = selectAdrs(sprint, concise);
   const taskScenarios = resolveTaskScenarios(sprint, task);
   const { reviewPending, nextTaskReview } = resolveReviewDebt(sprint, task);
 
@@ -90,6 +91,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     reviewPending,
     nextTaskReview,
     conventions,
+    adrs,
     warnings,
     routing: { modes: [...routing.modes] },
     budgetClass: routing.budgetClass,
@@ -140,6 +142,26 @@ function selectConventions(sprint: SprintFile, packMode: ContextPackMode, task: 
   return relevant.map((c) => ({ id: c.id, rule: c.rule, tags: c.tags }));
 }
 
+function selectAdrs(sprint: SprintFile, concise: boolean): ContextPackOutput['adrs'] {
+  const records = sortAdrsByRecency(sprint.adrs ?? []);
+  const selected = concise ? records.slice(0, 5) : records;
+  return selected.map((adr) => ({
+    id: adr.id,
+    title: adr.title,
+    status: adr.status,
+    date: adr.date,
+    context: adr.context,
+    decision: adr.decision,
+    consequences: adr.consequences,
+    alternatives: adr.alternatives,
+    links: adr.links,
+  }));
+}
+
+function sortAdrsByRecency(adrs: AdrRecord[]): AdrRecord[] {
+  return [...adrs].sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id));
+}
+
 /**
  * Surface maker/checker debt on the read path the agent hits every turn: which done tasks still lack a
  * pass verdict, and — for a task pack — the checker findings scoped to that task. This is the same data
@@ -182,6 +204,7 @@ function estimatePackTokens(pack: Omit<ContextPackOutput, 'estimatedTokens'>): n
     ...pack.specNonGoals, ...pack.specOpenQuestions,
     ...pack.taskScenarios.map((scenario) => `${scenario.id} ${scenario.given} ${scenario.when} ${scenario.then}`),
     ...pack.blockers, ...pack.conventions.map((c) => c.rule),
+    ...pack.adrs.map((adr) => `${adr.id} ${adr.title} ${adr.status} ${adr.context} ${adr.decision} ${adr.consequences.join(' ')} ${adr.alternatives.join(' ')}`),
   ].filter(Boolean).join(' ');
   return Math.ceil(text.length / 4);
 }
@@ -208,6 +231,7 @@ function printContextPackText(pack: ContextPackOutput): void {
   }
   if (pack.handoffNote) console.log(`\nResume note: ${pack.handoffNote}`);
   if (pack.conventions.length) console.log(`Conventions: ${pack.conventions.map((c) => c.rule).join(' | ')}`);
+  if (pack.adrs.length) console.log(`ADRs: ${pack.adrs.map((adr) => `${adr.id} ${adr.title} (${adr.status})`).join(' | ')}`);
   console.log(`\nBudget: ${pack.budgetClass} (${pack.reasoningTier}, ~${pack.estimatedTokens}/${pack.maxContextTokens} tokens)`);
   for (const w of pack.warnings) console.log(`! ${w}`);
 }

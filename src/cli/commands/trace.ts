@@ -1,4 +1,5 @@
 import { existsSync, rmSync } from 'node:fs';
+import { assertStateWriterLeaseHealthy } from '../pipeline/state-writer-lock';
 import { traceEventsPath } from '../artifacts/paths';
 import { resolveManagedPath } from '../fs';
 import { KyroCoreError } from '../core/errors';
@@ -84,6 +85,7 @@ function parseType(value: string): TraceEventType {
 function clearTrace(scope: string): void {
   const path = resolveManagedPath(traceEventsPath(scope));
   if (existsSync(path)) {
+    assertStateWriterLeaseHealthy();
     rmSync(path, { force: true });
     console.log(`Trace cleared for scope ${scope}: ${traceEventsPath(scope)}`);
     return;

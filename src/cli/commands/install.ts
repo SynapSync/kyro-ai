@@ -10,6 +10,7 @@ import type { Agent, CliOptions } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
 import { analyzeDrift, buildPrunePlan, hasDrift, hasPrunableDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
 import { readPackageVersion } from '../help';
+import { withStateWriterLock, withStateWriterLockAsync } from '../pipeline/state-writer-lock';
 
 export function install(options: CliOptions): void | Promise<void> {
   assertWorkspaceScope(options.scope);
@@ -20,11 +21,13 @@ export function install(options: CliOptions): void | Promise<void> {
   const existingState = readProjectState();
   const workspaceDecision = shouldInstallWorkspace(options, existingState !== null);
   if (workspaceDecision instanceof Promise) {
-    return workspaceDecision.then((shouldInitializeWorkspace) => {
-      runInstallPlan(options, agents, packageVersion, shouldInitializeWorkspace);
-    });
+    return workspaceDecision.then((shouldInitializeWorkspace) => withStateWriterLockAsync(() => {
+      // State may have changed while the prompt was open. Existing workspaces are always refreshed.
+      runInstallPlan(options, agents, packageVersion, readProjectState() !== null || shouldInitializeWorkspace);
+    }));
   }
-  runInstallPlan(options, agents, packageVersion, workspaceDecision);
+  if (options.dryRun) runInstallPlan(options, agents, packageVersion, workspaceDecision);
+  else withStateWriterLock(() => runInstallPlan(options, agents, packageVersion, readProjectState() !== null || workspaceDecision));
 }
 
 function runInstallPlan(

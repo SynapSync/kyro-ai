@@ -1,8 +1,8 @@
 # Close Sprint Mode
 
-Close a sprint by snapshotting it verbatim, recording a one-line ledger entry, then clearing `activeSprint`. Zero loss: the full structured record is preserved in the archive snapshot.
+Close a sprint by publishing a versioned lossless scope checkpoint, retaining the legacy verbatim ActiveSprint snapshot, recording a ledger entry, then clearing `activeSprint`.
 
-**The destructive step is NOT done by hand. It is owned by the CLI.** You prepare the additive work (narrative, conventions, debt); then a single command — `{{KYRO_CLI}} close-sprint` — snapshots `activeSprint` to `archive/` and only then clears it, atomically, and re-parses to verify. This is non-negotiable: a hand-edited close is how Sprint data has been lost before. Do **not** manually null `activeSprint` or hand-write the ledger entry.
+**The destructive step is NOT done by hand. It is owned by the CLI.** The command first publishes an immutable checkpoint containing complete `sprint.json` and affected `kyro.json` scope state before and after close. It then writes the compatible ActiveSprint snapshot and narrative and reconciles live state with compare-and-swap checks. Do **not** manually null `activeSprint` or hand-write the ledger entry.
 
 Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse).
 
@@ -21,7 +21,7 @@ Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Cont
    - Update `debt[]` via `../helpers/debt-tracker.md`: mark resolved items `resolved`, defer with reason, add new debt objects.
 4. **Do NOT hand-write the narrative `.md`.** The CLI renders it deterministically from the snapshot (the title comes from `roadmap.sprints[]`, so it can never be `undefined`). You only supply the *judgment* text — learnings and recommendations — as flags to the close command in the next step.
 
-### 5. Close with the CLI (deterministic, zero-loss)
+### 5. Close with the CLI (deterministic, lossless)
 
 Run:
 
@@ -33,13 +33,13 @@ Run:
   [--recommendation "..."]    # repeatable — recorded in the narrative + ledger
 ```
 
-In one atomic operation the command snapshots `activeSprint` to `archive/` (double-close protected), renders the narrative `.md` deterministically, appends the `ledger[]` entry, clears `activeSprint`, routes `handoff.nextAction` (`plan_sprint` or `wrap_up`), and re-parses to verify. The snapshot always survives even if the final write fails.
+The command publishes `sprint-NNN-slug.checkpoint.json` first, then the legacy `sprint-NNN-slug.json` ActiveSprint snapshot and narrative. It atomically reconciles `sprint.json` and only the affected `kyro.json` scope entry. A retry with the same frozen inputs resumes safely; corrupt, unsupported, conflicting, or divergent state stops without overwriting live work.
 
 Use `--dry-run` first if you want to review the plan. Do not replicate this by hand.
 
 ## Rules
 
-- The destructive snapshot+clear AND the narrative render are the CLI's job, never a manual edit. The JSON snapshot is the complete record; the `.md` is the readable narrative the CLI generates; the `ledger[]` entry is the one-line index.
+- Checkpoint, legacy snapshot, clear, and narrative rendering are the CLI's job. The checkpoint is the complete recovery record; the legacy JSON contains only `activeSprint`; the `.md` is human-readable; `ledger[]` indexes all three.
 - Retro must be honest and specific. Recommendations must point to concrete next actions.
 - Debt is never deleted; resolved debt appears in the archive and is dropped from `debt[]` only after it is recorded there.
 - Never create `state.json`, `index.json`, `events.ndjson`, summaries, `RE-ENTRY-PROMPTS.md`, or `phases/`.

@@ -26,7 +26,7 @@ The CLI remains the deterministic core. MCP is a protocol shell over the same co
 | `analyze_scope` | No | Run semantic checks for clarity, coverage, deps, debt, and principles. |
 | `scope_list` | No | List known scopes and active status. |
 | `scope_inspect` | No | Inspect one scope with artifact checks. |
-| `close_sprint` | Yes | Build/apply the zero-loss sprint close plan. |
+| `close_sprint` | Yes | Build/apply the lossless scope-checkpoint close plan. |
 | `repair_scope` | Yes | Build/apply sprint.json normalization. |
 
 Mutating tools use a two-phase protocol. Without `confirm: true`, they return a dry-run plan and write nothing. With `confirm: true`, Kyro rebuilds the plan from disk, applies it, and revalidates `sprint.json`.

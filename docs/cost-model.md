@@ -37,7 +37,7 @@ The audit includes command stubs, routers, eager agent/skill files, routed modes
 |--------|-------|
 | Task close | record compact evidence directly on the task object in `sprint.json` |
 | Phase close | update `sprint.json.handoff.nextAction` only |
-| Sprint close | write the verbatim snapshot plus human narrative to `archive/`, then clear the active sprint block in `sprint.json` |
+| Sprint close | publish the immutable scope checkpoint, retain the verbatim ActiveSprint snapshot and narrative, then atomically reconcile live state |
 | Wrap-up | update `sprint.json.handoff` with final context for the next session |
 
 This keeps work recoverable without rewriting large artifacts after every task.

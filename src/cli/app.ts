@@ -5,6 +5,7 @@ import { install, sync } from './commands/install';
 import { runTui } from './commands/tui';
 import { repair } from './commands/repair';
 import { contextPack } from './commands/context-pack';
+import { runStatusCommand } from './commands/status';
 import { runScopeCommand } from './commands/scope';
 import { runCloseSprintCommand } from './commands/close-sprint';
 import { uninstall } from './commands/uninstall';
@@ -15,9 +16,18 @@ import { runReviewCommand } from './commands/review';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
 import { KyroCoreError } from './core/errors';
+import { withStateWriterLockAsync } from './pipeline/state-writer-lock';
+
+let cliWriterLocked = false;
 
 export async function runCli(): Promise<void> {
   const [command = '', ...args] = process.argv.slice(2);
+  if (!cliWriterLocked && isMutatingInvocation(command, args)) {
+    cliWriterLocked = true;
+    try { await withStateWriterLockAsync(runCli); }
+    finally { cliWriterLocked = false; }
+    return;
+  }
 
   if (command === '' || command === 'tui') {
     await runTui();
@@ -56,6 +66,11 @@ export async function runCli(): Promise<void> {
 
   if (command === 'close-sprint') {
     await runCloseSprintCommand(args);
+    return;
+  }
+
+  if (command === 'status') {
+    runStatusCommand(args);
     return;
   }
 
@@ -104,4 +119,13 @@ export async function runCli(): Promise<void> {
     default:
       throw new KyroCoreError('UNKNOWN_COMMAND', `Unknown command: ${command}.`, 'Run kyro --help.');
   }
+}
+
+function isMutatingInvocation(command: string, args: string[]): boolean {
+  if (args.includes('--dry-run')) return false;
+  // close-sprint owns its lock after interactive confirmation so prompts never block writers.
+  // install owns a post-prompt lock and rebuilds its plan from fresh state.
+  if (['sync', 'uninstall', 'repair', 'review'].includes(command)) return true;
+  if (command === 'scope' && args[0] === 'set-active') return true;
+  return command === 'trace' && args.includes('--clear');
 }

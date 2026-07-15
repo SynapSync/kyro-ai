@@ -86,7 +86,7 @@ ORCHESTRATOR
 
 ## Artifact Layout
 
-Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, conventions, and handoff routing. Agents read `kyro.json` and `sprint.json` first, then write back to `sprint.json` as the only routine mutation. See [Cost Model](cost-model.md).
+Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, conventions, durable ADRs, and handoff routing. Agents read `kyro.json` and `sprint.json` first, then write back to `sprint.json` as the only routine mutation. See [Cost Model](cost-model.md).
 
 ```
 .agents/kyro/
@@ -95,7 +95,8 @@ Kyro keeps a single source of truth per scope: `sprint.json` holds the objective
     └── {scope}/
         ├── sprint.json          # single source of truth
         ├── archive/             # write-only, at sprint close
-        │   ├── sprint-001-slug.json  # verbatim zero-loss snapshot
+        │   ├── sprint-001-slug.checkpoint.json # versioned lossless scope checkpoint
+        │   ├── sprint-001-slug.json  # legacy verbatim ActiveSprint snapshot
         │   └── sprint-001-slug.md    # human narrative
         └── findings/            # write-only INIT analysis evidence
 ```
@@ -103,6 +104,19 @@ Kyro keeps a single source of truth per scope: `sprint.json` holds the objective
 `{scope}` is the work topic in kebab-case, for example `oauth-implementation` or `ui-redesign`.
 
 The output directory path (`{output_kyro_dir}`) is resolved once at the start of any mode and recorded in the scope's `sprint.json` under `handoff`. That file is the source of truth for the path.
+
+### Scope-local ADRs
+
+Architectural Decision Records live in `sprint.json.adrs[]`; Kyro does not create markdown ADR files or expose a separate ADR command in this version.
+
+| Field | Contract |
+|-------|----------|
+| `id` | Stable `ADR-0001` style identifier, unique within the scope |
+| `status` | `proposed`, `accepted`, `rejected`, or `superseded` |
+| `context`, `decision`, `consequences`, `alternatives` | Required decision narrative and tradeoffs |
+| `links` | Optional links to tasks, debt, conventions, docs, related ADRs, or superseded ADRs |
+
+Use `conventions[]` for operational learned rules from retros and corrections. Use `adrs[]` for durable architectural decisions that need context, tradeoffs, and long-term reviewability. `kyro context-pack` includes ADRs for agent routing context, `kyro status full` summarizes them for humans/scripts, and `kyro doctor --artifacts` validates malformed ADR records.
 
 ---
 

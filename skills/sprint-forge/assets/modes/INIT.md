@@ -50,7 +50,7 @@ Load `../templates/sprint.json`. Fill:
   - `openQuestions[]`: unresolved requirement-level questions that need `clarify.md`.
   - `scenarios[]`: start empty here unless the scenario is already unambiguous; `plan-sprint.md` normally adds Given/When/Then scenarios.
 - `roadmap` from the sizing above.
-- `conventions: []` (populated later by `learner.md`), `clarifications: []` (populated by `clarify.md`), `activeSprint: null`.
+- `conventions: []` (operational learned rules populated later by `learner.md`), `adrs: []` (durable architectural decisions, no markdown ADR files), `clarifications: []` (populated by `clarify.md`), `activeSprint: null`.
 - `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write `[NEEDS CLARIFICATION: ...]` markers rather than guessing), otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.
 
 **Plan-grade Seedbed mapping:** when a matured-idea document is referenced, load `../helpers/seedbed-init-mapping.md` and apply its exact schema-safe mapping. Account for every material item before writing. Do not load this helper on the normal one-line INIT path.

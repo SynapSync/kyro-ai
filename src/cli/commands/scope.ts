@@ -11,6 +11,7 @@ import { emitBlockedReason, emitGateApproved } from '../core/trace';
 import { inspectScope } from './artifact-doctor';
 import { listScopeNames } from '../artifacts/scopes';
 import type { KyroProjectState } from '../types';
+import { assertStateWriterLeaseHealthy } from '../pipeline/state-writer-lock';
 
 export function runScopeCommand(args: string[]): void {
   const [subcommand = '', maybeScope = ''] = args;
@@ -102,6 +103,7 @@ function setActiveScope(scope: string, yes: boolean, dryRun: boolean): void {
     return;
   }
   emitGateApproved(scope, 'scope_set_active');
+  assertStateWriterLeaseHealthy();
   writeFileSync(resolveManagedPath(KYRO_STATE_PATH), `${JSON.stringify(nextState, null, 2)}\n`, 'utf-8');
   console.log(`Active Kyro scope set to: ${scope}`);
 }

@@ -86,7 +86,7 @@ Your host application is responsible for persistence:
 
 - Write findings to `.agents/kyro/scopes/{scope}/findings/`.
 - Read and write the scope's single source of truth at `.agents/kyro/scopes/{scope}/sprint.json`.
-- Write the zero-loss snapshot and human narrative to `.agents/kyro/scopes/{scope}/archive/` at sprint close, not during normal task execution.
+- Write the lossless scope checkpoint, legacy ActiveSprint snapshot, and human narrative to `.agents/kyro/scopes/{scope}/archive/` at sprint close, not during normal task execution.
 - Run verification commands outside the model when possible.
 
 ---

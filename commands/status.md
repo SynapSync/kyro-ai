@@ -11,14 +11,14 @@ Report Kyro progress from the single source of truth.
 
 1. Read `.agents/kyro/kyro.json`.
 2. Resolve scope from `$ARGUMENTS`, `kyro.json.activeScope`, or `.agents/kyro/scopes/`.
-3. Read the scope's `sprint.json`. Everything needed for a report — `roadmap`, `ledger[]`, `activeSprint`, `debt[]`, `conventions[]`, `handoff` — is in that one file.
+3. Read the scope's `sprint.json`. Everything needed for a report — `roadmap`, `ledger[]`, `activeSprint`, `debt[]`, `conventions[]`, `adrs[]`, `handoff` — is in that one file.
 
 ## Route
 
 | Request | Load next |
 |---------|-----------|
 | `brief` or empty | Report directly from `sprint.json`; include review debt count (`done` tasks without a `pass` verdict). |
-| `full` | `skills/sprint-forge/assets/modes/STATUS.md` for the detailed report shape, including review-debt task ids. |
+| `full` | `skills/sprint-forge/assets/modes/STATUS.md` for the detailed report shape, including review-debt task ids and ADR summary/recent ADRs. |
 | `debt` | Report `debt[]` from `sprint.json`; load `skills/sprint-forge/assets/helpers/debt-tracker.md` only to explain status semantics. |
 | `debt-add`, `debt-resolve`, `debt-escalate` | `skills/sprint-forge/assets/helpers/debt-tracker.md`, then mutate `sprint.json.debt[]` via the Artifact Write Contract. |
 
