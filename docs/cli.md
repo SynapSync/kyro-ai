@@ -175,7 +175,7 @@ The uninstall output includes a summary with overlay, purged file, and empty-dir
 
 It does not create per-scope files. Each scope's `sprint.json` (the single source of truth for that scope) is created later by forge/INIT.
 
-Initial state shape (`runtimeVersion` reflects the installed CLI version):
+Initial state shape:
 
 ```json
 {
@@ -183,11 +183,12 @@ Initial state shape (`runtimeVersion` reflects the installed CLI version):
   "artifactRoot": ".agents/kyro/scopes",
   "scopes": [],
   "activeScope": null,
-  "runtimeVersion": "4.3.0",
   "runtimePath": "~/.agents/kyro/current",
   "installedAdapters": []
 }
 ```
+
+The project state intentionally does not copy the runtime version. Kyro has one global active runtime, so its authoritative version is `~/.agents/kyro/current/manifest.json.packageVersion`; install and sync remove the legacy project-local `runtimeVersion` field while preserving scopes, principles, adapters, and custom metadata.
 
 ## Token Audit
 

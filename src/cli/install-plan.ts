@@ -36,7 +36,7 @@ function buildInstallPlanForMode(
   // Probed once per install/sync — projected markdown is static, so the invocation must be
   // known at copy time. Reused for manifest.json, kyro.json, and (Phase 3+) substitution.
   const kyroInvocation = resolveKyroInvocation().raw;
-  const state = options.includeWorkspace ? mergeProjectState(agents, scope, now, packageVersion, kyroInvocation) : null;
+  const state = options.includeWorkspace ? mergeProjectState(agents, scope, now, kyroInvocation) : null;
   const manifestAgents = state?.installedAdapters.map((adapter) => adapter.agent) ?? [];
   const adapters = state?.installedAdapters ?? [];
   const managedFiles = buildManagedFiles(manifestAgents, runtimeRoot);
@@ -102,7 +102,6 @@ function mergeProjectState(
   agents: Agent[],
   scope: InstallScope,
   installedAt: string,
-  runtimeVersion: string,
   kyroInvocation: string,
 ): KyroProjectState {
   const existing = readProjectState();
@@ -111,13 +110,16 @@ function mergeProjectState(
     artifactRoot: ARTIFACT_ROOT,
     scopes: [],
     activeScope: null,
-    runtimeVersion,
     runtimePath: KYRO_ROOT,
     installedAdapters: [],
   };
   // Merge over defaults so an incomplete kyro.json (e.g. hand-written by an agent that never ran
   // kyro install) is REPAIRED instead of crashing. Arrays are normalized before we iterate them.
   const base: KyroProjectState = { ...defaults, ...(existing ?? {}) };
+  // runtimeVersion was a project-local snapshot of a global singleton and could become stale
+  // whenever another workspace replaced ~/.agents/kyro/current. Keep legacy files readable, but
+  // canonicalize them on install/sync; the active version lives in current/manifest.json only.
+  delete (base as KyroProjectState & { runtimeVersion?: unknown }).runtimeVersion;
   if (!Array.isArray(base.scopes)) base.scopes = [];
   if (!Array.isArray(base.installedAdapters)) base.installedAdapters = [];
 
@@ -136,7 +138,6 @@ function mergeProjectState(
     artifactRoot: ARTIFACT_ROOT,
     scopes: [...base.scopes],
     activeScope: base.activeScope,
-    runtimeVersion,
     runtimePath: KYRO_ROOT,
     installedAdapters: [...adaptersByAgent.values()].sort((a, b) => a.agent.localeCompare(b.agent)),
     kyroInvocation,

@@ -15,7 +15,6 @@ const validKyroJson = {
   artifactRoot: '.agents/kyro/scopes',
   activeScope: 'demo',
   scopes: [{ id: 'demo', title: 'Demo', status: 'active' }],
-  runtimeVersion: '4.0.0',
   runtimePath: '~/.agents/kyro/current',
   installedAdapters: [],
 };
@@ -120,6 +119,15 @@ function assertCase(name, kyroJson, sprintJson, expectedStatus, expectedText, ar
 
 // 1. Valid v4 artifacts pass.
 assertCase('valid', validKyroJson, validSprintJson, 0, 'Schema shapes are valid.');
+
+// Legacy v4 files may still contain runtimeVersion as an ignored extra field.
+assertCase(
+  'legacy-runtime-version',
+  { ...validKyroJson, runtimeVersion: '4.0.0' },
+  validSprintJson,
+  0,
+  'Schema shapes are valid.',
+);
 
 // 2. kyro.json scopes as string[] fails with a specific message.
 assertCase(

@@ -350,8 +350,8 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(agentsText.includes('Keep this user content.'), 'sync: user AGENTS.md content was not preserved');
 
   const statePath = join(installDir, '.agents', 'kyro', 'kyro.json');
-  const expectedVersion = require(join(repo, 'package.json')).version;
   const stateBeforeUpgrade = JSON.parse(readFileSync(statePath, 'utf-8'));
+  assert(!Object.hasOwn(stateBeforeUpgrade, 'runtimeVersion'), 'install: project state should not include runtimeVersion');
   const staleCodexInstalledAt = '2000-01-01T00:00:00.000Z';
   const staleStandardInstalledAt = '2001-01-01T00:00:00.000Z';
   stateBeforeUpgrade.principles = [
@@ -363,6 +363,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
     },
   ];
   stateBeforeUpgrade.customMetadata = { owner: 'fixture', preserve: true };
+  stateBeforeUpgrade.runtimeVersion = '0.0.0-legacy';
   stateBeforeUpgrade.scopes = [{ id: 'upgrade-scope', title: 'Upgrade Scope', status: 'active' }];
   stateBeforeUpgrade.activeScope = 'upgrade-scope';
   stateBeforeUpgrade.installedAdapters = [
@@ -382,7 +383,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(JSON.stringify(stateAfterSync.customMetadata) === JSON.stringify(stateBeforeUpgrade.customMetadata), 'sync: custom metadata was not preserved');
   assert(JSON.stringify(stateAfterSync.scopes) === JSON.stringify(stateBeforeUpgrade.scopes), 'sync: scopes were not preserved');
   assert(stateAfterSync.activeScope === 'upgrade-scope', 'sync: activeScope was not preserved');
-  assert(stateAfterSync.runtimeVersion === expectedVersion, 'sync: runtimeVersion should match package version');
+  assert(!Object.hasOwn(stateAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed');
   const syncedCodex = stateAfterSync.installedAdapters.find((adapter) => adapter.agent === 'codex');
   const syncedStandard = stateAfterSync.installedAdapters.find((adapter) => adapter.agent === 'standard');
   assert(syncedCodex.installedAt !== staleCodexInstalledAt, 'sync: selected adapter installedAt was not refreshed');
@@ -390,6 +391,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
 
   const staleReinstallInstalledAt = '2002-01-01T00:00:00.000Z';
   syncedCodex.installedAt = staleReinstallInstalledAt;
+  stateAfterSync.runtimeVersion = '0.0.0-legacy';
   writeFileSync(statePath, `${JSON.stringify(stateAfterSync, null, 2)}\n`, 'utf-8');
   captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
   const stateAfterReinstall = JSON.parse(readFileSync(statePath, 'utf-8'));
@@ -399,6 +401,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(JSON.stringify(stateAfterReinstall.customMetadata) === JSON.stringify(stateBeforeUpgrade.customMetadata), 'reinstall: custom metadata was not preserved');
   assert(JSON.stringify(stateAfterReinstall.scopes) === JSON.stringify(stateBeforeUpgrade.scopes), 'reinstall: scopes were not preserved');
   assert(stateAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
+  assert(!Object.hasOwn(stateAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed');
   assert(reinstalledCodex.installedAt !== staleReinstallInstalledAt, 'reinstall: selected adapter installedAt was not refreshed');
   assert(reinstalledStandard.installedAt === staleStandardInstalledAt, 'reinstall: unselected adapter installedAt should be preserved');
 

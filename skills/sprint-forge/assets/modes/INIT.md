@@ -69,13 +69,12 @@ Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using 
   "artifactRoot": ".agents/kyro/scopes",
   "scopes": [{ "id": "{scope}", "title": "{title}", "status": "planning" }],
   "activeScope": "{scope}",
-  "runtimeVersion": "4.0.0",
   "runtimePath": "~/.agents/kyro/current",
   "installedAdapters": []
 }
 ```
 
-After creating it, recommend running `{{KYRO_CLI}} install` once to populate `installedAdapters` and runtime paths.
+After creating it, recommend running `{{KYRO_CLI}} install` once to populate `installedAdapters` and the runtime path. The active runtime version is read from `~/.agents/kyro/current/manifest.json.packageVersion`, not copied into project state.
 
 **Optional — seed `principles[]`:** if the user states non-negotiable project rules, add them to
 `kyro.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
