@@ -4,7 +4,8 @@ import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
 import { KyroCoreError } from '../core/errors';
-import type { ActiveSprint, Debt, SprintFile, Task, TaskStatus } from '../types';
+import { ADR_STATUS } from '../types';
+import type { ActiveSprint, AdrRecord, AdrStatus, Debt, SprintFile, Task, TaskStatus } from '../types';
 
 const STATUS_MODE = {
   BRIEF: 'brief',
@@ -49,6 +50,20 @@ interface ReviewDebtItem {
   phaseTitle: string | null;
 }
 
+type AdrStatusCounts = Record<AdrStatus, number>;
+
+interface AdrSummary {
+  total: number;
+  byStatus: AdrStatusCounts;
+}
+
+interface RecentAdr {
+  id: string;
+  title: string;
+  status: AdrStatus;
+  date: string;
+}
+
 interface BriefStatusReport {
   scope: string;
   status: string;
@@ -84,6 +99,8 @@ interface FullStatusReport extends BriefStatusReport {
   phaseSummary: PhaseSummary[];
   taskSummary: TaskSummary;
   reviewDebt: ReviewDebtItem[];
+  adrSummary: AdrSummary;
+  recentAdrs: RecentAdr[];
 }
 
 interface DebtGroup<T extends string> {
@@ -229,6 +246,8 @@ function buildFullStatusReport(scope: string, sprint: SprintFile): FullStatusRep
     }) : [],
     taskSummary: countTasksByStatus(collectSprintTasks(activeSprint)),
     reviewDebt: collectReviewDebt(activeSprint),
+    adrSummary: summarizeAdrs(sprint.adrs ?? []),
+    recentAdrs: recentAdrs(sprint.adrs ?? []),
   };
 }
 
@@ -299,6 +318,24 @@ function countOpenDebt(debt: Debt[]): number {
   return debt.filter((item) => item.status === 'open' || item.status === 'in_progress').length;
 }
 
+function summarizeAdrs(adrs: AdrRecord[]): AdrSummary {
+  const byStatus: AdrStatusCounts = {
+    [ADR_STATUS.PROPOSED]: 0,
+    [ADR_STATUS.ACCEPTED]: 0,
+    [ADR_STATUS.REJECTED]: 0,
+    [ADR_STATUS.SUPERSEDED]: 0,
+  };
+  for (const adr of adrs) byStatus[adr.status] += 1;
+  return { total: adrs.length, byStatus };
+}
+
+function recentAdrs(adrs: AdrRecord[]): RecentAdr[] {
+  return [...adrs]
+    .sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id))
+    .slice(0, 5)
+    .map((adr) => ({ id: adr.id, title: adr.title, status: adr.status, date: adr.date }));
+}
+
 function printBriefStatus(report: BriefStatusReport): void {
   console.log(`Scope: ${report.scope} (${report.status})`);
   console.log(`Objective: ${report.objective}`);
@@ -322,6 +359,11 @@ function printFullStatus(report: FullStatusReport): void {
   if (report.reviewDebt.length > 0) {
     console.log('Review debt:');
     for (const item of report.reviewDebt) console.log(`- ${item.id}: ${item.title} (${item.phaseTitle ?? 'unknown phase'})`);
+  }
+  console.log(`\nADRs: total=${report.adrSummary.total}, proposed=${report.adrSummary.byStatus.proposed}, accepted=${report.adrSummary.byStatus.accepted}, rejected=${report.adrSummary.byStatus.rejected}, superseded=${report.adrSummary.byStatus.superseded}`);
+  if (report.recentAdrs.length > 0) {
+    console.log('Recent ADRs:');
+    for (const adr of report.recentAdrs) console.log(`- ${adr.id}: ${adr.title} (${adr.status}, ${adr.date})`);
   }
 }
 
@@ -360,7 +402,7 @@ function printStatusHelp(): void {
 
 Modes:
   brief   Read-only summary of scope, active sprint, next action, debt, and review debt (default)
-  full    Brief report plus phase/task summary and review debt details
+  full    Brief report plus phase/task summary, review debt, and ADR summary
   debt    Debt grouped by status and priority
 
 Notes:

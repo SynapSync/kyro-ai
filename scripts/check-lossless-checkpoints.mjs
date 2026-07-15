@@ -65,6 +65,7 @@ const sprintFileKeys = [
   'spec',
   'clarifications',
   'conventions',
+  'adrs',
   'roadmap',
   'ledger',
   'previousSprint',
@@ -87,6 +88,17 @@ function makeSandbox({ intermediate = false } = {}) {
   };
   sprint.clarifications = [{ q: 'Preserve debt?', a: 'Yes.', sprint: 1, date: '2026-07-13' }];
   sprint.conventions = [{ id: 'C-1', rule: 'Keep complete checkpoints.', tags: ['archive'], addedSprint: 1 }];
+  sprint.adrs = [{
+    id: 'ADR-0001',
+    title: 'Keep lossless close checkpoints',
+    status: 'accepted',
+    date: '2026-07-15',
+    context: 'Sprint close must preserve complete scope state for recovery.',
+    decision: 'Store durable architectural decisions in sprint.json.adrs[] so checkpoint before/after images retain them.',
+    consequences: ['Close recovery keeps ADR history with the rest of the scope state.'],
+    alternatives: ['Write separate markdown ADR files outside the checkpoint contract.'],
+    links: { docs: ['docs/sprint-close-checkpoints.md'] },
+  }];
   sprint.debt = [{ id: 'D-1', title: 'Legacy history is limited', origin: 1, priority: 'low', status: 'deferred', targetSprint: null, note: 'Do not fabricate.' }];
   sprint.activeSprint.phases[0].tasks[0].scenario_refs = ['SC-1'];
   sprint.extensionState = { retained: true, nested: { value: 7 } };
@@ -178,8 +190,8 @@ function closeSuccessfully(root) {
     assert(JSON.stringify(checkpoint.intendedAfterClose) === JSON.stringify(after), 'live sprint must equal intendedAfterClose');
     assertContainsKeys(checkpoint.beforeClose, sprintFileKeys, 'checkpoint.beforeClose');
     assertContainsKeys(checkpoint.intendedAfterClose, sprintFileKeys, 'checkpoint.intendedAfterClose');
-    assertContainsKeys(checkpoint.beforeClose, ['spec', 'debt', 'roadmap', 'handoff', 'ledger', 'conventions', 'clarifications', 'successCriteria', 'extensionState'], 'checkpoint.beforeClose');
-    assertContainsKeys(checkpoint.intendedAfterClose, ['spec', 'debt', 'roadmap', 'handoff', 'ledger', 'conventions', 'clarifications', 'successCriteria', 'extensionState'], 'checkpoint.intendedAfterClose');
+    assertContainsKeys(checkpoint.beforeClose, ['spec', 'debt', 'roadmap', 'handoff', 'ledger', 'conventions', 'adrs', 'clarifications', 'successCriteria', 'extensionState'], 'checkpoint.beforeClose');
+    assertContainsKeys(checkpoint.intendedAfterClose, ['spec', 'debt', 'roadmap', 'handoff', 'ledger', 'conventions', 'adrs', 'clarifications', 'successCriteria', 'extensionState'], 'checkpoint.intendedAfterClose');
     assertContainsKeys(checkpoint.projectScopeBefore, ['id', 'title', 'status'], 'checkpoint.projectScopeBefore');
     assertContainsKeys(checkpoint.projectScopeAfter, ['id', 'title', 'status'], 'checkpoint.projectScopeAfter');
     assert(after.ledger[0].snapshot === 'archive/sprint-001-demo-sprint.json', 'legacy snapshot link changed');

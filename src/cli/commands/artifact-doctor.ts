@@ -75,7 +75,7 @@ function checkScope(scope: string): CheckResult[] {
   }
   const issues = validateSprintFile(sprintRead.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
-    checks.push(fail(`${scope}/sprint.json`, formatIssues(issues), 'Fix the shape drift (see field paths). Conventions/scopes/debt must be objects, not strings.'));
+    checks.push(fail(`${scope}/sprint.json`, formatIssues(issues), 'Fix the shape drift (see field paths). Conventions/scopes/debt/ADRs must be structured objects, not loose strings.'));
     checks.push(...inspectSprintCloseCheckpoints(scope));
     return checks;
   }

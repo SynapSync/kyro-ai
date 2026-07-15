@@ -31,6 +31,24 @@ function sprintPath(root) {
   return join(root, '.agents/kyro/scopes/demo/sprint.json');
 }
 
+function addDemoAdr(root) {
+  const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+  sprint.adrs = [
+    {
+      id: 'ADR-0001',
+      title: 'Keep status read-only',
+      status: 'accepted',
+      date: '2026-07-15',
+      context: 'Status is used by humans and scripts during active work.',
+      decision: 'Status reports must derive data from sprint.json without mutating artifacts.',
+      consequences: ['Status output is safe to run repeatedly in automation.'],
+      alternatives: ['Reuse context-pack and accept trace side effects.'],
+      links: { tasks: ['T1.1'], docs: ['docs/cli.md'] },
+    },
+  ];
+  writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+}
+
 // 1. core/status.ts must be a pure module — no I/O, no state reads. Derivation cannot depend on the
 //    filesystem or it stops being a single, trivially-correct source of truth.
 function assertStatusCoreIsPure() {
@@ -80,12 +98,14 @@ function assertRepairNormalizesPhaseStatus() {
 function assertContextPackSurfacesReviewDebt() {
   const root = sandbox();
   try {
+    addDemoAdr(root);
     const result = run(['context-pack', '--kyro-scope', 'demo', '--task', 'T1.1', '--json'], root);
     assert(result.status === 0, `context-pack should succeed: ${result.stderr || result.stdout}`);
     const pack = JSON.parse(result.stdout);
     assert(Array.isArray(pack.reviewPending), 'context-pack output must declare reviewPending[]');
     assert(pack.reviewPending.includes('T1.1'), `reviewPending should include the done/no-verdict task, got ${JSON.stringify(pack.reviewPending)}`);
     assert(pack.nextTaskReview && pack.nextTaskReview.hasPassVerdict === false, 'nextTaskReview should report the missing pass verdict');
+    assert(Array.isArray(pack.adrs) && pack.adrs[0].id === 'ADR-0001', `context-pack should include ADRs, got ${JSON.stringify(pack.adrs)}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -139,6 +159,7 @@ function assertCliStatusCommand() {
   const root = sandbox();
   try {
     const statePath = join(root, '.agents/kyro/kyro.json');
+    addDemoAdr(root);
     const initialSprintText = readFileSync(sprintPath(root), 'utf-8');
     const initialStateText = readFileSync(statePath, 'utf-8');
 
@@ -166,6 +187,8 @@ function assertCliStatusCommand() {
     assert(Array.isArray(fullReport.phaseSummary) && fullReport.phaseSummary[0].id === 'P1', `full mode should include phase summary: ${full.stdout}`);
     assert(fullReport.taskSummary && fullReport.taskSummary.done === 1, `full mode should include task summary: ${full.stdout}`);
     assert(Array.isArray(fullReport.reviewDebt) && fullReport.reviewDebt[0].id === 'T1.1', `full mode should include review debt: ${full.stdout}`);
+    assert(fullReport.adrSummary && fullReport.adrSummary.total === 1 && fullReport.adrSummary.byStatus.accepted === 1, `full mode should include ADR summary: ${full.stdout}`);
+    assert(Array.isArray(fullReport.recentAdrs) && fullReport.recentAdrs[0].id === 'ADR-0001', `full mode should include recent ADRs: ${full.stdout}`);
 
     assert(readFileSync(sprintPath(root), 'utf-8') === initialSprintText, 'brief/full status must not mutate sprint.json');
     assert(readFileSync(statePath, 'utf-8') === initialStateText, 'brief/full status must not mutate kyro.json');

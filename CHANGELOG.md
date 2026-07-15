@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.20.0] - 2026-07-15
+
+### Added
+
+- Scope-local JSON ADRs now live in `sprint.json.adrs[]`, giving each Kyro scope durable architectural decision records with status, context, decision, consequences, alternatives, and typed links.
+- `kyro context-pack` includes ADR records, `kyro status full` reports ADR status counts and recent ADRs, and `kyro doctor --artifacts` validates malformed ADR records through the sprint schema.
+
+### Changed
+
+- New scope templates include `adrs: []`, while existing scopes remain compatible because the field is optional. Sprint-forge guidance now distinguishes operational `conventions[]` from durable architectural `adrs[]`.
+
 ## [4.19.0] - 2026-07-13
 
 ### Added

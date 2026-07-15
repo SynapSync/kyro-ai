@@ -94,6 +94,38 @@ export interface Convention {
   addedSprint: number;
 }
 
+export const ADR_STATUS = {
+  PROPOSED: 'proposed',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  SUPERSEDED: 'superseded',
+} as const;
+export type AdrStatus = (typeof ADR_STATUS)[keyof typeof ADR_STATUS];
+
+export const ADR_LINK_KEYS = {
+  TASKS: 'tasks',
+  DEBT: 'debt',
+  CONVENTIONS: 'conventions',
+  DOCS: 'docs',
+  ADRS: 'adrs',
+  SUPERSEDES: 'supersedes',
+} as const;
+export type AdrLinkKey = (typeof ADR_LINK_KEYS)[keyof typeof ADR_LINK_KEYS];
+
+export type AdrLinks = Partial<Record<AdrLinkKey, string[]>>;
+
+export interface AdrRecord {
+  id: string;
+  title: string;
+  status: AdrStatus;
+  date: string;
+  context: string;
+  decision: string;
+  consequences: string[];
+  alternatives: string[];
+  links?: AdrLinks;
+}
+
 export interface Roadmap {
   plannedSprintCount: number;
   sizingRationale: string;
@@ -297,6 +329,8 @@ export interface SprintFile {
   /** Resolved ambiguities, appended one per accepted clarify answer. */
   clarifications: Clarification[];
   conventions: Convention[];
+  /** Durable, scope-local architectural decision records. Absent in pre-ADR scopes. */
+  adrs?: AdrRecord[];
   roadmap: Roadmap;
   ledger: LedgerEntry[];
   previousSprint: unknown | null;
@@ -481,6 +515,18 @@ export interface ContextPackConvention {
   tags: string[];
 }
 
+export interface ContextPackAdr {
+  id: string;
+  title: string;
+  status: AdrStatus;
+  date: string;
+  context: string;
+  decision: string;
+  consequences: string[];
+  alternatives: string[];
+  links?: AdrLinks;
+}
+
 export interface NextTaskReview {
   taskId: string;
   status: TaskStatus;
@@ -515,6 +561,7 @@ export interface ContextPackOutput {
   reviewPending: string[];
   nextTaskReview: NextTaskReview | null;
   conventions: ContextPackConvention[];
+  adrs: ContextPackAdr[];
   warnings: string[];
   estimatedTokens: number;
   routing: { modes: string[] };

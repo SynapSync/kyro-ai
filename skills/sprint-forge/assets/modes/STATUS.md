@@ -12,7 +12,7 @@ Report progress from the single source of truth. One read, no summaries.
 | Variant | Content |
 |---------|---------|
 | `brief` or empty | scope + status, active sprint + next action (`handoff`), task progress, open debt count, next recommended command. |
-| `full` | roadmap health, sprint table (from `roadmap` + `ledger[]`), debt trend (`debt[]`), recommendations from the latest `ledger[]` entry. |
+| `full` | roadmap health, sprint table (from `roadmap` + `ledger[]`), debt trend (`debt[]`), ADR summary/recent ADRs (`adrs[]`), recommendations from the latest `ledger[]` entry. |
 | `debt` | `debt[]` grouped by status; oldest open item; critical count. |
 | `debt-*` | Load `../helpers/debt-tracker.md`, then mutate `sprint.json.debt[]` via the Artifact Write Contract. |
 
@@ -23,13 +23,14 @@ Report progress from the single source of truth. One read, no summaries.
 | Planned / closed sprints | `roadmap.sprints` + `ledger[]` |
 | Task counts (total/done/blocked/carry-over) | `activeSprint.phases[].tasks` |
 | Open / in_progress / resolved / deferred debt | `debt[]` |
+| ADR totals by status and recent decisions | `adrs[]` |
 | Review debt (done tasks without a `pass` verdict) | `activeSprint.phases[].tasks` + `emergentTasks` where `status === 'done'` and `verdict?.result !== 'pass'` |
 | Next action | `handoff.nextAction` + `handoff.nextTaskId` |
 
 ## Output
 
 - `brief`: scope, status, active sprint, next action, task progress, open debt count, review debt count, next command.
-- `full`: add roadmap health, sprint table, debt trend, review-debt task ids, and the resume note from `handoff.note`.
+- `full`: add roadmap health, sprint table, debt trend, review-debt task ids, ADR summary/recent ADRs, and the resume note from `handoff.note`.
 
 `context-pack` exposes the same review debt as `reviewPending` (and `nextTaskReview` for a task pack);
 prefer those fields when reporting from a pack rather than recomputing.

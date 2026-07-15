@@ -43,7 +43,7 @@ v4 installs exactly these. The two JSON files are the agent-facing source of tru
 
 | File | Description |
 |------|-------------|
-| [sprint.json](templates/sprint.json) | Single source of truth per scope (objective, conventions, roadmap, ledger, activeSprint, debt, handoff) |
+| [sprint.json](templates/sprint.json) | Single source of truth per scope (objective, conventions, ADRs, roadmap, ledger, activeSprint, debt, handoff) |
 | [kyro.json](templates/kyro.json) | Global registry: scopes list and activeScope |
 | [archive-sprint.md](templates/archive-sprint.md) | Human-readable narrative written when a sprint closes |
 
