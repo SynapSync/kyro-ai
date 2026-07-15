@@ -1,4 +1,5 @@
-import type { KyroProjectState, SprintFile, TaskEvidence, TaskVerdict } from '../types';
+import { ADR_LINK_KEYS, ADR_STATUS } from '../types';
+import type { AdrLinkKey, KyroProjectState, SprintFile, TaskEvidence, TaskVerdict } from '../types';
 
 export const KYRO_SCOPE_STATUS = {
   PLANNING: 'planning',
@@ -18,6 +19,9 @@ export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as con
 export const TASK_VERDICT_RESULT_VALUES = ['pass', 'fail'] as const;
 export const TASK_VERDICT_FINDING_SEVERITY_VALUES = ['critical', 'warning', 'suggestion'] as const;
 export const SPEC_REQUIREMENT_PRIORITY_VALUES = ['must', 'should', 'could'] as const;
+export const ADR_STATUS_VALUES = Object.values(ADR_STATUS);
+export const ADR_LINK_KEY_VALUES = Object.values(ADR_LINK_KEYS);
+const ADR_ID_PATTERN = /^ADR-\d{4}$/;
 
 export interface ValidationIssue {
   path: string;
@@ -215,6 +219,19 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
     value.conventions.forEach((c, i) => validateConvention(c, path, `conventions[${i}]`, issues));
   }
 
+  // adrs[] is optional for scopes created before JSON ADR support. New templates include it.
+  if ('adrs' in value) {
+    if (!Array.isArray(value.adrs)) {
+      issues.push({ path, field: 'adrs', message: 'must be an array when present' });
+    } else {
+      const adrIds = collectAdrIds(value.adrs);
+      for (const id of collectDuplicateAdrIds(value.adrs)) {
+        issues.push({ path, field: 'adrs', message: `contains duplicate ADR id ${id}` });
+      }
+      value.adrs.forEach((adr, index) => validateAdrRecord(adr, path, `adrs[${index}]`, issues, adrIds));
+    }
+  }
+
   if (!isRecord(value.roadmap)) {
     issues.push({ path, field: 'roadmap', message: 'must be an object' });
   } else {
@@ -317,6 +334,80 @@ function validateConvention(value: unknown, path: string, prefix: string, issues
   requireString(value, 'rule', path, issues, `${prefix}.rule`);
   requireStringArrayField(value, 'tags', path, issues, `${prefix}.tags`);
   requireNumber(value, 'addedSprint', path, issues, `${prefix}.addedSprint`);
+}
+
+function validateAdrRecord(value: unknown, path: string, prefix: string, issues: ValidationIssue[], adrIds: Set<string>): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { id, title, status, date, context, decision, consequences, alternatives }' });
+    return;
+  }
+  requireAdrId(value, 'id', path, issues, `${prefix}.id`);
+  requireNonEmptyString(value, 'title', path, issues, `${prefix}.title`);
+  requireLiteralSet(value, 'status', ADR_STATUS_VALUES, path, issues, `${prefix}.status`);
+  requireDateString(value, 'date', path, issues, `${prefix}.date`);
+  requireNonEmptyString(value, 'context', path, issues, `${prefix}.context`);
+  requireNonEmptyString(value, 'decision', path, issues, `${prefix}.decision`);
+  requireNonEmptyStringArrayField(value, 'consequences', path, issues, `${prefix}.consequences`);
+  requireNonEmptyStringArrayField(value, 'alternatives', path, issues, `${prefix}.alternatives`);
+  if ('links' in value) validateAdrLinks(value.links, value.id, path, `${prefix}.links`, issues, adrIds);
+}
+
+function collectAdrIds(values: unknown[]): Set<string> {
+  const ids = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (!isRecord(value) || typeof value.id !== 'string') continue;
+    if (ids.has(value.id)) duplicates.add(value.id);
+    ids.add(value.id);
+  }
+  return new Set([...ids].filter((id) => !duplicates.has(id)));
+}
+
+function collectDuplicateAdrIds(values: unknown[]): string[] {
+  const ids = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (!isRecord(value) || typeof value.id !== 'string') continue;
+    if (ids.has(value.id)) duplicates.add(value.id);
+    ids.add(value.id);
+  }
+  return [...duplicates].sort();
+}
+
+function validateAdrLinks(value: unknown, ownId: unknown, path: string, prefix: string, issues: ValidationIssue[], adrIds: Set<string>): void {
+  if (!isRecord(value) || Array.isArray(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object when present' });
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!ADR_LINK_KEY_VALUES.includes(key as AdrLinkKey)) {
+      issues.push({ path, field: `${prefix}.${key}`, message: `must be one of: ${ADR_LINK_KEY_VALUES.join(', ')}` });
+      continue;
+    }
+    requireNonEmptyStringArrayField(value, key, path, issues, `${prefix}.${key}`);
+  }
+  validateAdrReferenceLinks(value, 'adrs', ownId, path, prefix, issues, adrIds);
+  validateAdrReferenceLinks(value, 'supersedes', ownId, path, prefix, issues, adrIds);
+}
+
+function validateAdrReferenceLinks(
+  links: Record<string, unknown>,
+  key: 'adrs' | 'supersedes',
+  ownId: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  adrIds: Set<string>,
+): void {
+  if (!(key in links) || !Array.isArray(links[key])) return;
+  for (const ref of links[key]) {
+    if (typeof ref !== 'string') continue;
+    if (ref === ownId) {
+      issues.push({ path, field: `${prefix}.${key}`, message: `must not reference its own ADR id ${ref}` });
+    } else if (!adrIds.has(ref)) {
+      issues.push({ path, field: `${prefix}.${key}`, message: `references unknown ADR id ${ref}` });
+    }
+  }
 }
 
 function validateLedgerEntry(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
@@ -675,6 +766,29 @@ function requireLiteralSet(record: Record<string, unknown>, key: string, allowed
   }
 }
 
+function requireAdrId(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field = key): void {
+  if (typeof record[key] !== 'string' || !ADR_ID_PATTERN.test(record[key])) {
+    issues.push({ path, field, message: 'must match ADR-0001 format' });
+  }
+}
+
+function requireDateString(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field = key): void {
+  const value = record[key];
+  if (typeof value !== 'string' || !isValidIsoDate(value)) {
+    issues.push({ path, field, message: 'must be a YYYY-MM-DD date string' });
+  }
+}
+
+function isValidIsoDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 function requireStringArray(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[]): void {
   requireStringArrayField(record, key, path, issues, key);
 }
@@ -682,6 +796,12 @@ function requireStringArray(record: Record<string, unknown>, key: string, path: 
 function requireStringArrayField(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field: string): void {
   if (!Array.isArray(record[key]) || !record[key].every((item) => typeof item === 'string')) {
     issues.push({ path, field, message: 'must be an array of strings' });
+  }
+}
+
+function requireNonEmptyStringArrayField(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field: string): void {
+  if (!Array.isArray(record[key]) || record[key].length === 0 || !record[key].every((item) => typeof item === 'string' && item.trim() !== '')) {
+    issues.push({ path, field, message: 'must be a non-empty array of non-empty strings' });
   }
 }
 

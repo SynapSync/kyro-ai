@@ -96,22 +96,31 @@ When bumping version or changing the description:
 
 1. **Update `package.json`** (canonical source)
    - Change `"version": "X.Y.Z"`
-   - Change `"description": "..."`
+   - Change `"description": "..."` when release positioning changes
 
-2. **Sync 3 other files** to match:
+2. **Sync version-bearing files:**
+   - `package-lock.json` — update the root package version entries
    - `.claude-plugin/plugin.json` — update `"version"`
-   - `.claude-plugin/marketplace.json` — update `"description"`
-   - `WORKFLOW.yaml` — update `version:` and optionally `description:`
+   - `WORKFLOW.yaml` — update `version:`
 
-3. **Compile and verify:**
+3. **Sync release-facing docs/metadata when behavior changed:**
+   - `CHANGELOG.md` — add the new version section under `Unreleased`
+   - `.claude-plugin/marketplace.json` — update descriptions only when capabilities/positioning changed
+   - `AGENTS.md` / `docs/*` — update workflow guidance that release users or agents rely on
+
+4. **Compile and verify:**
    ```bash
-   npm run build
+   OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm_config_cache=/tmp/kyro-ai-npm-cache npm_config_script_shell=/bin/zsh npm run build
+   OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm_config_cache=/tmp/kyro-ai-npm-cache npm_config_script_shell=/bin/zsh npm run check
    npm pack --dry-run  # verify tarball contents
    ```
 
-4. **Commit with message** containing: "chore: bump version to X.Y.Z" or "docs: update descriptions"
+5. **Commit with Conventional Commits:**
+   - Feature release: `feat(<scope>): ...` may include code, docs, tests, and the version bump when they are one reviewable release unit
+   - Version-only release prep: `chore: bump version to X.Y.Z`
+   - Never include `Co-Authored-By` or AI attribution
 
-⚠️ **Important:** All 4 files must be kept in sync. Mismatched versions will cause installation issues.
+⚠️ **Important:** Version files must stay in sync. Mismatched versions will cause installation and release issues.
 
 <!-- kyro-ai:agents-md:start -->
 ## Kyro AI

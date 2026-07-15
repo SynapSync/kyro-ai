@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Captures corrections, patterns, and estimation insights as persistent **conventions** stored in `sprint.json.conventions[]`. Conventions are scope-local and carried forward between sprints. `conventions[]` is the single home for learned rules; never create a separate rules file.
+Captures corrections, patterns, and estimation insights as persistent **conventions** stored in `sprint.json.conventions[]`. Conventions are scope-local and carried forward between sprints. `conventions[]` is the home for operational learned rules; durable architectural decisions with context/tradeoffs belong in `sprint.json.adrs[]`. Never create separate rules or ADR markdown files.
 
 ## Convention shape
 
@@ -32,7 +32,7 @@ During `close-sprint`, conventions are extracted from the retro and task evidenc
 Conventions are already in context — every mode reads `sprint.json`, which contains `conventions[]`. No extra read.
 
 - Before planning sprint estimates, check `estimation`-tagged conventions.
-- Before architecture decisions, check `architecture`-tagged conventions.
+- Before architecture decisions, check relevant `architecture`-tagged conventions and existing `adrs[]`.
 - In `plan-sprint`, fold relevant conventions into each task's `context`.
 - If about to violate a convention, pause and surface it.
 
@@ -43,3 +43,4 @@ Conventions are already in context — every mode reads `sprint.json`, which con
 - Conventions from user corrections have higher confidence than proactive suggestions.
 - Keep the list lean — consolidate overlapping rules rather than accumulating noise (token budget is enforced by `{{KYRO_CLI}} doctor`).
 - A bare string in `conventions[]` is schema drift and `{{KYRO_CLI}} doctor` will fail it.
+- Do not store durable decision rationale in `conventions[]`; use `adrs[]` when the decision needs context, alternatives, and consequences.
