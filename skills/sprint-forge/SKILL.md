@@ -78,13 +78,11 @@ Claude Code's `PreToolUse` hook blocks edits nulling `activeSprint`; others rely
 
 Templates are loaded only immediately before writing their artifact.
 
-## Principles vs conventions
+## Principles, conventions, ADRs
 
-- **`conventions[]`** (`sprint.json`): *learned*, descriptive rules from retros; inform task `context`.
-- **`adrs[]`** (`sprint.json`, optional in old scopes): durable scope-local architectural decisions with context, decision, consequences, alternatives, status, and optional links. Do not create markdown ADR files or a separate ADR command in v1.
-- **`principles[]`** (`kyro.json`, project-level): *authored*, immutable gates (spec-kit's constitution). Each `{ id, rule, severity, rationale, check? }`. A violated `non-negotiable` is a hard stop. Those with a built-in `check` are enforced by `{{KYRO_CLI}} analyze`; free-text ones are agent gates at `plan-sprint`/`review-task`.
-
-Use `conventions[]` for operational learned rules. Use `adrs[]` for durable architectural choices where the tradeoff needs to remain reviewable across sprints.
+- `principles[]` in `kyro.json`: authored gates; `non-negotiable` blocks. Built-in checks run in `{{KYRO_CLI}} analyze`; free-text gates apply in planning/review.
+- `conventions[]` in `sprint.json`: operational learned rules from retros/corrections; fold into task context.
+- `adrs[]` in `sprint.json`: durable scope-local architecture decisions with context/tradeoffs. No markdown ADR files or ADR command in v1.
 
 ## Artifact Contract
 
