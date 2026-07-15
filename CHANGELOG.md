@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- Project state no longer stores a stale `runtimeVersion` snapshot. The active version is read from `~/.agents/kyro/current/manifest.json.packageVersion`; install and sync remove the legacy field while preserving project-owned state and metadata.
+
 ## [4.20.0] - 2026-07-15
 
 ### Added
