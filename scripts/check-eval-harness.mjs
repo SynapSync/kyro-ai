@@ -31,7 +31,6 @@ function baseState(dir) {
     artifactRoot: '.agents/kyro/scopes',
     scopes: [{ id: 'demo', title: 'Demo', status: 'active' }],
     activeScope: 'demo',
-    runtimeVersion: '4.4.0',
     runtimePath: '~/.agents/kyro/current',
     installedAdapters: [],
   });

@@ -142,7 +142,6 @@ export function validateProjectStateShape(value: unknown, path: string): Validat
     value.scopes.forEach((entry, index) => validateScopeEntry(entry, path, `scopes[${index}]`, issues));
   }
   requireNullableString(value, 'activeScope', path, issues);
-  requireString(value, 'runtimeVersion', path, issues);
   requireString(value, 'runtimePath', path, issues);
   if (!Array.isArray(value.installedAdapters)) issues.push({ path, field: 'installedAdapters', message: 'must be an array' });
   // principles[] is a v4.1 addition — validate shape only if present so pre-4.1 kyro.json stays valid.

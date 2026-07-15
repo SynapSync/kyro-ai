@@ -130,7 +130,6 @@ function checkProjectState(): CheckResult {
   const missing: string[] = [];
   if (state.artifactRoot !== ARTIFACT_ROOT) missing.push('artifactRoot');
   if (!Array.isArray(state.scopes)) missing.push('scopes');
-  if (typeof state.runtimeVersion !== 'string') missing.push('runtimeVersion');
   if (typeof state.runtimePath !== 'string') missing.push('runtimePath');
   if (!Array.isArray(state.installedAdapters)) missing.push('installedAdapters');
 

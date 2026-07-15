@@ -44,7 +44,6 @@ export interface KyroProjectState {
   artifactRoot: string;
   scopes: KyroScopeEntry[];
   activeScope: string | null;
-  runtimeVersion: string;
   runtimePath: string;
   installedAdapters: KyroInstalledAdapter[];
   /** Optional project-level principles (v4.1+). Absent in pre-4.1 files. */
