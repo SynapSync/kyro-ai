@@ -4,6 +4,7 @@ import { addCommandSkillProjectionToRoot, buildCommandSkillManagedFilesForRoot }
 import { managedPathExists } from '../fs';
 import { detectFromPaths } from './detection';
 import type { CheckResult, KyroCommandName, OperationPlan } from '../types';
+import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 
 const OPENCODE_SKILLS_ROOT = '~/.config/opencode/skills';
 const OPENCODE_COMMANDS_ROOT = '~/.config/opencode/commands';
@@ -127,7 +128,7 @@ function buildOpenCodeAgentPrompt(): string {
 function checkOpenCodeProjection(): CheckResult {
   const missing = buildOpenCodeManagedFiles().filter((file) => !managedPathExists(file));
   if (missing.length > 0) {
-    return { status: 'fail', name: 'OpenCode adapter', detail: `missing ${missing.join(', ')}`, remedy: 'Run kyro sync --agent opencode.' };
+    return { status: 'fail', name: 'OpenCode adapter', detail: `missing ${missing.join(', ')}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
   }
   return { status: 'pass', name: 'OpenCode adapter', detail: 'native OpenCode skills and slash commands present' };
 }

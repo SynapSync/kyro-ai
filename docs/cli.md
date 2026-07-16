@@ -94,7 +94,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 | Root | How you get it | Layout highlights |
 | ---- | -------------- | ----------------- |
 | **Full npm package** | `npx kyro-ai …` or global `kyro` after `npm i -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
-| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when `kyro` is not on PATH) | `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror (`manifest.json` is expected but not required for root identity) |
+| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when `kyro` is not on PATH) | `manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror |
 
 **Must run from the full npm package:**
 
@@ -105,7 +105,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 - `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `review`, `context-pack`, and other scope workflow commands
 
-Root mode is detected from structural markers (`dist/cli.js` + `core/agents/` or `core/WORKFLOW.yaml`, and no root `agents/orchestrator.md`) — not from `manifest.json` — so a corrupt runtime can still be diagnosed. Packaging checks that look for `agents/orchestrator.md` or `.claude-plugin/` are skipped on projected roots (PASS with an explicit note); a light runtime shape check reports missing files such as `manifest.json`. Install/sync refuse the projected runtime with `INVALID_INPUT` and an actionable `npx kyro-ai install` remedy.
+Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai` remedy.
 
 Global command skills are installed for agent discovery:
 

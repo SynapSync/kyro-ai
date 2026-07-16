@@ -41,9 +41,11 @@ export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adap
 export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, includeTraceSummary: boolean, kyroScope: string | null): CheckResult[] {
   const rootMode = detectPackageRootMode();
   const packagingChecks =
-    rootMode === 'projected-runtime'
-      ? [checkProjectedRuntimeRoot(), checkProjectedRuntimeShape()]
-      : [checkPackageVersionSync(), checkPackageAssets(), checkClaudePlugin()];
+    rootMode === 'full-package'
+      ? [checkPackageVersionSync(), checkPackageAssets(), checkClaudePlugin()]
+      : rootMode === 'projected-runtime'
+        ? [checkProjectedRuntimeRoot(), checkProjectedRuntimeShape()]
+        : [checkUnknownRoot()];
 
   const checks = [
     ...packagingChecks,
@@ -54,12 +56,12 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
   ];
 
   if (includeTokenAudit) {
-    if (rootMode === 'projected-runtime') {
+    if (rootMode !== 'full-package') {
       checks.push({
         status: 'fail',
         name: 'token audit',
-        detail: 'token/context budget audit requires the full npm package layout (agents/, command sources under package root)',
-        remedy: 'Run doctor --tokens via npx kyro-ai (or a global/package install), not the projected runtime CLI.',
+        detail: `token/context budget audit requires a verified full npm package layout; current CLI root mode is ${rootMode}`,
+        remedy: 'Run doctor --tokens via npx kyro-ai (or a verified full-package CLI), not a projected or unrecognized CLI root.',
       });
     } else {
       checks.push(...runTokenAuditChecks());
@@ -95,6 +97,16 @@ function checkProjectedRuntimeRoot(): CheckResult {
   };
 }
 
+/** Unknown roots are never allowed to inherit full-package checks or operations. */
+function checkUnknownRoot(): CheckResult {
+  return {
+    status: 'fail',
+    name: 'CLI root',
+    detail: 'unrecognized or corrupt layout (package packaging checks skipped)',
+    remedy: FULL_PACKAGE_INSTALL_REMEDY,
+  };
+}
+
 /** Light shape check of the projected runtime tree agents actually load. */
 function checkProjectedRuntimeShape(): CheckResult {
   const required = [
@@ -102,7 +114,9 @@ function checkProjectedRuntimeShape(): CheckResult {
     'package.json',
     'config.json',
     'manifest.json',
+    'KYRO.md',
     'core/agents/orchestrator.md',
+    'core/WORKFLOW.yaml',
     'commands/forge.md',
     'skills/sprint-forge/SKILL.md',
   ];
@@ -269,7 +283,7 @@ function checkAdapterProjections(): CheckResult[] {
         status: 'fail',
         name: `${installedAdapter.agent} adapter`,
         detail: errorMessage(error),
-        remedy: 'Run kyro sync or reinstall the adapter.',
+        remedy: FULL_PACKAGE_SYNC_REMEDY,
       };
     }
   });
