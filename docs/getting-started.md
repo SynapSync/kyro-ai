@@ -114,6 +114,8 @@ kyro doctor
 kyro doctor --tokens
 ```
 
+Use the full npm package CLI (`npx kyro-ai` or a global `kyro` install) for install, sync, and `doctor --tokens`. Day-to-day agent workflow uses the installed skills under `~/.agents/skills/kyro-*` and the projected runtime at `~/.agents/kyro/current/` (including `doctor --artifacts` via the substituted CLI invocation).
+
 `doctor --tokens` audits realistic Kyro runtime paths and fails forbidden eager helper loading or over-budget paths.
 
 ## Next steps

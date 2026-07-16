@@ -6,6 +6,7 @@ import { assertWorkspaceScope, uniqueAgents } from '../options';
 import { readProjectState } from '../state';
 import { KyroCoreError } from '../core/errors';
 import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
+import { requireFullPackageFor } from '../package-root-mode';
 import type { Agent, CliOptions } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
 import { analyzeDrift, buildPrunePlan, hasDrift, hasPrunableDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
@@ -13,6 +14,7 @@ import { readPackageVersion } from '../help';
 import { withStateWriterLock, withStateWriterLockAsync } from '../pipeline/state-writer-lock';
 
 export function install(options: CliOptions): void | Promise<void> {
+  requireFullPackageFor('install');
   assertWorkspaceScope(options.scope);
   const agents = options.agents.length > 0 ? options.agents : [AGENT.STANDARD];
   runAdapterPreflight('install', agents);
@@ -62,6 +64,7 @@ function runInstallPlan(
 }
 
 export function sync(options: CliOptions): void {
+  requireFullPackageFor('sync');
   assertWorkspaceScope(options.scope);
   const state = readProjectState();
   if (!state) {

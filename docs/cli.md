@@ -87,6 +87,26 @@ Installing or syncing replaces `~/.agents/kyro/current/` with the current
 package assets and removes the retired `~/.agents/kyro/versions/` layout. Kyro
 does not keep local runtime-version history or old bundled binaries.
 
+### Package vs projected runtime
+
+Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but different on-disk layouts:
+
+| Root | How you get it | Layout highlights |
+| ---- | -------------- | ----------------- |
+| **Full npm package** | `npx kyro-ai …` or global `kyro` after `npm i -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
+| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when `kyro` is not on PATH) | `manifest.json`, `core/agents/`, projected `skills/` + `dist/` — **not** a full package mirror |
+
+**Must run from the full npm package:**
+
+- `install`, `sync`
+- `doctor --tokens` (package token/budget audit)
+
+**Safe from either root (including the projected runtime CLI):**
+
+- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `review`, `context-pack`, and other scope workflow commands
+
+When the CLI detects a projected-runtime root, packaging checks that look for `agents/orchestrator.md` or `.claude-plugin/` are skipped (reported as PASS with an explicit note). Install/sync refuse the projected runtime with an actionable remedy pointing at `npx kyro-ai install`.
+
 Global command skills are installed for agent discovery:
 
 ```text

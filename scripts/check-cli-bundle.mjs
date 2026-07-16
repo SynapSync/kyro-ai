@@ -78,6 +78,43 @@ function main() {
     const [command, ...invArgs] = manifest.kyroInvocation.trim().split(/\s+/).map((segment) => expandHome(segment, home));
     assert(existsSync(invArgs[0]), `check-cli-bundle: resolved cli path does not exist: ${invArgs[0]}`);
 
+    // 5a. Doctor from projected runtime must not FAIL on npm-package packaging layout.
+    const doctor = spawnSync(command, [...invArgs, 'doctor', '--artifacts', '--kyro-scope', 'demo'], {
+      cwd: workspace,
+      env: runEnv,
+      encoding: 'utf-8',
+    });
+    assert(doctor.status === 0, `check-cli-bundle: projected doctor --artifacts should exit 0: ${doctor.stderr || doctor.stdout}`);
+    assert(
+      doctor.stdout.includes('projected runtime (package packaging checks skipped)'),
+      `check-cli-bundle: doctor should report projected-runtime root mode, got:\n${doctor.stdout}`,
+    );
+    assert(!doctor.stdout.includes('missing agents/orchestrator.md'), 'check-cli-bundle: doctor must not FAIL on missing root agents/orchestrator.md');
+    assert(!doctor.stdout.includes('.claude-plugin/plugin.json missing'), 'check-cli-bundle: doctor must not FAIL on missing .claude-plugin');
+
+    // 5b. Install from projected runtime must fail with an actionable remedy (no ENOENT on agents/).
+    const installFromRuntime = spawnSync(command, [...invArgs, 'install', '--scope', 'workspace', '--yes'], {
+      cwd: workspace,
+      env: runEnv,
+      encoding: 'utf-8',
+    });
+    assert(installFromRuntime.status !== 0, 'check-cli-bundle: projected install should exit non-zero');
+    const installOut = `${installFromRuntime.stdout || ''}${installFromRuntime.stderr || ''}`;
+    assert(installOut.includes('INVALID_INPUT') || installOut.includes('full kyro-ai npm package'), `check-cli-bundle: projected install should name full package / INVALID_INPUT, got:\n${installOut}`);
+    assert(installOut.includes('npx kyro-ai') || installOut.includes('full npm package'), `check-cli-bundle: projected install remedy should mention npx/full package, got:\n${installOut}`);
+    assert(!installOut.includes('scandir'), `check-cli-bundle: projected install must not crash with scandir ENOENT, got:\n${installOut}`);
+
+    // 5c. Token audit from projected runtime fails clearly (package-only), not with packaging ENOENT noise.
+    const doctorTokens = spawnSync(command, [...invArgs, 'doctor', '--tokens'], {
+      cwd: workspace,
+      env: runEnv,
+      encoding: 'utf-8',
+    });
+    assert(doctorTokens.status !== 0, 'check-cli-bundle: projected doctor --tokens should exit non-zero');
+    assert(doctorTokens.stdout.includes('token audit'), `check-cli-bundle: doctor --tokens should report token audit check, got:\n${doctorTokens.stdout}`);
+    assert(doctorTokens.stdout.includes('full npm package') || doctorTokens.stdout.includes('npx kyro-ai'), `check-cli-bundle: token audit remedy should point at full package, got:\n${doctorTokens.stdout}`);
+    assert(!doctorTokens.stdout.includes('ENOENT'), `check-cli-bundle: token audit must not surface ENOENT packaging noise, got:\n${doctorTokens.stdout}`);
+
     const scopePath = join(workspace, '.agents', 'kyro', 'scopes', 'demo');
     const sprintBefore = JSON.parse(readFileSync(join(scopePath, 'sprint.json'), 'utf-8'));
     assert(sprintBefore.activeSprint !== null, 'check-cli-bundle: fixture should start with an activeSprint');
@@ -108,7 +145,7 @@ function main() {
     rmSync(root, { recursive: true, force: true });
   }
 
-  console.log('check:cli-bundle — bundled runtime CLI closes a sprint end-to-end with no PATH binary');
+  console.log('check:cli-bundle — bundled runtime CLI closes a sprint end-to-end with no PATH binary; doctor/install root-mode guarded');
 }
 
 function assertNoPlaceholderLeak(runtimeRoot) {

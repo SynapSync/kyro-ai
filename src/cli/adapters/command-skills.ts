@@ -38,7 +38,7 @@ export function getCommandSkillPathForRoot(command: KyroCommandName, skillsRoot:
 function buildCommandSkill(command: KyroCommandName): string {
   const title = getCommandTitle(command);
   const description = getCommandDescription(command);
-  return `---\nname: kyro-${command}\ndescription: ${description}\nlicense: Apache-2.0\nmetadata:\n  author: synapsync\n  version: "1.0"\n  scope: [root]\n---\n\n# ${title}\n\nCommand stub. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`, then load only the files that router requests.\n\nRuntime: \`${KYRO_ROOT}/\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nDo not ask the user to restate this workflow in natural language.\n`;
+  return `---\nname: kyro-${command}\ndescription: ${description}\nlicense: Apache-2.0\nmetadata:\n  author: synapsync\n  version: "1.0"\n  scope: [root]\n---\n\n# ${title}\n\nCommand stub. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`, then load only the files that router requests.\n\nRuntime: \`${KYRO_ROOT}/\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nCLI workflow: use the invocation already substituted in runtime modes (\`status\`, \`doctor --artifacts\`, \`analyze\`, \`repair\`, \`close-sprint\`).\nInstall/update Kyro: only via the full npm package (\`npx kyro-ai install …\` or global \`kyro install\`). Do not treat \`${KYRO_ROOT}\` as the install source.\n\nDo not ask the user to restate this workflow in natural language.\n`;
 }
 
 function getCommandDescription(command: KyroCommandName): string {
