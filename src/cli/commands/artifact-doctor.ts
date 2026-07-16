@@ -23,7 +23,7 @@ export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResu
   const checks: CheckResult[] = [];
   const projectStateRead = readJsonSafely(KYRO_STATE_PATH);
   if (!projectStateRead.exists) {
-    return [warn('project state', `${KYRO_STATE_PATH} not found`, 'Run kyro install --scope workspace, then create/open a Kyro scope.')];
+    return [warn('project state', `${KYRO_STATE_PATH} not found`, 'Run: npx kyro-ai install --scope workspace --yes from the full npm package, then create/open a Kyro scope.')];
   }
   if (projectStateRead.error) {
     return [fail('project state', `${KYRO_STATE_PATH}: ${projectStateRead.error}`, 'Repair or recreate kyro.json.')];

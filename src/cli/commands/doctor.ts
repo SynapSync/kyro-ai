@@ -11,11 +11,14 @@ import { KyroCoreError } from '../core/errors';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { guardEnforcement } from '../adapters/registry-types';
 import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
+import { detectPackageRootMode, FULL_PACKAGE_INSTALL_REMEDY } from '../package-root-mode';
 import { runTokenAuditChecks } from './token-audit';
 import { listScopes } from '../core/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
+
+const PROJECT_STATE_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
 
 export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'trace' | 'kyroScope'>): void {
   const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.trace ?? false, options?.kyroScope ?? null);
@@ -32,17 +35,32 @@ export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adap
 }
 
 export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, includeTraceSummary: boolean, kyroScope: string | null): CheckResult[] {
+  const rootMode = detectPackageRootMode();
+  const packagingChecks =
+    rootMode === 'projected-runtime'
+      ? [checkProjectedRuntimeRoot(), checkProjectedRuntimeShape()]
+      : [checkPackageVersionSync(), checkPackageAssets(), checkClaudePlugin()];
+
   const checks = [
-    checkPackageVersionSync(),
-    checkPackageAssets(),
-    checkClaudePlugin(),
+    ...packagingChecks,
     checkProjectState(),
     checkGlobalRuntime(),
     checkCliInvocation(),
     ...checkAdapterProjections(),
   ];
 
-  if (includeTokenAudit) checks.push(...runTokenAuditChecks());
+  if (includeTokenAudit) {
+    if (rootMode === 'projected-runtime') {
+      checks.push({
+        status: 'fail',
+        name: 'token audit',
+        detail: 'token/context budget audit requires the full npm package layout (agents/, command sources under package root)',
+        remedy: 'Run doctor --tokens via npx kyro-ai (or a global/package install), not the projected runtime CLI.',
+      });
+    } else {
+      checks.push(...runTokenAuditChecks());
+    }
+  }
   if (includeArtifactAudit) {
     const artifactChecks = runArtifactAuditChecks({ kyroScope });
     checks.push(...artifactChecks);
@@ -62,6 +80,42 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
   if (includeAdapterInventory) checks.push(...checkAdapterInventory());
   if (includeTraceSummary) checks.push(...checkTraceSummary(kyroScope));
   return checks;
+}
+
+/** Honest PASS so agents/humans see packaging checks are N/A on the projected runtime. */
+function checkProjectedRuntimeRoot(): CheckResult {
+  return {
+    status: 'pass',
+    name: 'CLI root',
+    detail: 'projected runtime (package packaging checks skipped)',
+  };
+}
+
+/** Light shape check of the projected runtime tree agents actually load. */
+function checkProjectedRuntimeShape(): CheckResult {
+  const required = [
+    'dist/cli.js',
+    'package.json',
+    'config.json',
+    'manifest.json',
+    'core/agents/orchestrator.md',
+    'commands/forge.md',
+    'skills/sprint-forge/SKILL.md',
+  ];
+  const missing = required.filter((file) => !existsSync(resolve(PACKAGE_ROOT, file)));
+  if (missing.length > 0) {
+    return {
+      status: 'fail',
+      name: 'runtime packaging parity',
+      detail: `missing ${missing.join(', ')}`,
+      remedy: 'Re-run install/sync from the full npm package: npx kyro-ai install --scope workspace --yes',
+    };
+  }
+  return {
+    status: 'pass',
+    name: 'runtime packaging parity',
+    detail: 'projected runtime shape is complete',
+  };
 }
 
 function checkTraceSummary(kyroScope: string | null): CheckResult[] {
@@ -124,7 +178,7 @@ function checkProjectState(): CheckResult {
       status: 'warn',
       name: 'project state',
       detail: `${KYRO_STATE_PATH} not found`,
-      remedy: 'Run kyro install --scope workspace.',
+      remedy: PROJECT_STATE_INSTALL_REMEDY,
     };
   }
   const missing: string[] = [];
@@ -137,7 +191,12 @@ function checkProjectState(): CheckResult {
     // schemaVersion wrong/absent or fields missing — an incomplete file (e.g. hand-written by an
     // agent that never ran kyro install). install/sync repopulates the fields, preserving scopes.
     const gaps = [...(state.schemaVersion !== 4 ? ['schemaVersion'] : []), ...missing];
-    return { status: 'fail', name: 'project state', detail: `${KYRO_STATE_PATH} is incomplete (missing/invalid: ${gaps.join(', ')})`, remedy: 'Run kyro install --scope workspace to repopulate the required fields (scopes are preserved).' };
+    return {
+      status: 'fail',
+      name: 'project state',
+      detail: `${KYRO_STATE_PATH} is incomplete (missing/invalid: ${gaps.join(', ')})`,
+      remedy: `${PROJECT_STATE_INSTALL_REMEDY} Scopes are preserved.`,
+    };
   }
   return { status: 'pass', name: 'project state', detail: `${KYRO_STATE_PATH} is valid` };
 }

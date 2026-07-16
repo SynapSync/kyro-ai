@@ -6,9 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- `kyro doctor` no longer fails npm-package packaging checks (`agents/orchestrator.md`, `.claude-plugin/`) when the CLI is invoked via the projected runtime (`node ~/.agents/kyro/current/dist/cli.js`). Those checks run only against the full package layout; projected-runtime roots report an explicit PASS and a light runtime shape check instead.
+- `install` and `sync` refuse the projected runtime CLI with `INVALID_INPUT` and an actionable `npx kyro-ai install` remedy, instead of a cryptic `ENOENT` on `agents/`.
+- `doctor --tokens` from the projected runtime fails with a clear package-only message rather than packaging `ENOENT` noise.
+
 ### Changed
 
 - Project state no longer stores a stale `runtimeVersion` snapshot. The active version is read from `~/.agents/kyro/current/manifest.json.packageVersion`; install and sync remove the legacy field while preserving project-owned state and metadata.
+- INIT, projected command skill stubs, and CLI docs clarify the two CLI roots: full npm package for install/sync/token audit; projected runtime for agent workflow commands (`status`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, …).
 
 ## [4.20.0] - 2026-07-15
 

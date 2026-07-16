@@ -74,7 +74,7 @@ Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using 
 }
 ```
 
-After creating it, recommend running `{{KYRO_CLI}} install` once to populate `installedAdapters` and the runtime path. The active runtime version is read from `~/.agents/kyro/current/manifest.json.packageVersion`, not copied into project state.
+After creating it, recommend the human run `npx kyro-ai install --scope workspace --yes` once (full npm package only — never via the projected runtime CLI). Day-to-day workflow still uses `{{KYRO_CLI}}`. The active runtime version is read from `~/.agents/kyro/current/manifest.json.packageVersion`, not copied into project state.
 
 **Optional — seed `principles[]`:** if the user states non-negotiable project rules, add them to
 `kyro.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
