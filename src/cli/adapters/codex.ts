@@ -6,6 +6,7 @@ import { addCommandSkillProjection, buildCommandSkillManagedFiles } from './comm
 import { checkCommandProjection } from './standard';
 import type { AdapterDefinition } from './registry-types';
 import { detectFromPaths } from './detection';
+import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 
 const AGENTS_PATH = 'AGENTS.md';
 const KYRO_AGENTS_BLOCK = 'agents-md';
@@ -91,7 +92,7 @@ export const codexAdapter: AdapterDefinition = {
     const commandCheck = checkCommandProjection('Codex adapter');
     if (commandCheck.status !== 'pass') return commandCheck;
     if (!hasManagedBlock(AGENTS_PATH, KYRO_AGENTS_BLOCK)) {
-      return { status: 'fail', name: 'Codex adapter', detail: `missing Kyro block in ${AGENTS_PATH}`, remedy: 'Run kyro sync --agent codex.' };
+      return { status: 'fail', name: 'Codex adapter', detail: `missing Kyro block in ${AGENTS_PATH}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
     }
     return { status: 'pass', name: 'Codex adapter', detail: 'projected Kyro command skills and root AGENTS.md block present' };
   },

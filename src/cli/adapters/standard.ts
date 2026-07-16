@@ -4,6 +4,7 @@ import type { AdapterDefinition } from './registry-types';
 import type { CheckResult } from '../types';
 import { addCommandSkillProjection, buildCommandSkillManagedFiles } from './command-skills';
 import { detectFromPaths } from './detection';
+import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 
 export const standardAgentsAdapter: AdapterDefinition = {
   agent: AGENT.STANDARD,
@@ -61,7 +62,7 @@ export const standardAgentsAdapter: AdapterDefinition = {
 export function checkCommandProjection(name: string): CheckResult {
   const missing = buildCommandSkillManagedFiles().filter((file) => !workspaceFileExists(file));
   if (missing.length > 0) {
-    return { status: 'fail', name, detail: `missing ${missing.join(', ')}`, remedy: 'Run kyro sync.' };
+    return { status: 'fail', name, detail: `missing ${missing.join(', ')}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
   }
   return { status: 'pass', name, detail: 'projected Kyro command skills present' };
 }

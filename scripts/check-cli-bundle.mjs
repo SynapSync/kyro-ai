@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -92,17 +92,9 @@ function main() {
     assert(!doctor.stdout.includes('missing agents/orchestrator.md'), 'check-cli-bundle: doctor must not FAIL on missing root agents/orchestrator.md');
     assert(!doctor.stdout.includes('.claude-plugin/plugin.json missing'), 'check-cli-bundle: doctor must not FAIL on missing .claude-plugin');
 
-    // 5b. Install from projected runtime must fail with an actionable remedy (no ENOENT on agents/).
-    const installFromRuntime = spawnSync(command, [...invArgs, 'install', '--scope', 'workspace', '--yes'], {
-      cwd: workspace,
-      env: runEnv,
-      encoding: 'utf-8',
-    });
-    assert(installFromRuntime.status !== 0, 'check-cli-bundle: projected install should exit non-zero');
-    const installOut = `${installFromRuntime.stdout || ''}${installFromRuntime.stderr || ''}`;
-    assert(installOut.includes('INVALID_INPUT') || installOut.includes('full kyro-ai npm package'), `check-cli-bundle: projected install should name full package / INVALID_INPUT, got:\n${installOut}`);
-    assert(installOut.includes('npx kyro-ai') || installOut.includes('full npm package'), `check-cli-bundle: projected install remedy should mention npx/full package, got:\n${installOut}`);
-    assert(!installOut.includes('scandir'), `check-cli-bundle: projected install must not crash with scandir ENOENT, got:\n${installOut}`);
+    // 5b. Install/sync from projected runtime must fail with exact INVALID_INPUT + npx remedy (no ENOENT).
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
 
     // 5c. Token audit from projected runtime fails clearly (package-only), not with packaging ENOENT noise.
     const doctorTokens = spawnSync(command, [...invArgs, 'doctor', '--tokens'], {
@@ -141,11 +133,111 @@ function main() {
     const versionSmoke = spawnSync(command, [...invArgs, '--version'], { cwd: workspace, env: runEnv, encoding: 'utf-8' });
     assert(versionSmoke.status === 0, `check-cli-bundle: projected CLI --version should exit 0: ${versionSmoke.stderr || versionSmoke.stdout}`);
     assert(versionSmoke.stdout.includes(version), `check-cli-bundle: --version should print ${version}, got "${versionSmoke.stdout.trim()}"`);
+
+    // 8. Conflicting full/projected markers are unknown and fail closed.
+    const conflictingAgentsRoot = join(runtimeRoot, 'agents');
+    mkdirSync(conflictingAgentsRoot, { recursive: true });
+    cpSync(resolve(repo, 'agents/orchestrator.md'), join(conflictingAgentsRoot, 'orchestrator.md'));
+    assertUnknownRootBlocked(command, invArgs, workspace, runEnv, 'conflicting full/projected markers');
+    rmSync(conflictingAgentsRoot, { recursive: true, force: true });
+
+    // 9. Either core marker may disappear independently without losing projected identity.
+    const coreOrchestratorPath = join(runtimeRoot, 'core', 'agents', 'orchestrator.md');
+    const coreOrchestratorBackup = `${coreOrchestratorPath}.qa-backup`;
+    cpSync(coreOrchestratorPath, coreOrchestratorBackup);
+    unlinkSync(coreOrchestratorPath);
+    assertProjectedRuntimeCorrupt(command, invArgs, workspace, runEnv, ['core/agents/orchestrator.md']);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
+    cpSync(coreOrchestratorBackup, coreOrchestratorPath);
+    unlinkSync(coreOrchestratorBackup);
+
+    const coreWorkflowPath = join(runtimeRoot, 'core', 'WORKFLOW.yaml');
+    const coreWorkflowBackup = `${coreWorkflowPath}.qa-backup`;
+    cpSync(coreWorkflowPath, coreWorkflowBackup);
+    unlinkSync(coreWorkflowPath);
+    assertProjectedRuntimeCorrupt(command, invArgs, workspace, runEnv, ['core/WORKFLOW.yaml']);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
+    cpSync(coreWorkflowBackup, coreWorkflowPath);
+    unlinkSync(coreWorkflowBackup);
+
+    // 10. Corrupt projected runtime (missing manifest.json): stay mode-aware — report shape FAIL,
+    // never npm-package packaging FAILs, and keep install/sync blocked without scandir ENOENT.
+    const manifestPath = join(runtimeRoot, 'manifest.json');
+    unlinkSync(manifestPath);
+    assert(!existsSync(manifestPath), 'check-cli-bundle: manifest.json should be removed for corrupt-runtime smoke');
+    assertProjectedRuntimeCorrupt(command, invArgs, workspace, runEnv, ['manifest.json']);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
+
+    // 11. Losing both core identity markers must remain projected while KYRO.md survives.
+    unlinkSync(coreOrchestratorPath);
+    unlinkSync(coreWorkflowPath);
+    assertProjectedRuntimeCorrupt(command, invArgs, workspace, runEnv, [
+      'manifest.json',
+      'core/agents/orchestrator.md',
+      'core/WORKFLOW.yaml',
+    ]);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
+    assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
+
+    // 12. Losing every projected identity marker becomes unknown, never full-package.
+    unlinkSync(join(runtimeRoot, 'KYRO.md'));
+    assertUnknownRootBlocked(command, invArgs, workspace, runEnv, 'marker-less corrupt runtime');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 
-  console.log('check:cli-bundle — bundled runtime CLI closes a sprint end-to-end with no PATH binary; doctor/install root-mode guarded');
+  console.log('check:cli-bundle — runtime CLI workflows pass; package operations fail closed for projected, corrupt, conflicting, and unknown roots');
+}
+
+/** Install/sync from any non-full-package root: exact INVALID_INPUT, npx remedy, no ENOENT. */
+function assertPackageOpBlocked(command, invArgs, workspace, runEnv, operation, args) {
+  const result = spawnSync(command, [...invArgs, operation, ...args], {
+    cwd: workspace,
+    env: runEnv,
+    encoding: 'utf-8',
+  });
+  assert(result.status !== 0, `check-cli-bundle: non-full-package ${operation} should exit non-zero`);
+  const out = `${result.stdout || ''}${result.stderr || ''}`;
+  assert(out.includes('INVALID_INPUT'), `check-cli-bundle: blocked ${operation} must report INVALID_INPUT, got:\n${out}`);
+  assert(out.includes('npx kyro-ai'), `check-cli-bundle: blocked ${operation} remedy must mention npx kyro-ai, got:\n${out}`);
+  assert(out.includes('full kyro-ai npm package') || out.includes('full npm package'), `check-cli-bundle: blocked ${operation} must name the full package, got:\n${out}`);
+  assert(!out.includes('scandir'), `check-cli-bundle: blocked ${operation} must not crash with scandir ENOENT, got:\n${out}`);
+  assert(!/ENOENT: no such file or directory, scandir/.test(out), `check-cli-bundle: blocked ${operation} must not surface scandir ENOENT, got:\n${out}`);
+}
+
+function assertProjectedRuntimeCorrupt(command, invArgs, workspace, runEnv, expectedMissing) {
+  const result = spawnSync(command, [...invArgs, 'doctor'], { cwd: workspace, env: runEnv, encoding: 'utf-8' });
+  assert(result.status !== 0, `check-cli-bundle: corrupt projected doctor should exit non-zero: ${result.stderr || result.stdout}`);
+  assert(result.stdout.includes('projected runtime (package packaging checks skipped)'), `check-cli-bundle: corrupt runtime must remain projected, got:\n${result.stdout}`);
+  assert(result.stdout.includes('runtime packaging parity'), `check-cli-bundle: corrupt runtime must fail shape parity, got:\n${result.stdout}`);
+  for (const relative of expectedMissing) {
+    assert(result.stdout.includes(relative), `check-cli-bundle: corrupt runtime should report missing ${relative}, got:\n${result.stdout}`);
+  }
+  assertNoPackageNoise(result.stdout, 'corrupt projected runtime');
+}
+
+function assertUnknownRootBlocked(command, invArgs, workspace, runEnv, scenario) {
+  const doctor = spawnSync(command, [...invArgs, 'doctor'], { cwd: workspace, env: runEnv, encoding: 'utf-8' });
+  assert(doctor.status !== 0, `check-cli-bundle: ${scenario} doctor should exit non-zero`);
+  assert(doctor.stdout.includes('unrecognized or corrupt layout (package packaging checks skipped)'), `check-cli-bundle: ${scenario} must report unknown root, got:\n${doctor.stdout}`);
+  assertNoPackageNoise(doctor.stdout, scenario);
+
+  const tokens = spawnSync(command, [...invArgs, 'doctor', '--tokens'], { cwd: workspace, env: runEnv, encoding: 'utf-8' });
+  assert(tokens.status !== 0, `check-cli-bundle: ${scenario} token audit should exit non-zero`);
+  assert(tokens.stdout.includes('current CLI root mode is unknown'), `check-cli-bundle: ${scenario} token audit must reject unknown root, got:\n${tokens.stdout}`);
+  assertNoPackageNoise(tokens.stdout, `${scenario} token audit`);
+
+  assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
+  assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
+}
+
+function assertNoPackageNoise(stdout, scenario) {
+  assert(!stdout.includes('missing agents/orchestrator.md'), `check-cli-bundle: ${scenario} must not run root package asset checks`);
+  assert(!stdout.includes('.claude-plugin/plugin.json missing'), `check-cli-bundle: ${scenario} must not run Claude plugin packaging checks`);
+  assert(!stdout.includes('ENOENT'), `check-cli-bundle: ${scenario} must not surface packaging ENOENT, got:\n${stdout}`);
 }
 
 function assertNoPlaceholderLeak(runtimeRoot) {

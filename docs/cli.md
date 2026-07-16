@@ -94,7 +94,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 | Root | How you get it | Layout highlights |
 | ---- | -------------- | ----------------- |
 | **Full npm package** | `npx kyro-ai …` or global `kyro` after `npm i -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
-| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when `kyro` is not on PATH) | `manifest.json`, `core/agents/`, projected `skills/` + `dist/` — **not** a full package mirror |
+| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when `kyro` is not on PATH) | `manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror |
 
 **Must run from the full npm package:**
 
@@ -105,7 +105,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 - `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `review`, `context-pack`, and other scope workflow commands
 
-When the CLI detects a projected-runtime root, packaging checks that look for `agents/orchestrator.md` or `.claude-plugin/` are skipped (reported as PASS with an explicit note). Install/sync refuse the projected runtime with an actionable remedy pointing at `npx kyro-ai install`.
+Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai` remedy.
 
 Global command skills are installed for agent discovery:
 
