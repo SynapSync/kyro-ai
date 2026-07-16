@@ -9,8 +9,10 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 
 - `kyro doctor` no longer fails npm-package packaging checks (`agents/orchestrator.md`, `.claude-plugin/`) when the CLI is invoked via the projected runtime (`node ~/.agents/kyro/current/dist/cli.js`). Those checks run only against the full package layout; projected-runtime roots report an explicit PASS and a light runtime shape check instead.
-- `install` and `sync` refuse the projected runtime CLI with `INVALID_INPUT` and an actionable `npx kyro-ai install` remedy, instead of a cryptic `ENOENT` on `agents/`.
+- Projected-runtime classification no longer requires `manifest.json`. Identity uses structural markers (`dist/cli.js`, `core/agents/` or `core/WORKFLOW.yaml`, absence of root `agents/orchestrator.md`), so a corrupt runtime missing its manifest still reports `runtime packaging parity: missing manifest.json` instead of false full-package packaging FAILs or install `ENOENT` on `agents/`.
+- `install` and `sync` refuse the projected runtime CLI with `INVALID_INPUT` and an actionable `npx kyro-ai install` remedy, instead of a cryptic `ENOENT` on `agents/` (including when `manifest.json` is missing).
 - `doctor --tokens` from the projected runtime fails with a clear package-only message rather than packaging `ENOENT` noise.
+- Doctor remedies for missing global runtime / broken CLI invocation point at `npx kyro-ai` (full package) rather than bare `kyro install`/`kyro sync`, which are blocked from the projected fallback.
 
 ### Changed
 

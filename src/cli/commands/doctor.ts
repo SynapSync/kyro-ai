@@ -11,7 +11,7 @@ import { KyroCoreError } from '../core/errors';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { guardEnforcement } from '../adapters/registry-types';
 import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
-import { detectPackageRootMode, FULL_PACKAGE_INSTALL_REMEDY } from '../package-root-mode';
+import { detectPackageRootMode, FULL_PACKAGE_INSTALL_REMEDY, FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 import { runTokenAuditChecks } from './token-audit';
 import { listScopes } from '../core/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
@@ -19,6 +19,10 @@ import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
 
 const PROJECT_STATE_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
+const GLOBAL_RUNTIME_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
+const GLOBAL_RUNTIME_SYNC_REMEDY = FULL_PACKAGE_SYNC_REMEDY;
+const CLI_INVOCATION_REMEDY =
+  'Re-run: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) so the runtime CLI is projected and the invocation is refreshed. Use the full npm package, not the projected runtime CLI.';
 
 export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'trace' | 'kyroScope'>): void {
   const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.trace ?? false, options?.kyroScope ?? null);
@@ -108,7 +112,7 @@ function checkProjectedRuntimeShape(): CheckResult {
       status: 'fail',
       name: 'runtime packaging parity',
       detail: `missing ${missing.join(', ')}`,
-      remedy: 'Re-run install/sync from the full npm package: npx kyro-ai install --scope workspace --yes',
+      remedy: FULL_PACKAGE_INSTALL_REMEDY,
     };
   }
   return {
@@ -208,7 +212,7 @@ function checkGlobalRuntime(): CheckResult {
       status: 'warn',
       name: 'global runtime',
       detail: `${KYRO_MANIFEST_PATH} not found`,
-      remedy: 'Run kyro install.',
+      remedy: GLOBAL_RUNTIME_INSTALL_REMEDY,
     };
   }
   const runtimeFiles = manifest.managedFiles.filter((file) => file.startsWith(`${KYRO_GLOBAL_ROOT}/`));
@@ -218,7 +222,7 @@ function checkGlobalRuntime(): CheckResult {
       status: 'fail',
       name: 'global runtime',
       detail: `missing managed files: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '...' : ''}`,
-      remedy: 'Run kyro sync.',
+      remedy: GLOBAL_RUNTIME_SYNC_REMEDY,
     };
   }
   return { status: 'pass', name: 'global runtime', detail: `${runtimeFiles.length} runtime files present` };
@@ -230,7 +234,7 @@ function expandHome(segment: string): string {
 }
 
 function checkCliInvocation(): CheckResult {
-  const remedy = 'Re-run kyro install (or kyro sync) so the runtime CLI is projected and the invocation is refreshed.';
+  const remedy = CLI_INVOCATION_REMEDY;
   try {
     const manifest = readManifest();
     if (!manifest) {

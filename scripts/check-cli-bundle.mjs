@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -92,17 +92,9 @@ function main() {
     assert(!doctor.stdout.includes('missing agents/orchestrator.md'), 'check-cli-bundle: doctor must not FAIL on missing root agents/orchestrator.md');
     assert(!doctor.stdout.includes('.claude-plugin/plugin.json missing'), 'check-cli-bundle: doctor must not FAIL on missing .claude-plugin');
 
-    // 5b. Install from projected runtime must fail with an actionable remedy (no ENOENT on agents/).
-    const installFromRuntime = spawnSync(command, [...invArgs, 'install', '--scope', 'workspace', '--yes'], {
-      cwd: workspace,
-      env: runEnv,
-      encoding: 'utf-8',
-    });
-    assert(installFromRuntime.status !== 0, 'check-cli-bundle: projected install should exit non-zero');
-    const installOut = `${installFromRuntime.stdout || ''}${installFromRuntime.stderr || ''}`;
-    assert(installOut.includes('INVALID_INPUT') || installOut.includes('full kyro-ai npm package'), `check-cli-bundle: projected install should name full package / INVALID_INPUT, got:\n${installOut}`);
-    assert(installOut.includes('npx kyro-ai') || installOut.includes('full npm package'), `check-cli-bundle: projected install remedy should mention npx/full package, got:\n${installOut}`);
-    assert(!installOut.includes('scandir'), `check-cli-bundle: projected install must not crash with scandir ENOENT, got:\n${installOut}`);
+    // 5b. Install/sync from projected runtime must fail with exact INVALID_INPUT + npx remedy (no ENOENT).
+    assertProjectedPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
+    assertProjectedPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
 
     // 5c. Token audit from projected runtime fails clearly (package-only), not with packaging ENOENT noise.
     const doctorTokens = spawnSync(command, [...invArgs, 'doctor', '--tokens'], {
@@ -141,11 +133,54 @@ function main() {
     const versionSmoke = spawnSync(command, [...invArgs, '--version'], { cwd: workspace, env: runEnv, encoding: 'utf-8' });
     assert(versionSmoke.status === 0, `check-cli-bundle: projected CLI --version should exit 0: ${versionSmoke.stderr || versionSmoke.stdout}`);
     assert(versionSmoke.stdout.includes(version), `check-cli-bundle: --version should print ${version}, got "${versionSmoke.stdout.trim()}"`);
+
+    // 8. Corrupt projected runtime (missing manifest.json): stay mode-aware — report shape FAIL,
+    // never npm-package packaging FAILs, and keep install/sync blocked without scandir ENOENT.
+    const manifestPath = join(runtimeRoot, 'manifest.json');
+    unlinkSync(manifestPath);
+    assert(!existsSync(manifestPath), 'check-cli-bundle: manifest.json should be removed for corrupt-runtime smoke');
+
+    const doctorCorrupt = spawnSync(command, [...invArgs, 'doctor'], {
+      cwd: workspace,
+      env: runEnv,
+      encoding: 'utf-8',
+    });
+    assert(doctorCorrupt.status !== 0, `check-cli-bundle: doctor on corrupt runtime should exit non-zero: ${doctorCorrupt.stderr || doctorCorrupt.stdout}`);
+    assert(
+      doctorCorrupt.stdout.includes('projected runtime (package packaging checks skipped)'),
+      `check-cli-bundle: corrupt runtime must still classify as projected, got:\n${doctorCorrupt.stdout}`,
+    );
+    assert(
+      doctorCorrupt.stdout.includes('runtime packaging parity') && doctorCorrupt.stdout.includes('manifest.json'),
+      `check-cli-bundle: doctor should report missing manifest.json via runtime packaging parity, got:\n${doctorCorrupt.stdout}`,
+    );
+    assert(!doctorCorrupt.stdout.includes('missing agents/orchestrator.md'), 'check-cli-bundle: corrupt runtime must not FAIL package assets for agents/orchestrator.md');
+    assert(!doctorCorrupt.stdout.includes('.claude-plugin/plugin.json missing'), 'check-cli-bundle: corrupt runtime must not FAIL Claude plugin packaging');
+    assert(!doctorCorrupt.stdout.includes('ENOENT'), `check-cli-bundle: corrupt runtime doctor must not surface packaging ENOENT, got:\n${doctorCorrupt.stdout}`);
+
+    assertProjectedPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
+    assertProjectedPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 
-  console.log('check:cli-bundle — bundled runtime CLI closes a sprint end-to-end with no PATH binary; doctor/install root-mode guarded');
+  console.log('check:cli-bundle — bundled runtime CLI closes a sprint end-to-end with no PATH binary; doctor/install root-mode guarded (incl. missing-manifest corrupt runtime)');
+}
+
+/** Install/sync from projected runtime: exact INVALID_INPUT, npx remedy, no scandir/ENOENT crash. */
+function assertProjectedPackageOpBlocked(command, invArgs, workspace, runEnv, operation, args) {
+  const result = spawnSync(command, [...invArgs, operation, ...args], {
+    cwd: workspace,
+    env: runEnv,
+    encoding: 'utf-8',
+  });
+  assert(result.status !== 0, `check-cli-bundle: projected ${operation} should exit non-zero`);
+  const out = `${result.stdout || ''}${result.stderr || ''}`;
+  assert(out.includes('INVALID_INPUT'), `check-cli-bundle: projected ${operation} must report INVALID_INPUT, got:\n${out}`);
+  assert(out.includes('npx kyro-ai'), `check-cli-bundle: projected ${operation} remedy must mention npx kyro-ai, got:\n${out}`);
+  assert(out.includes('full kyro-ai npm package') || out.includes('full npm package'), `check-cli-bundle: projected ${operation} must name the full package, got:\n${out}`);
+  assert(!out.includes('scandir'), `check-cli-bundle: projected ${operation} must not crash with scandir ENOENT, got:\n${out}`);
+  assert(!/ENOENT: no such file or directory, scandir/.test(out), `check-cli-bundle: projected ${operation} must not surface scandir ENOENT, got:\n${out}`);
 }
 
 function assertNoPlaceholderLeak(runtimeRoot) {
