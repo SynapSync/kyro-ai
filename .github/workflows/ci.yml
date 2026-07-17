@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_tag: ${{ steps.version.outputs.tag }}
-      exists: ${{ steps.check.outputs.exists }}
 
     steps:
       - uses: actions/checkout@v5
@@ -37,23 +36,36 @@ jobs:
 
       - name: Read version
         id: version
-        run: echo "tag=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Check if release already exists
-        if: github.event_name == 'push'
-        id: check
+      - name: Verify release version is new
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ steps.version.outputs.tag }}" 2>/dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error title=Version already released::GitHub Release $TAG already exists. Bump package.json before merging to main."
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error title=Tag already exists::Git tag $TAG already exists. Bump package.json before merging to main."
+            exit 1
+          fi
+
+          if npm view "kyro-ai@$VERSION" version >/dev/null 2>&1; then
+            echo "::error title=Version already published::kyro-ai@$VERSION already exists on npm. Bump package.json before merging to main."
+            exit 1
           fi
 
   create_tag:
     needs: validate
-    if: github.event_name == 'push' && needs.validate.outputs.exists == 'false'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write

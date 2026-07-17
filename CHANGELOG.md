@@ -6,8 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.20.1] - 2026-07-16
+
 ### Fixed
 
+- Release CI now rejects versions that already exist as a GitHub Release, Git tag, or npm package, so reused versions fail visibly during PR validation instead of producing a green run with skipped publish jobs.
 - `kyro doctor` no longer fails npm-package packaging checks (`agents/orchestrator.md`, `.claude-plugin/`) when the CLI is invoked via the projected runtime (`node ~/.agents/kyro/current/dist/cli.js`). Those checks run only against the full package layout; projected-runtime roots report an explicit PASS and a light runtime shape check instead.
 - Root classification is fail-closed across verified full-package, projected-runtime, and unknown/corrupt layouts. Multiple independent runtime markers (`manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`) keep partial runtimes mode-aware, while marker-less or conflicting roots skip package checks and report an explicit root failure.
 - `install` and `sync` run only from a positively verified full npm package. Projected, partial, conflicting, and unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai` remedy instead of reaching a cryptic `ENOENT` on `agents/`.
