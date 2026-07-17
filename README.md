@@ -187,7 +187,7 @@ npm run build
 npm pack --dry-run
 ```
 
-`dist/` is generated from `src/` and must stay in sync — `npm run check:dist` proves the committed build matches source, so releases can't ship stale output. Release tags matching `package.json.version` publish to npm via GitHub Actions (requires the `NPM_TOKEN` secret).
+`dist/` is generated from `src/` and must stay in sync — `npm run check:dist` proves the committed build matches source, so releases can't ship stale output. A push to `main` with a new `package.json.version` creates the matching tag, publishes to npm, and creates the GitHub Release; reused versions fail validation (publishing requires the `NPM_TOKEN` secret).
 
 ---
 

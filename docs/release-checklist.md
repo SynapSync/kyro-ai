@@ -53,7 +53,9 @@ npm run check:artifacts
 npm pack --dry-run
 ```
 
-Only when `validate` succeeds does CI create a tag, publish to npm, and create a GitHub release.
+Validation also requires the package version to be absent from GitHub Releases, Git tags, and npm. This check runs on pull requests and pushes to `main`, so a reused version fails visibly with a required-bump error instead of skipping publication in an otherwise green run.
+
+Only when `validate` succeeds on a push to `main` does CI create the matching tag, publish to npm, and create a GitHub release. Re-running a completed release without a new version is expected to fail.
 
 ## Local publish safety net
 
@@ -67,6 +69,7 @@ This means a local `npm publish` also rebuilds, proves freshness, and validates 
 
 ## Before committing
 
+- [ ] The version was bumped and does not already exist as a GitHub Release, Git tag, or npm version.
 - [ ] `npm run check` passes.
 - [ ] `npm run build` produces no unexpected changes in `dist/`.
 - [ ] `npm run check:adapters` passes.
