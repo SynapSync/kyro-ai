@@ -3,7 +3,7 @@
 // the fat sprint.json), routes the handoff to review_task, and — critically — produces evidence the
 // deterministic checker accepts, so `kyro review --verdict pass` succeeds without --yes afterwards.
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,6 +95,76 @@ function run(args, root) {
     assert(badTask.status === 1 && (badTask.stderr + badTask.stdout).includes('TASK_NOT_FOUND'), 'unknown task should fail TASK_NOT_FOUND');
 
     assert(readFileSync(sprintPath(root), 'utf-8') === before, 'rejected record-evidence calls must not write sprint.json');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 4) --status blocked records evidence and marks the task blocked (still routes to review_task).
+{
+  const root = sandbox();
+  try {
+    const taskId = readSprint(root).activeSprint.phases[0].tasks[0].id;
+    const rec = run(['record-evidence', taskId, '--kyro-scope', 'demo', '--summary', 'Stuck.', '--validation', 'tsc', '--status', 'blocked'], root);
+    assert(rec.status === 0, `blocked record should succeed: ${rec.stdout}${rec.stderr}`);
+    const task = readSprint(root).activeSprint.phases[0].tasks[0];
+    assert(task.status === 'blocked', `status should be blocked, got ${task.status}`);
+    assert(task.evidence && task.evidence.summary === 'Stuck.', 'evidence still recorded when blocked');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 5) --dry-run previews without writing.
+{
+  const root = sandbox();
+  try {
+    const taskId = readSprint(root).activeSprint.phases[0].tasks[0].id;
+    const before = readFileSync(sprintPath(root), 'utf-8');
+    const rec = run(['record-evidence', taskId, '--kyro-scope', 'demo', '--summary', 'x', '--validation', 'tsc', '--dry-run'], root);
+    assert(rec.status === 0, `dry-run should succeed: ${rec.stdout}${rec.stderr}`);
+    assert(readFileSync(sprintPath(root), 'utf-8') === before, 'dry-run must not write sprint.json');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 6) Re-recording overwrites the prior evidence (last write wins, still valid).
+{
+  const root = sandbox();
+  try {
+    const taskId = readSprint(root).activeSprint.phases[0].tasks[0].id;
+    run(['record-evidence', taskId, '--kyro-scope', 'demo', '--summary', 'First.', '--validation', 'tsc'], root);
+    const rec = run(['record-evidence', taskId, '--kyro-scope', 'demo', '--summary', 'Second.', '--validation', 'npm test -- demo', '--file', 'src/demo.ts'], root);
+    assert(rec.status === 0, `re-record should succeed: ${rec.stdout}${rec.stderr}`);
+    const ev = readSprint(root).activeSprint.phases[0].tasks[0].evidence;
+    assert(ev.summary === 'Second.' && ev.validation === 'npm test -- demo', 're-record should overwrite prior evidence');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 7) Emergent tasks are locatable and recordable too (not just phase tasks).
+{
+  const root = sandbox();
+  try {
+    const sprint = readSprint(root);
+    sprint.activeSprint.emergentTasks.push({
+      id: 'E1',
+      title: 'Emergent task',
+      description: 'Emergent work.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Done.'],
+      status: 'pending',
+      evidence: null,
+      verdict: null,
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+    const rec = run(['record-evidence', 'E1', '--kyro-scope', 'demo', '--summary', 'Handled emergent.', '--validation', 'tsc'], root);
+    assert(rec.status === 0, `emergent record should succeed: ${rec.stdout}${rec.stderr}`);
+    const emergent = readSprint(root).activeSprint.emergentTasks.find((t) => t.id === 'E1');
+    assert(emergent.status === 'done' && emergent.evidence.summary === 'Handled emergent.', 'emergent task evidence should be recorded');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
