@@ -11,7 +11,7 @@ Validate completed work and record the verdict through the Kyro checker tool.
 ## Workflow
 
 1. Verify the real changes in `taskFiles` satisfy `taskAcceptanceCriteria`.
-2. Run the relevant checks for the touched area.
+2. Run only touched-area checks: targeted tests, scoped/capped searches.
 3. Classify findings as critical, warning, or suggestion. Critical issues block completion.
 4. Let the tool own the verdict write:
    - Passing review: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict pass --yes`

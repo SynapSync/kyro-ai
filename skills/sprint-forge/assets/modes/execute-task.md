@@ -10,7 +10,7 @@ Execute the active sprint task by task, recording evidence directly into `sprint
 ## Workflow
 
 1. Understand the task from its self-contained fields. Make the smallest coherent change.
-2. Run the validation implied by `acceptance_criteria` (tsc, lint, tests, grep, manual). Correct failures; after three failed correction rounds, mark the task `blocked` with evidence.
+2. Run the validation implied by `acceptance_criteria` (tsc, lint, tests, grep, manual), **scoped to the touched area**: only the tests covering the changed files (not the full suite each round), and searches capped/scoped (`-l`, `-m N`, `| head`, or a path) — an uncapped repo-wide search floods context. Correct failures; after three failed correction rounds, mark the task `blocked` with evidence.
 3. Record evidence on the task object and advance routing — all via the Artifact Write Contract in `../../SKILL.md`:
    - Set `task.evidence = { summary, validation, files_changed: [...], notes, by, recordedAt }`.
    - Set `task.status = "done"` (or `"blocked"`).

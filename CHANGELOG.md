@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.21.0] - 2026-07-18
+
+### Added
+
+- PreToolUse Bash guard (`guard-bash-output.mjs`) blocks a recursive `rg`/`grep -r` search only when it has no output bound at all — no cap, no scope, no redirect — which is the single biggest measured token cost in real runs (an uncapped repo-wide search can pull tens of thousands of tokens into context in one call). Bounded/scoped searches, tests, and non-search commands pass untouched, and the guard fails open on anything ambiguous. Its block message hands back the bounded form to re-run.
+
+### Changed
+
+- Execute and review modes and the reviewer helper now direct validation to the touched area: tests scoped to the changed files instead of a full-suite re-run, and searches capped/scoped rather than repo-wide.
+
 ## [4.20.1] - 2026-07-16
 
 ### Fixed

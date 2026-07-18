@@ -76,6 +76,30 @@ If `--kyro-scope` is omitted, the command uses `activeScope` from `.agents/kyro/
 
 ---
 
+## Search Output Guard
+
+The single biggest measured token cost in real Kyro runs is not the workflow engine — it is
+**unbounded tool output**: a broad `rg`/`grep -r` with no cap can pull tens of thousands of
+tokens into context in one call, and that stays billed on every later turn.
+
+The Claude Code plugin ships a `PreToolUse` hook (`guard-bash-output.mjs`) that **blocks a
+recursive search only when it has no output bound at all** — no cap, no scope, no redirect. It
+never touches tests or non-search commands, and it fails open on anything ambiguous. When it
+fires, it hands back the bounded form; re-run with any one of:
+
+| Make it bounded | Example |
+|-----------------|---------|
+| Cap the results | `rg 'pat' -m 50`  ·  `rg 'pat' \| head -50` |
+| List files / count only | `rg -l 'pat'`  ·  `rg -c 'pat'` |
+| Scope to a path or glob | `rg 'pat' src/feature`  ·  `rg 'pat' --glob '*.ts'` |
+| Keep it all off-context | `rg 'pat' > /tmp/hits.txt`, then read what you need |
+
+Tests are never hard-blocked (a full run is sometimes the right validation), but the same
+discipline applies: scope tests to the touched files instead of re-running the whole suite at
+every validation point.
+
+---
+
 ## Handoff Routing
 
 `sprint.json.handoff` is Kyro's primary defense against context loss between sprints. It is updated at INIT, sprint close, and wrap-up — not after every task.
