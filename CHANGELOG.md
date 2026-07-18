@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.22.0] - 2026-07-18
+
+### Added
+
+- `kyro close-sprint` now recommends starting the next sprint in a fresh session when sprints remain (`plan_sprint`), and prints paste-ready handoff facts (scope, `sprint.json` path, `nextAction`, note). Carrying one session across a multi-sprint run is the biggest token-cost amplifier; a fresh session reloads only the lean handoff. When no sprints remain (`wrap_up`) it points at `/kyro:wrap-up` instead. The close-sprint mode directs the agent to generate the continuation prompt for the user. Portable to every agent (deterministic CLI output — no host hooks).
+
 ## [4.21.0] - 2026-07-18
 
 ### Added
