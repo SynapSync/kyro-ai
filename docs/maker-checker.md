@@ -44,6 +44,22 @@ Always advisory:
 }
 ```
 
+## Tool-owned evidence (maker)
+
+The maker records evidence through the CLI instead of hand-editing `sprint.json`, so a whole-file
+read/rewrite of the (10–20k token) sprint file is never needed just to record a task:
+
+```bash
+kyro record-evidence T1.1 --kyro-scope demo \
+  --summary "Implemented the demo task." \
+  --validation "npm test -- demo" \
+  --file src/demo.ts
+```
+
+It writes `task.evidence`, sets `task.status` (`done` by default; `--status blocked` after repeated
+failures), and routes `handoff` to `review_task`. It never writes `task.verdict` — the checker owns
+that. Multiple `--validation`/`--file` flags are accepted; `--by` defaults to `maker`.
+
 ## Tool-owned review
 
 ```bash

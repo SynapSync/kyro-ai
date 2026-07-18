@@ -103,7 +103,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 **Safe from either root (including the projected runtime CLI):**
 
-- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `review`, `context-pack`, and other scope workflow commands
+- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `record-evidence`, `review`, `context-pack`, and other scope workflow commands
 
 Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai` remedy.
 

@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.25.0] - 2026-07-18
+
+### Added
+
+- `kyro record-evidence <task>` writes `task.evidence` and sets `task.status` through the CLI, so the maker no longer hand-edits the 10–20k-token `sprint.json` to record a task (each hand-edit was a whole-file read + rewrite). It sets `status` (`done` by default, `--status blocked` after repeated failures), routes `handoff` to `review_task`, and never touches `task.verdict` (the checker still owns that via `kyro review`). Accepts repeatable `--validation`/`--file`, optional `--notes`, and `--by` (defaults to `maker`). The evidence it writes is validated end-to-end: `kyro review --verdict pass` accepts it without `--yes`.
+
+### Changed
+
+- The execute-task mode now records evidence via `kyro record-evidence` instead of a hand-edited safe-write. Hand safe-writes remain only for emergent tasks and debt.
+
 ## [4.24.0] - 2026-07-18
 
 ### Removed

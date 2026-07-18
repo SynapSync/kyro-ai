@@ -13,6 +13,7 @@ import { runEval } from './commands/eval';
 import { runMcpCommand } from './commands/mcp';
 import { runTraceCommand } from './commands/trace';
 import { runReviewCommand } from './commands/review';
+import { runRecordEvidenceCommand } from './commands/record-evidence';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
 import { KyroCoreError } from './core/errors';
@@ -56,6 +57,11 @@ export async function runCli(): Promise<void> {
 
   if (command === 'review') {
     runReviewCommand(args);
+    return;
+  }
+
+  if (command === 'record-evidence') {
+    runRecordEvidenceCommand(args);
     return;
   }
 
@@ -125,7 +131,7 @@ function isMutatingInvocation(command: string, args: string[]): boolean {
   if (args.includes('--dry-run')) return false;
   // close-sprint owns its lock after interactive confirmation so prompts never block writers.
   // install owns a post-prompt lock and rebuilds its plan from fresh state.
-  if (['sync', 'uninstall', 'repair', 'review'].includes(command)) return true;
+  if (['sync', 'uninstall', 'repair', 'review', 'record-evidence'].includes(command)) return true;
   if (command === 'scope' && args[0] === 'set-active') return true;
   return command === 'trace' && args.includes('--clear');
 }
