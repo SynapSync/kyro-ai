@@ -2,7 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { collectCheckerFindings } from '../core/analysis';
+import { collectCheckerFindings, countClarificationMarkers } from '../core/analysis';
 import { deriveActiveSprintStatus, derivePhaseStatus } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
@@ -93,6 +93,14 @@ export function buildReviewPlan(scope: string, args: ReviewArgs): { sprint: Spri
   if (!sprint || !sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint to review.`);
   const located = locateTask(sprint, args.taskId);
   if (!located) throw new KyroCoreError('TASK_NOT_FOUND', `Task not found: ${args.taskId}`, 'Run kyro context-pack --json to inspect the active sprint tasks.');
+  const clarificationMarkers = countClarificationMarkers(sprint);
+  if (clarificationMarkers > 0) {
+    throw new KyroCoreError(
+      'CLARIFICATION_REQUIRED',
+      `Cannot review: sprint.json has ${clarificationMarkers} unresolved [NEEDS CLARIFICATION] marker(s).`,
+      'Resolve them in the clarify mode before reviewing — do not guess.',
+    );
+  }
 
   const reviewedAt = new Date().toISOString();
   const waivedSet = new Set(args.waivedCriteria.map((w) => w.criterion));

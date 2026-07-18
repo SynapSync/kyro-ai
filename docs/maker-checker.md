@@ -44,6 +44,22 @@ Always advisory:
 }
 ```
 
+## Tool-owned evidence (maker)
+
+The maker records evidence through the CLI instead of hand-editing `sprint.json`, so a whole-file
+read/rewrite of the (10–20k token) sprint file is never needed just to record a task:
+
+```bash
+kyro record-evidence T1.1 --kyro-scope demo \
+  --summary "Implemented the demo task." \
+  --validation "npm test -- demo" \
+  --file src/demo.ts
+```
+
+It writes `task.evidence`, sets `task.status` (`done` by default; `--status blocked` after repeated
+failures), and routes `handoff` to `review_task`. It never writes `task.verdict` — the checker owns
+that. Multiple `--validation`/`--file` flags are accepted; `--by` defaults to `maker`.
+
 ## Tool-owned review
 
 ```bash
@@ -73,3 +89,4 @@ When enabled, a `pass` where `verdict.by === evidence.by` is blocked as `SELF_RE
 - `CONFIRMATION_REQUIRED` — a guarded operation needs explicit confirmation (only for review when `review_task` is set to `confirm` in policy).
 - `CHECKER_FAILED` — deterministic checker findings vetoed the pass.
 - `SELF_REVIEW_BLOCKED` — policy requires a separate checker actor.
+- `CLARIFICATION_REQUIRED` — `record-evidence`/`review` refuse while any `[NEEDS CLARIFICATION]` marker remains; resolve them in clarify mode first.
