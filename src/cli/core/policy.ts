@@ -14,7 +14,7 @@ export const DEFAULT_POLICY: PolicyDefinition = {
     scope_set_active: { level: 'confirm' },
     clear_active_sprint: { level: 'blocked' },
     delete_archive: { level: 'blocked' },
-    review_task: { level: 'confirm' },
+    review_task: { level: 'tool_owned' },
   },
   allow: [],
   maker_checker: { requireSeparateChecker: false },

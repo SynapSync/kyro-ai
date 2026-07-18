@@ -51,7 +51,7 @@ kyro review T1.1 --kyro-scope demo --verdict pass --yes
 kyro review T1.1 --kyro-scope demo --verdict fail --finding critical:"Missing test evidence" --yes
 ```
 
-`review_task` is guarded by policy and defaults to `confirm`, so CLI review needs `--yes`.
+`review_task` defaults to `tool_owned`: the deterministic checker (coverage, evidence, self-review, principle vetoes) is the gate, and per-task review is reversible, so a pass does not need `--yes`. A project that wants a human confirmation on every review can set `review_task` to `confirm` in `policy.json`, after which CLI review needs `--yes` (the flag above is always safe to pass either way).
 
 ## Separate checker policy
 
@@ -70,6 +70,6 @@ When enabled, a `pass` where `verdict.by === evidence.by` is blocked as `SELF_RE
 
 ## Error codes
 
-- `CONFIRMATION_REQUIRED` — review needs explicit confirmation.
+- `CONFIRMATION_REQUIRED` — a guarded operation needs explicit confirmation (only for review when `review_task` is set to `confirm` in policy).
 - `CHECKER_FAILED` — deterministic checker findings vetoed the pass.
 - `SELF_REVIEW_BLOCKED` — policy requires a separate checker actor.
