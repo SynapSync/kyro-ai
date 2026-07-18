@@ -11,9 +11,9 @@ Continue Kyro work without loading the whole workflow upfront.
 
 1. Read `.agents/kyro/kyro.json` if it exists.
 2. Resolve the active scope from `$ARGUMENTS`, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
-3. Read the scope's `sprint.json` (single source of truth). Do not open archive Markdown, findings, templates, or helpers until the route requires them.
+3. Resolve routing with `kyro context-pack --kyro-scope <scope> --json` (lean pack). Do not open the full `sprint.json`, archive Markdown, findings, templates, or helpers to route. Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint` (see the Read Path Contract in `skills/sprint-forge/SKILL.md`).
 
-## Route (on `sprint.json.handoff.nextAction`)
+## Route (on the pack's `nextAction`)
 
 | Condition | Load next |
 |-----------|-----------|

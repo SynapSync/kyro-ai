@@ -5,7 +5,7 @@ Report progress from the single source of truth. One read, no summaries.
 ## Inputs
 
 1. Read `.agents/kyro/kyro.json`.
-2. Resolve scope and read `.agents/kyro/scopes/{scope}/sprint.json`. Everything is in that one file.
+2. Resolve scope. For `brief`, read the lean scope pack (`{{KYRO_CLI}} context-pack --kyro-scope {scope} --json`) — it carries `status`, `activeSprintSlug`, `nextAction`, `openDebtCount`, `reviewPending`. Open the full `.agents/kyro/scopes/{scope}/sprint.json` only for `full`/`debt`, which need `roadmap`/`ledger[]`/full `activeSprint`/`debt[]`/`adrs[]` (see the Read Path Contract in `../../SKILL.md`).
 
 ## Report variants
 
@@ -45,4 +45,4 @@ coverage, dependency, and overdue-debt issues with severity. Read-only.
 
 - A report is read-only unless an explicit `debt-*` mutation is requested.
 - Debt items are never deleted; only `status` changes.
-- One read of `sprint.json`; no other files.
+- `brief` reads only the scope pack; `full`/`debt` read the full `sprint.json`. No other files.

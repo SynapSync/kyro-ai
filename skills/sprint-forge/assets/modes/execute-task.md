@@ -4,8 +4,8 @@ Execute the active sprint task by task, recording evidence directly into `sprint
 
 ## Inputs
 
-1. Read `.agents/kyro/scopes/{scope}/sprint.json`.
-2. Work the task identified by `handoff.nextTaskId` (or the first `pending` task in phase order, respecting `depends_on`). Everything the executor needs is in the task object: `description`, `files_to_touch`, `context`, `acceptance_criteria`.
+1. Read the task pack, not the whole file: `{{KYRO_CLI}} context-pack --kyro-scope {scope} --task --json` — the next task self-contained (`taskDescription`, `taskFiles`, `taskContext`, `taskAcceptanceCriteria`, `taskScenarios`) plus `conventions`. Do NOT open the full `sprint.json` to execute; you open it once at write time (step 3).
+2. Work the task the pack names (respecting `depends_on`). Everything the executor needs is in the pack's task fields.
 
 ## Workflow
 

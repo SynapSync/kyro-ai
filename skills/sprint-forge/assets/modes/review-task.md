@@ -4,13 +4,13 @@ Validate completed work and record the verdict through the Kyro checker tool.
 
 ## Inputs
 
-1. Read `.agents/kyro/scopes/{scope}/sprint.json`.
-2. Review the task identified by `handoff.nextTaskId` (the one just executed): compare its `evidence` against actual code/docs changes and its `acceptance_criteria`.
+1. Read the task pack: `{{KYRO_CLI}} context-pack --kyro-scope {scope} --task <id> --json` (`handoff.nextTaskId`) — `taskAcceptanceCriteria`, `taskScenarios`, `nextTaskReview` (`hasPassVerdict`, `checkerFindings`). Do NOT open the full `sprint.json`; the verdict write is CLI-owned (`{{KYRO_CLI}} review`).
+2. Review the just-executed task: verify the real changes in `taskFiles` satisfy `taskAcceptanceCriteria`. The pack omits the recorded `evidence` blob — you don't need it; `{{KYRO_CLI}} review` validates its shape and criteria-coverage.
 3. Read `../helpers/reviewer.md` when classifying findings.
 
 ## Workflow
 
-1. Verify the task's `evidence` matches real changes.
+1. Verify the real changes in `taskFiles` satisfy `taskAcceptanceCriteria`.
 2. Run the relevant checks for the touched area.
 3. Classify findings as critical, warning, or suggestion. Critical issues block completion.
 4. Let the tool own the verdict write:
