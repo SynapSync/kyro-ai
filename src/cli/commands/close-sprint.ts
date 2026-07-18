@@ -107,7 +107,25 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
     outcome: normalizeTraceCloseOutcome(args.outcome),
   });
   console.log(`\nSprint ${identity.sprintN} closed. activeSprint cleared; ledger entry, snapshot, and checkpoint recorded.`);
-  console.log(`Next action: ${(verify.value as SprintFile).handoff.nextAction}.`);
+  const handoff = (verify.value as SprintFile).handoff;
+  console.log(`Next action: ${handoff.nextAction}.`);
+  if (handoff.nextAction === 'plan_sprint') {
+    console.log('');
+    console.log('▶ Start the next sprint in a FRESH session.');
+    console.log('  Carrying this session forward is the dominant token cost across a multi-sprint run;');
+    console.log('  a new session reloads only the lean handoff below.');
+    console.log('  New session → generate the handoff prompt (Claude: /kyro:task-context · other agents:');
+    console.log('  the kyro-task-context skill), then start the next cycle (/kyro:forge).');
+    console.log('');
+    console.log('  Handoff facts (paste into the new session if you skip task-context):');
+    console.log(`    scope:       ${scope}`);
+    console.log(`    sprint.json: ${sprintJsonPath(scope)}`);
+    console.log(`    nextAction:  ${handoff.nextAction}`);
+    if (handoff.note) console.log(`    note:        ${handoff.note}`);
+  } else if (handoff.nextAction === 'wrap_up') {
+    console.log('');
+    console.log('▶ Scope objective met — no sprints remain. This scope is complete.');
+  }
 }
 
 export function buildClosePlan(

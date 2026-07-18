@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.24.0] - 2026-07-18
+
+### Removed
+
+- Deleted a pre-v4 legacy documentation subsystem that nothing in the current workflow loads or references: `contexts/` (old context-mode files), `rules/` (pre-v4 rule files, superseded by JSON `conventions[]`/`principles[]` and the runtime `.agents/kyro/scopes/rules.md`), `templates/split-claude-md/` (unused CLAUDE.md-splitting templates), `docs/rules-guide.md`, and the orphaned `skills/sprint-forge/assets/modes/analyze.md` mode doc (the `analyze` step is a CLI command, not a loaded mode). Removed the now-empty `rules`/`contexts`/`templates` entries from the npm `files[]` and the README link to the rules guide. No runtime behavior changes; the `wrap_up` routing and all live modes/helpers/protocols are unaffected.
+
+## [4.23.0] - 2026-07-18
+
+### Removed
+
+- The `/kyro:wrap-up` command (projected skill `kyro-wrap-up`) is removed. Its only unique job was writing a resume note into `sprint.json.handoff`, which is already covered: `close-sprint` refreshes the handoff at every sprint boundary, `/kyro:task-context` regenerates a resume prompt from live state on demand, and `review`/`execute` keep `nextAction`/`nextTaskId` current. Dropping it removes a redundant command surface and the naming collision with the `wrap_up` routing state. Command count is now 5. **The `wrap_up` `nextAction` routing state is unchanged** — closing the last sprint of a scope still routes there.
+
+## [4.22.0] - 2026-07-18
+
+### Added
+
+- `kyro close-sprint` now recommends starting the next sprint in a fresh session when sprints remain (`plan_sprint`), and prints paste-ready handoff facts (scope, `sprint.json` path, `nextAction`, note). Carrying one session across a multi-sprint run is the biggest token-cost amplifier; a fresh session reloads only the lean handoff. When no sprints remain (`wrap_up`) it points at `/kyro:wrap-up` instead. The close-sprint mode directs the agent to generate the continuation prompt for the user. Portable to every agent (deterministic CLI output — no host hooks).
+
+## [4.21.0] - 2026-07-18
+
+### Added
+
+- PreToolUse Bash guard (`guard-bash-output.mjs`) blocks a recursive `rg`/`grep -r` search only when it has no output bound at all — no cap, no scope, no redirect — which is the single biggest measured token cost in real runs (an uncapped repo-wide search can pull tens of thousands of tokens into context in one call). Bounded/scoped searches, tests, and non-search commands pass untouched, and the guard fails open on anything ambiguous. Its block message hands back the bounded form to re-run.
+
+### Changed
+
+- Execute and review modes and the reviewer helper now direct validation to the touched area: tests scoped to the changed files instead of a full-suite re-run, and searches capped/scoped rather than repo-wide.
+
 ## [4.20.1] - 2026-07-16
 
 ### Fixed

@@ -22,7 +22,6 @@ Use the installed commands or command-like skills:
 
 - `/kyro/forge` or `kyro-forge` — route analyze/plan/execute/review/close
 - `/kyro/status` or `kyro-status` — summary-first progress and debt report
-- `/kyro/wrap-up` or `kyro-wrap-up` — close session and refresh handoff context
 - `/kyro/task-context` or `kyro-task-context` — generate a copy-paste prompt for a fresh context
 - `/kyro/idea` or `kyro-idea` — mature a rough or developed idea into an evidence-grounded, execution-ready plan (optional, pre-scope)
 

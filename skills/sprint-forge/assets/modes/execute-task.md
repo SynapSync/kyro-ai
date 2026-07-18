@@ -4,13 +4,13 @@ Execute the active sprint task by task, recording evidence directly into `sprint
 
 ## Inputs
 
-1. Read `.agents/kyro/scopes/{scope}/sprint.json`.
-2. Work the task identified by `handoff.nextTaskId` (or the first `pending` task in phase order, respecting `depends_on`). Everything the executor needs is in the task object: `description`, `files_to_touch`, `context`, `acceptance_criteria`.
+1. Read the task pack, not the whole file: `{{KYRO_CLI}} context-pack --kyro-scope {scope} --task --json` — the next task self-contained (`taskDescription`, `taskFiles`, `taskContext`, `taskAcceptanceCriteria`, `taskScenarios`) plus `conventions`. Do NOT open the full `sprint.json` to execute; you open it once at write time (step 3).
+2. Work the task the pack names (respecting `depends_on`). Everything the executor needs is in the pack's task fields.
 
 ## Workflow
 
 1. Understand the task from its self-contained fields. Make the smallest coherent change.
-2. Run the validation implied by `acceptance_criteria` (tsc, lint, tests, grep, manual). Correct failures; after three failed correction rounds, mark the task `blocked` with evidence.
+2. Run the validation implied by `acceptance_criteria` (tsc, lint, tests, grep, manual), **scoped to the touched area**: only the tests covering the changed files (not the full suite each round), and searches capped/scoped (`-l`, `-m N`, `| head`, or a path) — an uncapped repo-wide search floods context. Correct failures; after three failed correction rounds, mark the task `blocked` with evidence.
 3. Record evidence on the task object and advance routing — all via the Artifact Write Contract in `../../SKILL.md`:
    - Set `task.evidence = { summary, validation, files_changed: [...], notes, by, recordedAt }`.
    - Set `task.status = "done"` (or `"blocked"`).

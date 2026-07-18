@@ -40,7 +40,6 @@ There is intentionally no generic adapter. Root `AGENTS.md` is the standard cros
 |--------|---------------|-----------------|
 | forge | `kyro-forge` | `/kyro:forge` |
 | status | `kyro-status` | `/kyro:status` |
-| wrap-up | `kyro-wrap-up` | `/kyro:wrap-up` |
 | task context | `kyro-task-context` | `/kyro:task-context` |
 | idea maturation and executable planning | `kyro-idea` | `/kyro:idea` |
 
@@ -64,7 +63,7 @@ Use:
 npx kyro-ai install --agent opencode --scope workspace --yes
 ```
 
-OpenCode should invoke the native `/kyro/forge`, `/kyro/status`, `/kyro/wrap-up`, `/kyro/task-context`, and `/kyro/idea` commands, or the installed `kyro-*` skills under `~/.config/opencode/skills/`. It should not copy Kyro core into the project.
+OpenCode should invoke the native `/kyro/forge`, `/kyro/status`, `/kyro/task-context`, and `/kyro/idea` commands, or the installed `kyro-*` skills under `~/.config/opencode/skills/`. It should not copy Kyro core into the project.
 
 Kyro preserves existing `opencode.json` content and owns only `agent.kyro-orchestrator`. MCP merge is not enabled until there is a concrete Kyro MCP server contract.
 

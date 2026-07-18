@@ -26,7 +26,6 @@ It should not load the full sprint history, archived sprints, or unrelated helpe
 | `kyro-forge:review` | 2,500 estimated tokens |
 | `kyro-forge:close` | 3,200 estimated tokens |
 | `kyro-status:brief` | 1,500 estimated tokens |
-| `kyro-wrap-up` | 3,200 estimated tokens |
 | `kyro-task-context` | 2,200 estimated tokens |
 
 The audit includes command stubs, routers, eager agent/skill files, routed modes, and required helpers. It also fails forbidden eager helper combinations.

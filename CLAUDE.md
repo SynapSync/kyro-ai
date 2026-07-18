@@ -7,7 +7,7 @@ Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based p
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/kyro:forge, /kyro:status, /kyro:wrap-up)
+User Command (/kyro:forge, /kyro:status, /kyro:task-context)
   └── Agent (orchestrator)
         └── Skill (core)
 ```
@@ -18,10 +18,9 @@ User Command (/kyro:forge, /kyro:status, /kyro:wrap-up)
 kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
-├── commands/         # 6 slash commands
+├── commands/         # 5 slash commands
 │   ├── forge.md      # /kyro:forge — full cycle with gates
 │   ├── status.md     # /kyro:status — progress and debt summary
-│   ├── wrap-up.md    # /kyro:wrap-up — session closure ritual
 │   ├── idea.md       # /kyro:idea — idea maturation pre-scope (optional)
 │   ├── qa.md         # /kyro:qa — certification and quality audit (independent)
 │   └── task-context.md # /kyro:task-context — fresh-context continuation prompt

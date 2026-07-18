@@ -95,11 +95,9 @@ function buildOpenCodeCommand(command: KyroCommandName): string {
     ? 'Run the Kyro forge workflow'
     : command === 'status'
       ? 'Show Kyro project status'
-      : command === 'wrap-up'
-        ? 'Close the Kyro session'
-        : command === 'idea'
-          ? 'Mature a rough or mature idea into an execution-ready plan before starting a scope'
-          : 'Generate a fresh-context prompt';
+      : command === 'idea'
+        ? 'Mature a rough or mature idea into an execution-ready plan before starting a scope'
+        : 'Generate a fresh-context prompt';
   return `---\ndescription: ${description}\n---\n\nLoad \`${OPENCODE_SKILLS_ROOT}/kyro-${command}/SKILL.md\` and follow it. The skill must read \`${KYRO_COMMANDS_ROOT}/${command}.md\` first, then load only the routed Kyro mode/helper files.\n\nRuntime: \`${KYRO_ROOT}/\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nDo not inline the full Kyro workflow or ask the user to restate it.\n`;
 }
 
@@ -118,7 +116,7 @@ function buildOpenCodeAgentPrompt(): string {
   return [
     'You are the Kyro workflow orchestrator inside OpenCode.',
     `Use native OpenCode commands in ${OPENCODE_COMMANDS_ROOT}/kyro/ and skills in ${OPENCODE_SKILLS_ROOT}/kyro-*.`,
-    `Read ${KYRO_COMMANDS_ROOT}/{forge,status,wrap-up,task-context,idea}.md first, then load only the routed Kyro mode/helper files.`,
+    `Read ${KYRO_COMMANDS_ROOT}/{forge,status,task-context,idea}.md first, then load only the routed Kyro mode/helper files.`,
     `Runtime: ${KYRO_ROOT}/`,
     `Artifacts: ${ARTIFACT_ROOT}/{scope}/`,
     'Do not inline the full Kyro workflow or overwrite non-Kyro OpenCode configuration.',

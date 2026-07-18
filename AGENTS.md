@@ -7,7 +7,7 @@ Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based p
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/kyro:forge, /kyro:status, /kyro:wrap-up, /kyro:task-context, /kyro:qa, /kyro:idea)
+User Command (/kyro:forge, /kyro:status, /kyro:task-context, /kyro:qa, /kyro:idea)
   └── Agent (orchestrator, or direct skill load for qa and idea)
         └── Skill (core)
 ```
@@ -18,10 +18,9 @@ User Command (/kyro:forge, /kyro:status, /kyro:wrap-up, /kyro:task-context, /kyr
 kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
-├── commands/         # 6 slash commands
+├── commands/         # 5 slash commands
 │   ├── forge.md      # /kyro:forge — full cycle with gates
 │   ├── status.md     # /kyro:status — progress and debt summary
-│   ├── wrap-up.md    # /kyro:wrap-up — session closure ritual
 │   ├── task-context.md # /kyro:task-context — fresh-context prompt generation
 │   ├── idea.md       # /kyro:idea — idea maturation pre-scope (optional)
 │   └── qa.md         # /kyro:qa — certification audit (independent)
@@ -125,7 +124,7 @@ When bumping version or changing the description:
 <!-- kyro-ai:agents-md:start -->
 ## Kyro AI
 
-Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-wrap-up`, `kyro-task-context`, `kyro-qa`, `kyro-idea`.
+Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-qa`, `kyro-idea`.
 
 Runtime: `~/.agents/kyro/current/`
 Project state: `.agents/kyro/kyro.json`

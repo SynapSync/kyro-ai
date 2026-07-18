@@ -16,13 +16,13 @@ Lightweight index for sprint work. Do not load the full sprint protocol upfront.
 ## Required read order
 
 1. `.agents/kyro/kyro.json`
-2. `.agents/kyro/scopes/{scope}/sprint.json` (single source of truth)
+2. The lean pack (`{{KYRO_CLI}} context-pack`; `--task` for execute/review) — never the full `sprint.json` to route. Full file only to write or in plan/close, per the Read Path Contract in `../../SKILL.md`.
 3. The routed mode file above
 4. Only the helpers/templates named by that routed mode
 
 ## Invariants
 
-- One sprint at a time; route on `handoff.nextAction`, never on file presence.
+- One sprint at a time; never route on file presence.
 - Previous retro, recommendations, and debt feed the next sprint — all live in `sprint.json` (`ledger[]`, `previousSprint`, `debt[]`).
 - Every write to `sprint.json` follows the Artifact Write Contract in `../../SKILL.md`.
 - The only files that exist per scope are `sprint.json` and the write-only `archive/` + `findings/`.

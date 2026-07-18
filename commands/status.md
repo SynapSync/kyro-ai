@@ -11,7 +11,7 @@ Report Kyro progress from the single source of truth.
 
 1. Read `.agents/kyro/kyro.json`.
 2. Resolve scope from `$ARGUMENTS`, `kyro.json.activeScope`, or `.agents/kyro/scopes/`.
-3. Read the scope's `sprint.json`. Everything needed for a report — `roadmap`, `ledger[]`, `activeSprint`, `debt[]`, `conventions[]`, `adrs[]`, `handoff` — is in that one file.
+3. For `brief` (or empty), read the lean scope pack `kyro context-pack --kyro-scope <scope> --json` — it carries `status`, `activeSprintSlug`, `nextAction`, `openDebtCount`, and `reviewPending`. Open the full `sprint.json` only for `full`/`debt` reports, which need `roadmap`/`ledger[]`/`activeSprint`/`debt[]`/`adrs[]` (see the Read Path Contract in `skills/sprint-forge/SKILL.md`).
 
 ## Route
 

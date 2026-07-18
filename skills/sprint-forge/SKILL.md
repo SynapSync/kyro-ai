@@ -28,18 +28,22 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task
 
 # Kyro Sprint Forge — Runtime Contract (v4)
 
-One scope = one `sprint.json`. Agents read `kyro.json` + the scope's `sprint.json`, then route on `handoff.nextAction`. No other agent-facing files.
+One scope = one `sprint.json`. Agents read `kyro.json` + the scope's lean pack, then route on `nextAction`. No other agent-facing files.
 
 ## Core Invariants
 
-1. `sprint.json` is the single source of truth. Two reads to start (`kyro.json` + `sprint.json`), one file to update per action.
-2. Route on `sprint.json.handoff.nextAction` — never infer state from file presence.
+1. `sprint.json` is the single source of truth; one file to update per action (read it via the pack — see Read Path Contract).
+2. Route on the pack's `nextAction` (mirrors `handoff.nextAction`); never infer from file presence.
 3. Generate one sprint; never pre-generate.
 4. Tasks are self-contained: every task carries `description`, `files_to_touch`, `context`, `acceptance_criteria`.
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
 6. Closing a sprint (snapshot-then-clear of `activeSprint`) is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
 7. Findings and archives are write-only evidence; agents never re-read them to route.
-8. **Admit unknowns, never guess.** Write `[NEEDS CLARIFICATION: <gap>]` instead of inventing, and route to `clarify`. `{{KYRO_CLI}} doctor`/`analyze` FAIL while any marker remains — a deterministic gate, not a suggestion.
+8. **Admit unknowns, never guess.** Write `[NEEDS CLARIFICATION: <gap>]` and route to `clarify`. `{{KYRO_CLI}} doctor`/`analyze` FAIL while any marker remains — a deterministic gate.
+
+## Read Path Contract (context-pack first) — MANDATORY
+
+The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open the full file only to write or in `plan_sprint`/`close_sprint`/status-full (invariant 7: never re-read `archive/`/`findings/`).
 
 ## Artifact Write Contract (MANDATORY)
 
@@ -51,11 +55,11 @@ NEVER partial/string-replace for structural changes (nulling `activeSprint`, rem
 
 ## Tool-owned operations (use the CLI, do not hand-roll)
 
-Irreversible or schema-critical operations are done deterministically by the CLI — never by hand:
+Irreversible or schema-critical operations are CLI-owned, never hand-rolled:
 
 | Command | What it owns |
 |---------|--------------|
-| `{{KYRO_CLI}} close-sprint --kyro-scope <scope> --outcome <...>` | Lossless close: publishes the immutable full-scope checkpoint first, retains the legacy ActiveSprint snapshot, renders the narrative, reconciles live state, and safely resumes matching retries. |
+| `{{KYRO_CLI}} close-sprint --kyro-scope <scope> --outcome <...>` | Lossless close: publishes the immutable checkpoint, snapshots the sprint into `ledger[]`, renders the narrative, reconciles state, and resumes matching retries. |
 | `{{KYRO_CLI}} doctor --artifacts --kyro-scope <scope>` | Validates shape drift, checkpoint state/digests/artifacts, legacy snapshots, and unresolved `[NEEDS CLARIFICATION]`. |
 | `{{KYRO_CLI}} analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, deps, debt, principles), severity-triaged; non-zero on CRITICAL/HIGH. Gate before close. |
 | `{{KYRO_CLI}} repair --kyro-scope <scope>` | Normalizes `sprint.json` formatting. |
@@ -94,8 +98,6 @@ Templates are loaded only immediately before writing their artifact.
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.checkpoint.json` | Versioned lossless scope checkpoint with before/intended-after state (write-only) |
 | `.agents/kyro/scopes/{scope}/findings/NN-slug.md` | INIT analysis evidence (write-only) |
-
-The only per-scope files are `sprint.json` and the write-only `archive/` + `findings/`.
 
 ## Boundaries
 

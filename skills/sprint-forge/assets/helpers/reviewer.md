@@ -29,7 +29,8 @@ Provides a structured quality checklist that runs after each sprint task complet
 
 ## Validation Commands
 
-The orchestrator uses these commands during the review step to validate (adapt to project stack):
+The orchestrator uses these commands to validate (adapt to project stack); keep them
+bounded — scope tests, cap searches:
 
 ```bash
 # Typecheck
@@ -39,15 +40,15 @@ npm run typecheck
 # Build
 npm run build
 
-# Tests and lint
+# Tests and lint — scope to the touched files, not the whole suite.
 # Run the target project's configured test/lint commands when they exist.
 # Examples: pytest, go test, dart test, flutter test, ruff, golangci-lint
 
-# Debug artifacts
-grep -rn "console\.log\|debugger\|print(" src/ --include="*.ts" --include="*.tsx"
+# Debug artifacts (capped)
+grep -rn "console\.log\|debugger\|print(" src/ --include="*.ts" | head -50
 
-# Secrets
-grep -rn "apikey\|api_key\|secret\|password\|token" src/ --include="*.ts" -i
+# Secrets (capped)
+grep -rn "apikey\|secret\|password\|token" src/ --include="*.ts" -i | head -50
 ```
 
 ## Output Format

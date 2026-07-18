@@ -131,17 +131,35 @@ function assertSelfReviewPolicy() {
   }
 }
 
-function assertReviewRequiresConfirmation() {
-  const root = sandbox();
-  try {
-    prepareDoneTask(root);
-    const before = sig(sprintPath(root));
-    const result = run(['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
-    assert(result.status === 1 && (result.stderr + result.stdout).includes('CONFIRMATION_REQUIRED'), 'review_task should require --yes by default');
-    const after = sig(sprintPath(root));
-    assert(before.bytes === after.bytes && before.mtimeMs === after.mtimeMs, 'unconfirmed review must not write');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
+function assertReviewConfirmationPolicy() {
+  // Default is tool_owned: per-task review is reversible and gated by the deterministic checker
+  // (coverage/evidence/self-review veto), so a pass must not need --yes. Requiring confirmation on
+  // every task only re-fires CONFIRMATION_REQUIRED in autonomous loops without adding real oversight.
+  {
+    const root = sandbox();
+    try {
+      prepareDoneTask(root);
+      const result = run(['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+      assert(result.status === 0, `review_task default (tool_owned) should pass without --yes: ${result.stdout}${result.stderr}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  // Opt-in confirm still works: a project that sets review_task=confirm in policy.json gets the gate
+  // back — an unconfirmed pass is blocked and writes nothing.
+  {
+    const root = sandbox();
+    try {
+      prepareDoneTask(root);
+      writePolicy(root, { policyVersion: 1, operations: { review_task: { level: 'confirm' } }, allow: [], maker_checker: { requireSeparateChecker: false } });
+      const before = sig(sprintPath(root));
+      const result = run(['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+      assert(result.status === 1 && (result.stderr + result.stdout).includes('CONFIRMATION_REQUIRED'), 'review_task=confirm should require --yes');
+      const after = sig(sprintPath(root));
+      assert(before.bytes === after.bytes && before.mtimeMs === after.mtimeMs, 'unconfirmed review must not write');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 }
 
@@ -162,7 +180,7 @@ function main() {
   assertHappyPathTraceAndCloseGate();
   assertEvidenceAndTimeChecks();
   assertSelfReviewPolicy();
-  assertReviewRequiresConfirmation();
+  assertReviewConfirmationPolicy();
   console.log('check:maker-checker — deterministic maker/checker invariants passed');
 }
 

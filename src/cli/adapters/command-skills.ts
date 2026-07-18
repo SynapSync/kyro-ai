@@ -44,14 +44,12 @@ function buildCommandSkill(command: KyroCommandName): string {
 function getCommandDescription(command: KyroCommandName): string {
   if (command === 'forge') return 'Run the Kyro forge workflow through the installed workspace harness';
   if (command === 'status') return 'Show Kyro project status through the installed workspace harness';
-  if (command === 'wrap-up') return 'Close the Kyro session through the installed workspace harness';
   if (command === 'idea') return 'Mature a rough or mature idea into an evidence-grounded, execution-ready pre-scope plan (optional)';
   if (command === 'qa') return 'Certify a scope\'s implementation and planning against its full specification (independent audit)';
   return 'Generate a fresh-context prompt for continuing Kyro work';
 }
 
 function getCommandTitle(command: KyroCommandName): string {
-  if (command === 'wrap-up') return 'Kyro Wrap-Up';
   if (command === 'task-context') return 'Kyro Task Context';
   if (command === 'idea') return 'Kyro Idea';
   if (command === 'qa') return 'Kyro QA';

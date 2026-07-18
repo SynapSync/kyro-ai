@@ -15,10 +15,10 @@ Kyro preserves quality by loading the smallest contract needed for the current l
 
 1. Read `.agents/kyro/kyro.json` if present.
 2. Resolve scope from user input, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
-3. Read the scope's `sprint.json` (the single source of truth). If absent, route to INIT.
-4. Load `skills/sprint-forge/SKILL.md`, then the single mode named by `sprint.json.handoff.nextAction`.
+3. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack: `nextAction`, `nextTaskId`, `reviewPending`, `conventions`, budget). Do not open the full `sprint.json` to route. No `sprint.json` → INIT.
+4. Load `skills/sprint-forge/SKILL.md`, then the single mode named by the pack's `nextAction`.
 
-`conventions[]` are already inside `sprint.json` — no extra read for learned rules.
+Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint`/status-full (see SKILL.md Read Path Contract).
 
 ## Routed Loading (route on `handoff.nextAction`)
 

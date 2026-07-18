@@ -46,7 +46,7 @@ kyro ›  INIT      analyzed the module, wrote objective + success criteria
 state ›  .agents/kyro/scopes/jwt-auth/sprint.json      ← single source of truth
 ```
 
-Everything the agent knows about that work — objective, roadmap, the active sprint, technical debt, conventions, and where to resume — lives in **one** `sprint.json`. Close a session with `/kyro:wrap-up`, come back tomorrow (or from a different agent), and it picks up exactly where it left off.
+Everything the agent knows about that work — objective, roadmap, the active sprint, technical debt, conventions, and where to resume — lives in **one** `sprint.json`. Come back tomorrow (or from a different agent), and it picks up exactly where it left off.
 
 ---
 
@@ -55,7 +55,7 @@ Everything the agent knows about that work — objective, roadmap, the active sp
 Under the hood, one install gives your agents:
 
 - a **managed core** with orchestrator, command, skill, and template instructions
-- **command-like skills** such as `kyro-forge`, `kyro-status`, `kyro-qa`, and `kyro-wrap-up`
+- **command-like skills** such as `kyro-forge`, `kyro-status`, and `kyro-qa`
 - **a single source of truth per scope** — one `sprint.json` holding objective, success criteria, roadmap, the active sprint, debt, conventions, and handoff routing
 - **lossless scope checkpoints** — every close preserves complete scope state before and after the transition, while retaining the legacy verbatim ActiveSprint snapshot
 - **deterministic CLI gates** (`doctor`, `analyze`) so quality is enforced in code, not left to prompt discipline
@@ -87,18 +87,17 @@ That's it. No prompt to paste, no workflow to explain.
 
 ## The commands
 
-Six slash commands, one job each. All are thin routers over `sprint.json` — they read structured state first, then load only what the current step needs.
+Five slash commands, one job each. All are thin routers over `sprint.json` — they read structured state first, then load only what the current step needs.
 
 | Command             | What it does                                                                 |
 | ------------------- | ---------------------------------------------------------------------------- |
 | `/kyro:forge`       | Full cycle: analyze → plan → execute → review → close, with a gate per phase  |
 | `/kyro:status`      | Progress bars, roadmap health, and technical-debt summary (`brief`/`full`/`debt`) |
-| `/kyro:wrap-up`     | Close the session, refresh handoff routing, preserve learnings               |
 | `/kyro:idea`        | **Optional** pre-scope step: mature a rough or developed idea into an evidence-grounded, execution-ready plan |
 | `/kyro:qa`          | **Independent certification audit**: validate scope implementation, architecture, security, testing, and planning against spec |
 | `/kyro:task-context`| Emit a copy-paste prompt to continue the work in a fresh context             |
 
-On hosts without slash commands, the CLI projects the equivalent skills `kyro-forge`, `kyro-status`, `kyro-wrap-up`, `kyro-task-context`, `kyro-idea`, and `kyro-qa` into `~/.agents/skills/`.
+On hosts without slash commands, the CLI projects the equivalent skills `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-idea`, and `kyro-qa` into `~/.agents/skills/`.
 
 ---
 
@@ -172,7 +171,6 @@ The README is the 30-second tour. Everything deep lives in `docs/`:
 | [Portable Guardrails](docs/guardrails.md)        | Policy enforcement across CLI and MCP surfaces           |
 | [Maker/Checker Boundary](docs/maker-checker.md)  | Tool-owned task review and evidence/verdict contracts    |
 | [Spec Traceability](docs/spec-traceability.md)   | Requirement → Scenario → Task traceability               |
-| [Rules Guide](docs/rules-guide.md)               | Persistent learning rules                                |
 | [Programmatic Usage](docs/programmatic-usage.md) | Using Kyro instructions from custom LLM apps             |
 | [Release Checklist](docs/release-checklist.md)   | Maintainer release and CI gate ordering                  |
 

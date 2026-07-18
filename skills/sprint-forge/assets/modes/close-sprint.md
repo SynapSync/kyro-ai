@@ -37,6 +37,15 @@ The command publishes `sprint-NNN-slug.checkpoint.json` first, then the legacy `
 
 Use `--dry-run` first if you want to review the plan. Do not replicate this by hand.
 
+## Hand off for a fresh session
+
+After the CLI reports `Next action: plan_sprint` (sprints remain), the next sprint must start
+in a **fresh session** — continuing here carries the whole session's context, the biggest cost
+driver across a multi-sprint run. Do NOT auto-start the next sprint now. Generate the
+continuation prompt via the task-context capability (`/kyro:task-context`, or the
+`kyro-task-context` skill) and present it in a fenced block for the user to paste into a new
+session. When the CLI reports `Next action: wrap_up`, the scope is complete — no more sprints to plan.
+
 ## Rules
 
 - Checkpoint, legacy snapshot, clear, and narrative rendering are the CLI's job. The checkpoint is the complete recovery record; the legacy JSON contains only `activeSprint`; the `.md` is human-readable; `ledger[]` indexes all three.

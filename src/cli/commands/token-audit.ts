@@ -317,13 +317,6 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       forbiddenFiles: ['skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/helpers/sprint-generator.md'],
     },
     {
-      name: 'runtime path: kyro-wrap-up',
-      budget: TOKEN_BUDGET.runtimeForgeCloseTokens,
-      projectedSkill: 'wrap-up',
-      files: ['commands/wrap-up.md', 'agents/orchestrator.md', 'skills/sprint-forge/SKILL.md', 'skills/sprint-forge/assets/helpers/handoff.md'],
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md'],
-    },
-    {
       name: 'runtime path: kyro-idea',
       budget: TOKEN_BUDGET.runtimeIdeaTokens,
       projectedSkill: 'idea',
@@ -356,7 +349,7 @@ function heaviestAnalysisHelperPath(): string | null {
 function weightProjectedCommandSkill(command: CommandName): WeightedFile {
   const managedPath = `${AGENT_SKILLS_ROOT}/kyro-${command}/SKILL.md`;
   if (existsSync(resolveManagedPath(managedPath))) return weightManagedFile(managedPath);
-  const title = command === 'wrap-up' ? 'Kyro Wrap-Up' : command === 'task-context' ? 'Kyro Task Context' : `Kyro ${command}`;
+  const title = command === 'task-context' ? 'Kyro Task Context' : `Kyro ${command}`;
   const text = `---\nname: kyro-${command}\ndescription: Kyro command stub\n---\n# ${title}\nRead the Kyro command router, then load only the files requested by that router. Do not ask the user to restate the workflow.`;
   return buildWeightedFile(`projected:${command}`, text);
 }
