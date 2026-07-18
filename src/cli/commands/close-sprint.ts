@@ -124,7 +124,7 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
     if (handoff.note) console.log(`    note:        ${handoff.note}`);
   } else if (handoff.nextAction === 'wrap_up') {
     console.log('');
-    console.log('▶ Scope objective met — no sprints remain. Close out with /kyro:wrap-up (or the kyro-wrap-up skill).');
+    console.log('▶ Scope objective met — no sprints remain. This scope is complete.');
   }
 }
 

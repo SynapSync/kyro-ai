@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.23.0] - 2026-07-18
+
+### Removed
+
+- The `/kyro:wrap-up` command (projected skill `kyro-wrap-up`) is removed. Its only unique job was writing a resume note into `sprint.json.handoff`, which is already covered: `close-sprint` refreshes the handoff at every sprint boundary, `/kyro:task-context` regenerates a resume prompt from live state on demand, and `review`/`execute` keep `nextAction`/`nextTaskId` current. Dropping it removes a redundant command surface and the naming collision with the `wrap_up` routing state. Command count is now 5. **The `wrap_up` `nextAction` routing state is unchanged** — closing the last sprint of a scope still routes there.
+
 ## [4.22.0] - 2026-07-18
 
 ### Added

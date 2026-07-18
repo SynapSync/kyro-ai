@@ -1,6 +1,6 @@
 # Commands Reference
 
-Kyro provides 6 slash commands. Five are thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. `/kyro:idea` is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid. `/kyro:qa` is an independent **certification audit** that can be run anytime to validate a scope against its specification, standing outside the forge gate lifecycle.
+Kyro provides 5 slash commands, most of them thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. `/kyro:idea` is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid. `/kyro:qa` is an independent **certification audit** that can be run anytime to validate a scope against its specification, standing outside the forge gate lifecycle.
 
 ## Cost-Aware Routing
 
@@ -166,14 +166,6 @@ The status command reads structured state first:
 - `{scope}/sprint.json` for roadmap, active sprint progress, and debt
 
 All metrics come directly from `sprint.json` fields — there are no separate summary files to keep in sync.
-
----
-
-## /kyro:wrap-up
-
-**Close the current session and refresh `sprint.json.handoff`.**
-
-Reads `.agents/kyro/kyro.json`, resolves the active scope, audits workspace changes, and updates `handoff.nextAction`, `handoff.nextTaskId`, blockers, and the resume note. It asks before commits or user-owned rewrites.
 
 ---
 

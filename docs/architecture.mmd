@@ -2,7 +2,6 @@ flowchart TD
     USER["User command"]
     FORGE["/kyro:forge"]
     STATUS["/kyro:status"]
-    WRAP["/kyro:wrap-up"]
     ORCH["orchestrator agent"]
     SPRINT["sprint-forge skill"]
     QA["qa-review skill"]
@@ -11,9 +10,7 @@ flowchart TD
 
     USER --> FORGE
     USER --> STATUS
-    USER --> WRAP
     FORGE --> ORCH
-    WRAP --> ORCH
     STATUS --> SCOPE
     ORCH --> SPRINT
     ORCH --> QA

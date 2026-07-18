@@ -64,7 +64,7 @@ function run(root) {
     const out = res.stdout + res.stderr;
     assert(res.status === 0, `happy close should succeed: ${out}`);
     assert(out.includes('Next action: wrap_up'), `expected wrap_up next action: ${out}`);
-    assert(out.includes('Scope objective met'), `expected wrap-up pointer: ${out}`);
+    assert(out.includes('Scope objective met'), `expected scope-complete message: ${out}`);
     assert(!out.includes('FRESH session'), `fresh-session nudge must not appear on wrap_up: ${out}`);
   } finally {
     rmSync(root, { recursive: true, force: true });

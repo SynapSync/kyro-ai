@@ -113,7 +113,6 @@ Global command skills are installed for agent discovery:
 ~/.agents/skills/
 ├── kyro-forge/SKILL.md
 ├── kyro-status/SKILL.md
-├── kyro-wrap-up/SKILL.md
 ├── kyro-task-context/SKILL.md
 └── kyro-idea/SKILL.md
 ```
@@ -161,7 +160,6 @@ Projected skills:
 
 - `kyro-forge`
 - `kyro-status`
-- `kyro-wrap-up`
 - `kyro-task-context`
 - `kyro-idea`
 
@@ -220,7 +218,7 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - mode file <= 900 words
 - INIT mode <= 500 words
 - each analysis helper <= 450 words
-- startup, status brief, INIT happy path, and realistic forge/status/wrap-up runtime paths stay under estimated token budgets
+- startup, status brief, INIT happy path, and realistic forge/status runtime paths stay under estimated token budgets
 - forbidden eager helper combinations fail the audit
 - `sizingDecision` regression fixture stays internally consistent
 

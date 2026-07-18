@@ -102,7 +102,7 @@ every validation point.
 
 ## Handoff Routing
 
-`sprint.json.handoff` is Kyro's primary defense against context loss between sprints. It is updated at INIT, sprint close, and wrap-up — not after every task.
+`sprint.json.handoff` is Kyro's primary defense against context loss between sprints. It is updated at INIT and sprint close — not after every task.
 
 - Current sprint number and status
 - `nextAction` — the mode the next session should route into
