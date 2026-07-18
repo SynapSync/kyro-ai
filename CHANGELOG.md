@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.24.0] - 2026-07-18
+
+### Removed
+
+- Deleted a pre-v4 legacy documentation subsystem that nothing in the current workflow loads or references: `contexts/` (old context-mode files), `rules/` (pre-v4 rule files, superseded by JSON `conventions[]`/`principles[]` and the runtime `.agents/kyro/scopes/rules.md`), `templates/split-claude-md/` (unused CLAUDE.md-splitting templates), `docs/rules-guide.md`, and the orphaned `skills/sprint-forge/assets/modes/analyze.md` mode doc (the `analyze` step is a CLI command, not a loaded mode). Removed the now-empty `rules`/`contexts`/`templates` entries from the npm `files[]` and the README link to the rules guide. No runtime behavior changes; the `wrap_up` routing and all live modes/helpers/protocols are unaffected.
+
 ## [4.23.0] - 2026-07-18
 
 ### Removed

@@ -1,6 +1,6 @@
 {
   "name": "kyro-ai",
-  "version": "4.23.0",
+  "version": "4.24.0",
   "description": "Portable sprint workflow kit for AI coding agents, with markdown artifacts, adapter guides, formal debt tracking, and evidence-grounded idea maturation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -87,9 +87,6 @@
     "scripts",
     "fixtures",
     "docs",
-    "rules",
-    "contexts",
-    "templates",
     "config.json",
     "WORKFLOW.yaml",
     ".claude-plugin",

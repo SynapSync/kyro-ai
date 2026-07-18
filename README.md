@@ -171,7 +171,6 @@ The README is the 30-second tour. Everything deep lives in `docs/`:
 | [Portable Guardrails](docs/guardrails.md)        | Policy enforcement across CLI and MCP surfaces           |
 | [Maker/Checker Boundary](docs/maker-checker.md)  | Tool-owned task review and evidence/verdict contracts    |
 | [Spec Traceability](docs/spec-traceability.md)   | Requirement → Scenario → Task traceability               |
-| [Rules Guide](docs/rules-guide.md)               | Persistent learning rules                                |
 | [Programmatic Usage](docs/programmatic-usage.md) | Using Kyro instructions from custom LLM apps             |
 | [Release Checklist](docs/release-checklist.md)   | Maintainer release and CI gate ordering                  |
 
