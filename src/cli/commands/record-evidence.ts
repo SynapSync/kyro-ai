@@ -4,6 +4,7 @@ import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import { deriveActiveSprintStatus, derivePhaseStatus } from '../core/status';
 import { KyroCoreError } from '../core/errors';
+import { countClarificationMarkers } from '../core/analysis';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import type { OperationPlan, SprintFile, Task, TaskEvidence } from '../types';
@@ -75,6 +76,14 @@ export function buildRecordEvidencePlan(scope: string, args: RecordEvidenceArgs)
   if (!sprint || !sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint.`);
   const located = locateTask(sprint, args.taskId);
   if (!located) throw new KyroCoreError('TASK_NOT_FOUND', `Task not found: ${args.taskId}`, 'Run kyro context-pack --json to inspect the active sprint tasks.');
+  const markers = countClarificationMarkers(sprint);
+  if (markers > 0) {
+    throw new KyroCoreError(
+      'CLARIFICATION_REQUIRED',
+      `Cannot record evidence: sprint.json has ${markers} unresolved [NEEDS CLARIFICATION] marker(s).`,
+      'Resolve them in the clarify mode (set handoff.nextAction to "clarify", answer each marker, remove it) before executing — do not guess.',
+    );
+  }
 
   const recordedAt = new Date().toISOString();
   const evidence: TaskEvidence = {

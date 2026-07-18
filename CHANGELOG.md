@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.26.0] - 2026-07-18
+
+### Added
+
+- Portable clarification gate: `kyro record-evidence` and `kyro review` now fail with `CLARIFICATION_REQUIRED` while `sprint.json` still contains unresolved `[NEEDS CLARIFICATION]` markers. The deterministic marker check already existed but only ran at the close gate; moving it into the two execute-phase CLI commands (which run on every agent host) blocks execution the moment it starts with unresolved unknowns, instead of surfacing them late at close. This is portable — no host-specific hook.
+
 ## [4.25.0] - 2026-07-18
 
 ### Added

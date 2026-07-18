@@ -72,7 +72,7 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
       add(severity, 'principle', `principle ${p.id} violated (${p.rule})`, `Satisfy the principle or amend it explicitly. Rationale: ${p.rationale}`);
     }
   }
-  const markers = (JSON.stringify(sprint).match(/\[NEEDS CLARIFICATION/g) ?? []).length;
+  const markers = countClarificationMarkers(sprint);
   if (markers > 0) add('CRITICAL', 'clarity', `${markers} unresolved [NEEDS CLARIFICATION] marker(s)`, 'Resolve via the clarify mode before planning/executing.');
   const active = sprint.activeSprint;
   if (active) {
@@ -118,6 +118,10 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
   }
   if (!Array.isArray(sprint.successCriteria) || sprint.successCriteria.length === 0) add('MEDIUM', 'spec', 'scope has no successCriteria', 'Add 2–5 technology-agnostic, measurable outcomes (see INIT).');
   return out.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+}
+
+export function countClarificationMarkers(sprint: SprintFile): number {
+  return (JSON.stringify(sprint).match(/\[NEEDS CLARIFICATION/g) ?? []).length;
 }
 
 export function collectSpecFindings(sprint: SprintFile): AnalysisFinding[] {
