@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.27.0] - 2026-07-19
+
+### Added
+
+- `kyro plan --from <file>` — tool-owned scope bootstrap (init mode). The planning phase previously had no CLI write path: the agent hand-authored the whole fat `sprint.json` per the INIT contract (read→parse→mutate→write the monolith, ~63% of which is static spec/roadmap). `kyro plan` takes a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap`) and materializes the full validated v4 `sprint.json` (`activeSprint: null`) plus registers the scope in `kyro.json` — so the agent writes only the essential fields and never touches the full document by hand. It refuses with `SCOPE_ALREADY_INITIALIZED` rather than overwrite an initialized scope, allows `[NEEDS CLARIFICATION]` markers at planning (routing `handoff.nextAction` to `clarify`) without the execute-phase block, and is portable — any host driving the CLI gets a deterministic, schema-owned bootstrap. Per-sprint `activeSprint` materialization is a later increment; INIT mode's guidance now points at this command with the hand-write contract kept as fallback.
+
 ## [4.26.2] - 2026-07-19
 
 ### Fixed

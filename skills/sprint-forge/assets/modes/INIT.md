@@ -55,6 +55,8 @@ Load `../templates/sprint.json`. Fill:
 
 **Plan-grade Seedbed mapping:** when a matured-idea document is referenced, load `../helpers/seedbed-init-mapping.md` and apply its exact schema-safe mapping. Account for every material item before writing. Do not load this helper on the normal one-line INIT path.
 
+Preferred: write a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap`) and run `{{KYRO_CLI}} plan --from <file>` — tool-owned and validated, it materializes `sprint.json` and registers `kyro.json` for you (skip to Step 6's verification only). Fallback: hand-write the document.
+
 Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`: read the current target when present, serialize the complete v4 document, write atomically, then re-read and parse it before continuing. Create `archive/` and `findings/` beside it. Do not update `kyro.json` until this verification succeeds.
 
 ## Step 6 — Update kyro.json

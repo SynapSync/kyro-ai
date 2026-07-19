@@ -19,6 +19,7 @@ export type KyroErrorCode =
   | 'UNKNOWN_TOOL'
   | 'NO_ACTIVE_SPRINT'
   | 'TASK_NOT_FOUND'
+  | 'SCOPE_ALREADY_INITIALIZED'
   | 'INTERNAL';
 
 export class KyroCoreError extends Error {

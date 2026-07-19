@@ -368,6 +368,33 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 `kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. See [maker-checker.md](maker-checker.md).
 
+## Tool-owned scope bootstrap (init mode)
+
+`kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]` materializes a scope's initial `sprint.json` (spec + roadmap, `activeSprint: null`) from a compact lean plan JSON file, instead of the agent hand-authoring the full v4 document. Init mode only — it refuses with `SCOPE_ALREADY_INITIALIZED` if the scope already has a `sprint.json`, and never overwrites. It also registers the scope in `kyro.json.scopes[]` (and sets `activeScope` if unset). `[NEEDS CLARIFICATION]` markers are allowed here (INIT legitimately writes them and routes `handoff.nextAction` to `clarify`); this is separate from the O5 clarification gate on execute-phase commands.
+
+Lean plan file shape:
+
+```json
+{
+  "scope": "kebab-case-scope",
+  "title": "Human title",
+  "objective": "One sentence.",
+  "successCriteria": ["...", "..."],
+  "spec": {
+    "requirements": [{ "id": "R1", "statement": "...", "priority": "must", "rationale": "..." }],
+    "nonGoals": ["..."],
+    "openQuestions": ["..."]
+  },
+  "roadmap": {
+    "plannedSprintCount": 2,
+    "sizingRationale": "...",
+    "sprints": [{ "n": 1, "slug": "...", "title": "..." }]
+  }
+}
+```
+
+`scope` may be omitted from the file if `--kyro-scope` is given (and vice versa); if both are present they must agree. `spec` is optional; missing sub-arrays default to `[]`. `spec.scenarios` is never read from this file — INIT always writes `scenarios: []` (the plan-sprint workflow adds scenarios later). Every `roadmap.sprints[]` entry needs `n`, `slug`, `title`; `roadmap.plannedSprintCount` must equal `roadmap.sprints.length`.
+
 ## Spec traceability
 
 `kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces requirements for scope packs and resolved scenarios for task packs. See [spec-traceability.md](spec-traceability.md).
