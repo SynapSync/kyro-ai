@@ -1,10 +1,14 @@
 #!/usr/bin/env node
-// Verifies `kyro plan --from <file>` (init mode): it materializes a scope's initial sprint.json
-// (spec + roadmap, activeSprint: null) from a compact lean plan JSON file — tool-owned and
-// validated, so the agent never hand-writes the full v4 sprint.json for INIT. Covers the happy
-// path, the [NEEDS CLARIFICATION] routing (allowed here, unlike execute-phase commands), the
-// SCOPE_ALREADY_INITIALIZED refusal (no overwrite), input validation, scope-mismatch rejection,
-// and --dry-run.
+// Verifies `kyro plan --from <file>`, both modes — tool-owned and validated, so the agent never
+// hand-writes the full v4 sprint.json. Mode is auto-detected from scope state, not file shape:
+//   - init mode (no sprint.json yet): materializes a scope's initial sprint.json (spec + roadmap,
+//     activeSprint: null). Covers the happy path, [NEEDS CLARIFICATION] routing (allowed here,
+//     unlike execute-phase commands), SCOPE_ALREADY_INITIALIZED-shaped refusal on replay (no
+//     overwrite — see case 3), input validation, scope-mismatch rejection, and --dry-run.
+//   - sprint mode (sprint.json ready to plan: activeSprint null, handoff.nextAction plan_sprint):
+//     materializes the next activeSprint from a lean sprint-plan file. Covers the happy path,
+//     marker routing to clarify, SPRINT_ALREADY_ACTIVE refusal, wrong sprint.n, bad depends_on /
+//     scenario_refs references, and --dry-run.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -93,6 +97,48 @@ function writeLeanPlan(root, data, name = 'lean-plan.json') {
   return path;
 }
 
+function validLeanSprintPlan(overrides = {}) {
+  return {
+    sprint: { n: 1, slug: 'foundation', title: 'Foundation', objective: 'Ship the foundation.' },
+    phases: [
+      {
+        id: 'P1',
+        title: 'Phase 1',
+        objective: 'Build the core.',
+        tasks: [
+          {
+            id: 'T1.1',
+            title: 'Task 1',
+            description: 'Do the thing.',
+            files_to_touch: ['src/x.ts'],
+            context: 'Context for the task.',
+            acceptance_criteria: ['It works.'],
+            depends_on: [],
+            scenario_refs: [],
+          },
+        ],
+      },
+    ],
+    definitionOfDone: ['All tasks done.'],
+    scenarios: [],
+    ...overrides,
+  };
+}
+
+function writeLeanSprintPlan(root, data, name = 'lean-sprint.json') {
+  const path = join(root, name);
+  writeFileSync(path, JSON.stringify(data, null, 2));
+  return path;
+}
+
+// Bootstraps a scope into the "ready to plan Sprint 1" state (sprint.json exists, activeSprint:
+// null, handoff.nextAction: plan_sprint) so sprint-mode cases can start from there.
+function initScope(root, scope = 'demo-scope') {
+  const leanPath = writeLeanPlan(root, validLeanPlan({ scope }));
+  const result = run(['plan', '--from', leanPath], root);
+  assert(result.status === 0, `init (sprint-mode setup) should succeed: ${result.stdout}${result.stderr}`);
+}
+
 // 1) Happy path: materializes sprint.json (spec + roadmap, activeSprint: null), routes to
 //    plan_sprint, registers the scope in kyro.json, and the result passes doctor + analyze clean.
 {
@@ -145,8 +191,11 @@ function writeLeanPlan(root, data, name = 'lean-plan.json') {
   }
 }
 
-// 3) Already initialized: re-running plan on the same scope refuses with SCOPE_ALREADY_INITIALIZED
-//    and never touches the existing sprint.json.
+// 3) Already initialized: mode is auto-detected from scope state, not file shape. Once a scope has a
+//    sprint.json ready to plan (nextAction: plan_sprint, activeSprint: null), re-running plan routes
+//    to SPRINT MODE regardless of the file passed — so replaying the same init-shaped lean file now
+//    fails INVALID_INPUT (it isn't a valid lean sprint plan: no "sprint" object), not
+//    SCOPE_ALREADY_INITIALIZED. Either way, sprint.json is never touched by the refused second call.
 {
   const root = sandbox();
   try {
@@ -157,7 +206,7 @@ function writeLeanPlan(root, data, name = 'lean-plan.json') {
 
     const second = run(['plan', '--from', leanPath], root);
     assert(second.status === 1, 'second plan on the same scope should fail');
-    assert((second.stderr + second.stdout).includes('SCOPE_ALREADY_INITIALIZED'), `should report SCOPE_ALREADY_INITIALIZED: ${second.stdout}${second.stderr}`);
+    assert((second.stderr + second.stdout).includes('INVALID_INPUT'), `should report INVALID_INPUT (routed to sprint mode): ${second.stdout}${second.stderr}`);
 
     const after = readFileSync(sprintPath(root, 'demo-scope'), 'utf-8');
     assert(before === after, 'sprint.json must be byte-identical after the refused re-init');
@@ -227,4 +276,207 @@ function writeLeanPlan(root, data, name = 'lean-plan.json') {
   }
 }
 
-console.log('check:plan — tool-owned scope init (kyro plan --from) verified end-to-end');
+// --- sprint mode ---
+
+// 7) Sprint mode happy path: init a scope, then materialize Sprint 1 from a lean sprint-plan file.
+{
+  const root = sandbox();
+  try {
+    initScope(root);
+    const leanPath = writeLeanSprintPlan(root, validLeanSprintPlan());
+    const result = run(['plan', '--from', leanPath, '--kyro-scope', 'demo-scope'], root);
+    assert(result.status === 0, `sprint plan should succeed: ${result.stdout}${result.stderr}`);
+
+    const sprint = readSprint(root, 'demo-scope');
+    assert(sprint.activeSprint !== null, 'activeSprint must be non-null after sprint mode');
+    assert(sprint.activeSprint.status === 'planned', `activeSprint.status should be derived "planned", got ${sprint.activeSprint.status}`);
+    const tasks = sprint.activeSprint.phases.flatMap((phase) => phase.tasks);
+    assert(tasks.length === 1 && tasks[0].id === 'T1.1', 'should materialize the one input task');
+    assert(tasks.every((t) => t.status === 'pending' && t.evidence === null && t.verdict === null), 'all tasks should be pending/evidence null/verdict null');
+    assert(sprint.handoff.nextAction === 'execute_task', `nextAction should be execute_task, got ${sprint.handoff.nextAction}`);
+    assert(sprint.handoff.nextTaskId === 'T1.1', `nextTaskId should be the first task, got ${sprint.handoff.nextTaskId}`);
+    const roadmapEntry = sprint.roadmap.sprints.find((s) => s.n === 1);
+    assert(roadmapEntry && roadmapEntry.state === 'active', `roadmap sprint 1 state should be active, got ${roadmapEntry && roadmapEntry.state}`);
+
+    // Sprint mode reconciles the kyro.json status cache so the artifact is fully coherent — no stale
+    // status finding. Without reconciliation this would be a guaranteed MEDIUM on every sprint-mode run.
+    const kyroJson = readKyroJson(root);
+    assert(kyroJson.scopes.find((entry) => entry.id === 'demo-scope').status === 'active', `kyro.json scope status should reconcile to "active", got ${kyroJson.scopes.find((entry) => entry.id === 'demo-scope').status}`);
+
+    const analyzeResult = run(['analyze', '--kyro-scope', 'demo-scope'], root);
+    assert(analyzeResult.status === 0, `analyze should show no CRITICAL/HIGH findings: ${analyzeResult.stdout}${analyzeResult.stderr}`);
+    assert(!analyzeResult.stdout.includes('[CRITICAL]') && !analyzeResult.stdout.includes('[HIGH]'), `analyze output unexpectedly has a CRITICAL/HIGH finding: ${analyzeResult.stdout}`);
+    // The reconciliation fix specifically removes the kyro.json stale-status coherence finding.
+    assert(!analyzeResult.stdout.includes('is stale'), `sprint mode should not leave a stale kyro.json status finding: ${analyzeResult.stdout}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 8) A [NEEDS CLARIFICATION] marker in a sprint-mode task routes handoff.nextAction to "clarify".
+{
+  const root = sandbox();
+  try {
+    initScope(root);
+    const leanPath = writeLeanSprintPlan(root, validLeanSprintPlan({
+      phases: [
+        {
+          id: 'P1',
+          title: 'Phase 1',
+          objective: 'Build the core.',
+          tasks: [
+            {
+              id: 'T1.1',
+              title: 'Task 1',
+              description: 'Do the thing [NEEDS CLARIFICATION: which api?].',
+              files_to_touch: [],
+              context: 'ctx',
+              acceptance_criteria: ['It works.'],
+              depends_on: [],
+              scenario_refs: [],
+            },
+          ],
+        },
+      ],
+    }));
+    const result = run(['plan', '--from', leanPath, '--kyro-scope', 'demo-scope'], root);
+    assert(result.status === 0, `sprint plan with a marker should still succeed: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'demo-scope');
+    assert(sprint.handoff.nextAction === 'clarify', `nextAction should be clarify, got ${sprint.handoff.nextAction}`);
+    assert(sprint.handoff.nextTaskId === null, 'nextTaskId should be null when routed to clarify');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 9) Active sprint present: running sprint mode a second time fails SPRINT_ALREADY_ACTIVE and
+//    leaves sprint.json byte-identical.
+{
+  const root = sandbox();
+  try {
+    initScope(root);
+    const leanPath = writeLeanSprintPlan(root, validLeanSprintPlan());
+    const first = run(['plan', '--from', leanPath, '--kyro-scope', 'demo-scope'], root);
+    assert(first.status === 0, `first sprint plan should succeed: ${first.stdout}${first.stderr}`);
+    const before = readFileSync(sprintPath(root, 'demo-scope'), 'utf-8');
+
+    const second = run(['plan', '--from', leanPath, '--kyro-scope', 'demo-scope'], root);
+    assert(second.status === 1, 'second sprint plan call should fail');
+    assert((second.stderr + second.stdout).includes('SPRINT_ALREADY_ACTIVE'), `should report SPRINT_ALREADY_ACTIVE: ${second.stdout}${second.stderr}`);
+
+    const after = readFileSync(sprintPath(root, 'demo-scope'), 'utf-8');
+    assert(before === after, 'sprint.json must be byte-identical after the refused second sprint plan');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 10) Wrong N: sprint.n not equal to the expected next number (1, empty ledger) fails INVALID_INPUT,
+//     nothing written.
+{
+  const root = sandbox();
+  try {
+    initScope(root);
+    const leanPath = writeLeanSprintPlan(root, validLeanSprintPlan({ sprint: { n: 2, slug: 'foundation', title: 'Foundation', objective: 'Ship the foundation.' } }));
+    const result = run(['plan', '--from', leanPath, '--kyro-scope', 'demo-scope'], root);
+    assert(result.status === 1, 'wrong sprint.n should fail');
+    assert((result.stderr + result.stdout).includes('INVALID_INPUT'), `should report INVALID_INPUT: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'demo-scope');
+    assert(sprint.activeSprint === null, 'activeSprint must remain null after the refused wrong-N plan');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 11) Bad depends_on: a task depends_on a task id that does not exist in the sprint fails
+//     INVALID_INPUT, nothing written.
+{
+  const root = sandbox();
+  try {
+    initScope(root);
+    const leanPath = writeLeanSprintPlan(root, validLeanSprintPlan({
+      phases: [
+        {
+          id: 'P1',
+          title: 'Phase 1',
+          objective: 'Build the core.',
+          tasks: [
+            {
+              id: 'T1.1',
+              title: 'Task 1',
+              description: 'Do the thing.',
+              files_to_touch: [],
+              context: 'ctx',
+              acceptance_criteria: ['It works.'],
+              depends_on: ['T9.9'],
+              scenario_refs: [],
+            },
+          ],
+        },
+      ],
+    }));
+    const result = run(['plan', '--from', leanPath, '--kyro-scope', 'demo-scope'], root);
+    assert(result.status === 1, 'bad depends_on should fail');
+    assert((result.stderr + result.stdout).includes('INVALID_INPUT'), `should report INVALID_INPUT: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'demo-scope');
+    assert(sprint.activeSprint === null, 'activeSprint must remain null after the refused bad-depends_on plan');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 12) Bad scenario_refs: a task scenario_refs a scenario id that does not exist (neither in
+//     spec.scenarios nor this file's scenarios) fails INVALID_INPUT, nothing written.
+{
+  const root = sandbox();
+  try {
+    initScope(root);
+    const leanPath = writeLeanSprintPlan(root, validLeanSprintPlan({
+      phases: [
+        {
+          id: 'P1',
+          title: 'Phase 1',
+          objective: 'Build the core.',
+          tasks: [
+            {
+              id: 'T1.1',
+              title: 'Task 1',
+              description: 'Do the thing.',
+              files_to_touch: [],
+              context: 'ctx',
+              acceptance_criteria: ['It works.'],
+              depends_on: [],
+              scenario_refs: ['S404'],
+            },
+          ],
+        },
+      ],
+    }));
+    const result = run(['plan', '--from', leanPath, '--kyro-scope', 'demo-scope'], root);
+    assert(result.status === 1, 'bad scenario_refs should fail');
+    assert((result.stderr + result.stdout).includes('INVALID_INPUT'), `should report INVALID_INPUT: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'demo-scope');
+    assert(sprint.activeSprint === null, 'activeSprint must remain null after the refused bad-scenario_refs plan');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 13) --dry-run in sprint mode prints a plan and writes nothing.
+{
+  const root = sandbox();
+  try {
+    initScope(root);
+    const leanPath = writeLeanSprintPlan(root, validLeanSprintPlan());
+    const before = readFileSync(sprintPath(root, 'demo-scope'), 'utf-8');
+    const result = run(['plan', '--from', leanPath, '--kyro-scope', 'demo-scope', '--dry-run'], root);
+    assert(result.status === 0, `sprint dry-run should succeed: ${result.stdout}${result.stderr}`);
+    assert(result.stdout.includes('write'), 'dry-run should print the write operation plan');
+    const after = readFileSync(sprintPath(root, 'demo-scope'), 'utf-8');
+    assert(before === after, 'dry-run must not mutate sprint.json');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+console.log('check:plan — tool-owned scope bootstrap (init) and sprint materialization (sprint) verified end-to-end');

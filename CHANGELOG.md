@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.28.0] - 2026-07-19
+
+### Added
+
+- `kyro plan --from <file>` now has a **sprint mode** (increment 2 of the tool-owned planning path). The command auto-detects mode from scope state: no `sprint.json` → init/bootstrap (unchanged); an initialized scope with `activeSprint: null` and `handoff.nextAction: "plan_sprint"` → sprint mode, which materializes the next `activeSprint` from a compact lean sprint-plan file (`sprint`, `phases`/`tasks`, `definitionOfDone`, optional `scenarios`). It expands each task to `status: "pending"` / `evidence: null` / `verdict: null`, derives `activeSprint.status` (`"planned"` for an all-pending sprint — never hardcodes `"executing"`, which the hand-write path did and which tripped an analyze coherence finding), merges scenarios into `spec.scenarios` by id, flips the matching `roadmap.sprints[]` entry to `state: "active"`, wires `handoff` to `execute_task` (or `clarify` when `[NEEDS CLARIFICATION]` markers are present), and reconciles the `kyro.json` scope-status cache so the written artifact is fully coherent (zero stale-status findings). It refuses with `SPRINT_ALREADY_ACTIVE` when a sprint is already active and `NOT_READY_TO_PLAN` when the handoff is not `plan_sprint`. Validates `sprint.n` against the expected next number (ledger max + 1), unique task/phase ids, and `depends_on`/`scenario_refs` referential integrity.
+
 ## [4.27.0] - 2026-07-19
 
 ### Added

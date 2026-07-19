@@ -14,7 +14,7 @@ Usage:
   kyro doctor                  Check package/workspace health
   kyro analyze [options]       Semantic cross-check of a scope (clarity, coverage, deps, debt)
   kyro record-evidence <task>  Tool-owned maker evidence write (sets status, routes to review)
-  kyro plan --from <file>      Tool-owned scope bootstrap (init mode) from a lean plan JSON file
+  kyro plan --from <file>      Tool-owned scope bootstrap (init) or next-sprint materialization (sprint)
   kyro review <task> [options] Tool-owned maker/checker verdict write
   kyro repair [options]        Validate and normalize a scope's sprint.json
   kyro status [mode]           Read-only scope progress, review debt, and debt report
@@ -81,7 +81,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'record-evidence') {
     console.log('Usage: kyro record-evidence <task> [--kyro-scope <scope>] --summary <text> --validation <text> [--validation <text> ...] [--file <path> ...] [--notes <text>] [--by <actor>] [--status done|blocked] [--dry-run]');
   } else if (command === 'plan') {
-    console.log('Usage: kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]');
+    console.log('Usage: kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]  (mode auto-detected: init when the scope has no sprint.json, sprint when it is ready to plan its next sprint; run kyro plan --help for both file shapes)');
   } else if (command === 'review') {
     console.log('Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes]');
   } else if (command === 'close-sprint') {

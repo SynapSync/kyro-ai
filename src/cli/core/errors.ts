@@ -20,6 +20,8 @@ export type KyroErrorCode =
   | 'NO_ACTIVE_SPRINT'
   | 'TASK_NOT_FOUND'
   | 'SCOPE_ALREADY_INITIALIZED'
+  | 'SPRINT_ALREADY_ACTIVE'
+  | 'NOT_READY_TO_PLAN'
   | 'INTERNAL';
 
 export class KyroCoreError extends Error {
