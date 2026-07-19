@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.30.0] - 2026-07-19
+
+### Added
+
+- `kyro add-emergent` — tool-owned append of an emergent task to `activeSprint.emergentTasks[]`, so the agent no longer hand-edits the full sprint file to record required work discovered mid-sprint. Takes `--title`, `--description`, one or more `--acceptance` (a task needs acceptance criteria), optional `--file`/`--context`/`--depends-on`. The new task gets a fresh sequential id (`E1`, `E2`, …), `status: pending`, `evidence: null`, `verdict: null`, so `kyro record-evidence` and `kyro review` then operate on it like any planned task. Requires an active sprint (`NO_ACTIVE_SPRINT` otherwise) and validates every `--depends-on` against existing task ids (`TASK_NOT_FOUND` otherwise); recomputes `activeSprint.status` and leaves the handoff untouched (an emergent task does not reroute the flow). With this, the residual hand-edit paths flagged by the field test are closed for debt and emergent tasks; clarification-answer application stays agent-driven by design.
+
 ## [4.29.0] - 2026-07-19
 
 ### Added

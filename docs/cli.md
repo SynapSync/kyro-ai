@@ -380,6 +380,10 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 Unknown ids fail with `DEBT_NOT_FOUND`. Run `kyro status debt` to inspect the result.
 
+## Tool-owned emergent-task append (`kyro add-emergent`)
+
+`kyro add-emergent --title <t> --description <d> --acceptance <a> [--acceptance <a> ...] [--file <p> ...] [--context <c>] [--depends-on <id> ...] [--kyro-scope <scope>] [--dry-run]` appends a task to `activeSprint.emergentTasks[]` deterministically, so the agent never hand-edits `sprint.json` for required work discovered mid-sprint. `--title`, `--description`, and at least one `--acceptance` are required. The new task gets a fresh, never-reused `E<N>` id, `status: pending`, `evidence: null`, `verdict: null` — `kyro record-evidence` and `kyro review` then operate on it exactly like a phase task. Each `--depends-on` must reference an existing task id (phase or emergent) already in the sprint, or the command refuses with `TASK_NOT_FOUND`; with no active sprint it refuses with `NO_ACTIVE_SPRINT`. Nothing is written on refusal.
+
 ## Tool-owned scope bootstrap and sprint planning (`kyro plan`)
 
 `kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]` is tool-owned and validated, so the agent never hand-authors the full v4 `sprint.json` document. It has two modes, **auto-detected from the resolved scope's state** — not from the `--from` file's shape:
