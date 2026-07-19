@@ -14,11 +14,10 @@ Execute the active sprint task by task, recording evidence through the Kyro CLI.
 3. Record evidence and route with the CLI — tool-owned, never hand-edit `sprint.json` for evidence:
    `{{KYRO_CLI}} record-evidence <task-id> --kyro-scope {scope} --summary "..." --validation "<check>" [--validation ...] [--file <path> ...] [--notes "..."] [--status blocked]`
    It writes `task.evidence`, sets `task.status` (`done` by default; `blocked` after three failed rounds), and routes `handoff` to `review_task`.
-4. Add an emergent task to `activeSprint.emergentTasks[]` (via the Artifact Write Contract in `../../SKILL.md`) only for required work that blocks the sprint objective or would create debt if deferred. New debt goes to `debt[]` as an object.
+4. Add an emergent task with `{{KYRO_CLI}} add-emergent --title <t> --description <d> --acceptance <a>` for required work that blocks the sprint objective or would create debt if deferred; new debt goes through `{{KYRO_CLI}} debt add`.
 
 ## Rules
 
-- Hand writes to `sprint.json` (emergent, debt) are full safe-writes; never partial-edit the JSON.
 - Evidence lives on the task object in `sprint.json`, written by `record-evidence`; create no other files.
 - Do not write `task.verdict` as the maker. The checker verdict is tool-owned by `{{KYRO_CLI}} review`.
 - Do not introduce new project patterns without justification.

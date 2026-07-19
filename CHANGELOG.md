@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.30.0] - 2026-07-19
+
+### Added
+
+- `kyro add-emergent` — tool-owned append of an emergent task to `activeSprint.emergentTasks[]`, so the agent no longer hand-edits the full sprint file to record required work discovered mid-sprint. Takes `--title`, `--description`, one or more `--acceptance` (a task needs acceptance criteria), optional `--file`/`--context`/`--depends-on`. The new task gets a fresh sequential id (`E1`, `E2`, …), `status: pending`, `evidence: null`, `verdict: null`, so `kyro record-evidence` and `kyro review` then operate on it like any planned task. Requires an active sprint (`NO_ACTIVE_SPRINT` otherwise) and validates every `--depends-on` against existing task ids (`TASK_NOT_FOUND` otherwise); recomputes `activeSprint.status` and leaves the handoff untouched (an emergent task does not reroute the flow). With this, the residual hand-edit paths flagged by the field test are closed for debt and emergent tasks; clarification-answer application stays agent-driven by design.
+
+## [4.29.0] - 2026-07-19
+
+### Added
+
+- `kyro debt <subcommand>` — tool-owned mutation of `sprint.json.debt[]`, so the agent no longer hand-edits the full sprint file to track technical debt. Five operations: `add` (appends `{ id: debt-<next>, origin, priority, status: open, ... }` with a never-reused sequential id and origin derived from the current sprint), `start` (open/deferred → in_progress; refuses to restart resolved debt), `resolve` (→ resolved, optional `--note`), `defer` (→ deferred; requires both `--target` and a non-empty `--note` — deferring without a concrete reason is the anti-pattern the debt discipline exists to prevent), and `escalate` (raises priority only; refuses to lower). Debt is never deleted — only its status/priority/target/note change. Each op validates the sprint, mutates only the target item, and re-verifies the written file. `kyro status debt` remains the read-only inspector, and its remedy now points at these commands instead of a hand-edit.
+
 ## [4.28.0] - 2026-07-19
 
 ### Added

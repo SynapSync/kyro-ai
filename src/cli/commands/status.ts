@@ -187,7 +187,7 @@ function readOnlyDebtError(command: string): KyroCoreError {
   return new KyroCoreError(
     'INVALID_INPUT',
     `kyro status ${command} is not supported.`,
-    'Kyro CLI status is read-only. Record or change debt through the Kyro workflow artifacts, then run kyro status debt to inspect it.',
+    'kyro status is read-only. Use kyro debt add|start|resolve|defer|escalate to change debt, then kyro status debt to inspect it.',
   );
 }
 

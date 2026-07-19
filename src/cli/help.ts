@@ -16,6 +16,8 @@ Usage:
   kyro record-evidence <task>  Tool-owned maker evidence write (sets status, routes to review)
   kyro plan --from <file>      Tool-owned scope bootstrap (init) or next-sprint materialization (sprint)
   kyro review <task> [options] Tool-owned maker/checker verdict write
+  kyro debt <subcommand>       Tool-owned debt mutation: add, start, resolve, defer, escalate
+  kyro add-emergent [options]  Tool-owned append to activeSprint.emergentTasks[]
   kyro repair [options]        Validate and normalize a scope's sprint.json
   kyro status [mode]           Read-only scope progress, review debt, and debt report
   kyro close-sprint [options]  Checkpoint + close the active sprint (lossless, tool-owned)
@@ -58,6 +60,8 @@ Examples:
   kyro record-evidence T1.1 --kyro-scope auth-refactor --summary "..." --validation "npm test" --file src/x.ts
   kyro plan --from lean-plan.json --kyro-scope auth-refactor --dry-run
   kyro review T1.1 --kyro-scope auth-refactor --verdict pass --yes
+  kyro debt add --title "Missing test" --priority high --kyro-scope auth-refactor
+  kyro add-emergent --title "Add missing migration" --description "..." --acceptance "Migration runs clean." --kyro-scope auth-refactor
   kyro context-pack --kyro-scope 01-token-cost-optimization --json
   kyro eval --json
   kyro trace --kyro-scope auth-refactor --tail 20
@@ -84,6 +88,15 @@ export function printCommandHelp(command: string): void {
     console.log('Usage: kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]  (mode auto-detected: init when the scope has no sprint.json, sprint when it is ready to plan its next sprint; run kyro plan --help for both file shapes)');
   } else if (command === 'review') {
     console.log('Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes]');
+  } else if (command === 'debt') {
+    console.log(`Usage:
+  kyro debt add --title <text> --priority <critical|high|medium|low> [--target <n>] [--note <text>] [--kyro-scope <scope>] [--dry-run]
+  kyro debt start <id> [--kyro-scope <scope>] [--dry-run]
+  kyro debt resolve <id> [--note <text>] [--kyro-scope <scope>] [--dry-run]
+  kyro debt defer <id> --target <n> --note <text> [--kyro-scope <scope>] [--dry-run]
+  kyro debt escalate <id> --priority <critical|high|medium|low> [--kyro-scope <scope>] [--dry-run]`);
+  } else if (command === 'add-emergent') {
+    console.log('Usage: kyro add-emergent --title <text> --description <text> --acceptance <text> [--acceptance <text> ...] [--file <path> ...] [--context <text>] [--depends-on <id> ...] [--kyro-scope <scope>] [--dry-run]');
   } else if (command === 'close-sprint') {
     console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {
