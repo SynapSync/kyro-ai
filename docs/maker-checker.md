@@ -10,7 +10,7 @@ Enforced by `kyro analyze`:
 
 - `done` tasks must have valid evidence.
 - `done` tasks must have a valid verdict.
-- `pass` verdicts must include every task `acceptance_criteria` entry in `checked_criteria`.
+- `pass` verdicts must include every task `acceptance_criteria` entry in `checked_criteria`. Matching is normalization-insensitive (ignores backticks, surrounding/collapsed whitespace, and case), and `kyro review` fails fast with the exact expected list when a supplied `--checked-criterion`/`--waive-criterion` matches no acceptance criterion.
 - `pass` verdicts are blocked while non-negotiable principle gates are violated.
 - Verdict timestamps must not predate evidence timestamps.
 - Self-review is blocked only when policy enables `maker_checker.requireSeparateChecker`.
@@ -89,4 +89,4 @@ When enabled, a `pass` where `verdict.by === evidence.by` is blocked as `SELF_RE
 - `CONFIRMATION_REQUIRED` — a guarded operation needs explicit confirmation (only for review when `review_task` is set to `confirm` in policy).
 - `CHECKER_FAILED` — deterministic checker findings vetoed the pass.
 - `SELF_REVIEW_BLOCKED` — policy requires a separate checker actor.
-- `CLARIFICATION_REQUIRED` — `record-evidence`/`review` refuse while any `[NEEDS CLARIFICATION]` marker remains; resolve them in clarify mode first.
+- `CLARIFICATION_REQUIRED` — `record-evidence`/`review` refuse while any `[NEEDS CLARIFICATION]` marker remains; resolve them in clarify mode first. The gate counts only unresolved markers in the closed colon form `[NEEDS CLARIFICATION: <gap>]`; it ignores references that merely document the syntax — backtick-wrapped (`` `[NEEDS CLARIFICATION: …]` ``) or placeholder payloads (`<gap>`, `...`) — so a spec that talks *about* the marker does not trip the gate.

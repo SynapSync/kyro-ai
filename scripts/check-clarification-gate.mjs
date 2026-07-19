@@ -75,4 +75,26 @@ const taskArgs = (cmd, root, extra = []) =>
   }
 }
 
-console.log('check:clarification-gate — portable [NEEDS CLARIFICATION] gate verified for record-evidence and review');
+// 3) Documentation-form references must NOT block — bare (no colon), backtick-wrapped (same payload
+//    as a real marker, so only the backticks distinguish them), and placeholder payloads. This is the
+//    false-positive the field test hit: prose that talks *about* the marker tripped the gate.
+{
+  const root = sandbox();
+  try {
+    const sprint = readSprint(root);
+    sprint.activeSprint.objective =
+      `${sprint.activeSprint.objective} — docs mention [NEEDS CLARIFICATION] markers, the ` +
+      '`[NEEDS CLARIFICATION: which auth flow?]`' +
+      ' form, and templates like [NEEDS CLARIFICATION: <gap>] or [NEEDS CLARIFICATION: ...].';
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const rec = taskArgs('record-evidence', root, ['--summary', 'Done.', '--validation', 'npm test -- demo', '--file', 'src/demo.ts']);
+    assert(rec.status === 0, `documentation-form markers must not block record-evidence: ${rec.stdout}${rec.stderr}`);
+    const rev = taskArgs('review', root, ['--verdict', 'pass']);
+    assert(rev.status === 0, `documentation-form markers must not block review: ${rev.stdout}${rev.stderr}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+console.log('check:clarification-gate — portable [NEEDS CLARIFICATION] gate verified (real markers block; documented/placeholder refs do not)');

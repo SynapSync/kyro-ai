@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.28.0] - 2026-07-19
+
+### Added
+
+- `kyro plan --from <file>` now has a **sprint mode** (increment 2 of the tool-owned planning path). The command auto-detects mode from scope state: no `sprint.json` → init/bootstrap (unchanged); an initialized scope with `activeSprint: null` and `handoff.nextAction: "plan_sprint"` → sprint mode, which materializes the next `activeSprint` from a compact lean sprint-plan file (`sprint`, `phases`/`tasks`, `definitionOfDone`, optional `scenarios`). It expands each task to `status: "pending"` / `evidence: null` / `verdict: null`, derives `activeSprint.status` (`"planned"` for an all-pending sprint — never hardcodes `"executing"`, which the hand-write path did and which tripped an analyze coherence finding), merges scenarios into `spec.scenarios` by id, flips the matching `roadmap.sprints[]` entry to `state: "active"`, wires `handoff` to `execute_task` (or `clarify` when `[NEEDS CLARIFICATION]` markers are present), and reconciles the `kyro.json` scope-status cache so the written artifact is fully coherent (zero stale-status findings). It refuses with `SPRINT_ALREADY_ACTIVE` when a sprint is already active and `NOT_READY_TO_PLAN` when the handoff is not `plan_sprint`. Validates `sprint.n` against the expected next number (ledger max + 1), unique task/phase ids, and `depends_on`/`scenario_refs` referential integrity.
+
+## [4.27.0] - 2026-07-19
+
+### Added
+
+- `kyro plan --from <file>` — tool-owned scope bootstrap (init mode). The planning phase previously had no CLI write path: the agent hand-authored the whole fat `sprint.json` per the INIT contract (read→parse→mutate→write the monolith, ~63% of which is static spec/roadmap). `kyro plan` takes a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap`) and materializes the full validated v4 `sprint.json` (`activeSprint: null`) plus registers the scope in `kyro.json` — so the agent writes only the essential fields and never touches the full document by hand. It refuses with `SCOPE_ALREADY_INITIALIZED` rather than overwrite an initialized scope, allows `[NEEDS CLARIFICATION]` markers at planning (routing `handoff.nextAction` to `clarify`) without the execute-phase block, and is portable — any host driving the CLI gets a deterministic, schema-owned bootstrap. Per-sprint `activeSprint` materialization is a later increment; INIT mode's guidance now points at this command with the hand-write contract kept as fallback.
+
+## [4.26.2] - 2026-07-19
+
+### Fixed
+
+- `kyro review` no longer rejects acceptance criteria over cosmetic differences. Coverage matching (`missingCheckedCriteria`, plus the waiver-exclusion in `review.ts`) previously compared `--checked-criterion`/`--waive-criterion` against stored `acceptance_criteria` byte-for-byte, so a one-character paraphrase — a stray space, a backtick, different case — marked the criterion uncovered and failed the review, looping the agent through opaque rejections. Matching is now normalization-insensitive via a shared `normalizeCriterion` (NFC, strip backticks, collapse whitespace, trim, lowercase); the written verdict still stores the agent's original strings. When a supplied criterion matches no acceptance criterion even after normalization, `kyro review` now fails fast with `INVALID_INPUT` listing the exact expected criteria to paste, instead of surfacing an indirect coverage finding.
+
+## [4.26.1] - 2026-07-19
+
+### Fixed
+
+- Clarification gate no longer false-positives on prose that *documents* the marker syntax. The detector (`countClarificationMarkers`, shared by `kyro analyze`, `kyro doctor --artifacts`, `kyro record-evidence`, and `kyro review`) previously did a raw substring scan of the whole serialized `sprint.json`, so any spec/task text that merely *mentioned* `[NEEDS CLARIFICATION]` — e.g. when the project being built is itself a tool with such a gate — blocked execution. It now counts only unresolved markers: the closed colon form `[NEEDS CLARIFICATION: <concrete gap>]`, excluding backtick-wrapped references (the repo-wide documentation convention) and placeholder payloads (`<gap>`, `...`). Real markers still block on every host; the three duplicated inline scans (analyze, doctor, eval predicate) were unified onto the single detector.
+
 ## [4.26.0] - 2026-07-18
 
 ### Added

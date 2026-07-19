@@ -163,6 +163,73 @@ function assertReviewConfirmationPolicy() {
   }
 }
 
+function assertNormalizedCriterionMatching() {
+  // Normalized match passes: backticks/whitespace/case variants of both criteria should be treated as
+  // covering the real acceptance_criteria strings, since agents paraphrase supplied criteria constantly.
+  {
+    const root = sandbox();
+    try {
+      prepareDoneTask(root);
+      const result = run(
+        ['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass', '--checked-criterion', '`criterion a`', '--checked-criterion', 'CRITERION   B', '--yes'],
+        root,
+      );
+      assert(result.status === 0, `normalized-variant criteria should pass: ${result.stdout}${result.stderr}`);
+      const analyze = run(['analyze', '--kyro-scope', 'demo'], root);
+      assert(!(analyze.stdout + analyze.stderr).includes('CHECKER'), `analyze should show no CHECKER finding after normalized pass: ${analyze.stdout}${analyze.stderr}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  // No-match errors actionably: an invented criterion must fail fast with the real expected list, not
+  // silently sink into "uncovered" and loop the agent through opaque rejections.
+  {
+    const root = sandbox();
+    try {
+      prepareDoneTask(root);
+      const result = run(
+        ['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass', '--checked-criterion', 'Totally invented criterion', '--yes'],
+        root,
+      );
+      assert(result.status === 1, `invented criterion should fail: ${result.stdout}${result.stderr}`);
+      const combined = result.stdout + result.stderr;
+      assert(combined.includes('Criterion A'), `actionable error should list real acceptance criteria: ${combined}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  // Waiver via normalized form: a backtick-wrapped waiver criterion should still resolve to the real
+  // acceptance criterion it waives.
+  {
+    const root = sandbox();
+    try {
+      prepareDoneTask(root);
+      const result = run(
+        ['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass', '--checked-criterion', 'Criterion A', '--waive-criterion', '`Criterion B`::not applicable', '--yes'],
+        root,
+      );
+      assert(result.status === 0, `normalized waiver should pass: ${result.stdout}${result.stderr}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  // Existing partial-coverage behavior must be unchanged: Criterion B is genuinely neither checked nor
+  // waived here, so the pass must still be vetoed.
+  {
+    const root = sandbox();
+    try {
+      prepareDoneTask(root);
+      const result = run(['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass', '--checked-criterion', 'Criterion A', '--yes'], root);
+      assert(result.status === 1, `genuinely uncovered criterion should still fail: ${result.stdout}${result.stderr}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+}
+
 function assertSingleDecisionSite() {
   const lines = scanLines('missingCheckedCriteria|principle-gate|nonNegotiableViolations|checked_criteria.*acceptance_criteria', 'src/cli', { cwd: repo });
   const offenders = lines.filter((line) => {
@@ -181,6 +248,7 @@ function main() {
   assertEvidenceAndTimeChecks();
   assertSelfReviewPolicy();
   assertReviewConfirmationPolicy();
+  assertNormalizedCriterionMatching();
   console.log('check:maker-checker — deterministic maker/checker invariants passed');
 }
 

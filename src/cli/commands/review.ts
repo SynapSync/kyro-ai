@@ -2,7 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { collectCheckerFindings, countClarificationMarkers } from '../core/analysis';
+import { collectCheckerFindings, countClarificationMarkers, normalizeCriterion } from '../core/analysis';
 import { deriveActiveSprintStatus, derivePhaseStatus } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
@@ -102,9 +102,20 @@ export function buildReviewPlan(scope: string, args: ReviewArgs): { sprint: Spri
     );
   }
 
+  const acceptanceCriteria = located.task.acceptance_criteria ?? [];
+  const acceptanceNormalized = new Set(acceptanceCriteria.map(normalizeCriterion));
+  const assertKnownCriterion = (supplied: string): void => {
+    if (acceptanceNormalized.has(normalizeCriterion(supplied))) return;
+    throw new KyroCoreError('INVALID_INPUT',
+      `--checked-criterion/--waive-criterion "${supplied}" matches no acceptance criterion for task ${located.task.id}.`,
+      `Expected one of:\n${acceptanceCriteria.map((c) => `  - "${c}"`).join('\n')}`);
+  };
+  if (args.checkedCriteria.length > 0) args.checkedCriteria.forEach(assertKnownCriterion);
+  if (args.waivedCriteria.length > 0) args.waivedCriteria.forEach((w) => assertKnownCriterion(w.criterion));
+
   const reviewedAt = new Date().toISOString();
-  const waivedSet = new Set(args.waivedCriteria.map((w) => w.criterion));
-  const autoChecked = [...(located.task.acceptance_criteria ?? [])].filter((c) => !waivedSet.has(c));
+  const waivedSet = new Set(args.waivedCriteria.map((w) => normalizeCriterion(w.criterion)));
+  const autoChecked = [...acceptanceCriteria].filter((c) => !waivedSet.has(normalizeCriterion(c)));
   const verdict: TaskVerdict = {
     result: args.verdict,
     checked_criteria: args.checkedCriteria.length > 0 ? args.checkedCriteria : args.verdict === 'pass' ? autoChecked : [],

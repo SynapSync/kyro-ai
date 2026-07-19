@@ -120,8 +120,19 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
   return out.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
 }
 
+// Counts UNRESOLVED [NEEDS CLARIFICATION: <gap>] markers, ignoring references that merely
+// document the syntax. A real marker is the closed colon form with a concrete payload; a
+// documentation reference is backtick-wrapped (the repo-wide convention) or uses a placeholder
+// payload (`<gap>`, `...`). Without this, prose that talks *about* the marker trips the gate.
 export function countClarificationMarkers(sprint: SprintFile): number {
-  return (JSON.stringify(sprint).match(/\[NEEDS CLARIFICATION/g) ?? []).length;
+  const re = /(?<!`)\[NEEDS CLARIFICATION:\s*([^\]]*?)\s*\](?!`)/g;
+  let count = 0;
+  for (const match of JSON.stringify(sprint).matchAll(re)) {
+    const payload = match[1];
+    if (payload === '' || /^<.*>$/.test(payload) || payload === '...' || payload === '…') continue;
+    count += 1;
+  }
+  return count;
 }
 
 export function collectSpecFindings(sprint: SprintFile): AnalysisFinding[] {
@@ -252,16 +263,20 @@ export function collectCheckerFindings(sprint: SprintFile, principles: Principle
 
 function principleViolated(check: PrincipleCheck, sprint: SprintFile): boolean {
   switch (check) {
-    case 'no-clarification-markers': return /\[NEEDS CLARIFICATION/.test(JSON.stringify(sprint));
+    case 'no-clarification-markers': return countClarificationMarkers(sprint) > 0;
     case 'success-criteria-present': return !Array.isArray(sprint.successCriteria) || sprint.successCriteria.length === 0;
     case 'tasks-have-acceptance-criteria': return sprint.activeSprint ? allTasks(sprint.activeSprint).some((t) => !Array.isArray(t.acceptance_criteria) || t.acceptance_criteria.length === 0) : false;
     default: return false;
   }
 }
 
+export function normalizeCriterion(text: string): string {
+  return text.normalize('NFC').replace(/`/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 function missingCheckedCriteria(acceptanceCriteria: string[], checkedCriteria: string[], waivedCriteria: string[] = []): string[] {
-  const satisfied = new Set([...checkedCriteria, ...waivedCriteria]);
-  return acceptanceCriteria.filter((criterion) => !satisfied.has(criterion));
+  const satisfied = new Set([...checkedCriteria, ...waivedCriteria].map(normalizeCriterion));
+  return acceptanceCriteria.filter((criterion) => !satisfied.has(normalizeCriterion(criterion)));
 }
 
 function duplicateStrings(values: string[]): string[] {

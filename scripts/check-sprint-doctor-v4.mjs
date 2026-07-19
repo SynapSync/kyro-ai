@@ -270,6 +270,16 @@ assertCase(
   'unresolved [NEEDS CLARIFICATION]',
 );
 
+// 14b. A documentation reference to the marker must PASS — backtick-wrapped (same payload as a real
+//    marker) and placeholder forms are not unresolved markers. Prevents the field-test false positive.
+assertCase(
+  'documented-clarification-passes',
+  validKyroJson,
+  { ...validSprintJson, objective: 'Gate blocks any `[NEEDS CLARIFICATION: OAuth or JWT?]` or [NEEDS CLARIFICATION: <gap>] reference' },
+  0,
+  'Schema shapes are valid.',
+);
+
 // 15. REGRESSION (schema/runtime contract): an activeSprint missing a field the runtime consumes
 //    (definitionOfDone — close-sprint reads `.length`) must FAIL the doctor, never PASS and then
 //    crash close-sprint. If the doctor says PASS, no downstream command may explode.

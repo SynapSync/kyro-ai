@@ -368,6 +368,65 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 `kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. See [maker-checker.md](maker-checker.md).
 
+## Tool-owned scope bootstrap and sprint planning (`kyro plan`)
+
+`kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]` is tool-owned and validated, so the agent never hand-authors the full v4 `sprint.json` document. It has two modes, **auto-detected from the resolved scope's state** — not from the `--from` file's shape:
+
+- **Init mode** — the scope has no `sprint.json` yet. Materializes the scope's initial `sprint.json` (spec + roadmap, `activeSprint: null`) from a compact lean plan JSON file. Refuses with `SCOPE_ALREADY_INITIALIZED` if the scope already has a `sprint.json` (never overwrites). Also registers the scope in `kyro.json.scopes[]` (and sets `activeScope` if unset).
+- **Sprint mode** — the scope's `sprint.json` exists, `activeSprint` is `null`, and `handoff.nextAction === 'plan_sprint'`. Materializes the next `activeSprint` (all tasks `pending`, `evidence: null`, `verdict: null`) from a lean sprint-plan JSON file. Writes only `sprint.json`. Refuses with `SPRINT_ALREADY_ACTIVE` if a sprint is already active, or `NOT_READY_TO_PLAN` if the handoff isn't at `plan_sprint` yet (e.g. still `clarify`).
+
+`[NEEDS CLARIFICATION]` markers are allowed in both modes' output (they legitimately route `handoff.nextAction` to `clarify`); this is separate from the O5 clarification gate on execute-phase commands.
+
+### Init mode
+
+Lean plan file shape:
+
+```json
+{
+  "scope": "kebab-case-scope",
+  "title": "Human title",
+  "objective": "One sentence.",
+  "successCriteria": ["...", "..."],
+  "spec": {
+    "requirements": [{ "id": "R1", "statement": "...", "priority": "must", "rationale": "..." }],
+    "nonGoals": ["..."],
+    "openQuestions": ["..."]
+  },
+  "roadmap": {
+    "plannedSprintCount": 2,
+    "sizingRationale": "...",
+    "sprints": [{ "n": 1, "slug": "...", "title": "..." }]
+  }
+}
+```
+
+`scope` may be omitted from the file if `--kyro-scope` is given (and vice versa); if both are present they must agree. `spec` is optional; missing sub-arrays default to `[]`. `spec.scenarios` is never read from this file — init always writes `scenarios: []` (sprint mode adds scenarios later). Every `roadmap.sprints[]` entry needs `n`, `slug`, `title`; `roadmap.plannedSprintCount` must equal `roadmap.sprints.length`.
+
+### Sprint mode
+
+Lean sprint-plan file shape (`--kyro-scope` is required — this file has no `"scope"` field):
+
+```json
+{
+  "sprint": { "n": 1, "slug": "artifact-standard", "title": "Artifact standard", "objective": "One sentence." },
+  "phases": [
+    {
+      "id": "P1", "title": "Phase title", "objective": "Phase objective",
+      "tasks": [
+        {
+          "id": "T1.1", "title": "...", "description": "...", "files_to_touch": ["src/x.rs"],
+          "context": "...", "acceptance_criteria": ["...", "..."], "depends_on": [], "scenario_refs": []
+        }
+      ]
+    }
+  ],
+  "definitionOfDone": ["...", "..."],
+  "scenarios": [{ "id": "S1", "requirement": "R1", "given": "...", "when": "...", "then": "..." }]
+}
+```
+
+`sprint.n` must equal `(max n in sprint.ledger[]) + 1`, or `1` if the ledger is empty. Phase and task `id`s must be unique within the sprint; `depends_on` entries must reference a task `id` that exists in the same file. `scenarios` is optional; each `requirement` must reference an existing `spec.requirements[].id`, and each task's `scenario_refs` must reference a scenario `id` that exists after merging (existing `spec.scenarios` ∪ this file's `scenarios`, merged by `id` — new entries added, existing ones replaced). `definitionOfDone` is required and non-empty. The matching `roadmap.sprints[]` entry (by `n`) is set to `state: 'active'`; `debt[]` is left untouched (not auto-transitioned).
+
 ## Spec traceability
 
 `kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces requirements for scope packs and resolved scenarios for task packs. See [spec-traceability.md](spec-traceability.md).
