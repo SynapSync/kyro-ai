@@ -270,9 +270,13 @@ function principleViolated(check: PrincipleCheck, sprint: SprintFile): boolean {
   }
 }
 
+export function normalizeCriterion(text: string): string {
+  return text.normalize('NFC').replace(/`/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 function missingCheckedCriteria(acceptanceCriteria: string[], checkedCriteria: string[], waivedCriteria: string[] = []): string[] {
-  const satisfied = new Set([...checkedCriteria, ...waivedCriteria]);
-  return acceptanceCriteria.filter((criterion) => !satisfied.has(criterion));
+  const satisfied = new Set([...checkedCriteria, ...waivedCriteria].map(normalizeCriterion));
+  return acceptanceCriteria.filter((criterion) => !satisfied.has(normalizeCriterion(criterion)));
 }
 
 function duplicateStrings(values: string[]): string[] {

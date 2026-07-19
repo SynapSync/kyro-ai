@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.26.2] - 2026-07-19
+
+### Fixed
+
+- `kyro review` no longer rejects acceptance criteria over cosmetic differences. Coverage matching (`missingCheckedCriteria`, plus the waiver-exclusion in `review.ts`) previously compared `--checked-criterion`/`--waive-criterion` against stored `acceptance_criteria` byte-for-byte, so a one-character paraphrase — a stray space, a backtick, different case — marked the criterion uncovered and failed the review, looping the agent through opaque rejections. Matching is now normalization-insensitive via a shared `normalizeCriterion` (NFC, strip backticks, collapse whitespace, trim, lowercase); the written verdict still stores the agent's original strings. When a supplied criterion matches no acceptance criterion even after normalization, `kyro review` now fails fast with `INVALID_INPUT` listing the exact expected criteria to paste, instead of surfacing an indirect coverage finding.
+
 ## [4.26.1] - 2026-07-19
 
 ### Fixed

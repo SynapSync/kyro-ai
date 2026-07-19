@@ -10,7 +10,7 @@ Enforced by `kyro analyze`:
 
 - `done` tasks must have valid evidence.
 - `done` tasks must have a valid verdict.
-- `pass` verdicts must include every task `acceptance_criteria` entry in `checked_criteria`.
+- `pass` verdicts must include every task `acceptance_criteria` entry in `checked_criteria`. Matching is normalization-insensitive (ignores backticks, surrounding/collapsed whitespace, and case), and `kyro review` fails fast with the exact expected list when a supplied `--checked-criterion`/`--waive-criterion` matches no acceptance criterion.
 - `pass` verdicts are blocked while non-negotiable principle gates are violated.
 - Verdict timestamps must not predate evidence timestamps.
 - Self-review is blocked only when policy enables `maker_checker.requireSeparateChecker`.
