@@ -39,6 +39,18 @@ Persist scope artifacts under:
 
 `sprint.json` is the single source of truth for the scope. `archive/` and `findings/` are write-only evidence directories.
 
+## Tool-owned state changes
+
+Changes to `sprint.json` go through Kyro's tool-owned CLI verbs — they run identically here as on Claude, through your shell, and never require hand-editing the file:
+
+- `kyro plan --from <file> --kyro-scope <scope>` — bootstrap a scope (init mode) or materialize the next sprint (sprint mode)
+- `kyro record-evidence <task> --kyro-scope <scope> ...` — record maker evidence on a task
+- `kyro review <task> --kyro-scope <scope> --verdict pass|fail` — record the checker verdict
+- `kyro debt add|start|resolve|defer|escalate` — track technical debt
+- `kyro add-emergent --title <t> --description <d> --acceptance <a>` — add a task discovered mid-sprint
+
+These deterministic gates live in the Kyro CLI, so Codex gets the same enforcement as Claude. See [cli.md](cli.md) and [agent-adapters.md](agent-adapters.md).
+
 ## Verify
 
 ```bash

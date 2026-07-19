@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.30.1] - 2026-07-19
+
+### Changed
+
+- Documentation polish. Removed two dead, unreferenced docs that shipped to npm: `docs/agents-reference.md` (described a superseded verbose orchestrator model that contradicted the current lean `agents/orchestrator.md`) and `docs/cost-optimization-audit.md` (a point-in-time audit fully superseded by `docs/cost-model.md`). Extended the multi-agent guides — `docs/agent-adapters.md`, `docs/HOW-TO-USE-CODEX.md`, `docs/HOW-TO-USE-OPENCODE.md` — to document the tool-owned CLI verbs (`kyro plan`, `record-evidence`, `review`, `debt`, `add-emergent`) and to state the portability boundary explicitly: the deterministic gates live in the CLI and are identical on Codex and OpenCode; only the two `PreToolUse` hooks are Claude-only reinforcements. `docs/status-coherence.md` was reviewed and kept (still accurate).
+
 ## [4.30.0] - 2026-07-19
 
 ### Added
