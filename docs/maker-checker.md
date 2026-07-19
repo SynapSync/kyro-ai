@@ -89,4 +89,4 @@ When enabled, a `pass` where `verdict.by === evidence.by` is blocked as `SELF_RE
 - `CONFIRMATION_REQUIRED` — a guarded operation needs explicit confirmation (only for review when `review_task` is set to `confirm` in policy).
 - `CHECKER_FAILED` — deterministic checker findings vetoed the pass.
 - `SELF_REVIEW_BLOCKED` — policy requires a separate checker actor.
-- `CLARIFICATION_REQUIRED` — `record-evidence`/`review` refuse while any `[NEEDS CLARIFICATION]` marker remains; resolve them in clarify mode first.
+- `CLARIFICATION_REQUIRED` — `record-evidence`/`review` refuse while any `[NEEDS CLARIFICATION]` marker remains; resolve them in clarify mode first. The gate counts only unresolved markers in the closed colon form `[NEEDS CLARIFICATION: <gap>]`; it ignores references that merely document the syntax — backtick-wrapped (`` `[NEEDS CLARIFICATION: …]` ``) or placeholder payloads (`<gap>`, `...`) — so a spec that talks *about* the marker does not trip the gate.

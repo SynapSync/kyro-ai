@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.26.1] - 2026-07-19
+
+### Fixed
+
+- Clarification gate no longer false-positives on prose that *documents* the marker syntax. The detector (`countClarificationMarkers`, shared by `kyro analyze`, `kyro doctor --artifacts`, `kyro record-evidence`, and `kyro review`) previously did a raw substring scan of the whole serialized `sprint.json`, so any spec/task text that merely *mentioned* `[NEEDS CLARIFICATION]` — e.g. when the project being built is itself a tool with such a gate — blocked execution. It now counts only unresolved markers: the closed colon form `[NEEDS CLARIFICATION: <concrete gap>]`, excluding backtick-wrapped references (the repo-wide documentation convention) and placeholder payloads (`<gap>`, `...`). Real markers still block on every host; the three duplicated inline scans (analyze, doctor, eval predicate) were unified onto the single detector.
+
 ## [4.26.0] - 2026-07-18
 
 ### Added

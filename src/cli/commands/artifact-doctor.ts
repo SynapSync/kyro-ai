@@ -4,13 +4,14 @@ import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { listScopeFolders } from '../artifacts/scopes';
+import { countClarificationMarkers } from '../core/analysis';
 import {
   asProjectState,
   validateProjectStateShape,
   validateSprintFile,
   type ValidationIssue,
 } from '../artifacts/schema';
-import type { CheckResult, KyroScopeEntry } from '../types';
+import type { CheckResult, KyroScopeEntry, SprintFile } from '../types';
 import { SPRINT_CLOSE_TRANSACTION_STATUS, type SprintCloseCheckpointV1, type SprintCloseTransactionStatus } from '../types';
 import { checkpointCommitment, sha256, validateSprintCloseCheckpoint } from '../checkpoints/sprint-close';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
@@ -84,7 +85,7 @@ function checkScope(scope: string): CheckResult[] {
   // 2b. Unresolved ambiguity: a [NEEDS CLARIFICATION] marker anywhere in sprint.json means the agent
   //     guessed instead of asking. This is the deterministic enforcement of the clarify discipline —
   //     it fails in ANY harness (including OpenCode), where prose-only guidance gets ignored.
-  const markerCount = (JSON.stringify(sprintRead.value).match(/\[NEEDS CLARIFICATION/g) ?? []).length;
+  const markerCount = countClarificationMarkers(sprintRead.value as SprintFile);
   if (markerCount > 0) {
     checks.push(fail(`${scope}/clarity`, `${markerCount} unresolved [NEEDS CLARIFICATION] marker(s) in sprint.json`, 'Run the clarify mode (or kyro analyze) to resolve them before planning/executing — do not guess.'));
   }
