@@ -91,7 +91,7 @@ Kyro routes progressively:
 2. resolve or create scope
 3. read the scope's `sprint.json` if present
 4. route on `sprint.json.handoff.nextAction` and load only the required mode: INIT, clarify, plan, execute, review, close, or recover
-5. record compact task evidence directly on the task object in `sprint.json` during execution, then write the archive snapshot and narrative at sprint close
+5. record task evidence and status through tool-owned CLI verbs during execution (`kyro record-evidence`, then `kyro review` for the checker verdict — no hand-editing of `sprint.json`), then write the archive snapshot and narrative at sprint close via `kyro close-sprint`
 
 ## Scope output
 

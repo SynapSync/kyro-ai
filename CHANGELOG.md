@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.30.2] - 2026-07-19
+
+### Fixed
+
+- Documentation QA follow-up: corrected stale narrative that still described the agent hand-writing state, which a keyword-grep pass had missed because the phrasing ("record compact task evidence **directly on the task object** in `sprint.json`", "one safe write back to `sprint.json`") did not contain the searched terms. Updated `docs/getting-started.md`, `docs/architecture.md` (the `/kyro:forge` flow steps + the artifact-layout mutation note), `docs/cost-model.md` (Write Policy table), `docs/context-management.md`, and `README.md` to describe the tool-owned verbs (`kyro plan`, `record-evidence`, `review`, `debt`, `add-emergent`, `close-sprint`) as the way state is written. No behavior change — documentation accuracy only.
+
 ## [4.30.1] - 2026-07-19
 
 ### Changed
