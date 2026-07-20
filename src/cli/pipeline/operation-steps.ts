@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { removeManagedBlock, upsertManagedBlock } from '../injectors/managed-block';
 import { mergeJsonObjectContent, removeJsonPathContent } from '../injectors/json-merge';
+import { describeWriteFailure } from '../core/errors';
 import type { OperationPlan } from '../types';
 import { PipelineOrchestrator } from './orchestrator';
 import type { PipelineResult, StagePlan, Step } from './types';
@@ -180,6 +181,8 @@ function restoreTarget(target: string, snapshot: TargetSnapshot): void {
 }
 
 function formatPipelineError(result: PipelineResult): Error {
+  const writeFailure = describeWriteFailure(result.error);
+  if (writeFailure) return writeFailure;
   const message = result.rollback && !result.rollback.success
     ? `Apply failed and rollback failed: ${result.error?.message ?? 'unknown error'}`
     : `Apply failed and rollback completed: ${result.error?.message ?? 'unknown error'}`;

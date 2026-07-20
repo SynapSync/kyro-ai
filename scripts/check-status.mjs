@@ -4,9 +4,11 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const cli = resolve(repo, 'dist/cli.js');
+const require = createRequire(import.meta.url);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -75,7 +77,8 @@ function assertAnalyzeReportsActiveSprintStatusDrift() {
   }
 }
 
-// 3. repair must normalize stale phase.status and activeSprint.status to derived values.
+// 3. repair must normalize stale phase.status and activeSprint.status to derived values, and must
+//    refuse to run without --yes/--confirm (no interactive prompt — CONFIRMATION_REQUIRED instead).
 function assertRepairNormalizesPhaseStatus() {
   const root = sandbox();
   try {
@@ -84,6 +87,16 @@ function assertRepairNormalizesPhaseStatus() {
     sprint.activeSprint.phases[0].status = 'executing';
     sprint.activeSprint.status = 'planned';
     writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+    const before = readFileSync(sprintPath(root), 'utf-8');
+
+    const unconfirmed = run(['repair', '--kyro-scope', 'demo'], root);
+    assert(unconfirmed.status !== 0, `repair without --yes should exit non-zero: ${unconfirmed.stderr || unconfirmed.stdout}`);
+    assert(
+      `${unconfirmed.stdout}${unconfirmed.stderr}`.includes('CONFIRMATION_REQUIRED'),
+      `repair without --yes should report CONFIRMATION_REQUIRED: ${unconfirmed.stderr || unconfirmed.stdout}`,
+    );
+    assert(readFileSync(sprintPath(root), 'utf-8') === before, 'repair without --yes must not change sprint.json');
+
     const result = run(['repair', '--kyro-scope', 'demo', '--yes'], root);
     assert(result.status === 0, `repair should succeed: ${result.stderr || result.stdout}`);
     const after = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
@@ -233,6 +246,23 @@ function assertCliStatusCommand() {
   }
 }
 
+// 7. describeWriteFailure must classify EROFS/EACCES/ENOSPC as an actionable WRITE_NOT_PERMITTED
+//    error (with a remedy) and leave every other error untouched (returns null).
+function assertDescribeWriteFailureClassifiesErrno() {
+  const { describeWriteFailure } = require(resolve(repo, 'dist/cli/core/errors.js'));
+  for (const code of ['EROFS', 'EACCES', 'ENOSPC']) {
+    const error = Object.assign(new Error('boom'), { code, path: '/managed/sprint.json' });
+    const result = describeWriteFailure(error);
+    assert(result && result.code === 'WRITE_NOT_PERMITTED', `describeWriteFailure(${code}) should return a WRITE_NOT_PERMITTED error, got ${JSON.stringify(result)}`);
+    assert(typeof result.remedy === 'string' && result.remedy.length > 0, `describeWriteFailure(${code}) should include a remedy`);
+    assert(result.message.includes(code), `describeWriteFailure(${code}) message should mention the errno code: ${result.message}`);
+  }
+  const benignErrno = describeWriteFailure(Object.assign(new Error('exists'), { code: 'EEXIST' }));
+  assert(benignErrno === null, `describeWriteFailure(EEXIST) should return null, got ${JSON.stringify(benignErrno)}`);
+  const plain = describeWriteFailure(new Error('generic failure'));
+  assert(plain === null, `describeWriteFailure(generic Error) should return null, got ${JSON.stringify(plain)}`);
+}
+
 function main() {
   assertStatusCoreIsPure();
   assertAnalyzeReportsActiveSprintStatusDrift();
@@ -241,6 +271,7 @@ function main() {
   assertMcpReviewTaskAcceptsWaivers();
   assertStatusRouterDocumentsReviewDebt();
   assertCliStatusCommand();
+  assertDescribeWriteFailureClassifiesErrno();
   console.log('check:status — status coherence invariants passed');
 }
 
