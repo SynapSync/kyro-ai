@@ -77,7 +77,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'doctor') {
     console.log('Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--trace] [--kyro-scope <scope>]');
   } else if (command === 'repair') {
-    console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]');
+    console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes|--confirm]');
   } else if (command === 'status') {
     console.log('Usage: kyro status [brief|full|debt] [--kyro-scope <scope>] [--json]');
   } else if (command === 'analyze') {

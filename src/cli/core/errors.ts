@@ -23,6 +23,7 @@ export type KyroErrorCode =
   | 'SCOPE_ALREADY_INITIALIZED'
   | 'SPRINT_ALREADY_ACTIVE'
   | 'NOT_READY_TO_PLAN'
+  | 'WRITE_NOT_PERMITTED'
   | 'INTERNAL';
 
 export class KyroCoreError extends Error {
@@ -41,4 +42,22 @@ export function toErrorEnvelope(error: unknown): { code: KyroErrorCode; message:
     return { code: error.code, message: error.message, ...(error.remedy ? { remedy: error.remedy } : {}) };
   }
   return { code: 'INTERNAL', message: error instanceof Error ? error.message : String(error) };
+}
+
+/**
+ * Recognize durable-write failures caused by the environment (read-only filesystem, permission
+ * denied, disk full) and translate them into an actionable KyroCoreError. Returns null for any
+ * other error so callers can fall back to their existing generic handling.
+ */
+export function describeWriteFailure(error: unknown): KyroCoreError | null {
+  const errno = error as NodeJS.ErrnoException | undefined;
+  const code = errno?.code;
+  if (code !== 'EROFS' && code !== 'EACCES' && code !== 'ENOSPC') return null;
+  const path = errno?.path ? ` (${errno.path})` : '';
+  const message = `Kyro could not write${path}: ${code}.`;
+  const remedy =
+    code === 'ENOSPC'
+      ? 'The filesystem is out of space. Free space and re-run the command.'
+      : "Kyro needs write access under .agents/kyro but the path is read-only for this process (EROFS/EACCES). On sandboxed agents (Codex/OpenCode) re-run the command with write access to the project's .agents/kyro directory.";
+  return new KyroCoreError('WRITE_NOT_PERMITTED', message, remedy);
 }

@@ -1,6 +1,4 @@
 import { existsSync } from 'node:fs';
-import { createInterface } from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
 import { applyPlan, printPlan, resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
@@ -26,17 +24,14 @@ export async function repair(options: CliOptions): Promise<void> {
     console.log('Dry run complete. No files changed.');
     return;
   }
-  if (!options.yes) {
-    const confirmed = await confirmRepair();
-    if (!confirmed) {
-      console.log('No changes made.');
-      return;
-    }
-  }
-  const guard = evaluateGuard('repair_scope', { surface: 'cli', scope, confirmed: true });
+  const guard = evaluateGuard('repair_scope', { surface: 'cli', scope, confirmed: options.yes === true });
   if (guard.kind === 'blocked') {
     emitBlockedReason(scope, guard.message, guard.code);
     throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
+  }
+  if (guard.kind === 'confirmation_required') {
+    emitBlockedReason(scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
   }
   emitGateApproved(scope, 'repair_scope');
   emitToolCommandRun(scope, 'cli', 'repair');
@@ -106,15 +101,4 @@ function buildScopeStatusReconcilePlan(scope: string, normalizedSprint: unknown)
   if (entry.status === derived) return null;
   const updated = { ...state, scopes: state.scopes.map((s) => (s.id === scope ? { ...s, status: derived } : s)) };
   return { action: 'write', path: projectStatePath(), content: `${JSON.stringify(updated, null, 2)}\n` };
-}
-
-
-async function confirmRepair(): Promise<boolean> {
-  const rl = createInterface({ input, output });
-  try {
-    const answer = await rl.question('Normalize sprint.json? [y/N] ');
-    return answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes';
-  } finally {
-    rl.close();
-  }
 }

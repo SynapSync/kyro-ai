@@ -15,7 +15,7 @@ import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { projectStatePath, sprintJsonPath } from '../artifacts/paths';
 import { asProjectState, validateProjectStateShape, validateSprintFile } from '../artifacts/schema';
-import { KyroCoreError } from '../core/errors';
+import { KyroCoreError, describeWriteFailure } from '../core/errors';
 import {
   SPRINT_CLOSE_CHECKPOINT_KIND,
   SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION,
@@ -378,11 +378,11 @@ function verifyArtifact(path: string, digest: string, label: string): void {
 
 function publishExclusive(path: string, content: string, label: string): void {
   const target = assertSafeManagedPath(path);
-  assertStateWriterLeaseHealthy();
-  ensureDurableDirectory(dirname(target));
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
   let failure: unknown = null;
   try {
+    assertStateWriterLeaseHealthy();
+    ensureDurableDirectory(dirname(target));
     assertStateWriterLeaseHealthy();
     writeSynced(temporary, content, true);
     assertStateWriterLeaseHealthy();
@@ -394,16 +394,16 @@ function publishExclusive(path: string, content: string, label: string): void {
       : error;
   }
   cleanupTemporary(temporary, failure);
-  if (failure) throw failure;
+  if (failure) throw describeWriteFailure(failure) ?? failure;
 }
 
 function atomicReplace(path: string, content: string): void {
   const target = assertSafeManagedPath(path);
-  assertStateWriterLeaseHealthy();
-  ensureDurableDirectory(dirname(target));
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
   let failure: unknown = null;
   try {
+    assertStateWriterLeaseHealthy();
+    ensureDurableDirectory(dirname(target));
     assertStateWriterLeaseHealthy();
     writeSynced(temporary, content, true);
     assertStateWriterLeaseHealthy();
@@ -413,7 +413,7 @@ function atomicReplace(path: string, content: string): void {
     failure = error;
   }
   cleanupTemporary(temporary, failure);
-  if (failure) throw failure;
+  if (failure) throw describeWriteFailure(failure) ?? failure;
 }
 
 function cleanupTemporary(path: string, primaryFailure: unknown): void {
@@ -423,7 +423,11 @@ function cleanupTemporary(path: string, primaryFailure: unknown): void {
     fsyncParentDirectory(path);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-    if (primaryFailure) throw new AggregateError([primaryFailure, error], 'Durable file operation failed and temporary cleanup also failed');
+    if (primaryFailure) {
+      const writeFailure = describeWriteFailure(primaryFailure);
+      if (writeFailure) throw writeFailure;
+      throw new AggregateError([primaryFailure, error], 'Durable file operation failed and temporary cleanup also failed');
+    }
     throw error;
   }
 }
