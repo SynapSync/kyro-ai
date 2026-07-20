@@ -85,7 +85,7 @@ response = llm.generate({
 Your host application is responsible for persistence:
 
 - Write findings to `.agents/kyro/scopes/{scope}/findings/`.
-- Read and write the scope's single source of truth at `.agents/kyro/scopes/{scope}/sprint.json`.
+- Read the scope's single source of truth at `.agents/kyro/scopes/{scope}/sprint.json` (prefer `kyro context-pack` for a lean read). Write it through Kyro's tool-owned CLI verbs (`kyro plan`, `record-evidence`, `review`, `debt`, `add-emergent`, `close-sprint`) rather than hand-serializing the file, so the schema and deterministic gates are enforced.
 - Write the lossless scope checkpoint, legacy ActiveSprint snapshot, and human narrative to `.agents/kyro/scopes/{scope}/archive/` at sprint close, not during normal task execution.
 - Run verification commands outside the model when possible.
 

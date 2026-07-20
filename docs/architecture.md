@@ -75,17 +75,17 @@ ORCHESTRATOR
 1. **Routing** - Orchestrator reads `.agents/kyro/kyro.json`, then the scope's `sprint.json`, and routes on `handoff.nextAction`.
 2. **Analysis** - Orchestrator explores the codebase and writes finding files under `findings/`.
 3. **Gate 1** - User approves analysis.
-4. **Planning** - Orchestrator writes the objective, roadmap, and active sprint into `sprint.json`.
+4. **Planning** - Orchestrator materializes the objective, roadmap, and active sprint into `sprint.json` via `kyro plan --from` (tool-owned; init and sprint modes).
 5. **Gate 2** - User approves the plan.
-6. **Implementation** - Orchestrator executes tasks, runs review checks, and records compact task evidence directly on the task object in `sprint.json`.
+6. **Implementation** - Orchestrator executes tasks, then records evidence and the checker verdict through tool-owned verbs (`kyro record-evidence`, `kyro review`) rather than hand-editing `sprint.json`.
 7. **Gate 3** - User approves implementation.
-8. **Review and Close** - Orchestrator updates debt entries in `sprint.json`, runs retro, and closes the sprint — writing a verbatim snapshot plus a human narrative to `archive/`.
+8. **Review and Close** - Orchestrator records debt changes with `kyro debt`, runs retro, and closes the sprint with `kyro close-sprint` — writing a verbatim snapshot plus a human narrative to `archive/`.
 
 ---
 
 ## Artifact Layout
 
-Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, conventions, durable ADRs, and handoff routing. Agents read `kyro.json` and `sprint.json` first, then write back to `sprint.json` as the only routine mutation. See [Cost Model](cost-model.md).
+Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, conventions, durable ADRs, and handoff routing. Agents read `kyro.json` and `sprint.json` first, then route state changes through Kyro's tool-owned verbs (`kyro plan`, `record-evidence`, `review`, `debt`, `add-emergent`, `close-sprint`), which mutate `sprint.json` — the only routine mutation. See [Cost Model](cost-model.md).
 
 ```
 .agents/kyro/

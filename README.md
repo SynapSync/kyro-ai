@@ -110,7 +110,7 @@ read kyro.json + scopes/{scope}/sprint.json
   → route on sprint.json.handoff.nextAction
     (init → clarify → plan → execute → review → close, or recover)
   → load only the selected mode/helper/template
-  → one safe write back to sprint.json
+  → one tool-owned write to sprint.json
 ```
 
 It loads two files to start and updates one per action — it never pre-loads every roadmap, helper, and template just to decide what's next. Unknowns become explicit `[NEEDS CLARIFICATION]` markers resolved before planning: the agent admits what it doesn't know instead of inventing it.

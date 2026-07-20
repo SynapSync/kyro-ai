@@ -120,7 +120,7 @@ If compaction happens mid-session, a new agent can read `sprint.json.handoff` to
 
 3. **Use lighter models for read-only exploration** — The analysis phase reads many files. A lighter model can reduce cost when the task is status, inventory, or summarization. Use the strongest available model for implementation, debugging, and architecture decisions.
 
-4. **Checkpoint leanly** — Kyro records compact task evidence directly on the task object in `sprint.json` during execution and writes the archive snapshot plus narrative at sprint close.
+4. **Checkpoint leanly** — Kyro records task evidence and status through tool-owned CLI verbs (`kyro record-evidence`, `kyro review`) during execution and writes the archive snapshot plus narrative at sprint close via `kyro close-sprint`.
 
 5. **Avoid loading unnecessary skills** — Each loaded skill adds to the context. Only invoke skills when needed.
 
