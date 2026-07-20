@@ -57,6 +57,7 @@ Under the hood, one install gives your agents:
 - a **managed core** with orchestrator, command, skill, and template instructions
 - **command-like skills** such as `kyro-forge`, `kyro-status`, and `kyro-qa`
 - **a single source of truth per scope** — one `sprint.json` holding objective, success criteria, roadmap, the active sprint, debt, conventions, and handoff routing
+- **tool-owned state verbs** (`kyro plan`, `record-evidence`, `review`, `debt`, `add-emergent`, `close-sprint`) so agents change state through the CLI instead of hand-editing `sprint.json` — the schema and gates are enforced on every write, and `kyro context-pack` gives a lean read for routing
 - **lossless scope checkpoints** — every close preserves complete scope state before and after the transition, while retaining the legacy verbatim ActiveSprint snapshot
 - **deterministic CLI gates** (`doctor`, `analyze`) so quality is enforced in code, not left to prompt discipline
 - **behavioral evals** (`kyro eval`) that replay agent-facing routing, guardrails, and artifact transitions
