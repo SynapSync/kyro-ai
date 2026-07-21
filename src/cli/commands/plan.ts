@@ -117,7 +117,7 @@ export function runPlanCommand(rawArgs: string[]): void {
     throw new KyroCoreError(
       'NOT_READY_TO_PLAN',
       `Scope "${scope}" is not ready to plan a sprint (nextAction=${currentSprint.handoff.nextAction}).`,
-      'Resolve the current handoff first (e.g. clarify, or wrap_up means the scope is complete).',
+      'Resolve the current handoff first (e.g. clarify, or done means the scope is complete).',
     );
   }
   runPlanSprintMode(raw, scope, currentSprint, args, state);

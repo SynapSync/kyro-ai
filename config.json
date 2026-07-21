@@ -34,7 +34,7 @@
     "close": {
       "maxContextTokens": 3200,
       "reasoningTier": "deep",
-      "guidance": "Use for sprint close, retro, and wrap-up materialization. Quality gates matter more than speed."
+      "guidance": "Use for sprint close and retro materialization. Quality gates matter more than speed."
     }
   }
 }

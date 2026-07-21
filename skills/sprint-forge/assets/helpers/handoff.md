@@ -18,7 +18,7 @@ Captures the mental context a fresh session needs to resume — hypotheses, deci
 }
 ```
 
-- `nextAction`: the route (`init | plan_sprint | execute_task | review_task | close_sprint | wrap_up`).
+- `nextAction`: the route (`init | clarify | plan_sprint | execute_task | review_task | close_sprint | done`).
 - `nextTaskId`: the task to resume, or `null`.
 - `blockers`: concrete things preventing progress.
 - `note`: free-text mental context — active hypotheses, pending decisions, where work was left. This is the resume prompt; keep it specific and current.
@@ -26,7 +26,7 @@ Captures the mental context a fresh session needs to resume — hypotheses, deci
 ## Update points
 
 - Each task transition: refresh `nextTaskId`, `nextAction`, and `note`.
-- Wrap-up: set `note` to the most important thing to do next session, list `blockers`.
+- Done (scope complete): leave `nextAction: "done"`; set `note` only if residual context helps a future reopen.
 - Sprint close: point `note` at the next sprint or scope completion.
 
 ## Generation

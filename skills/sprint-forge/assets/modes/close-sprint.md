@@ -44,7 +44,7 @@ in a **fresh session** — continuing here carries the whole session's context, 
 driver across a multi-sprint run. Do NOT auto-start the next sprint now. Generate the
 continuation prompt via the task-context capability (`/kyro:task-context`, or the
 `kyro-task-context` skill) and present it in a fenced block for the user to paste into a new
-session. When the CLI reports `Next action: wrap_up`, the scope is complete — no more sprints to plan.
+session. When the CLI reports `Next action: done`, the scope is complete — no more sprints to plan.
 
 ## Rules
 

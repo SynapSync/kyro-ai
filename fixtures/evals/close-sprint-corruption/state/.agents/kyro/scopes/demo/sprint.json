@@ -35,7 +35,7 @@
   "activeSprint": null,
   "debt": [],
   "handoff": {
-    "nextAction": "wrap_up",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
     "note": "Resume demo.",

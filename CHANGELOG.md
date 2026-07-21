@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.32.0] - 2026-07-21
+
+### Removed
+
+- **`wrap_up` is gone.** Closing the last sprint now sets `handoff.nextAction: "done"` (with `status: "completed"`). `done` is a terminal handoff: empty routing modes, budget class `brief`, no close-mode load, no post-close action. Pre-existing artifacts that still say `wrap_up` are normalized to `done` on read/validation so customer scopes keep loading without a mass migration.
+
 ## [4.31.0] - 2026-07-20
 
 ### Fixed

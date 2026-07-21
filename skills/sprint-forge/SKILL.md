@@ -76,7 +76,7 @@ Claude Code's `PreToolUse` hook blocks edits nulling `activeSprint`; others rely
 | `execute_task` | `modes/SPRINT.md`, `modes/execute-task.md` |
 | `review_task` | `modes/SPRINT.md`, `modes/review-task.md`, `helpers/reviewer.md` |
 | `close_sprint` | `modes/SPRINT.md`, `modes/close-sprint.md`, `helpers/debt-tracker.md` + `helpers/learner.md` as needed |
-| `wrap_up` | `modes/close-sprint.md` only if a milestone closed |
+| `done` | Stop — scope complete. No work mode. |
 | status report | `modes/STATUS.md` |
 | inconsistent | `modes/recover.md` |
 

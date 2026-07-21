@@ -11,7 +11,7 @@ export const KYRO_SCOPE_STATUS = {
 export type KyroScopeStatus = (typeof KYRO_SCOPE_STATUS)[keyof typeof KYRO_SCOPE_STATUS];
 
 export const SCOPE_STATUS_VALUES = ['planning', 'active', 'blocked', 'completed'] as const;
-export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'wrap_up'] as const;
+export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'done'] as const;
 export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
 export const PHASE_STATUS_VALUES = ['pending', 'active', 'blocked', 'done'] as const;
 export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'] as const;
@@ -259,6 +259,11 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
   if (!isRecord(value.handoff)) {
     issues.push({ path, field: 'handoff', message: 'must be an object' });
   } else {
+    // Pre-4.32 scopes wrote terminal close as wrap_up. Collapse to done on read so
+    // wrap_up never remains a first-class nextAction in the runtime contract.
+    if (value.handoff.nextAction === 'wrap_up') {
+      value.handoff.nextAction = 'done';
+    }
     requireLiteralSet(value.handoff, 'nextAction', NEXT_ACTION_VALUES, path, issues, 'handoff.nextAction');
     requireNullableString(value.handoff, 'nextTaskId', path, issues);
   }

@@ -10,7 +10,8 @@ Lightweight index for sprint work. Do not load the full sprint protocol upfront.
 | `plan_sprint` | `plan-sprint.md` |
 | `execute_task` | `execute-task.md` |
 | `review_task` | `review-task.md` |
-| `close_sprint` / `wrap_up` | `close-sprint.md` |
+| `close_sprint` | `close-sprint.md` |
+| `done` | Stop — scope complete. No mode. |
 | inconsistent | `recover.md` |
 
 ## Required read order
