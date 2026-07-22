@@ -454,4 +454,190 @@ withWorkspace('kyro-layered-bootstrap-readonly-', (cwd) => {
   console.log('ok status/context-pack bootstrap no-write + remedy');
 });
 
+// --- doctor: layered health, monolito leftover WARN, missing-state bootstrap, minPackageVersion (R7/R10) ---
+function loadDoctor() {
+  return require(join(repo, 'dist/cli/commands/doctor.js'));
+}
+
+withWorkspace('kyro-layered-doctor-healthy-', (cwd) => {
+  const { writeProjectLayers } = loadState();
+  const { runDoctorChecks, compareSemverLike } = loadDoctor();
+
+  writeProjectLayers({
+    shared: {
+      schemaVersion: 4,
+      artifactRoot: '.agents/kyro/scopes',
+      scopes: [{ id: 'alpha', title: 'Alpha', status: 'active' }],
+      principles: [principle()],
+    },
+    local: {
+      schemaVersion: 4,
+      activeScope: 'alpha',
+      installedAdapters: monolitoFixture().installedAdapters,
+      runtimePath: '~/.agents/kyro/current',
+    },
+  });
+
+  const before = stateFilesPresent(cwd);
+  const checks = runDoctorChecks(false, false, false, false, null);
+  const after = stateFilesPresent(cwd);
+  assert(
+    before.project === after.project && before.local === after.local && before.monolito === after.monolito,
+    'doctor must not create or remove project state files',
+  );
+
+  const projectState = checks.find((c) => c.name === 'project state');
+  assert(projectState?.status === 'pass', `healthy layered project state must pass: ${JSON.stringify(projectState)}`);
+  assert(
+    typeof projectState.detail === 'string' && projectState.detail.includes('layered'),
+    `healthy detail should mention layered: ${projectState.detail}`,
+  );
+  assert(
+    checks.some((c) => c.name === 'project.json' && c.status === 'pass'),
+    'healthy workspace must pass project.json shape',
+  );
+  assert(
+    checks.some((c) => c.name === 'local.json' && c.status === 'pass'),
+    'healthy workspace must pass local.json shape',
+  );
+  assert(
+    !checks.some((c) => c.name === 'legacy monolito' && c.status === 'warn'),
+    'healthy layered-only workspace must not warn about monolito leftover',
+  );
+  assert(
+    !checks.some((c) => c.status === 'fail' && (c.name === 'project state' || c.name === 'project.json' || c.name === 'local.json')),
+    `no layered-state fails on healthy workspace: ${JSON.stringify(checks.filter((c) => c.status === 'fail'))}`,
+  );
+
+  assert(compareSemverLike('4.34.0', '4.34.0') === 0, 'semver equal');
+  assert(compareSemverLike('4.33.0', '4.34.0') === -1, 'semver older');
+  assert(compareSemverLike('5.0.0', '4.34.0') === 1, 'semver newer');
+  console.log('ok doctor healthy layered');
+});
+
+withWorkspace('kyro-layered-doctor-monolito-leftover-', (cwd) => {
+  const { writeProjectLayers } = loadState();
+  const { KYRO_STATE_PATH } = loadConstants();
+  const { runDoctorChecks } = loadDoctor();
+
+  writeProjectLayers({
+    shared: {
+      schemaVersion: 4,
+      artifactRoot: '.agents/kyro/scopes',
+      scopes: [{ id: 'alpha', title: 'Alpha', status: 'active' }],
+    },
+    local: {
+      schemaVersion: 4,
+      activeScope: 'alpha',
+      installedAdapters: [],
+      runtimePath: '~/.agents/kyro/current',
+    },
+  });
+  writeJson(cwd, KYRO_STATE_PATH, monolitoFixture());
+
+  const checks = runDoctorChecks(false, false, false, false, null);
+  const leftover = checks.find((c) => c.name === 'legacy monolito');
+  assert(leftover?.status === 'warn', `monolito leftover must WARN: ${JSON.stringify(leftover)}`);
+  assert(
+    typeof leftover.detail === 'string' && leftover.detail.includes('kyro.json'),
+    `leftover detail mentions kyro.json: ${leftover.detail}`,
+  );
+  assert(
+    typeof leftover.remedy === 'string' && leftover.remedy.includes('install'),
+    `leftover remedy actionable: ${leftover.remedy}`,
+  );
+  // WARN only — must not fail solely for leftover monolito
+  assert(leftover.status !== 'fail', 'monolito leftover must not FAIL');
+  console.log('ok doctor monolito leftover WARN');
+});
+
+withWorkspace('kyro-layered-doctor-missing-', (cwd) => {
+  const { runDoctorChecks } = loadDoctor();
+  const before = stateFilesPresent(cwd);
+  assert(!before.project && !before.local && !before.monolito, 'fixture starts empty');
+
+  const checks = runDoctorChecks(false, false, false, false, null);
+  const after = stateFilesPresent(cwd);
+  assert(!after.project && !after.local && !after.monolito, 'doctor must not create project state when missing');
+
+  const projectState = checks.find((c) => c.name === 'project state');
+  assert(projectState?.status === 'warn', `missing state must WARN: ${JSON.stringify(projectState)}`);
+  assert(
+    typeof projectState.detail === 'string'
+      && (projectState.detail.includes('project.json') || projectState.detail.includes('No project state')),
+    `missing detail mentions layered paths: ${projectState.detail}`,
+  );
+  assert(
+    typeof projectState.remedy === 'string'
+      && projectState.remedy.includes('install')
+      && projectState.remedy.includes('project.json'),
+    `missing remedy must mention layered install, not only kyro.json: ${projectState.remedy}`,
+  );
+  assert(
+    !projectState.detail.includes('kyro.json not found') || projectState.detail.includes('project.json'),
+    'must not be monolito-only messaging',
+  );
+  console.log('ok doctor missing-state bootstrap remedy');
+});
+
+withWorkspace('kyro-layered-doctor-minpkg-', (cwd) => {
+  const { writeProjectLayers } = loadState();
+  const { runDoctorChecks } = loadDoctor();
+  const { readPackageVersion } = require(join(repo, 'dist/cli/help.js'));
+  const runtime = readPackageVersion();
+
+  writeProjectLayers({
+    shared: {
+      schemaVersion: 4,
+      artifactRoot: '.agents/kyro/scopes',
+      scopes: [],
+      team: { minPackageVersion: '99.0.0' },
+    },
+    local: {
+      schemaVersion: 4,
+      activeScope: null,
+      installedAdapters: [],
+      runtimePath: '~/.agents/kyro/current',
+    },
+  });
+
+  const checks = runDoctorChecks(false, false, false, false, null);
+  const minCheck = checks.find((c) => c.name === 'team minPackageVersion');
+  assert(minCheck?.status === 'warn', `minPackageVersion must WARN when runtime older: ${JSON.stringify(minCheck)}`);
+  assert(
+    typeof minCheck.detail === 'string' && minCheck.detail.includes(runtime) && minCheck.detail.includes('99.0.0'),
+    `detail must include versions: ${minCheck.detail}`,
+  );
+  assert(
+    typeof minCheck.remedy === 'string' && minCheck.remedy.toLowerCase().includes('upgrade'),
+    `remedy should recommend upgrade: ${minCheck.remedy}`,
+  );
+  // Non-blocking: doctor exit is driven by fail status only
+  assert(minCheck.status === 'warn', 'minPackageVersion must not FAIL by default');
+  assert(
+    !checks.some((c) => c.name === 'team minPackageVersion' && c.status === 'fail'),
+    'no fail for minPackageVersion',
+  );
+
+  // When floor is met, PASS
+  writeProjectLayers({
+    shared: {
+      schemaVersion: 4,
+      artifactRoot: '.agents/kyro/scopes',
+      scopes: [],
+      team: { minPackageVersion: '0.0.1' },
+    },
+    local: {
+      schemaVersion: 4,
+      activeScope: null,
+      installedAdapters: [],
+      runtimePath: '~/.agents/kyro/current',
+    },
+  });
+  const okChecks = runDoctorChecks(false, false, false, false, null);
+  const okMin = okChecks.find((c) => c.name === 'team minPackageVersion');
+  assert(okMin?.status === 'pass', `minPackageVersion must PASS when met: ${JSON.stringify(okMin)}`);
+  console.log('ok doctor minPackageVersion WARN');
+});
+
 console.log('check-layered-state: all assertions passed');
