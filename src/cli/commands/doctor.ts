@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { ARTIFACT_ROOT, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
-import { resolveKyroInvocation } from '../invocation';
+import { isEphemeralPackageManagerPath, resolveKyroBinaryPath, resolveKyroInvocation } from '../invocation';
 import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
@@ -22,7 +22,7 @@ const PROJECT_STATE_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
 const GLOBAL_RUNTIME_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
 const GLOBAL_RUNTIME_SYNC_REMEDY = FULL_PACKAGE_SYNC_REMEDY;
 const CLI_INVOCATION_REMEDY =
-  'Re-run: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) so the runtime CLI is projected and the invocation is refreshed. Use the full npm package, not the projected runtime CLI.';
+  'Re-run: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) so the runtime CLI is projected and the invocation is refreshed. Use the full npm package, not the projected runtime CLI. After sync, agents should invoke the persisted form (often `node ~/.agents/kyro/current/dist/cli.js`), not a bare `kyro` that only existed during npx.';
 
 export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'trace' | 'kyroScope'>): void {
   const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.trace ?? false, options?.kyroScope ?? null);
@@ -285,6 +285,28 @@ function checkCliInvocation(): CheckResult {
     }
     // Prefer the persisted invocation; fall back to a live resolve for legacy manifests.
     const raw = manifest.kyroInvocation ?? resolveKyroInvocation().raw;
+    // Bare `kyro` is only safe when PATH still resolves to a durable (non-npx) binary.
+    // A stale install from `npx kyro-ai install` often leaves kyroInvocation="kyro" after the
+    // temporary npx bin is gone — fail closed with a re-sync remedy.
+    if (raw.trim() === 'kyro') {
+      const resolved = resolveKyroBinaryPath();
+      if (!resolved) {
+        return {
+          status: 'fail',
+          name: 'CLI invocation',
+          detail: 'persisted kyroInvocation is bare "kyro" but no durable kyro binary is on PATH',
+          remedy,
+        };
+      }
+      if (isEphemeralPackageManagerPath(resolved)) {
+        return {
+          status: 'fail',
+          name: 'CLI invocation',
+          detail: `persisted kyroInvocation is bare "kyro" but resolves to ephemeral package-manager path: ${resolved}`,
+          remedy,
+        };
+      }
+    }
     // The invocation is a shell string (e.g. `node ~/.agents/kyro/current/dist/cli.js`), not a
     // bare binary — split into command + args and expand `~` before exec, which does neither.
     const [command, ...args] = raw.trim().split(/\s+/).map(expandHome);

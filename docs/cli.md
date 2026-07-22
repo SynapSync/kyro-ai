@@ -94,7 +94,18 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 | Root | How you get it | Layout highlights |
 | ---- | -------------- | ----------------- |
 | **Full npm package** | `npx kyro-ai …` or global `kyro` after `npm i -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
-| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when `kyro` is not on PATH) | `manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror |
+| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when no durable `kyro` is on PATH) | `manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror |
+
+### CLI invocation persistence (`kyroInvocation`)
+
+Install/sync probe PATH once and write the result into `manifest.json` and `kyro.json`, then substitute it for `{{KYRO_CLI}}` in projected modes.
+
+| Situation | Persisted invocation |
+| --------- | -------------------- |
+| Durable global `kyro` on PATH (`npm i -g kyro-ai`, user shim under `~/.local/bin`, …) | `kyro` |
+| No `kyro`, **or** only an ephemeral package-manager bin (npx/`_npx` cache, yarn dlx, pnpm dlx) | `node ~/.agents/kyro/current/dist/cli.js` |
+
+**Why:** `npx kyro-ai install` puts a temporary `…/.npm/_npx/…/bin/kyro` on PATH for the install process only. Treating that as durable used to persist bare `kyro`, which then failed for agents after npx exited and pushed them into hand-writing `sprint.json`. Re-run `npx kyro-ai sync` (or install) after upgrading so existing workspaces refresh a stale `"kyro"` invocation.
 
 **Must run from the full npm package:**
 
