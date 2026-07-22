@@ -109,6 +109,11 @@ export function ensureDurableDirectory(directory: string): void {
   }
 }
 
+/**
+ * Serialize project-state mutations (including multi-file layer writes to
+ * project.json + local.json via writeProjectLayers). Nested calls re-enter the
+ * same lease (localLockDepth); prefer write helpers in state.ts for layer I/O.
+ */
 export function withStateWriterLock<T>(work: () => T): T {
   const release = acquireStateWriterLock();
   let primary: unknown = null;
