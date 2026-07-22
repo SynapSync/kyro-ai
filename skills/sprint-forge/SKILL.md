@@ -55,6 +55,8 @@ NEVER partial/string-replace for structural changes (nulling `activeSprint`, rem
 
 ## Tool-owned operations (use the CLI, do not hand-roll)
 
+Irreversible or schema-critical operations are CLI-owned, never hand-rolled:
+
 | Command | What it owns |
 |---------|--------------|
 | `{{KYRO_CLI}} close-sprint --kyro-scope <scope> --outcome <...>` | Lossless close: publishes the immutable checkpoint, snapshots the sprint into `ledger[]`, renders the narrative, reconciles state, and resumes matching retries. |
