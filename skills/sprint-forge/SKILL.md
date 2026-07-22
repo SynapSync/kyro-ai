@@ -37,7 +37,7 @@ One scope = one `sprint.json`. Agents read `kyro.json` + the scope's lean pack, 
 3. Generate one sprint; never pre-generate.
 4. Tasks are self-contained: every task carries `description`, `files_to_touch`, `context`, `acceptance_criteria`.
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
-6. Closing a sprint (snapshot-then-clear of `activeSprint`) is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
+6. Closing a sprint is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
 7. Findings and archives are write-only evidence; agents never re-read them to route.
 8. **Admit unknowns, never guess.** Write `[NEEDS CLARIFICATION: <gap>]` and route to `clarify`. `{{KYRO_CLI}} doctor`/`analyze` FAIL while any marker remains — a deterministic gate.
 
@@ -54,8 +54,6 @@ Every mutation of `sprint.json` or `kyro.json` MUST be a **safe write**:
 NEVER partial/string-replace for structural changes (nulling `activeSprint`, removing a nested block) — it orphans the JSON body and corrupts the source of truth. Only exception: the per-sprint archive snapshot (a fresh file, pure write, never re-read).
 
 ## Tool-owned operations (use the CLI, do not hand-roll)
-
-Irreversible or schema-critical operations are CLI-owned, never hand-rolled:
 
 | Command | What it owns |
 |---------|--------------|
