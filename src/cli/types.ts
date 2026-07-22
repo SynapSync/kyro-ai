@@ -48,8 +48,9 @@ export interface KyroProjectState {
   installedAdapters: KyroInstalledAdapter[];
   /** Optional project-level principles (v4.1+). Absent in pre-4.1 files. */
   principles?: Principle[];
-  /** Resolved CLI invocation (v4.2+). Absent in pre-4.2 files until the next install/sync. */
-  kyroInvocation?: string;
+  // kyroInvocation is intentionally NOT project state. Authoritative value lives on the
+  // global runtime manifest (~/.agents/kyro/current/manifest.json). Install/sync strip any
+  // legacy project-local copy so multi-workspace fleets cannot drift.
 }
 
 // --- v4 sprint.json model (single source of truth per scope) ---

@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { KYRO_ROOT } from './constants';
+import { readManifest } from './state';
 
 /** Mustache-style token substituted in projected markdown at install/sync time. See design.md §5. */
 export const KYRO_CLI_PLACEHOLDER = '{{KYRO_CLI}}';
@@ -100,4 +101,20 @@ export function isKyroOnPath(): boolean {
 
 export function resolveKyroInvocation(): KyroInvocation {
   return buildInvocation(isDurableKyroOnPath(), KYRO_ROOT);
+}
+
+/**
+ * Authoritative CLI invocation for this machine.
+ *
+ * Source of truth is the global runtime manifest (`~/.agents/kyro/current/manifest.json`).
+ * Falls back to a live PATH probe when the manifest is missing or has no invocation yet.
+ * Never reads project `.agents/kyro/kyro.json` — that field is legacy and stripped on install/sync
+ * so one workspace refresh cannot leave N other projects with a stale bare `"kyro"`.
+ */
+export function getPersistedKyroInvocation(): string {
+  const manifest = readManifest();
+  if (typeof manifest?.kyroInvocation === 'string' && manifest.kyroInvocation.trim()) {
+    return manifest.kyroInvocation.trim();
+  }
+  return resolveKyroInvocation().raw;
 }

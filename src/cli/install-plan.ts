@@ -35,10 +35,10 @@ function buildInstallPlanForMode(
   const packageVersion = readPackageVersion();
   const runtimeRoot = KYRO_ROOT;
   // Probed once per install/sync (durable kyro only; ephemeral npx bins are rejected — see invocation.ts).
-  // Projected markdown is static, so the invocation must be
-  // known at copy time. Reused for manifest.json, kyro.json, and (Phase 3+) substitution.
+  // Projected markdown is static, so the invocation must be known at copy time.
+  // SoT is the global runtime manifest only — never project kyro.json (avoids multi-workspace drift).
   const kyroInvocation = resolveKyroInvocation().raw;
-  const state = options.includeWorkspace ? mergeProjectState(agents, scope, now, kyroInvocation) : null;
+  const state = options.includeWorkspace ? mergeProjectState(agents, scope, now) : null;
   const manifestAgents = state?.installedAdapters.map((adapter) => adapter.agent) ?? [];
   const adapters = state?.installedAdapters ?? [];
   const managedFiles = buildManagedFiles(manifestAgents, runtimeRoot);
@@ -104,7 +104,6 @@ function mergeProjectState(
   agents: Agent[],
   scope: InstallScope,
   installedAt: string,
-  kyroInvocation: string,
 ): KyroProjectState {
   const existing = readProjectState();
   const defaults: KyroProjectState = {
@@ -118,10 +117,13 @@ function mergeProjectState(
   // Merge over defaults so an incomplete kyro.json (e.g. hand-written by an agent that never ran
   // kyro install) is REPAIRED instead of crashing. Arrays are normalized before we iterate them.
   const base: KyroProjectState = { ...defaults, ...(existing ?? {}) };
-  // runtimeVersion was a project-local snapshot of a global singleton and could become stale
-  // whenever another workspace replaced ~/.agents/kyro/current. Keep legacy files readable, but
-  // canonicalize them on install/sync; the active version lives in current/manifest.json only.
+  // runtimeVersion / kyroInvocation were project-local snapshots of global singleton runtime
+  // metadata and could become stale whenever another workspace replaced ~/.agents/kyro/current.
+  // Keep legacy files readable, but canonicalize on install/sync:
+  // - packageVersion lives in current/manifest.json only
+  // - kyroInvocation lives in current/manifest.json only (see getPersistedKyroInvocation)
   delete (base as KyroProjectState & { runtimeVersion?: unknown }).runtimeVersion;
+  delete (base as KyroProjectState & { kyroInvocation?: unknown }).kyroInvocation;
   if (!Array.isArray(base.scopes)) base.scopes = [];
   if (!Array.isArray(base.installedAdapters)) base.installedAdapters = [];
 
@@ -144,7 +146,6 @@ function mergeProjectState(
     activeScope: base.activeScope,
     runtimePath: KYRO_ROOT,
     installedAdapters: [...adaptersByAgent.values()].sort((a, b) => a.agent.localeCompare(b.agent)),
-    kyroInvocation,
   });
 }
 

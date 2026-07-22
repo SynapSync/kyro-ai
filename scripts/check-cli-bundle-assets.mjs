@@ -90,9 +90,8 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
   const managedDistCli = `~/.agents/kyro/current/dist/cli.js`;
   assert(manifest.managedFiles.includes(managedDistCli), `check-cli-bundle-assets: manifest.managedFiles missing ${managedDistCli}`);
 
-  // Phase 2 (design.md §4 / tasks.md 2.x): kyroInvocation must be persisted to both
-  // manifest.json and kyro.json, and must be either the bare `kyro` command or the
-  // `node {current}/dist/cli.js` fallback form.
+  // kyroInvocation SoT is the global runtime manifest only (not project kyro.json).
+  // Shape: bare `kyro` (durable PATH) or `node {current}/dist/cli.js` fallback.
   const isValidInvocation = (value) => value === 'kyro' || /^node .+\/dist\/cli\.js$/.test(value);
   assert(typeof manifest.kyroInvocation === 'string', 'check-cli-bundle-assets: manifest.json missing kyroInvocation');
   assert(isValidInvocation(manifest.kyroInvocation), `check-cli-bundle-assets: unexpected manifest.kyroInvocation shape "${manifest.kyroInvocation}"`);
@@ -100,8 +99,7 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
   const statePath = join(cwd, '.agents', 'kyro', 'kyro.json');
   assert(existsSync(statePath), `check-cli-bundle-assets: missing ${statePath}`);
   const state = JSON.parse(readFileSync(statePath, 'utf-8'));
-  assert(typeof state.kyroInvocation === 'string', 'check-cli-bundle-assets: kyro.json missing kyroInvocation');
-  assert(state.kyroInvocation === manifest.kyroInvocation, 'check-cli-bundle-assets: kyro.json.kyroInvocation does not match manifest.json.kyroInvocation');
+  assert(!Object.hasOwn(state, 'kyroInvocation'), 'check-cli-bundle-assets: kyro.json must not store kyroInvocation (global manifest is SoT)');
 
   const strayRuntimeFile = join(runtimeDir, 'stray-old-binary.js');
   const legacyVersionDir = join(home, '.agents', 'kyro', 'versions', '0.0.0');

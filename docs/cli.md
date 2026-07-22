@@ -98,14 +98,16 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 ### CLI invocation persistence (`kyroInvocation`)
 
-Install/sync probe PATH once and write the result into `manifest.json` and `kyro.json`, then substitute it for `{{KYRO_CLI}}` in projected modes.
+**Source of truth is global only:** `~/.agents/kyro/current/manifest.json.kyroInvocation`.
 
-| Situation | Persisted invocation |
+Install/sync probe PATH once, write the result into the **runtime manifest**, and substitute it for `{{KYRO_CLI}}` in projected modes under `current/`. Project `.agents/kyro/kyro.json` does **not** store `kyroInvocation` (legacy copies are stripped on the next install/sync of that workspace). One machine-wide refresh is enough for all projects.
+
+| Situation | Persisted invocation (manifest) |
 | --------- | -------------------- |
 | Durable global `kyro` on PATH (`npm i -g kyro-ai`, user shim under `~/.local/bin`, …) | `kyro` |
 | No `kyro`, **or** only an ephemeral package-manager bin (npx/`_npx` cache, yarn dlx, pnpm dlx) | `node ~/.agents/kyro/current/dist/cli.js` |
 
-**Why:** `npx kyro-ai@latest install` puts a temporary `…/.npm/_npx/…/bin/kyro` on PATH for the install process only. Treating that as durable used to persist bare `kyro`, which then failed for agents after npx exited and pushed them into hand-writing `sprint.json`. Re-run `npx kyro-ai@latest sync` (or install) after upgrading so existing workspaces refresh a stale `"kyro"` invocation.
+**Why:** `npx kyro-ai@latest install` puts a temporary `…/.npm/_npx/…/bin/kyro` on PATH for the install process only. Treating that as durable used to persist bare `kyro`, which then failed for agents after npx exited and pushed them into hand-writing `sprint.json`. Ephemeral package-manager paths are rejected. Re-run `npx kyro-ai@latest sync` (or install) **once** (any workspace, or runtime-only install) so the global manifest and projected modes refresh; you do not need to visit every project just to fix the invocation string.
 
 **Must run from the full npm package:**
 
@@ -234,7 +236,7 @@ Initial state shape (no scopes on disk yet):
 
 `kyro doctor` WARNs when folders on disk are missing from the local registry.
 
-The project state intentionally does not copy the runtime version. Kyro has one global active runtime, so its authoritative version is `~/.agents/kyro/current/manifest.json.packageVersion`; install and sync remove the legacy project-local `runtimeVersion` field while preserving scopes, principles, adapters, and custom metadata.
+The project state intentionally does not copy runtime infrastructure fields. Kyro has one global active runtime: authoritative `packageVersion` and `kyroInvocation` live on `~/.agents/kyro/current/manifest.json`. Install and sync remove legacy project-local `runtimeVersion` and `kyroInvocation` while preserving scopes, principles, adapters, and custom metadata.
 
 ## Token Audit
 
