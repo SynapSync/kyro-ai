@@ -50,6 +50,53 @@ export function hasMonolitoProjectStateOnDisk(): boolean {
   return workspacePathExists(KYRO_STATE_PATH);
 }
 
+/** True when any persisted project state file exists (layers or legacy monolito). */
+export function hasPersistedProjectStateOnDisk(): boolean {
+  return hasLayeredProjectStateOnDisk() || hasMonolitoProjectStateOnDisk();
+}
+
+/**
+ * One-line install/bootstrap remedy for missing or incomplete project state (D7a / R5).
+ * Read-only commands surface this string; they never create the files themselves.
+ */
+export const PROJECT_STATE_BOOTSTRAP_REMEDY =
+  'Run: npx kyro-ai install --init-workspace --yes  (writes project.json + local.json; rehydrates on-disk scopes).';
+
+/**
+ * Format a one-line actionable bootstrap remedy. Optional reason prefixes the install line.
+ * Never creates files.
+ */
+export function formatBootstrapRemedy(reason?: string): string {
+  if (reason && reason.trim()) {
+    const trimmed = reason.trim().replace(/\s+/g, ' ');
+    const base = trimmed.endsWith('.') ? trimmed : `${trimmed}.`;
+    return `${base} ${PROJECT_STATE_BOOTSTRAP_REMEDY}`;
+  }
+  return PROJECT_STATE_BOOTSTRAP_REMEDY;
+}
+
+/**
+ * Detect whether a read-only command should surface a bootstrap remedy.
+ * Callers pass unregistered on-disk scope ids (from unregisteredScopeFolders) so this module
+ * stays free of scopes imports. Never writes.
+ *
+ * @returns one-line remedy, or null when persisted state exists and all listed scopes are registered
+ */
+export function detectProjectStateBootstrapNeed(unregisteredScopeIds: string[] = []): string | null {
+  if (!hasPersistedProjectStateOnDisk()) {
+    return formatBootstrapRemedy(
+      'No project state on disk (expected project.json + local.json, or legacy kyro.json)',
+    );
+  }
+  if (unregisteredScopeIds.length > 0) {
+    const sorted = [...unregisteredScopeIds].sort((a, b) => a.localeCompare(b));
+    return formatBootstrapRemedy(
+      `${sorted.length} on-disk scope(s) not registered in project state: ${sorted.join(', ')}`,
+    );
+  }
+  return null;
+}
+
 /**
  * Effective project state façade used by all CLI/MCP readers.
  *

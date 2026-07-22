@@ -11,7 +11,8 @@ import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
 import { getPersistedKyroInvocation } from '../invocation';
 import { scopeFindingsToTask } from './review';
-import { readProjectState } from '../state';
+import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
+import { unregisteredScopeFolders } from '../core/scopes';
 import type {
   ActiveSprint,
   AdrRecord,
@@ -73,6 +74,9 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const adrs = selectAdrs(sprint, concise);
   const taskScenarios = resolveTaskScenarios(sprint, task);
   const { reviewPending, nextTaskReview } = resolveReviewDebt(sprint, task);
+  // D7a: never create project state from context-pack; surface install remedy when layers missing.
+  const bootstrapRemedy = detectProjectStateBootstrapNeed(unregisteredScopeFolders(readProjectState()));
+  if (bootstrapRemedy) warnings.push(bootstrapRemedy);
 
   // Concise trims long-form advisory prose (context, budget guidance) an agent does not need to
   // route/execute; the structured routing/task fields it acts on are always present. Detailed keeps

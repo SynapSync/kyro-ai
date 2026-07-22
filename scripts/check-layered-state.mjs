@@ -1,9 +1,11 @@
 /**
- * Layered project state foundation (team-project-state Sprint 1).
+ * Layered project state foundation (team-project-state Sprint 1–2).
  * Covers: merge precedence, no-write-on-read, monolito migration, write targeting,
- * shared/local schema validators, and scope set-active local-only when layers exist.
+ * shared/local schema validators, scope set-active local-only when layers exist,
+ * and status/context-pack bootstrap remedies without creating project state files.
  */
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -313,6 +315,143 @@ withWorkspace('kyro-layered-setactive-', (cwd) => {
   assert(readJson(cwd, LOCAL_STATE_PATH).activeScope === 'beta', 'set-active updates local activeScope');
   assert(JSON.parse(sharedAfter).principles[0].id === 'p-quality', 'principles unchanged after set-active');
   console.log('ok scope set-active local-only');
+});
+
+// --- status / context-pack: bootstrap remedy without writing project state (R5 / D7a) ---
+function minimalSprint(scopeId = 'demo') {
+  return {
+    schemaVersion: 4,
+    scope: scopeId,
+    title: 'Demo',
+    status: 'active',
+    objective: 'Demonstrate read-only bootstrap remedy.',
+    successCriteria: ['status does not write state files'],
+    clarifications: [],
+    conventions: [],
+    adrs: [],
+    roadmap: {
+      plannedSprintCount: 1,
+      sizingRationale: 'Single sprint.',
+      sprints: [{ n: 1, slug: 'demo', title: 'Demo', state: 'active' }],
+    },
+    ledger: [],
+    previousSprint: null,
+    activeSprint: {
+      n: 1,
+      slug: 'demo',
+      title: 'Demo',
+      objective: 'Do the demo.',
+      status: 'executing',
+      phases: [
+        {
+          id: 'P1',
+          title: 'Phase 1',
+          objective: 'Demo phase.',
+          status: 'active',
+          tasks: [
+            {
+              id: 'T1.1',
+              title: 'Demo task',
+              description: 'Do a thing.',
+              files_to_touch: ['a.ts'],
+              context: 'context',
+              acceptance_criteria: ['it works'],
+              depends_on: [],
+              status: 'pending',
+              evidence: null,
+              verdict: null,
+            },
+          ],
+        },
+      ],
+      emergentTasks: [],
+      definitionOfDone: ['done'],
+    },
+    debt: [],
+    handoff: {
+      nextAction: 'execute_task',
+      nextTaskId: 'T1.1',
+      blockers: [],
+      note: '',
+      lastUpdated: '2026-06-29',
+    },
+  };
+}
+
+function stateFilesPresent(cwd) {
+  return {
+    project: existsSync(join(cwd, '.agents/kyro/project.json')),
+    local: existsSync(join(cwd, '.agents/kyro/local.json')),
+    monolito: existsSync(join(cwd, '.agents/kyro/kyro.json')),
+  };
+}
+
+withWorkspace('kyro-layered-bootstrap-readonly-', (cwd) => {
+  const cli = join(repo, 'dist/cli.js');
+  const scopeId = 'demo';
+  writeJson(cwd, `.agents/kyro/scopes/${scopeId}/sprint.json`, minimalSprint(scopeId));
+
+  const before = stateFilesPresent(cwd);
+  assert(!before.project && !before.local && !before.monolito, 'fixture must start with no project state files');
+
+  const env = { ...process.env, HOME: join(cwd, '.home'), KYRO_TRACE: '0' };
+
+  const status = spawnSync(
+    process.execPath,
+    [cli, 'status', '--kyro-scope', scopeId, '--json'],
+    { cwd, env, encoding: 'utf-8' },
+  );
+  assert(status.status === 0, `status should exit 0: ${status.stderr || status.stdout}`);
+  const statusReport = JSON.parse(status.stdout);
+  assert(
+    typeof statusReport.bootstrapRemedy === 'string' && statusReport.bootstrapRemedy.includes('install --init-workspace'),
+    `status must include bootstrap remedy: ${status.stdout}`,
+  );
+  const afterStatus = stateFilesPresent(cwd);
+  assert(!afterStatus.project && !afterStatus.local && !afterStatus.monolito, 'status must not create project state files');
+
+  const pack = spawnSync(
+    process.execPath,
+    [cli, 'context-pack', '--kyro-scope', scopeId, '--json'],
+    { cwd, env, encoding: 'utf-8' },
+  );
+  assert(pack.status === 0, `context-pack should exit 0: ${pack.stderr || pack.stdout}`);
+  const packReport = JSON.parse(pack.stdout);
+  assert(
+    Array.isArray(packReport.warnings)
+      && packReport.warnings.some((w) => typeof w === 'string' && w.includes('install --init-workspace')),
+    `context-pack must warn with bootstrap remedy: ${pack.stdout}`,
+  );
+  const afterPack = stateFilesPresent(cwd);
+  assert(!afterPack.project && !afterPack.local && !afterPack.monolito, 'context-pack must not create project state files');
+
+  // Unit helper: formatBootstrapRemedy / detect with unregistered scopes when layers exist
+  const {
+    detectProjectStateBootstrapNeed,
+    formatBootstrapRemedy,
+    writeProjectLayers,
+  } = loadState();
+  assert(
+    formatBootstrapRemedy('missing layers').includes('install --init-workspace'),
+    'formatBootstrapRemedy must mention install',
+  );
+  writeProjectLayers({
+    shared: {
+      schemaVersion: 4,
+      artifactRoot: '.agents/kyro/scopes',
+      scopes: [],
+    },
+    local: { schemaVersion: 4, activeScope: null, installedAdapters: [] },
+  });
+  const unregisteredHint = detectProjectStateBootstrapNeed([scopeId]);
+  assert(
+    unregisteredHint && unregisteredHint.includes(scopeId) && unregisteredHint.includes('install --init-workspace'),
+    `unregistered scopes must yield remedy: ${unregisteredHint}`,
+  );
+  const healthy = detectProjectStateBootstrapNeed([]);
+  assert(healthy === null, 'registered/empty unregistered list with layers present → no remedy');
+
+  console.log('ok status/context-pack bootstrap no-write + remedy');
 });
 
 console.log('check-layered-state: all assertions passed');
