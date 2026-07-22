@@ -29,6 +29,8 @@ const LOCK_WAIT_MS = 10_000;
 const LOCK_POLL_MS = 25;
 const DEFAULT_LEASE_MS = 5_000;
 const PARTIAL_LOCK_GRACE_MS = 2_000;
+/** Reclaim claims must outlive publish→select under slow fsync/CI; test heartbeats may be ≤200ms. */
+const MIN_RECLAIM_CLAIM_MS = 2_000;
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const PORTABLE_DIRECTORY_SYNC_ERRORS = new Set(['EINVAL', 'ENOTSUP', 'EISDIR', 'EBADF']);
 
@@ -275,8 +277,17 @@ function publishReclaimClaim(parent: string, target: LockIdentity, leaseMs: numb
   try {
     mkdirSync(path);
     const identity = lockIdentity(path);
+    // Claim TTL is independent of short test heartbeats: fsync + winner selection must finish
+    // while the claim is still selectable (see selectReclaimWinner leaseUntil check).
+    const claimTtlMs = Math.max(leaseMs, MIN_RECLAIM_CLAIM_MS);
     const createdAt = Date.now();
-    const metadata: ReclaimClaim = { token, targetDev: String(target.dev), targetIno: String(target.ino), createdAt, leaseUntil: createdAt + leaseMs };
+    const metadata: ReclaimClaim = {
+      token,
+      targetDev: String(target.dev),
+      targetIno: String(target.ino),
+      createdAt,
+      leaseUntil: createdAt + claimTtlMs,
+    };
     const raw = `${JSON.stringify(metadata)}\n`;
     writeSyncedExclusive(`${path}/${OWNER_FILE}`, raw);
     fsyncDirectory(path);
