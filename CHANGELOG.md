@@ -23,6 +23,10 @@ All notable changes to this project are documented here. The format is based on
 - **ADR shape validation** names missing fields and includes a full example object plus `kyro adr add` remedy.
 - **`kyro status` human output** clarifies that `activeSprint.status: planned` with `nextAction: execute_task` is coherent (progress vs routing).
 
+### Fixed
+
+- **`check:lossless-checkpoints` heartbeat stall cases use a CI-safe 1s test lease** (was 300ms) and a longer readiness budget, so Worker renewals under loaded GitHub runners are not fail-stopped before the first post-ready tick.
+
 ## [4.33.2] - 2026-07-22
 
 ### Fixed
