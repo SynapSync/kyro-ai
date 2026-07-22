@@ -13,7 +13,7 @@ import { guardEnforcement } from '../adapters/registry-types';
 import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
 import { detectPackageRootMode, FULL_PACKAGE_INSTALL_REMEDY, FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 import { runTokenAuditChecks } from './token-audit';
-import { listScopes } from '../core/scopes';
+import { listScopes, unregisteredScopeFolders } from '../core/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
@@ -50,6 +50,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
   const checks = [
     ...packagingChecks,
     checkProjectState(),
+    checkUnregisteredScopes(),
     checkGlobalRuntime(),
     checkCliInvocation(),
     ...checkAdapterProjections(),
@@ -217,6 +218,32 @@ function checkProjectState(): CheckResult {
     };
   }
   return { status: 'pass', name: 'project state', detail: `${KYRO_STATE_PATH} is valid` };
+}
+
+/** Advisory: scope folders on disk that never made it into the local registry (e.g. gitignored kyro.json). */
+function checkUnregisteredScopes(): CheckResult {
+  const state = readProjectState();
+  if (!state || !Array.isArray(state.scopes)) {
+    return {
+      status: 'pass',
+      name: 'scope registry',
+      detail: 'skipped (no project state)',
+    };
+  }
+  const missing = unregisteredScopeFolders(state);
+  if (missing.length === 0) {
+    return {
+      status: 'pass',
+      name: 'scope registry',
+      detail: 'all on-disk scopes are registered in kyro.json',
+    };
+  }
+  return {
+    status: 'warn',
+    name: 'scope registry',
+    detail: `${missing.length} scope folder(s) on disk missing from kyro.json.scopes[]: ${missing.sort().join(', ')}`,
+    remedy: 'Run: npx kyro-ai install --init-workspace (or npx kyro-ai sync) to register existing scopes. Then kyro scope set-active <scope> --yes if needed.',
+  };
 }
 
 function checkGlobalRuntime(): CheckResult {

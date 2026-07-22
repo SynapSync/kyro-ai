@@ -69,7 +69,7 @@ Project state:
 └── scopes/
 ```
 
-`kyro install` does not create a scoped `sprint.json`; the forge/INIT workflow creates it only when a scope is opened for the first time.
+`kyro install` does not create a scoped `sprint.json`; the forge/INIT workflow creates it only when a scope is opened for the first time. If `scopes/` already has directories (for example after cloning a team repo that gitignores `kyro.json`), install/sync registers them into `kyro.json.scopes[]`. With multiple scopes, set yours with `kyro scope set-active <scope> --yes`.
 
 ## First run
 

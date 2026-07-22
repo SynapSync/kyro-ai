@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.33.0] - 2026-07-21
+
+### Added
+
+- **Install/sync rehydrates scopes from disk into `kyro.json`.** When workspace state is written, Kyro unions directories under `.agents/kyro/scopes/` into `scopes[]` (title/status from `sprint.json` when readable). Existing registry entries are never clobbered. If `activeScope` is null and exactly one scope is known, it is set automatically; with multiple scopes it stays null so each developer chooses with `kyro scope set-active`. This unblocks the multi-dev pattern where `kyro.json` is gitignored (personal `activeScope`) but `scopes/` is shared.
+- Interactive `npx kyro-ai install` prompt now lists on-disk scopes when present, so answering **y** clearly registers them.
+- `kyro doctor` WARNs when scope folders exist on disk but are missing from `kyro.json.scopes[]`, with a remedy to re-run install/sync.
+
 ## [4.32.0] - 2026-07-21
 
 ### Removed

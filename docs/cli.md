@@ -185,15 +185,19 @@ The uninstall output includes a summary with overlay, purged file, and empty-dir
 
 ## State Model
 
-`kyro install` creates only root project state:
+`kyro install` (with workspace init) and `kyro sync` write root project state:
 
 ```text
 .agents/kyro/kyro.json
 ```
 
-It does not create per-scope files. Each scope's `sprint.json` (the single source of truth for that scope) is created later by forge/INIT.
+They do not create per-scope files. Each scope's `sprint.json` (the single source of truth for that scope) is created later by forge/INIT or `kyro plan`.
 
-Initial state shape:
+**Rehydrate from disk:** if `.agents/kyro/scopes/{id}/` directories already exist (common after clone when `kyro.json` is gitignored but scopes are committed), install/sync **registers** those folders into `scopes[]`. Title and status come from each scope's `sprint.json` when readable; existing registry entries are never overwritten. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
+
+Bare interactive install (`npx kyro-ai install`) asks whether to initialize the workspace; when scopes already exist on disk, the prompt lists them so a **y** answer registers them intentionally.
+
+Initial state shape (no scopes on disk yet):
 
 ```json
 {
@@ -205,6 +209,15 @@ Initial state shape:
   "installedAdapters": []
 }
 ```
+
+### Multi-developer note
+
+`activeScope` is personal (who is working on what). Teams often gitignore `.agents/kyro/kyro.json` and commit `.agents/kyro/scopes/**`. After clone:
+
+1. `npx kyro-ai install` → answer **y** (or pass `--init-workspace`) so scopes are registered.
+2. If more than one scope: `kyro scope set-active <yours> --yes`.
+
+`kyro doctor` WARNs when folders on disk are missing from the local registry.
 
 The project state intentionally does not copy the runtime version. Kyro has one global active runtime, so its authoritative version is `~/.agents/kyro/current/manifest.json.packageVersion`; install and sync remove the legacy project-local `runtimeVersion` field while preserving scopes, principles, adapters, and custom metadata.
 
