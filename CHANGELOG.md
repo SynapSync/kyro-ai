@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.35.0] - 2026-07-22
+
+### Added
+
+- **Layered multi-dev project state** — shared `.agents/kyro/project.json` (principles, team policy, scopes registry cache) + personal `.agents/kyro/local.json` (`activeScope`, installed adapters). Install/sync migrate legacy monolito `kyro.json`, write `.agents/kyro/.gitignore` for local-only files, and rehydrate on-disk scopes.
+- **`docs/teams.md`** — multi-dev commit matrix, clone bootstrap, dual-read/migration, optional `team.minPackageVersion`.
+- **Doctor layered health** — validates shared/local shapes, WARNs on leftover live monolito, optional non-blocking WARN when runtime is older than `team.minPackageVersion`.
+- **Read-only bootstrap remedies** — `status` / `context-pack` / `doctor` never create project state files; they surface `install --init-workspace` when layers are missing.
+
+### Changed
+
+- **README, getting-started, cli, architecture, adapters** document layered state as the multi-dev default (supersedes gitignore-entire-`kyro.json` as the only team strategy).
+- **Codex / AGENTS.md projected block** points at `project.json` + `local.json` instead of monolito-only `kyro.json`.
+- **`close-sprint` project-scope CAS** writes shared `project.json` on layered workspaces (monolito `kyro.json` only while dual-reading a live monolito).
+
+### Fixed
+
+- **Sprint close no longer diverges on layered-only workspaces** that lack live `kyro.json` after install/migrate (`STATE_DIVERGED … kyro.json: missing`).
+- **`listScopeNames` dual-reads layered project state** so scope listing works when only `project.json` + `local.json` exist.
+- **`uninstall` clears `installedAdapters` on layered state** (`local.json` / `project.json`) instead of rewriting live monolito `kyro.json`.
+
 ## [4.34.0] - 2026-07-22
 
 ### Added

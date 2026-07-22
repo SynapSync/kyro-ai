@@ -15,7 +15,14 @@ import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { projectStatePath, sprintJsonPath } from '../artifacts/paths';
 import { asProjectState, validateProjectStateShape, validateSprintFile } from '../artifacts/schema';
+import { PROJECT_STATE_PATH, KYRO_STATE_PATH } from '../constants';
 import { KyroCoreError, describeWriteFailure } from '../core/errors';
+import {
+  hasLayeredProjectStateOnDisk,
+  hasMonolitoProjectStateOnDisk,
+  readProjectState,
+  updateProjectStateLayersUnlocked,
+} from '../state';
 import {
   SPRINT_CLOSE_CHECKPOINT_KIND,
   SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION,
@@ -28,6 +35,16 @@ import {
 } from '../types';
 import type { LedgerEntry } from '../types';
 import { assertSafeManagedPath, assertSafePathSegment, assertStateWriterLeaseHealthy, ensureDurableDirectory, fsyncParentDirectory, withStateWriterLock } from '../pipeline/state-writer-lock';
+
+/**
+ * Path reported/written for the project-scope CAS during sprint close.
+ * Layers prefer shared project.json; monolito dual-read keeps kyro.json until migrated.
+ */
+export function projectScopeWritePath(): string {
+  if (hasLayeredProjectStateOnDisk()) return PROJECT_STATE_PATH;
+  if (hasMonolitoProjectStateOnDisk()) return KYRO_STATE_PATH;
+  return PROJECT_STATE_PATH;
+}
 
 export interface SprintCloseCheckpointMaterials {
   scope: string;
@@ -285,7 +302,7 @@ export function validateSprintCloseCheckpoint(value: unknown, path: string): str
 }
 
 export function applySprintCloseTransaction(transaction: SprintCloseTransaction): SprintCloseApplyResult {
-  for (const path of [transaction.checkpointPath, transaction.checkpoint.paths.legacySnapshot, transaction.checkpoint.paths.narrative, sprintJsonPath(transaction.checkpoint.identity.scope), projectStatePath()]) {
+  for (const path of [transaction.checkpointPath, transaction.checkpoint.paths.legacySnapshot, transaction.checkpoint.paths.narrative, sprintJsonPath(transaction.checkpoint.identity.scope), projectScopeWritePath()]) {
     assertSafeManagedPath(path);
   }
   return withStateWriterLock(() => {
@@ -328,7 +345,44 @@ function compareAndSwapSprint(checkpoint: SprintCloseCheckpointV1): void {
   atomicReplace(path, `${JSON.stringify(checkpoint.intendedAfterClose, null, 2)}\n`);
 }
 
+/**
+ * CAS the affected KyroScopeEntry into project state.
+ *
+ * - Layered workspaces write shared `project.json` via updateProjectStateLayers (never monolito).
+ * - Monolito-only workspaces keep the legacy atomicReplace on `kyro.json` so dual-read fixtures
+ *   and unknown top-level extensions remain stable until migration.
+ * - Missing live entry is restored from checkpoint.projectScopeAfter.
+ */
 function compareAndSwapProjectScope(checkpoint: SprintCloseCheckpointV1): void {
+  if (hasLayeredProjectStateOnDisk() || !hasMonolitoProjectStateOnDisk()) {
+    compareAndSwapProjectScopeLayers(checkpoint);
+    return;
+  }
+  compareAndSwapProjectScopeMonolito(checkpoint);
+}
+
+function compareAndSwapProjectScopeLayers(checkpoint: SprintCloseCheckpointV1): void {
+  const path = PROJECT_STATE_PATH;
+  const state = readProjectState();
+  if (!state) throw diverged(path, 'missing');
+  const entry = state.scopes.find((scope) => scope.id === checkpoint.identity.scope);
+  if (!entry) {
+    updateProjectStateLayersUnlocked({
+      scopes: [...state.scopes, checkpoint.projectScopeAfter],
+    });
+    return;
+  }
+  const currentDigest = sha256(entry);
+  if (currentDigest === checkpoint.digests.projectScopeAfter) return;
+  if (currentDigest !== checkpoint.digests.projectScopeBefore) throw diverged(path, 'scope entry matches neither checkpoint state');
+  updateProjectStateLayersUnlocked({
+    scopes: state.scopes.map((scope) => (
+      scope.id === checkpoint.identity.scope ? checkpoint.projectScopeAfter : scope
+    )),
+  });
+}
+
+function compareAndSwapProjectScopeMonolito(checkpoint: SprintCloseCheckpointV1): void {
   const path = projectStatePath();
   const read = readJsonSafely(path);
   if (read.error || !read.exists) throw diverged(path, read.error ?? 'missing');
@@ -354,10 +408,12 @@ function compareAndSwapProjectScope(checkpoint: SprintCloseCheckpointV1): void {
 function verifyApplied(checkpoint: SprintCloseCheckpointV1): void {
   const sprint = readJsonSafely(sprintJsonPath(checkpoint.identity.scope));
   if (sprint.error || !sprint.exists || sha256(sprint.value) !== checkpoint.digests.intendedAfterClose) throw diverged(sprint.path, 'post-write verification failed');
-  const state = readJsonSafely(projectStatePath());
-  const project = asProjectState(state.value);
+  const project = readProjectState();
   const scopeEntry = project?.scopes.find((entry) => entry.id === checkpoint.identity.scope);
-  if (state.error || !scopeEntry || sha256(scopeEntry) !== checkpoint.digests.projectScopeAfter) throw diverged(state.path, 'project scope post-write verification failed');
+  const projectPath = projectScopeWritePath();
+  if (!project || !scopeEntry || sha256(scopeEntry) !== checkpoint.digests.projectScopeAfter) {
+    throw diverged(projectPath, 'project scope post-write verification failed');
+  }
   verifyArtifact(checkpoint.paths.legacySnapshot, checkpoint.digests.legacySnapshot, 'legacy snapshot');
   verifyArtifact(checkpoint.paths.narrative, checkpoint.digests.narrative, 'narrative');
 }

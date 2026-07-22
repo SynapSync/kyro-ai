@@ -17,6 +17,7 @@ Run these commands in order. Any failure stops the release.
 ```bash
 # 1. Fast static checks (typecheck, version sync, link check, dist freshness)
 npm run check
+# (includes check:layered-state + check:install-rehydrate for multi-dev project state)
 
 # 2. Regenerate the runtime from source
 npm run build
@@ -31,6 +32,14 @@ npm run check:artifacts
 # 5. Simulate packaging with fresh, validated output
 npm pack --dry-run
 ```
+
+### Multi-dev project state (layered)
+
+Before claiming multi-developer readiness in release notes, confirm:
+
+- `npm run check:layered-state` — merge, migrate, write targeting, status/context-pack no-write, doctor layered health
+- `npm run check:install-rehydrate` — install writes `project.json` + `local.json`, gitignore assist, scope rehydrate
+- Docs match the commit matrix (`project.json` + `scopes/**` committed; `local.json` gitignored) — see [Teams](teams.md)
 
 ### Why this order matters
 

@@ -7,7 +7,7 @@ import { assertWorkspaceScope, uniqueAgents } from '../options';
 import { readProjectState } from '../state';
 import { formatWorkspaceInitPrompt } from '../core/scopes';
 import { KyroCoreError } from '../core/errors';
-import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
+import { AGENT, KYRO_ROOT, LOCAL_STATE_PATH, PROJECT_STATE_PATH, SCOPE } from '../constants';
 import { requireFullPackageFor } from '../package-root-mode';
 import type { Agent, CliOptions } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
@@ -58,7 +58,7 @@ function runInstallPlan(
   console.log('Kyro has been installed.');
   console.log(`Version: ${packageVersion}`);
   if (shouldInitializeWorkspace) {
-    console.log(`State: ${KYRO_STATE_PATH}`);
+    console.log(`State: ${PROJECT_STATE_PATH} + ${LOCAL_STATE_PATH}`);
   } else {
     console.log('Workspace: skipped');
   }

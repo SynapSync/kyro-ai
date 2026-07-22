@@ -12,7 +12,7 @@ Kyro is a portable sprint workflow kit for AI coding agents (**kyro-ai**, `sprin
 
 ## Install
 
-**Run every install/sync from the project root** (the repository Kyro should manage). The global runtime and skills always land under your home directory; **project state** (`.agents/kyro/kyro.json` and registration of `scopes/`) is written relative to the **current working directory**. If you install from `~` or another folder, you still get the runtime—but Kyro state appears in the wrong place.
+**Run every install/sync from the project root** (the repository Kyro should manage). The global runtime and skills always land under your home directory; **project state** (layered files under `.agents/kyro/` and registration of `scopes/`) is written relative to the **current working directory**. If you install from `~` or another folder, you still get the runtime—but Kyro state appears in the wrong place.
 
 Always install and sync with **`npx kyro-ai@latest …`** so you get the current release (omit `@latest` only if you intentionally pin a version).
 
@@ -23,7 +23,13 @@ cd /path/to/your-app
 npx kyro-ai@latest install --scope workspace --init-workspace --yes
 ```
 
-`--init-workspace` creates or refreshes `.agents/kyro/kyro.json` in this directory (non-interactive). It also **rehydrates** any existing `scopes/` folders (common after cloning a team repo that gitignores personal `kyro.json`).
+`--init-workspace` creates or refreshes **layered** project state in this directory (non-interactive):
+
+- `.agents/kyro/project.json` — shared (safe to commit): principles, team policy, scopes registry cache
+- `.agents/kyro/local.json` — personal/machine (gitignored): `activeScope`, installed adapters
+- `.agents/kyro/.gitignore` — ignores local-only files; never ignores `project.json` or `scopes/`
+
+It also **rehydrates** any existing `scopes/` folders (common after cloning a team repo that commits scopes + `project.json` while each developer keeps a personal `local.json`).
 
 Agent-specific installs (still from the project root):
 
@@ -64,24 +70,28 @@ Global command skills:
 
 OpenCode installs equivalent native entrypoints under `~/.config/opencode/` when you use `--agent opencode`.
 
-Project state:
+Project state (layered):
 
 ```text
 .agents/kyro/
-├── kyro.json
+├── project.json          # shared — commit
+├── local.json            # personal — gitignored
+├── .gitignore            # install/sync assist
 └── scopes/
 ```
 
-`kyro install` does not create a scoped `sprint.json`; forge/INIT creates it when a scope is opened for the first time. If `scopes/` already has directories (for example after cloning a team repo that gitignores `kyro.json`), install/sync **registers** them into `kyro.json.scopes[]`. With multiple scopes, set yours with:
+`kyro install` does not create a scoped `sprint.json`; forge/INIT creates it when a scope is opened for the first time. If `scopes/` already has directories (for example after cloning a team repo), install/sync **registers** them into the shared `project.json` scopes registry. With multiple scopes, set yours with:
 
 ```bash
 node ~/.agents/kyro/current/dist/cli.js scope set-active <scope> --yes
 # or: kyro scope set-active <scope> --yes   # when a durable global bin exists
 ```
 
+Full multi-dev commit matrix: [Teams](teams.md).
+
 ### CLI invocation (important)
 
-`npx kyro-ai@latest install` does **not** permanently put `kyro` on PATH. Install/sync records a durable invocation in the **global** `manifest.json` only (bare `kyro` only if a real global bin exists; otherwise `node ~/.agents/kyro/current/dist/cli.js`). Projected modes under `current/` substitute that string for agents. Project `kyro.json` is not the source of truth for the CLI string — one install/sync refreshes invocation for every workspace on the machine.
+`npx kyro-ai@latest install` does **not** permanently put `kyro` on PATH. Install/sync records a durable invocation in the **global** `manifest.json` only (bare `kyro` only if a real global bin exists; otherwise `node ~/.agents/kyro/current/dist/cli.js`). Projected modes under `current/` substitute that string for agents. Project state files are not the source of truth for the CLI string — one install/sync refreshes invocation for every workspace on the machine.
 
 After upgrades (from the project root):
 
@@ -108,7 +118,7 @@ or, in Claude-style slash command environments:
 
 Kyro routes progressively:
 
-1. read `.agents/kyro/kyro.json`
+1. read layered project state (`.agents/kyro/project.json` + `local.json`, or legacy `kyro.json` dual-read)
 2. resolve or create scope
 3. read the scope's lean pack / `sprint.json` if present
 4. route on `sprint.json.handoff.nextAction` and load only the required mode: INIT, clarify, plan, execute, review, close, done, or recover
@@ -141,6 +151,7 @@ Use the **full npm package** (`npx kyro-ai@latest` or a global `kyro` from `npm 
 ## Next steps
 
 - [CLI](cli.md)
+- [Teams & multi-dev](teams.md)
 - [Agent adapters](agent-adapters.md)
 - [Commands reference](commands-reference.md)
 - [Architecture](architecture.md)

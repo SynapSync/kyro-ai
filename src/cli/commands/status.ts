@@ -2,8 +2,10 @@ import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
+import { unregisteredScopeFolders } from '../core/scopes';
 import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
 import { KyroCoreError } from '../core/errors';
+import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
 import { ADR_STATUS } from '../types';
 import type { ActiveSprint, AdrRecord, AdrStatus, Debt, SprintFile, Task, TaskStatus } from '../types';
 
@@ -74,6 +76,17 @@ interface BriefStatusReport {
   blockers: string[];
   openDebtCount: number;
   pendingReviewCount: number;
+  /** Present when project layers/monolito are missing or disk scopes are unregistered (D7a). */
+  bootstrapRemedy: string | null;
+}
+
+interface DebtStatusReport {
+  scope: string;
+  status: string;
+  objective: string;
+  byStatus: Array<DebtGroup<Debt['status']>>;
+  byPriority: Array<DebtGroup<Debt['priority']>>;
+  bootstrapRemedy: string | null;
 }
 
 interface PhaseSummary {
@@ -107,14 +120,6 @@ interface DebtGroup<T extends string> {
   key: T;
   count: number;
   items: Debt[];
-}
-
-interface DebtStatusReport {
-  scope: string;
-  status: string;
-  objective: string;
-  byStatus: Array<DebtGroup<Debt['status']>>;
-  byPriority: Array<DebtGroup<Debt['priority']>>;
 }
 
 export function runStatusCommand(args: string[]): void {
@@ -223,6 +228,7 @@ function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusR
     blockers: sprint.handoff.blockers ?? [],
     openDebtCount: countOpenDebt(sprint.debt),
     pendingReviewCount: reviewDebt.length,
+    bootstrapRemedy: resolveBootstrapRemedy(),
   };
 }
 
@@ -266,7 +272,13 @@ function buildDebtStatusReport(scope: string, sprint: SprintFile): DebtStatusRep
       count: sprint.debt.filter((item) => item.priority === priority).length,
       items: sprint.debt.filter((item) => item.priority === priority),
     })),
+    bootstrapRemedy: resolveBootstrapRemedy(),
   };
+}
+
+/** Read-only: never creates project.json / local.json / kyro.json (D7a). */
+function resolveBootstrapRemedy(): string | null {
+  return detectProjectStateBootstrapNeed(unregisteredScopeFolders(readProjectState()));
 }
 
 function resolveNextTask(activeSprint: ActiveSprint | null, nextTaskId: string | null): TaskReference | null {
@@ -350,6 +362,7 @@ function printBriefStatus(report: BriefStatusReport): void {
   console.log(`Open debt: ${report.openDebtCount}`);
   console.log(`Pending review: ${report.pendingReviewCount}`);
   if (report.blockers.length > 0) console.log(`Blockers: ${report.blockers.join(' | ')}`);
+  if (report.bootstrapRemedy) console.log(`Bootstrap: ${report.bootstrapRemedy}`);
 }
 
 function printFullStatus(report: FullStatusReport): void {
@@ -382,6 +395,7 @@ function printDebtStatus(report: DebtStatusReport): void {
   }
   console.log('\nDebt by priority:');
   for (const group of report.byPriority) console.log(`- ${group.key}: ${group.count}`);
+  if (report.bootstrapRemedy) console.log(`\nBootstrap: ${report.bootstrapRemedy}`);
 }
 
 function formatActiveSprint(activeSprint: ActiveSprintStatusSummary | null): string {

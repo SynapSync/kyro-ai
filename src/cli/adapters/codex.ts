@@ -104,5 +104,5 @@ function expandHome(segment: string): string {
 }
 
 function buildAgentsBlock(): string {
-  return `## Kyro AI\n\nUse installed Kyro command skills: \`kyro-forge\`, \`kyro-status\`, \`kyro-task-context\`, \`kyro-idea\`.\n\nRuntime: \`${KYRO_ROOT}/\`\nProject state: \`.agents/kyro/kyro.json\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\nSkills: \`${AGENT_SKILLS_ROOT}/kyro-*\`\n\nLoad command routers only when a Kyro skill is invoked. Do not load full Kyro docs unless the router asks for them. Preserve non-Kyro content; Kyro owns only this marked block.\n`;
+  return `## Kyro AI\n\nUse installed Kyro command skills: \`kyro-forge\`, \`kyro-status\`, \`kyro-task-context\`, \`kyro-idea\`.\n\nRuntime: \`${KYRO_ROOT}/\`\nProject state: \`.agents/kyro/project.json\` + \`local.json\` (legacy \`kyro.json\` dual-read)\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\nSkills: \`${AGENT_SKILLS_ROOT}/kyro-*\`\n\nLoad command routers only when a Kyro skill is invoked. Do not load full Kyro docs unless the router asks for them. Preserve non-Kyro content; Kyro owns only this marked block.\n`;
 }

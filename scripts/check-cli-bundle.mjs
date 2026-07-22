@@ -59,13 +59,16 @@ function main() {
     assert(install.status === 0, `check-cli-bundle: install should exit 0: ${install.stderr || install.stdout}`);
 
     // 2. kyroInvocation SoT is the global manifest (node fallback when no durable kyro on PATH).
-    // Project kyro.json must not carry a (drift-prone) copy.
+    // Layered project state must not carry a (drift-prone) copy.
     const runtimeRoot = join(home, '.agents', 'kyro', 'current');
     const manifest = JSON.parse(readFileSync(join(runtimeRoot, 'manifest.json'), 'utf-8'));
-    const state = JSON.parse(readFileSync(join(workspace, '.agents', 'kyro', 'kyro.json'), 'utf-8'));
+    const shared = JSON.parse(readFileSync(join(workspace, '.agents', 'kyro', 'project.json'), 'utf-8'));
+    const local = JSON.parse(readFileSync(join(workspace, '.agents', 'kyro', 'local.json'), 'utf-8'));
     const fallbackShape = /^node .+\/dist\/cli\.js$/;
     assert(fallbackShape.test(manifest.kyroInvocation), `check-cli-bundle: manifest.kyroInvocation should be the node fallback form, got "${manifest.kyroInvocation}"`);
-    assert(!Object.hasOwn(state, 'kyroInvocation'), 'check-cli-bundle: kyro.json must not store kyroInvocation (global manifest is SoT)');
+    assert(!Object.hasOwn(shared, 'kyroInvocation'), 'check-cli-bundle: project.json must not store kyroInvocation (global manifest is SoT)');
+    assert(!Object.hasOwn(local, 'kyroInvocation'), 'check-cli-bundle: local.json must not store kyroInvocation (global manifest is SoT)');
+    assert(!existsSync(join(workspace, '.agents', 'kyro', 'kyro.json')), 'check-cli-bundle: live monolito kyro.json must not remain after install');
 
     // 3. Projected-tree parity: the runtime mirrors the npm layout the CLI reads at runtime.
     for (const relative of ['dist/cli.js', 'package.json', 'config.json', 'skills/sprint-forge/SKILL.md']) {

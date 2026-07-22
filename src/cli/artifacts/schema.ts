@@ -1,5 +1,13 @@
 import { ADR_LINK_KEYS, ADR_STATUS } from '../types';
-import type { AdrLinkKey, KyroProjectState, SprintFile, TaskEvidence, TaskVerdict } from '../types';
+import type {
+  AdrLinkKey,
+  KyroLocalProjectState,
+  KyroProjectState,
+  KyroSharedProjectState,
+  SprintFile,
+  TaskEvidence,
+  TaskVerdict,
+} from '../types';
 
 export const KYRO_SCOPE_STATUS = {
   PLANNING: 'planning',
@@ -152,7 +160,86 @@ export function validateProjectStateShape(value: unknown, path: string): Validat
       value.principles.forEach((p, i) => validatePrinciple(p, path, `principles[${i}]`, issues));
     }
   }
+  if ('team' in value) validateTeamPolicy(value.team, path, 'team', issues);
   return issues;
+}
+
+/**
+ * Shared team file (`.agents/kyro/project.json`).
+ * Must never include activeScope or installedAdapters (personal/machine fields).
+ */
+export function validateSharedProjectStateShape(value: unknown, path: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
+  requireLiteral(value, 'schemaVersion', 4, path, issues);
+  requireString(value, 'artifactRoot', path, issues);
+  if (!Array.isArray(value.scopes)) {
+    issues.push({ path, field: 'scopes', message: 'must be an array' });
+  } else {
+    value.scopes.forEach((entry, index) => validateScopeEntry(entry, path, `scopes[${index}]`, issues));
+  }
+  if ('activeScope' in value) {
+    issues.push({ path, field: 'activeScope', message: 'must not be present on shared project state (local-only field)' });
+  }
+  if ('installedAdapters' in value) {
+    issues.push({ path, field: 'installedAdapters', message: 'must not be present on shared project state (local-only field)' });
+  }
+  if ('kyroInvocation' in value) {
+    issues.push({ path, field: 'kyroInvocation', message: 'must not be present on project files (global manifest only)' });
+  }
+  if ('principles' in value) {
+    if (!Array.isArray(value.principles)) {
+      issues.push({ path, field: 'principles', message: 'must be an array when present' });
+    } else {
+      value.principles.forEach((p, i) => validatePrinciple(p, path, `principles[${i}]`, issues));
+    }
+  }
+  if ('team' in value) validateTeamPolicy(value.team, path, 'team', issues);
+  return issues;
+}
+
+/**
+ * Local overlay (`.agents/kyro/local.json`).
+ * Personal/machine fields only — principles belong on shared after migration.
+ */
+export function validateLocalProjectStateShape(value: unknown, path: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
+  requireLiteral(value, 'schemaVersion', 4, path, issues);
+  requireNullableString(value, 'activeScope', path, issues);
+  if (!Array.isArray(value.installedAdapters)) {
+    issues.push({ path, field: 'installedAdapters', message: 'must be an array' });
+  }
+  if ('runtimePath' in value && value.runtimePath !== undefined && typeof value.runtimePath !== 'string') {
+    issues.push({ path, field: 'runtimePath', message: 'must be a string when present' });
+  }
+  if ('principles' in value) {
+    issues.push({ path, field: 'principles', message: 'must not be present on local overlay (shared-only field)' });
+  }
+  if ('team' in value) {
+    issues.push({ path, field: 'team', message: 'must not be present on local overlay (shared-only field)' });
+  }
+  if ('kyroInvocation' in value) {
+    issues.push({ path, field: 'kyroInvocation', message: 'must not be present on project files (global manifest only)' });
+  }
+  return issues;
+}
+
+function validateTeamPolicy(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object when present' });
+    return;
+  }
+  if ('minPackageVersion' in value && value.minPackageVersion !== undefined && typeof value.minPackageVersion !== 'string') {
+    issues.push({ path, field: `${prefix}.minPackageVersion`, message: 'must be a string when present' });
+  }
+  if ('recommendedAdapters' in value) {
+    if (!Array.isArray(value.recommendedAdapters)) {
+      issues.push({ path, field: `${prefix}.recommendedAdapters`, message: 'must be an array when present' });
+    } else if (!value.recommendedAdapters.every((entry) => typeof entry === 'string')) {
+      issues.push({ path, field: `${prefix}.recommendedAdapters`, message: 'must be an array of strings when present' });
+    }
+  }
 }
 
 const PRINCIPLE_SEVERITY_VALUES = ['non-negotiable', 'strong', 'advisory'] as const;
@@ -728,6 +815,18 @@ export function validateDebtSummary(value: unknown, path: string): ValidationIss
 
 export function asProjectState(value: unknown): KyroProjectState | null {
   return validateProjectStateShape(value, '.agents/kyro/kyro.json').length === 0 ? value as KyroProjectState : null;
+}
+
+export function asSharedProjectState(value: unknown): KyroSharedProjectState | null {
+  return validateSharedProjectStateShape(value, '.agents/kyro/project.json').length === 0
+    ? value as KyroSharedProjectState
+    : null;
+}
+
+export function asLocalProjectState(value: unknown): KyroLocalProjectState | null {
+  return validateLocalProjectStateShape(value, '.agents/kyro/local.json').length === 0
+    ? value as KyroLocalProjectState
+    : null;
 }
 
 export function asSprintFile(value: unknown): SprintFile | null {

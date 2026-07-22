@@ -1,15 +1,13 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { applyPlan, printPlan, resolveManagedPath } from '../fs';
+import { readFileSync } from 'node:fs';
+import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { KYRO_STATE_PATH } from '../constants';
 import { KyroCoreError } from '../core/errors';
 import { countClarificationMarkers } from '../core/analysis';
 import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
 import { emitToolCommandRun } from '../core/trace';
-import { assertStateWriterLeaseHealthy } from '../pipeline/state-writer-lock';
-import { readProjectState } from '../state';
+import { readProjectState, updateProjectStateLayers } from '../state';
 import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
 
 const KEBAB_CASE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -90,7 +88,13 @@ export function runPlanCommand(rawArgs: string[]): void {
   const scope = resolvePlanScope(record, args.scope);
 
   const state = readProjectState();
-  if (!state) throw new KyroCoreError('INVALID_INPUT', 'Kyro workspace not initialized (no kyro.json).', 'Run: kyro install --init-workspace');
+  if (!state) {
+    throw new KyroCoreError(
+      'INVALID_INPUT',
+      'Kyro workspace not initialized (no project state).',
+      'Run: kyro install --init-workspace',
+    );
+  }
 
   const existing = readJsonSafely(sprintJsonPath(scope));
   if (!existing.exists) {
@@ -315,27 +319,23 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
 
 function registerScopeInProjectState(scope: string, title: string, state: KyroProjectState): void {
   if (state.scopes.some((entry) => entry.id === scope)) return;
-  const nextState: KyroProjectState = {
-    ...state,
-    scopes: [...state.scopes, { id: scope, title, status: 'planning' }],
-    activeScope: state.activeScope ?? scope,
-  };
-  assertStateWriterLeaseHealthy();
-  writeFileSync(resolveManagedPath(KYRO_STATE_PATH), `${JSON.stringify(nextState, null, 2)}\n`, 'utf-8');
+  const scopes = [...state.scopes, { id: scope, title, status: 'planning' as const }];
+  // Registry cache on shared; auto-activeScope only when unset (local layer).
+  if (state.activeScope == null) {
+    updateProjectStateLayers({ scopes, activeScope: scope });
+  } else {
+    updateProjectStateLayers({ scopes });
+  }
 }
 
-/** Reconcile the kyro.json scope-status cache with the derived scope status (mirrors kyro repair). */
+/** Reconcile the shared scopes[] status cache with the derived scope status (mirrors kyro repair). */
 function reconcileScopeStatusInProjectState(scope: string, sprint: SprintFile, state: KyroProjectState): void {
   const entry = state.scopes.find((s) => s.id === scope);
   if (!entry) return;
   const derived = deriveScopeStatus(sprint, Boolean(sprint.activeSprint));
   if (entry.status === derived) return;
-  const nextState: KyroProjectState = {
-    ...state,
-    scopes: state.scopes.map((s) => (s.id === scope ? { ...s, status: derived } : s)),
-  };
-  assertStateWriterLeaseHealthy();
-  writeFileSync(resolveManagedPath(KYRO_STATE_PATH), `${JSON.stringify(nextState, null, 2)}\n`, 'utf-8');
+  const scopes = state.scopes.map((s) => (s.id === scope ? { ...s, status: derived } : s));
+  updateProjectStateLayers({ scopes });
 }
 
 function readLeanPlanFile(path: string): unknown {

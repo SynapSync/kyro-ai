@@ -58,7 +58,7 @@ USER
   |
   v
 ORCHESTRATOR
-  |-- loads .agents/kyro/kyro.json
+  |-- loads layered project state (project.json + local.json)
   |-- reads scoped sprint.json
   |-- reads sprint-forge skill assets
   |-- runs built-in checkpoints
@@ -72,7 +72,7 @@ ORCHESTRATOR
 
 ### Flow for `/kyro:forge`
 
-1. **Routing** - Orchestrator reads `.agents/kyro/kyro.json`, then the scope's `sprint.json`, and routes on `handoff.nextAction`.
+1. **Routing** - Orchestrator reads layered project state (`.agents/kyro/project.json` + `local.json`, or legacy `kyro.json` dual-read), then the scope's `sprint.json`, and routes on `handoff.nextAction`.
 2. **Analysis** - Orchestrator explores the codebase and writes finding files under `findings/`.
 3. **Gate 1** - User approves analysis.
 4. **Planning** - Orchestrator materializes the objective, roadmap, and active sprint into `sprint.json` via `kyro plan --from` (tool-owned; init and sprint modes).
@@ -85,11 +85,13 @@ ORCHESTRATOR
 
 ## Artifact Layout
 
-Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, conventions, durable ADRs, and handoff routing. Agents read `kyro.json` and `sprint.json` first, then route state changes through Kyro's tool-owned verbs (`kyro plan`, `record-evidence`, `review`, `debt`, `add-emergent`, `close-sprint`), which mutate `sprint.json` — the only routine mutation. See [Cost Model](cost-model.md).
+Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, conventions, durable ADRs, and handoff routing. Agents read layered project state and `sprint.json` first, then route state changes through Kyro's tool-owned verbs (`kyro plan`, `record-evidence`, `review`, `debt`, `add-emergent`, `close-sprint`), which mutate `sprint.json` — the only routine mutation. See [Cost Model](cost-model.md) and [Teams](teams.md).
 
 ```
 .agents/kyro/
-├── kyro.json
+├── project.json                 # shared — commit
+├── local.json                   # personal — gitignored
+├── .gitignore                   # install/sync local-only assist
 └── scopes/
     └── {scope}/
         ├── sprint.json          # single source of truth

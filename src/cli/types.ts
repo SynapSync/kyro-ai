@@ -39,6 +39,61 @@ export interface Principle {
   check?: PrincipleCheck;
 }
 
+/**
+ * Optional team policy stored only on the shared project file (WARN-first fleet alignment).
+ * Never personal: no activeScope, no installedAdapters.
+ */
+export interface TeamPolicy {
+  /** When set, doctor may WARN if the runtime package is older (non-blocking default). */
+  minPackageVersion?: string;
+  /** Advisory adapter recommendations for teammates (not machine install records). */
+  recommendedAdapters?: string[];
+}
+
+/**
+ * Field ownership for layered project state (D1–D6, D8):
+ *
+ * | Field              | Layer                         | Notes |
+ * |--------------------|-------------------------------|-------|
+ * | schemaVersion      | shared + effective            | Stay 4; additive layers |
+ * | artifactRoot       | shared + effective            | Team constant under `.agents/kyro/scopes` |
+ * | principles         | **shared only**               | Team constitution; must travel with git |
+ * | team               | **shared only**               | TeamPolicy (minPackageVersion, …) |
+ * | scopes             | shared cache + disk rehydrate | Presence SoT is scopes/ folders |
+ * | activeScope        | **local only**                | Never on shared (git thrash) |
+ * | installedAdapters  | **local only**                | Per-machine adapter install records |
+ * | runtimePath        | effective default / local     | Informational; not a git conflict surface |
+ * | kyroInvocation     | **neither** (global only)     | `~/.agents/kyro/current/manifest.json` |
+ *
+ * Effective façade = merge(shared, local) + optional in-memory disk rehydrate on mutating paths.
+ * Legacy monolito `.agents/kyro/kyro.json` dual-reads into the same effective shape.
+ */
+
+/** Committed shared project file shape (`.agents/kyro/project.json`). Never includes activeScope. */
+export interface KyroSharedProjectState {
+  schemaVersion: 4;
+  artifactRoot: string;
+  /** Registry cache + titles/status hints; disk folders remain recoverable SoT for presence. */
+  scopes: KyroScopeEntry[];
+  /** Team constitution (optional until authored). */
+  principles?: Principle[];
+  /** Optional team policy shell (WARN-first). */
+  team?: TeamPolicy;
+}
+
+/** Gitignored local overlay (`.agents/kyro/local.json`). Personal/machine fields only. */
+export interface KyroLocalProjectState {
+  schemaVersion: 4;
+  activeScope: string | null;
+  installedAdapters: KyroInstalledAdapter[];
+  /** Optional informational runtime path; defaults to global current when absent. */
+  runtimePath?: string;
+}
+
+/**
+ * Effective merged project state used by CLI/MCP readers.
+ * Stable façade: call sites keep using KyroProjectState; layering is internal.
+ */
 export interface KyroProjectState {
   schemaVersion: 4;
   artifactRoot: string;
@@ -46,8 +101,10 @@ export interface KyroProjectState {
   activeScope: string | null;
   runtimePath: string;
   installedAdapters: KyroInstalledAdapter[];
-  /** Optional project-level principles (v4.1+). Absent in pre-4.1 files. */
+  /** Optional project-level principles (v4.1+). From shared layer after migration. */
   principles?: Principle[];
+  /** Optional team policy from shared layer (v4 layered). */
+  team?: TeamPolicy;
   // kyroInvocation is intentionally NOT project state. Authoritative value lives on the
   // global runtime manifest (~/.agents/kyro/current/manifest.json). Install/sync strip any
   // legacy project-local copy so multi-workspace fleets cannot drift.
