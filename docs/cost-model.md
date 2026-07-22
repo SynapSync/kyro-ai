@@ -7,7 +7,7 @@ Kyro is designed to stay rigorous without loading or rewriting the whole workflo
 When a user says "use Kyro", the agent should load:
 
 1. command stub and command router
-2. `.agents/kyro/kyro.json`
+2. Layered project state (`.agents/kyro/project.json` + `local.json`)
 3. the scope's `sprint.json` when present
 4. exactly one routed mode, selected from `sprint.json.handoff.nextAction`
 5. only helpers named by that mode

@@ -12,7 +12,7 @@ Kyro's adapter contract is: global runtime, adapter command entrypoints, and loc
 | `~/.config/opencode/skills/kyro-*` | Native OpenCode command skills |
 | `~/.config/opencode/commands/kyro/*.md` | Native OpenCode slash commands |
 | `~/.config/opencode/opencode.json` `agent.kyro-orchestrator` | Kyro-owned OpenCode agent overlay |
-| `.agents/kyro/kyro.json` | Project-level Kyro state |
+| `.agents/kyro/project.json` + `local.json` | Layered project state (shared + personal; see [Teams](teams.md)) |
 | `.agents/kyro/scopes/{scope}/` | Scope artifacts, state, summaries, roadmap, sprints |
 | root `AGENTS.md` | Small Codex/cross-agent bootstrap when the Codex adapter is installed |
 

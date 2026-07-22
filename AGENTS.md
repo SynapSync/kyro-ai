@@ -127,7 +127,7 @@ When bumping version or changing the description:
 Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-qa`, `kyro-idea`.
 
 Runtime: `~/.agents/kyro/current/`
-Project state: `.agents/kyro/kyro.json`
+Project state: `.agents/kyro/project.json` + `local.json` (legacy `kyro.json` dual-read)
 Artifacts: `.agents/kyro/scopes/{scope}/`
 Skills: `~/.agents/skills/kyro-*`
 

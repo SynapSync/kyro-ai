@@ -43,7 +43,8 @@ Always use **`kyro-ai@latest`** so install/sync pulls the current release (plain
 cd /path/to/your-app
 
 # Default (standard skills under ~/.agents/skills/kyro-*)
-# --init-workspace writes .agents/kyro/kyro.json here (also rehydrates existing scopes/ after clone)
+# --init-workspace writes layered project state here (project.json + local.json),
+# ensures .agents/kyro/.gitignore for local-only files, and rehydrates existing scopes/ after clone
 npx kyro-ai@latest install --scope workspace --init-workspace --yes
 
 # Optional host adapters (can combine; still run from the project root)
@@ -57,7 +58,7 @@ npx kyro-ai@latest install --agent opencode --scope workspace --init-workspace -
 | Command skills | `~/.agents/skills/kyro-*` | No |
 | Project state | `./.agents/kyro/` (cwd) | **Yes** |
 
-If the repo already has `.agents/kyro/scopes/` (team clone) and no personal `kyro.json`, the same command registers those scopes. With several scopes, set yours afterward: `… scope set-active <scope> --yes`.
+If the repo already has `.agents/kyro/scopes/` (team clone) without local state, the same command registers those scopes into shared `project.json` and writes your personal `local.json`. With several scopes, set yours afterward: `… scope set-active <scope> --yes`.
 
 ### 2. Verify
 
@@ -70,7 +71,7 @@ node ~/.agents/kyro/current/dist/cli.js doctor
 npx kyro-ai@latest doctor
 ```
 
-> **`npx` vs bare `kyro`:** `npx kyro-ai@latest install` does **not** permanently put `kyro` on your PATH. Install/sync persists a runnable invocation (often `node ~/.agents/kyro/current/dist/cli.js`) on the **global** runtime manifest and projected modes — not on each project’s `kyro.json`. Agents should use **that** form — not invent hand-edits when `kyro` is missing. Details: [CLI invocation](docs/cli.md#cli-invocation-persistence-kyroinvocation).
+> **`npx` vs bare `kyro`:** `npx kyro-ai@latest install` does **not** permanently put `kyro` on your PATH. Install/sync persists a runnable invocation (often `node ~/.agents/kyro/current/dist/cli.js`) on the **global** runtime manifest and projected modes — not on project state files. Agents should use **that** form — not invent hand-edits when `kyro` is missing. Details: [CLI invocation](docs/cli.md#cli-invocation-persistence-kyroinvocation).
 
 ### 3. Run a cycle
 
@@ -157,7 +158,7 @@ Replace `…` with your persisted invocation (`kyro`, or `node ~/.agents/kyro/cu
 ### How routing works
 
 ```text
-read kyro.json + scopes/{scope}/sprint.json (prefer context-pack)
+read project state (project.json + local.json) + scopes/{scope}/sprint.json (prefer context-pack)
   → route on handoff.nextAction
     (init → clarify → plan_sprint → execute_task → review_task → close_sprint → done | recover)
   → load only that mode/helper
@@ -177,18 +178,29 @@ Unknowns become `[NEEDS CLARIFICATION]` markers; `doctor` / `analyze` fail until
 ~/.agents/skills/kyro-*/    # command skill stubs (standard)
 ```
 
-**Project** (commit scopes; often gitignore personal `kyro.json`):
+**Project** (layered state — team-safe by default):
 
 ```text
 .agents/kyro/
-├── kyro.json                 # registry, activeScope, principles (invocation is global, not here)
-└── scopes/{scope}/
-    ├── sprint.json           # single source of truth
+├── project.json              # SHARED — commit: principles, team policy, scopes registry cache
+├── local.json                # LOCAL — gitignored: activeScope, installedAdapters
+├── .gitignore                # written by install/sync (local.json, legacy kyro.json, locks)
+└── scopes/{scope}/           # SHARED — commit sprint artifacts
+    ├── sprint.json           # single source of truth for the scope
     ├── archive/              # write-only at close
     └── findings/             # write-only INIT evidence
 ```
 
-Also includes (power users): behavioral evals, MCP (`kyro mcp serve`), append-only trace, portable guardrails — see docs map below.
+| Path | Commit? | Holds |
+| ---- | ------- | ----- |
+| `project.json` | **Yes** | Team constitution (`principles`), optional `team.minPackageVersion`, scopes registry cache |
+| `local.json` | **No** (gitignored) | Personal `activeScope`, machine `installedAdapters` |
+| `scopes/**` | **Yes** | Sprint work shared by the team |
+| Legacy `kyro.json` | **No** | Pre-layered monolito; dual-read until install migrates it to layers |
+
+CLI invocation is **global** (`~/.agents/kyro/current/manifest.json`), never stored on project files.
+
+Also includes (power users): behavioral evals, MCP (`kyro mcp serve`), append-only trace, portable guardrails — see docs map below. Full multi-dev contract: [Teams](docs/teams.md).
 
 ---
 
@@ -204,9 +216,12 @@ npx kyro-ai@latest sync --scope workspace --yes
 | ------- | -------- |
 | **Working directory** | Always install/sync from the **project root**. Global runtime is shared; `.agents/kyro/` is per-cwd. |
 | **Upgrade** | Always `npx kyro-ai@latest sync` (or re-`install`) from that root so you get the newest package and refresh the global runtime / projected modes. `kyroInvocation` lives in `~/.agents/kyro/current/manifest.json` (one refresh serves all projects). |
-| **Team scopes** | Commit `.agents/kyro/scopes/**`. Many teams **gitignore** `kyro.json` (`activeScope` is personal). |
-| **Missing `kyro.json` after clone** | From the clone root: `install --init-workspace --yes` **rehydrates** on-disk scopes into `scopes[]`. With multiple scopes, set yours: `… scope set-active <scope> --yes`. |
+| **Team commit matrix** | Commit `project.json` + `scopes/**`. Do **not** commit `local.json` (personal `activeScope`). Install writes `.agents/kyro/.gitignore` for local-only files — you no longer need to gitignore the entire `.agents/kyro/` tree or treat monolito `kyro.json` as the only multi-dev strategy. |
+| **Clone bootstrap** | From the clone root: `install --init-workspace --yes` writes layers if missing, **rehydrates** on-disk scopes into the shared registry, and leaves `activeScope` unset when multiple scopes exist. Then: `… scope set-active <scope> --yes`. |
+| **Read-only commands** | `status` / `doctor` / `context-pack` never create project state files; they surface an install bootstrap remedy when layers are missing. |
 | **Global bin (optional)** | `npm i -g kyro-ai@latest` for a durable `kyro` on PATH; still prefer `@latest` on every upgrade. |
+
+Details: [Teams multi-dev contract](docs/teams.md) · [CLI project state](docs/cli.md).
 
 ---
 
@@ -217,6 +232,7 @@ npx kyro-ai@latest sync --scope workspace --yes
 | `kyro: command not found` | Expected after install-only-via-npx. Use `node ~/.agents/kyro/current/dist/cli.js …`, or `npm i -g kyro-ai@latest`, then from the project root `npx kyro-ai@latest sync --yes`. |
 | Agent hand-writes `sprint.json` | Stop. Fix CLI discovery, load **kyro-ai** skills (`kyro-forge`), run `… doctor --artifacts`. Prefer `plan --from` / tool-owned verbs. |
 | No `.agents/kyro/` in the repo / wrong folder has Kyro state | Install was run outside the project. Remove stray `./.agents/kyro` if you created it by mistake, `cd` to the real project root, re-run `install --init-workspace --yes`. |
+| Status/doctor says install bootstrap / missing project state | From project root: `npx kyro-ai@latest install --init-workspace --yes` (creates `project.json` + `local.json`; does not invent scopes). |
 | Stale runtime after upgrade | From project root: `npx kyro-ai@latest sync --scope workspace --yes` |
 | Broken close / checkpoint | Do not null `activeSprint` by hand. Use `close-sprint` and [sprint-close checkpoints](docs/sprint-close-checkpoints.md). |
 
@@ -230,6 +246,7 @@ npx kyro-ai@latest sync --scope workspace --yes
 | ----- | ---- |
 | [Getting started](docs/getting-started.md) | First install and first scope |
 | [CLI](docs/cli.md) | Install, sync, doctor, tool-owned verbs, invocation |
+| [Teams](docs/teams.md) | Multi-dev commit matrix, clone bootstrap, layered state |
 | [Commands reference](docs/commands-reference.md) | Full `/kyro:*` semantics |
 | [Agent adapters](docs/agent-adapters.md) | Host-specific setup |
 

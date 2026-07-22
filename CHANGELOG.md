@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Layered multi-dev project state** — shared `.agents/kyro/project.json` (principles, team policy, scopes registry cache) + personal `.agents/kyro/local.json` (`activeScope`, installed adapters). Install/sync migrate legacy monolito `kyro.json`, write `.agents/kyro/.gitignore` for local-only files, and rehydrate on-disk scopes.
+- **`docs/teams.md`** — multi-dev commit matrix, clone bootstrap, dual-read/migration, optional `team.minPackageVersion`.
+- **Doctor layered health** — validates shared/local shapes, WARNs on leftover live monolito, optional non-blocking WARN when runtime is older than `team.minPackageVersion`.
+- **Read-only bootstrap remedies** — `status` / `context-pack` / `doctor` never create project state files; they surface `install --init-workspace` when layers are missing.
+
+### Changed
+
+- **README, getting-started, cli, architecture, adapters** document layered state as the multi-dev default (supersedes gitignore-entire-`kyro.json` as the only team strategy).
+- **Codex / AGENTS.md projected block** points at `project.json` + `local.json` instead of monolito-only `kyro.json`.
+
 ## [4.34.0] - 2026-07-22
 
 ### Added
