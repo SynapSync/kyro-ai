@@ -48,7 +48,7 @@ function baseState(dir) {
     previousSprint: null,
     activeSprint: null,
     debt: [],
-    handoff: { nextAction: 'wrap_up', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-02' },
+    handoff: { nextAction: 'done', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-02' },
   });
 }
 

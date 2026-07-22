@@ -37,7 +37,7 @@ One scope = one `sprint.json`. Agents read `kyro.json` + the scope's lean pack, 
 3. Generate one sprint; never pre-generate.
 4. Tasks are self-contained: every task carries `description`, `files_to_touch`, `context`, `acceptance_criteria`.
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
-6. Closing a sprint (snapshot-then-clear of `activeSprint`) is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
+6. Closing a sprint is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
 7. Findings and archives are write-only evidence; agents never re-read them to route.
 8. **Admit unknowns, never guess.** Write `[NEEDS CLARIFICATION: <gap>]` and route to `clarify`. `{{KYRO_CLI}} doctor`/`analyze` FAIL while any marker remains — a deterministic gate.
 
@@ -76,7 +76,7 @@ Claude Code's `PreToolUse` hook blocks edits nulling `activeSprint`; others rely
 | `execute_task` | `modes/SPRINT.md`, `modes/execute-task.md` |
 | `review_task` | `modes/SPRINT.md`, `modes/review-task.md`, `helpers/reviewer.md` |
 | `close_sprint` | `modes/SPRINT.md`, `modes/close-sprint.md`, `helpers/debt-tracker.md` + `helpers/learner.md` as needed |
-| `wrap_up` | `modes/close-sprint.md` only if a milestone closed |
+| `done` | Stop — scope complete. No work mode. |
 | status report | `modes/STATUS.md` |
 | inconsistent | `modes/recover.md` |
 

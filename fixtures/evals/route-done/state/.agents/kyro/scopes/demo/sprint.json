@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "scope": "demo",
   "title": "Demo",
-  "status": "active",
+  "status": "completed",
   "objective": "Demo objective",
   "successCriteria": [
     "Demo works."
@@ -26,7 +26,7 @@
   "activeSprint": null,
   "debt": [],
   "handoff": {
-    "nextAction": "wrap_up",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
     "note": "Resume demo.",

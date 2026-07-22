@@ -6,12 +6,30 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.33.0] - 2026-07-21
+
+### Added
+
+- **Install/sync rehydrates scopes from disk into `kyro.json`.** When workspace state is written, Kyro unions directories under `.agents/kyro/scopes/` into `scopes[]` (title/status from `sprint.json` when readable). Existing registry entries are never clobbered. If `activeScope` is null and exactly one scope is known, it is set automatically; with multiple scopes it stays null so each developer chooses with `kyro scope set-active`. This unblocks the multi-dev pattern where `kyro.json` is gitignored (personal `activeScope`) but `scopes/` is shared.
+- Interactive `npx kyro-ai install` prompt now lists on-disk scopes when present, so answering **y** clearly registers them.
+- `kyro doctor` WARNs when scope folders exist on disk but are missing from `kyro.json.scopes[]`, with a remedy to re-run install/sync.
+
+## [4.32.0] - 2026-07-21
+
+### Removed
+
+- **`wrap_up` is gone.** Closing the last sprint now sets `handoff.nextAction: "done"` (with `status: "completed"`). `done` is a terminal handoff: empty routing modes, budget class `brief`, no close-mode load, no post-close action. Pre-existing artifacts that still say `wrap_up` are normalized to `done` on read/validation so customer scopes keep loading without a mass migration.
+
 ## [4.31.0] - 2026-07-20
 
 ### Fixed
 
 - `kyro repair` now consumes the confirmation guard like every other mutating verb instead of prompting interactively. Previously, with no TTY and no `--yes`/`--confirm`, it printed `Normalize sprint.json? [y/N]`, read an empty answer, and **exited 0 having done nothing** — which a non-interactive agent reads as success. It now routes through `evaluateGuard('repair_scope', …)` and exits non-zero with `CONFIRMATION_REQUIRED` when unconfirmed, matching `kyro review` and `kyro scope set-active`; `kyro repair --yes` still normalizes. The interactive `[y/N]` helper was removed. Surfaced by a field-test review of a client's Codex sprint session.
 - Read-only / permission durable-write failures now report an actionable `WRITE_NOT_PERMITTED` error with a remedy instead of an opaque message. A new `describeWriteFailure` helper (`src/cli/core/errors.ts`) classifies `EROFS`/`EACCES`/`ENOSPC` and is applied at every durable-write site: the operation pipeline (`review`, `repair`, and any tool-owned write) via `formatPipelineError`, and all three of `close-sprint`'s writers (`atomicReplace`, `publishExclusive`, and the `ensureDurableDirectory` mkdir, which are now inside the guarded try). Under Codex's default read-only sandbox the previous errors (`Apply failed and rollback completed: EROFS…`, `Durable file operation failed and temporary cleanup also failed`, raw `EACCES: … mkdir …`) gave the agent no remedy and cost repeated failed retries; the new message names the cause and tells sandboxed agents (Codex/OpenCode) to re-run with write access to `.agents/kyro`.
+
+### Changed
+
+- Clarified in the runtime instructions and architecture docs that `sprint-forge` is a **skill loaded as instruction files**, not a spawnable subagent — the only Kyro agent is `orchestrator`. A field-test agent driving planning outside `/kyro:forge` tried to invoke `kyro-ai:sprint-forge` through the Task/Agent tool (which fails, then self-recovers to `orchestrator`); the plan-sprint mode and `docs/architecture.md` now state that a sprint is materialized via `/kyro:forge` or the tool-owned `kyro plan --from` verb, never by spawning `sprint-forge` as an agent.
 
 ## [4.30.2] - 2026-07-19
 

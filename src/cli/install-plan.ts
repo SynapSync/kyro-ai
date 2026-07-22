@@ -14,6 +14,7 @@ import { getAdapterDefinition, getInstalledAdapterDefinitions } from './adapters
 import { addCopyDirectoryPlan, addCopyFilePlan, listRelativeFiles } from './fs';
 import { readPackageVersion } from './help';
 import { KYRO_CLI_PLACEHOLDER, resolveKyroInvocation } from './invocation';
+import { rehydrateScopesFromDisk } from './core/scopes';
 import { readProjectState } from './state';
 import type { Agent, InstallScope, KyroManifest, KyroProjectState, OperationPlan } from './types';
 
@@ -132,7 +133,9 @@ function mergeProjectState(
     adaptersByAgent.set(agent, getAdapterDefinition(agent).buildInstalledAdapter(scope, installedAt));
   }
 
-  return {
+  // Register scope folders already on disk (common when kyro.json is gitignored but scopes/ is shared).
+  // Existing scopes[] entries are preserved; activeScope is only auto-set when null and exactly one scope.
+  return rehydrateScopesFromDisk({
     ...base,
     schemaVersion: 4,
     artifactRoot: ARTIFACT_ROOT,
@@ -141,7 +144,7 @@ function mergeProjectState(
     runtimePath: KYRO_ROOT,
     installedAdapters: [...adaptersByAgent.values()].sort((a, b) => a.agent.localeCompare(b.agent)),
     kyroInvocation,
-  };
+  });
 }
 
 function buildManagedFiles(agents: Agent[], runtimeRoot: string): string[] {

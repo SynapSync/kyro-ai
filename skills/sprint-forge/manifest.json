@@ -57,7 +57,7 @@
       "version": "2.0.0",
       "date": "2026-03-08",
       "changes": [
-        "Evolve from standalone skill to full workflow with one orchestrator agent, built-in checkpoints, slash commands (/kyro:forge, /kyro:status, /kyro:wrap-up), and per-project learning via persistent rules"
+        "Evolve from standalone skill to full workflow with one orchestrator agent, built-in checkpoints, slash commands (/kyro:forge, /kyro:status, /kyro:task-context), and per-project learning via persistent rules"
       ]
     },
     {

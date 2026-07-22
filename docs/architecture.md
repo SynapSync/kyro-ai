@@ -39,7 +39,7 @@ The orchestrator coordinates the full sprint lifecycle. It performs read-only an
 
 ### Skills
 
-Skills provide domain knowledge that the orchestrator consumes.
+Skills provide domain knowledge that the orchestrator consumes. They are **loaded as instruction files** (the router reads `SKILL.md` and the routed mode), not spawned as subagents — the only Kyro agent is `orchestrator`. To generate or materialize a sprint, use `/kyro:forge` or the tool-owned `kyro plan --from` verb; never invoke `sprint-forge` through the Task/Agent tool.
 
 | Skill | Knowledge Domain |
 |-------|-----------------|

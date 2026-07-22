@@ -88,7 +88,7 @@ Se analizó el `trace/events.ndjson` del CLI de Kyro de la corrida completa de l
 
 **Ceremonia de CLI (34 `tool_command_run`):** 25× `review` (una por tarea), 4× `close-sprint`, 5× `repair` (re-serializa `sprint.json` completo tras cada close). Más 54 `validation_result` (11 de `doctor`, 43 de `analyze`) — `analyze` corre antes de cada cierre emitiendo 10–16 findings que el agente lee.
 
-**Nota sobre budget routing:** `route_selected` muestra que el ruteo de budget SÍ se activó (execute_task→`execute`, wrap_up→`close`, plan_sprint→`brief`, con packMode task/scope). O sea el mecanismo lean estaba operando a nivel de routing; el gasto vino de rework + tool outputs + sesión larga, no de un ruteo defectuoso.
+**Nota sobre budget routing:** `route_selected` muestra que el ruteo de budget SÍ se activó (execute_task→`execute`, close_sprint→`close`, plan_sprint→`brief`, con packMode task/scope). O sea el mecanismo lean estaba operando a nivel de routing; el gasto vino de rework + tool outputs + sesión larga, no de un ruteo defectuoso.
 
 **Límite honesto:** los huecos de tiempo (p. ej. T3.4→T3.5 = 31 min; la hora 19:00 solo con `repair`) son donde el agente ejecutaba código y corría tests que NO aparecen en el trace. El trace subestima el costo real; los outputs grandes ocurrieron en esos huecos.
 
@@ -197,7 +197,7 @@ Para un caso simple con muchas tareas chicas repartidas en 4 sprints, son **dece
 
 ## Falla #3 — Nada fuerza contexto fresco entre sprints (el pico de costo)
 
-**Dónde:** `skills/sprint-forge/assets/modes/close-sprint.md` + comandos `wrap-up` / `task-context`.
+**Dónde:** `skills/sprint-forge/assets/modes/close-sprint.md` + comando `task-context`.
 
 `close-sprint` publica un checkpoint lossless **justo para permitir retomar en sesión fresca y barata** — el diseño lo soporta. Pero **nada en el flujo empuja al usuario a resetear el contexto** al cerrar un sprint. El usuario, naturalmente, sigue en la misma sesión → el sprint 4 arrastra el contexto de los 3 anteriores → peor caso de tokens, como default de facto.
 
@@ -220,6 +220,6 @@ Con eso se emite el veredicto concreto ("el sprint 2 y 3 debieron ser uno" vs. "
 
 ## Respuestas de comunicación (para el usuario que reportó)
 
-**Mensaje sugerido (customer-facing):** validar el síntoma, explicar que la causa no es el motor sino (1) contexto acumulado en una sola sesión y (2) profundidad de planificación; recomendar menos sprints más grandes + `/kyro:wrap-up` y `/kyro:task-context` para arrancar cada sprint en fresco; ofrecer revisar el scope concreto.
+**Mensaje sugerido (customer-facing):** validar el síntoma, explicar que la causa no es el motor sino (1) contexto acumulado en una sola sesión y (2) profundidad de planificación; recomendar menos sprints más grandes + `/kyro:task-context` para arrancar cada sprint en fresco; ofrecer revisar el scope concreto.
 
 **Argumento fuerte:** sin la disciplina de Kyro (lean loading, un sprint activo, fuente única) la misma cantidad de trabajo costaría *más*, no menos. Kyro no infla el consumo — pero correr los 4 sprints en una sesión paga el peor caso, y eso es evitable.

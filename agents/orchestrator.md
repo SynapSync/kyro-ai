@@ -29,7 +29,8 @@ Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint`/st
 | `plan_sprint` | `assets/modes/SPRINT.md` + `assets/modes/plan-sprint.md` |
 | `execute_task` | `assets/modes/SPRINT.md` + `assets/modes/execute-task.md` |
 | `review_task` | `assets/modes/SPRINT.md` + `assets/modes/review-task.md` |
-| `close_sprint` / `wrap_up` | `assets/modes/SPRINT.md` + `assets/modes/close-sprint.md` |
+| `close_sprint` | `assets/modes/SPRINT.md` + `assets/modes/close-sprint.md` |
+| `done` | Stop — scope is complete. No work mode. |
 | inconsistent state | `assets/modes/SPRINT.md` + `assets/modes/recover.md` |
 | status report | `assets/modes/STATUS.md` |
 
@@ -44,8 +45,7 @@ All writes to `sprint.json` use the **Artifact Write Contract** in `SKILL.md` (r
 | Plan sprint | Set `activeSprint` and `handoff.nextAction: "execute_task"` in `sprint.json`. |
 | Task done | Set that task's `evidence` and `status` in `sprint.json`. |
 | Task reviewed | Set that task's `verdict` in `sprint.json`. |
-| Sprint close | Additive `debt[]`/`conventions[]` writes by hand; then run `{{KYRO_CLI}} close-sprint` — the CLI publishes a lossless scope checkpoint, retains the legacy ActiveSprint snapshot, appends `ledger[]`, and clears `activeSprint` atomically. Never null `activeSprint` by hand. |
-| Wrap-up | Update `handoff` (next action + note) only. |
+| Sprint close | Additive `debt[]`/`conventions[]` writes by hand; then run `{{KYRO_CLI}} close-sprint` — the CLI publishes a lossless scope checkpoint, retains the legacy ActiveSprint snapshot, appends `ledger[]`, and clears `activeSprint` atomically. Never null `activeSprint` by hand. When no sprints remain, the CLI sets `status: "completed"` and `handoff.nextAction: "done"`. Do not invent a post-close action. |
 
 Never split a structural JSON change into a partial string edit. The only writes are `sprint.json`, `kyro.json`, and the write-only `archive/` + `findings/` files.
 

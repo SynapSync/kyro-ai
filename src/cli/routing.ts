@@ -22,7 +22,8 @@ export const ROUTING_TABLE = {
   execute_task: { modes: ['SPRINT.md', 'execute-task.md'] },
   review_task: { modes: ['SPRINT.md', 'review-task.md'] },
   close_sprint: { modes: ['SPRINT.md', 'close-sprint.md'] },
-  wrap_up: { modes: ['SPRINT.md', 'close-sprint.md'] },
+  /** Terminal: scope complete — no work mode to load. */
+  done: { modes: [] },
 } as const satisfies Record<NextAction, RouteDefinition>;
 
 export function resolveRoute(nextAction: NextAction, packMode: ContextPackMode = 'scope'): ResolvedRoute {

@@ -1,9 +1,11 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+import { listScopeFolders } from '../artifacts/scopes';
 import { buildInstallPlan, buildRuntimeInstallPlan } from '../install-plan';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope, uniqueAgents } from '../options';
 import { readProjectState } from '../state';
+import { formatWorkspaceInitPrompt } from '../core/scopes';
 import { KyroCoreError } from '../core/errors';
 import { AGENT, KYRO_ROOT, KYRO_STATE_PATH, SCOPE } from '../constants';
 import { requireFullPackageFor } from '../package-root-mode';
@@ -121,7 +123,7 @@ function isInteractiveTerminal(): boolean {
 async function confirmWorkspaceInit(): Promise<boolean> {
   const rl = createInterface({ input, output });
   try {
-    const answer = await rl.question('Initialize Kyro in this workspace? [y/N] ');
+    const answer = await rl.question(formatWorkspaceInitPrompt(listScopeFolders()));
     return answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes';
   } finally {
     rl.close();

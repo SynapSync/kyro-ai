@@ -166,7 +166,7 @@ export function deriveSprintCloseTransition(
     roadmap: { ...beforeClose.roadmap, sprints: roadmapSprints },
     handoff: {
       ...beforeClose.handoff,
-      nextAction: remaining > 0 ? 'plan_sprint' : 'wrap_up',
+      nextAction: remaining > 0 ? 'plan_sprint' : 'done',
       nextTaskId: null,
       note: close.note ?? `Sprint ${active.n} (${active.slug}) closed as ${close.outcome}. ${remaining > 0 ? `${remaining} sprint(s) remain.` : 'No sprints remain — scope objective met.'}`,
       lastUpdated: closedAt,

@@ -1,11 +1,11 @@
 {
   "evalCaseSchemaVersion": 1,
-  "id": "route-wrap-up",
-  "title": "Route wrap_up",
+  "id": "route-done",
+  "title": "Route done (scope complete terminal)",
   "kind": "replay",
   "tags": [
     "routing",
-    "wrap_up"
+    "done"
   ],
   "agents": [
     "any"
@@ -29,12 +29,9 @@
   ],
   "expectFinalState": false,
   "route": {
-    "nextAction": "wrap_up",
-    "expectedModes": [
-      "SPRINT.md",
-      "close-sprint.md"
-    ],
-    "expectedBudgetClass": "close",
-    "expectedReasoningTier": "deep"
+    "nextAction": "done",
+    "expectedModes": [],
+    "expectedBudgetClass": "brief",
+    "expectedReasoningTier": "light"
   }
 }

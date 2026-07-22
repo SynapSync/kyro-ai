@@ -42,7 +42,7 @@
   "activeSprint": null,
   "debt": [],
   "handoff": {
-    "nextAction": "wrap_up",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
     "note": "Sprint 1 (demo-sprint) closed as shipped. No sprints remain \u2014 scope objective met.",

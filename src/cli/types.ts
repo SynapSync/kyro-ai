@@ -61,7 +61,7 @@ export type NextAction =
   | 'execute_task'
   | 'review_task'
   | 'close_sprint'
-  | 'wrap_up';
+  | 'done';
 
 /** A resolved ambiguity, recorded verbatim like spec-kit's Clarifications section. */
 export interface Clarification {

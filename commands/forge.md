@@ -22,7 +22,8 @@ Continue Kyro work without loading the whole workflow upfront.
 | `nextAction: "plan_sprint"` | `skills/sprint-forge/assets/modes/plan-sprint.md` |
 | `nextAction: "execute_task"` | `skills/sprint-forge/assets/modes/execute-task.md` |
 | `nextAction: "review_task"` | `skills/sprint-forge/assets/modes/review-task.md` |
-| `nextAction: "close_sprint"` or `"wrap_up"` | `skills/sprint-forge/assets/modes/close-sprint.md` |
+| `nextAction: "close_sprint"` | `skills/sprint-forge/assets/modes/close-sprint.md` |
+| `nextAction: "done"` | Stop — scope complete. No mode. |
 | `sprint.json` missing/unparseable or inconsistent | `skills/sprint-forge/assets/modes/recover.md` |
 
 ## Rules

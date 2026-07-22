@@ -12,4 +12,5 @@ dist/
 /.agents/
 .claude-plugin/
 .cursor/
+.commandcode/
 openspec/

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Verifies close-sprint's post-close handoff guidance: when sprints remain (plan_sprint) it
-// recommends a FRESH session + paste-ready handoff facts; when none remain (wrap_up) it points
-// at wrap-up instead. This is the portable, deterministic half of the fresh-context nudge.
+// recommends a FRESH session + paste-ready handoff facts; when none remain (done) it reports
+// scope complete with no fresh-session nudge. Portable, deterministic half of the fresh-context nudge.
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,22 +50,26 @@ function run(root) {
     assert(out.includes('FRESH session'), `expected fresh-session recommendation: ${out}`);
     assert(out.includes('task-context'), `expected task-context pointer: ${out}`);
     assert(out.includes('sprint.json:'), `expected paste-ready handoff facts: ${out}`);
-    assert(!out.includes('Scope objective met'), `wrap_up message must not appear on plan_sprint: ${out}`);
+    assert(!out.includes('Scope objective met'), `done message must not appear on plan_sprint: ${out}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 }
 
-// Case 2 — no sprints remain -> wrap_up -> no fresh-session nudge, points at wrap-up.
+// Case 2 — no sprints remain -> done -> no fresh-session nudge, scope complete.
 {
   const root = sandbox();
   try {
     const res = run(root);
     const out = res.stdout + res.stderr;
     assert(res.status === 0, `happy close should succeed: ${out}`);
-    assert(out.includes('Next action: wrap_up'), `expected wrap_up next action: ${out}`);
+    assert(out.includes('Next action: done'), `expected done next action: ${out}`);
     assert(out.includes('Scope objective met'), `expected scope-complete message: ${out}`);
-    assert(!out.includes('FRESH session'), `fresh-session nudge must not appear on wrap_up: ${out}`);
+    assert(!out.includes('FRESH session'), `fresh-session nudge must not appear on done: ${out}`);
+    assert(!out.includes('wrap_up'), `wrap_up must not appear: ${out}`);
+    const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+    assert(sprint.handoff.nextAction === 'done', `sprint.json nextAction must be done, got ${sprint.handoff.nextAction}`);
+    assert(sprint.status === 'completed', `sprint.json status must be completed, got ${sprint.status}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
