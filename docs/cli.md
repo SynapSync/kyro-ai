@@ -21,7 +21,7 @@ kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
 
-`npx kyro-ai` resolves to the same CLI entrypoint.
+`npx kyro-ai@latest` resolves to the same CLI entrypoint. Prefer **`@latest`** for install/sync so clients do not reuse a stale npx cache; pin an explicit version only when you need reproducibility.
 
 ## Maintenance Scripts
 
@@ -93,8 +93,19 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 | Root | How you get it | Layout highlights |
 | ---- | -------------- | ----------------- |
-| **Full npm package** | `npx kyro-ai …` or global `kyro` after `npm i -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
-| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when `kyro` is not on PATH) | `manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror |
+| **Full npm package** | `npx kyro-ai@latest …` or global `kyro` after `npm i -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
+| **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when no durable `kyro` is on PATH) | `manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror |
+
+### CLI invocation persistence (`kyroInvocation`)
+
+Install/sync probe PATH once and write the result into `manifest.json` and `kyro.json`, then substitute it for `{{KYRO_CLI}}` in projected modes.
+
+| Situation | Persisted invocation |
+| --------- | -------------------- |
+| Durable global `kyro` on PATH (`npm i -g kyro-ai`, user shim under `~/.local/bin`, …) | `kyro` |
+| No `kyro`, **or** only an ephemeral package-manager bin (npx/`_npx` cache, yarn dlx, pnpm dlx) | `node ~/.agents/kyro/current/dist/cli.js` |
+
+**Why:** `npx kyro-ai@latest install` puts a temporary `…/.npm/_npx/…/bin/kyro` on PATH for the install process only. Treating that as durable used to persist bare `kyro`, which then failed for agents after npx exited and pushed them into hand-writing `sprint.json`. Re-run `npx kyro-ai@latest sync` (or install) after upgrading so existing workspaces refresh a stale `"kyro"` invocation.
 
 **Must run from the full npm package:**
 
@@ -105,7 +116,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 - `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `record-evidence`, `review`, `context-pack`, and other scope workflow commands
 
-Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai` remedy.
+Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai@latest` remedy.
 
 Global command skills are installed for agent discovery:
 
@@ -139,19 +150,22 @@ Implemented workspace adapters:
 | `opencode` | Native OpenCode skills, commands under `~/.config/opencode/commands/kyro/`, and `agent.kyro-orchestrator` in `opencode.json` |
 | `codex`    | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block                                       |
 
-Default install uses `standard`:
+Default install uses `standard`. **Always run install/sync from the project root:** global runtime and skills go under `~/.agents/…`; project state (`.agents/kyro/`) is created in the current working directory.
 
 ```bash
-kyro install --scope workspace --dry-run
-kyro install --scope workspace --yes
+cd /path/to/your-app
+npx kyro-ai@latest install --scope workspace --dry-run
+npx kyro-ai@latest install --scope workspace --init-workspace --yes
 ```
 
-Agent-specific installs:
+`--init-workspace` non-interactively writes `./.agents/kyro/kyro.json` (and rehydrates on-disk `scopes/`). Without it, a non-interactive install may install only the global runtime. `--yes` alone does not initialize a new workspace.
+
+Agent-specific installs (from the project root):
 
 ```bash
-kyro install --agent opencode --scope workspace --yes
-kyro install --agent codex --scope workspace --yes
-kyro install --agent standard,opencode,codex --scope workspace --yes
+npx kyro-ai@latest install --agent opencode --scope workspace --init-workspace --yes
+npx kyro-ai@latest install --agent codex --scope workspace --init-workspace --yes
+npx kyro-ai@latest install --agent standard,opencode,codex --scope workspace --init-workspace --yes
 ```
 
 The adapters project Kyro workflows into concrete agent entrypoints so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose. `standard` and `codex` use `~/.agents/skills/`; OpenCode uses its native config tree and preserves non-Kyro `opencode.json` keys.
@@ -195,7 +209,7 @@ They do not create per-scope files. Each scope's `sprint.json` (the single sourc
 
 **Rehydrate from disk:** if `.agents/kyro/scopes/{id}/` directories already exist (common after clone when `kyro.json` is gitignored but scopes are committed), install/sync **registers** those folders into `scopes[]`. Title and status come from each scope's `sprint.json` when readable; existing registry entries are never overwritten. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
 
-Bare interactive install (`npx kyro-ai install`) asks whether to initialize the workspace; when scopes already exist on disk, the prompt lists them so a **y** answer registers them intentionally.
+Bare interactive install (`npx kyro-ai@latest install`) asks whether to initialize the workspace; when scopes already exist on disk, the prompt lists them so a **y** answer registers them intentionally.
 
 Initial state shape (no scopes on disk yet):
 
@@ -214,8 +228,9 @@ Initial state shape (no scopes on disk yet):
 
 `activeScope` is personal (who is working on what). Teams often gitignore `.agents/kyro/kyro.json` and commit `.agents/kyro/scopes/**`. After clone:
 
-1. `npx kyro-ai install` → answer **y** (or pass `--init-workspace`) so scopes are registered.
-2. If more than one scope: `kyro scope set-active <yours> --yes`.
+1. `cd` into the cloned project root (not your home directory).
+2. `npx kyro-ai@latest install --init-workspace --yes` (or interactive install and answer **y**) so `kyro.json` is created here and scopes are registered.
+3. If more than one scope: `kyro scope set-active <yours> --yes` (or the projected `node ~/.agents/kyro/current/dist/cli.js …` form).
 
 `kyro doctor` WARNs when folders on disk are missing from the local registry.
 

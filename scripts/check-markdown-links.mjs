@@ -67,7 +67,11 @@ function checkFile(filePath) {
         continue;
       }
 
-      const resolved = resolve(baseDir, target);
+      // Strip URL fragments (#section) and query strings; only the file path must exist.
+      const pathOnly = target.split(/[?#]/)[0];
+      if (!pathOnly) continue;
+
+      const resolved = resolve(baseDir, pathOnly);
       if (!existsSync(resolved)) {
         const relPath = relative(root, filePath);
         console.error(`BROKEN LINK: ${relPath}:${i + 1} -> ${target}`);

@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.33.1] - 2026-07-22
+
+### Fixed
+
+- **Install/sync no longer persists bare `kyro` from ephemeral npx PATH.** `npx kyro-ai install` temporarily puts `…/.npm/_npx/…/bin/kyro` on PATH; the probe treated that as durable and wrote `kyroInvocation: "kyro"` into `manifest.json` / `kyro.json` / projected modes. After npx exited, agents got `command not found` and fell back to hand-writing `sprint.json`. Ephemeral package-manager paths (`_npx`, yarn/pnpm dlx) are now rejected; install falls back to the stable `node ~/.agents/kyro/current/dist/cli.js` form. `kyro doctor` fails closed when a persisted bare `kyro` is missing or still resolves only to an ephemeral path. Re-run `npx kyro-ai sync` (or install) once to refresh workspaces that already have a stale `"kyro"` invocation.
+
 ## [4.33.0] - 2026-07-21
 
 ### Added

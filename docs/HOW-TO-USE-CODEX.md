@@ -5,7 +5,8 @@ Codex should use the installed Kyro command skills and root `AGENTS.md` bootstra
 ## Setup
 
 ```bash
-npx kyro-ai install --agent codex --scope workspace --yes
+cd /path/to/your-app
+npx kyro-ai@latest install --agent codex --scope workspace --init-workspace --yes
 ```
 
 This installs:

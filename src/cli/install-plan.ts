@@ -34,7 +34,8 @@ function buildInstallPlanForMode(
   const now = new Date().toISOString();
   const packageVersion = readPackageVersion();
   const runtimeRoot = KYRO_ROOT;
-  // Probed once per install/sync — projected markdown is static, so the invocation must be
+  // Probed once per install/sync (durable kyro only; ephemeral npx bins are rejected — see invocation.ts).
+  // Projected markdown is static, so the invocation must be
   // known at copy time. Reused for manifest.json, kyro.json, and (Phase 3+) substitution.
   const kyroInvocation = resolveKyroInvocation().raw;
   const state = options.includeWorkspace ? mergeProjectState(agents, scope, now, kyroInvocation) : null;

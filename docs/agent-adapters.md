@@ -19,9 +19,11 @@ Kyro's adapter contract is: global runtime, adapter command entrypoints, and loc
 ## Install adapters
 
 ```bash
-npx kyro-ai install --scope workspace --yes
-npx kyro-ai install --agent opencode --scope workspace --yes
-npx kyro-ai install --agent codex --scope workspace --yes
+# Always from the project root. Always @latest unless you intentionally pin a version.
+cd /path/to/your-app
+npx kyro-ai@latest install --scope workspace --init-workspace --yes
+npx kyro-ai@latest install --agent opencode --scope workspace --init-workspace --yes
+npx kyro-ai@latest install --agent codex --scope workspace --init-workspace --yes
 ```
 
 Implemented adapters:
@@ -63,7 +65,7 @@ See [cli.md](cli.md) for full syntax and [maker-checker.md](maker-checker.md) fo
 Use:
 
 ```bash
-npx kyro-ai install --agent codex --scope workspace --yes
+npx kyro-ai@latest install --agent codex --scope workspace --yes
 ```
 
 Codex reads the managed root `AGENTS.md` block, discovers `~/.agents/skills/kyro-*`, and follows the router-first workflow.
@@ -73,7 +75,7 @@ Codex reads the managed root `AGENTS.md` block, discovers `~/.agents/skills/kyro
 Use:
 
 ```bash
-npx kyro-ai install --agent opencode --scope workspace --yes
+npx kyro-ai@latest install --agent opencode --scope workspace --yes
 ```
 
 OpenCode should invoke the native `/kyro/forge`, `/kyro/status`, `/kyro/task-context`, `/kyro/idea`, and `/kyro/qa` commands, or the installed `kyro-*` skills under `~/.config/opencode/skills/`. It should not copy Kyro core into the project.
