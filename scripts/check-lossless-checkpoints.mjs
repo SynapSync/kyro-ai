@@ -522,18 +522,20 @@ for (const mode of ['corrupt', 'unsupported']) {
     writeJson(join(lock, 'owner.json'), { pid: process.pid, token, createdAt: old });
     writeJson(join(lock, 'heartbeat.json'), { token, renewedAt: old, leaseUntil: old + 100 });
     const crashed = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
-      KYRO_TEST_LOCK_LEASE_MS: '200',
+      KYRO_TEST_LOCK_LEASE_MS: '500',
       KYRO_TEST_LOCK_CRASH_AFTER_RECLAIM_CLAIM: '1',
     });
     assert(crashed.status === 86, `reclaim crash hook did not terminate after durable claim publication: ${output(crashed)}`);
     assert(readdirSync(root).some((name) => name.startsWith('.kyro-state-writer.lock.reclaim-')), 'crashed reclaimer left no recoverable claim fixture');
-    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '200' });
+    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '500' });
     assert(recovered.status === 0, `next writer could not recover a crashed reclaim claim: ${output(recovered)}`);
     assert(!existsSync(lock) && !readdirSync(root).some((name) => name.startsWith('.kyro-state-writer.lock.reclaim-')), `reclaim recovery left lock/claim debris: ${readdirSync(root).join(', ')}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
 // PID reuse cannot keep an expired lease alive; heartbeat token/expiry is authoritative.
+// Use a compact owner/heartbeat shape (production writes one-line JSON) and a reclaim-friendly
+// lease env so slow CI fsync cannot drop the reclaim claim before winner selection.
 {
   const root = makeSandbox();
   try {
@@ -541,10 +543,13 @@ for (const mode of ['corrupt', 'unsupported']) {
     mkdirSync(lock);
     const token = 'pid-reuse-simulation';
     const old = Date.now() - 10_000;
-    writeJson(join(lock, 'owner.json'), { pid: process.pid, token, createdAt: old });
-    writeJson(join(lock, 'heartbeat.json'), { token, renewedAt: old, leaseUntil: old + 100 });
-    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '200' });
-    assert(recovered.status === 0 && !existsSync(lock), `live reused PID incorrectly protected an expired token lease: ${output(recovered)}`);
+    writeFileSync(join(lock, 'owner.json'), `${JSON.stringify({ pid: process.pid, token, createdAt: old })}\n`);
+    writeFileSync(join(lock, 'heartbeat.json'), `${JSON.stringify({ token, renewedAt: old, leaseUntil: old + 100 })}\n`);
+    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '500' });
+    assert(
+      recovered.status === 0 && !existsSync(lock),
+      `live reused PID incorrectly protected an expired token lease (status=${recovered.status}, lock=${existsSync(lock)}): ${output(recovered)}`,
+    );
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -727,7 +732,7 @@ for (const mode of ['corrupt', 'unsupported']) {
     utimesSync(ownerSymlinkClaim, stale, stale);
     symlinkSync(victimFile, join(lock, 'heartbeat.json.tmp-33333333-3333-4333-8333-333333333333'));
 
-    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '200' });
+    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '500' });
     assert(recovered.status === 0, `safe reclaim was blocked by malicious prefix symlinks: ${output(recovered)}`);
     assert(readFileSync(victimFile, 'utf8') === 'untouched\n' && existsSync(victim), 'reclaim cleanup followed a symlink and modified the victim');
   } finally { rmSync(root, { recursive: true, force: true }); rmSync(victim, { recursive: true, force: true }); }

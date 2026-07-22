@@ -70,7 +70,7 @@ node ~/.agents/kyro/current/dist/cli.js doctor
 npx kyro-ai@latest doctor
 ```
 
-> **`npx` vs bare `kyro`:** `npx kyro-ai@latest install` does **not** permanently put `kyro` on your PATH. Install/sync persists a runnable invocation (often `node ~/.agents/kyro/current/dist/cli.js`) into the runtime and projected modes. Agents should use **that** form — not invent hand-edits when `kyro` is missing. Details: [CLI invocation](docs/cli.md#cli-invocation-persistence-kyroinvocation).
+> **`npx` vs bare `kyro`:** `npx kyro-ai@latest install` does **not** permanently put `kyro` on your PATH. Install/sync persists a runnable invocation (often `node ~/.agents/kyro/current/dist/cli.js`) on the **global** runtime manifest and projected modes — not on each project’s `kyro.json`. Agents should use **that** form — not invent hand-edits when `kyro` is missing. Details: [CLI invocation](docs/cli.md#cli-invocation-persistence-kyroinvocation).
 
 ### 3. Run a cycle
 
@@ -181,7 +181,7 @@ Unknowns become `[NEEDS CLARIFICATION]` markers; `doctor` / `analyze` fail until
 
 ```text
 .agents/kyro/
-├── kyro.json                 # registry, activeScope, principles, kyroInvocation
+├── kyro.json                 # registry, activeScope, principles (invocation is global, not here)
 └── scopes/{scope}/
     ├── sprint.json           # single source of truth
     ├── archive/              # write-only at close
@@ -203,7 +203,7 @@ npx kyro-ai@latest sync --scope workspace --yes
 | Pattern | Guidance |
 | ------- | -------- |
 | **Working directory** | Always install/sync from the **project root**. Global runtime is shared; `.agents/kyro/` is per-cwd. |
-| **Upgrade** | Always `npx kyro-ai@latest sync` (or re-`install`) from that root so you get the newest package and refresh `kyroInvocation` / modes. |
+| **Upgrade** | Always `npx kyro-ai@latest sync` (or re-`install`) from that root so you get the newest package and refresh the global runtime / projected modes. `kyroInvocation` lives in `~/.agents/kyro/current/manifest.json` (one refresh serves all projects). |
 | **Team scopes** | Commit `.agents/kyro/scopes/**`. Many teams **gitignore** `kyro.json` (`activeScope` is personal). |
 | **Missing `kyro.json` after clone** | From the clone root: `install --init-workspace --yes` **rehydrates** on-disk scopes into `scopes[]`. With multiple scopes, set yours: `… scope set-active <scope> --yes`. |
 | **Global bin (optional)** | `npm i -g kyro-ai@latest` for a durable `kyro` on PATH; still prefer `@latest` on every upgrade. |

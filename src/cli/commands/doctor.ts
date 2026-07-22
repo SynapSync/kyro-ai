@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { ARTIFACT_ROOT, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
-import { isEphemeralPackageManagerPath, resolveKyroBinaryPath, resolveKyroInvocation } from '../invocation';
+import { getPersistedKyroInvocation, isEphemeralPackageManagerPath, resolveKyroBinaryPath } from '../invocation';
 import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
@@ -22,7 +22,7 @@ const PROJECT_STATE_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
 const GLOBAL_RUNTIME_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
 const GLOBAL_RUNTIME_SYNC_REMEDY = FULL_PACKAGE_SYNC_REMEDY;
 const CLI_INVOCATION_REMEDY =
-  'Re-run: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) so the runtime CLI is projected and the invocation is refreshed. Use the full npm package, not the projected runtime CLI. After sync, agents should invoke the persisted form (often `node ~/.agents/kyro/current/dist/cli.js`), not a bare `kyro` that only existed during npx.';
+  'Re-run once: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) from the full npm package so ~/.agents/kyro/current/manifest.json.kyroInvocation is refreshed (global for all workspaces). Agents should use that form (often `node ~/.agents/kyro/current/dist/cli.js`), not a bare `kyro` that only existed during npx.';
 
 export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'trace' | 'kyroScope'>): void {
   const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.trace ?? false, options?.kyroScope ?? null);
@@ -280,11 +280,12 @@ function checkCliInvocation(): CheckResult {
     const manifest = readManifest();
     if (!manifest) {
       // No manifest → no installed runtime. checkGlobalRuntime already reports this as a
-      // warning. Don't speculate with resolveKyroInvocation() — the path won't exist.
+      // warning. Don't live-probe — the projected path won't exist yet.
       return { status: 'warn', name: 'CLI invocation', detail: `${KYRO_MANIFEST_PATH} not found`, remedy };
     }
-    // Prefer the persisted invocation; fall back to a live resolve for legacy manifests.
-    const raw = manifest.kyroInvocation ?? resolveKyroInvocation().raw;
+    // Global manifest is SoT (project kyro.json never consulted). Live resolve only if the
+    // field is missing on a legacy manifest.
+    const raw = getPersistedKyroInvocation();
     // Bare `kyro` is only safe when PATH still resolves to a durable (non-npx) binary.
     // A stale install from `npx kyro-ai install` often leaves kyroInvocation="kyro" after the
     // temporary npx bin is gone — fail closed with a re-sync remedy.
@@ -294,7 +295,7 @@ function checkCliInvocation(): CheckResult {
         return {
           status: 'fail',
           name: 'CLI invocation',
-          detail: 'persisted kyroInvocation is bare "kyro" but no durable kyro binary is on PATH',
+          detail: 'global manifest kyroInvocation is bare "kyro" but no durable kyro binary is on PATH',
           remedy,
         };
       }
@@ -302,7 +303,7 @@ function checkCliInvocation(): CheckResult {
         return {
           status: 'fail',
           name: 'CLI invocation',
-          detail: `persisted kyroInvocation is bare "kyro" but resolves to ephemeral package-manager path: ${resolved}`,
+          detail: `global manifest kyroInvocation is bare "kyro" but resolves to ephemeral package-manager path: ${resolved}`,
           remedy,
         };
       }

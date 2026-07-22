@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.33.2] - 2026-07-22
+
+### Fixed
+
+- **`kyroInvocation` is global-only (no more per-project drift).** Install/sync still probe PATH and persist the runnable form on `~/.agents/kyro/current/manifest.json`, and still substitute `{{KYRO_CLI}}` into projected modes under `current/`. Project `.agents/kyro/kyro.json` no longer stores `kyroInvocation`; any legacy copy is stripped on the next install/sync of that workspace (same pattern as the retired project-local `runtimeVersion`). Consumers use `getPersistedKyroInvocation()` (manifest first, then live resolve) and never read project state for the CLI string. One machine-wide install/sync is enough for all workspaces; you no longer need to re-sync every repo solely to fix a stale bare `"kyro"` left in each `kyro.json`. Multi-version runtime (retiring the `current` singleton) remains deferred and is out of scope for this change.
+- **State-writer lock reclaim claims stay selectable under short test leases.** `publishReclaimClaim` now floors claim TTL at 2s (`MIN_RECLAIM_CLAIM_MS`) so CI/`check:lossless-checkpoints` reclaim races do not expire the claim before the winner can select it under sub-second lease windows.
+
 ## [4.33.1] - 2026-07-22
 
 ### Fixed

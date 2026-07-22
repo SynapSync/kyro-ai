@@ -81,7 +81,7 @@ node ~/.agents/kyro/current/dist/cli.js scope set-active <scope> --yes
 
 ### CLI invocation (important)
 
-`npx kyro-ai@latest install` does **not** permanently put `kyro` on PATH. Install/sync records a durable invocation in `manifest.json` / `kyro.json` (bare `kyro` only if a real global bin exists; otherwise `node ~/.agents/kyro/current/dist/cli.js`). Projected modes substitute that string for agents.
+`npx kyro-ai@latest install` does **not** permanently put `kyro` on PATH. Install/sync records a durable invocation in the **global** `manifest.json` only (bare `kyro` only if a real global bin exists; otherwise `node ~/.agents/kyro/current/dist/cli.js`). Projected modes under `current/` substitute that string for agents. Project `kyro.json` is not the source of truth for the CLI string — one install/sync refreshes invocation for every workspace on the machine.
 
 After upgrades (from the project root):
 

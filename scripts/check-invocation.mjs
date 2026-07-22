@@ -14,6 +14,7 @@ const repo = resolve(new URL('..', import.meta.url).pathname);
 const require = createRequire(import.meta.url);
 const {
   buildInvocation,
+  getPersistedKyroInvocation,
   isDurableKyroOnPath,
   isEphemeralPackageManagerPath,
   resolveKyroInvocation,
@@ -93,6 +94,24 @@ if (process.platform !== 'win32') {
   } finally {
     rmSync(probeRoot, { recursive: true, force: true });
   }
+}
+
+// getPersistedKyroInvocation: without a projected manifest, falls back to live resolve
+// (same decision as resolveKyroInvocation). Project kyro.json is never consulted.
+{
+  const persisted = getPersistedKyroInvocation();
+  const live = resolveKyroInvocation().raw;
+  assert(
+    typeof persisted === 'string' && persisted.length > 0,
+    'getPersistedKyroInvocation must return a non-empty string',
+  );
+  // When no global manifest is installed in this process HOME, both paths should agree.
+  // (If a developer machine has a real ~/.agents/kyro/current/manifest.json, prefer-manifest
+  // is still valid as long as the string is a known shape.)
+  assert(
+    persisted === 'kyro' || /^node .+\/dist\/cli\.js$/.test(persisted) || persisted === live,
+    `getPersistedKyroInvocation unexpected shape: ${persisted}`,
+  );
 }
 
 console.log('check:invocation — durable vs ephemeral invocation resolution passed');
