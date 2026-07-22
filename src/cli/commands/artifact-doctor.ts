@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { KYRO_STATE_PATH } from '../constants';
+import { KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
@@ -7,7 +7,9 @@ import { listScopeFolders } from '../artifacts/scopes';
 import { countClarificationMarkers } from '../core/analysis';
 import {
   asProjectState,
+  validateLocalProjectStateShape,
   validateProjectStateShape,
+  validateSharedProjectStateShape,
   validateSprintFile,
   type ValidationIssue,
 } from '../artifacts/schema';
@@ -15,6 +17,13 @@ import type { CheckResult, KyroScopeEntry, SprintFile } from '../types';
 import { SPRINT_CLOSE_TRANSACTION_STATUS, type SprintCloseCheckpointV1, type SprintCloseTransactionStatus } from '../types';
 import { checkpointCommitment, sha256, validateSprintCloseCheckpoint } from '../checkpoints/sprint-close';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
+import {
+  formatBootstrapRemedy,
+  hasLayeredProjectStateOnDisk,
+  hasMonolitoProjectStateOnDisk,
+  hasPersistedProjectStateOnDisk,
+  readProjectState,
+} from '../state';
 
 export interface ArtifactAuditOptions {
   kyroScope: string | null;
@@ -22,23 +31,92 @@ export interface ArtifactAuditOptions {
 
 export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResult[] {
   const checks: CheckResult[] = [];
-  const projectStateRead = readJsonSafely(KYRO_STATE_PATH);
-  if (!projectStateRead.exists) {
-    return [warn('project state', `${KYRO_STATE_PATH} not found`, 'Run: npx kyro-ai install --scope workspace --yes from the full npm package, then create/open a Kyro scope.')];
+
+  if (!hasPersistedProjectStateOnDisk()) {
+    return [
+      warn(
+        'project state',
+        'No project state on disk (expected project.json + local.json, or legacy kyro.json)',
+        formatBootstrapRemedy(),
+      ),
+    ];
   }
-  if (projectStateRead.error) {
-    return [fail('project state', `${KYRO_STATE_PATH}: ${projectStateRead.error}`, 'Repair or recreate kyro.json.')];
+
+  const layered = hasLayeredProjectStateOnDisk();
+  const monolito = hasMonolitoProjectStateOnDisk();
+
+  if (layered) {
+    const sharedRead = readJsonSafely(PROJECT_STATE_PATH);
+    if (sharedRead.exists) {
+      if (sharedRead.error) {
+        checks.push(fail('project.json', `${PROJECT_STATE_PATH}: ${sharedRead.error}`, 'Repair or recreate project.json (shared layer).'));
+        return checks;
+      }
+      const sharedIssues = validateSharedProjectStateShape(sharedRead.value, PROJECT_STATE_PATH);
+      if (sharedIssues.length > 0) {
+        checks.push(fail(
+          'project.json',
+          formatIssues(sharedIssues),
+          'Fix project.json so scopes[] are objects { id, title, status }, schemaVersion is 4, and activeScope is never present. Or run kyro install to repopulate.',
+        ));
+        return checks;
+      }
+      checks.push(pass('project.json', 'Valid shared v4 schema.'));
+    }
+
+    const localRead = readJsonSafely(LOCAL_STATE_PATH);
+    if (localRead.exists) {
+      if (localRead.error) {
+        checks.push(fail('local.json', `${LOCAL_STATE_PATH}: ${localRead.error}`, 'Repair or recreate local.json (local overlay).'));
+        return checks;
+      }
+      const localIssues = validateLocalProjectStateShape(localRead.value, LOCAL_STATE_PATH);
+      if (localIssues.length > 0) {
+        checks.push(fail(
+          'local.json',
+          formatIssues(localIssues),
+          'Fix local.json personal fields (activeScope, installedAdapters). principles/team belong on project.json.',
+        ));
+        return checks;
+      }
+      checks.push(pass('local.json', 'Valid local v4 schema.'));
+    }
+
+    if (monolito) {
+      checks.push(warn(
+        'legacy monolito',
+        `${KYRO_STATE_PATH} still present alongside layered project state (dual-read leftover)`,
+        'Run: npx kyro-ai install --init-workspace --yes (or npx kyro-ai sync) to migrate leftover kyro.json into project.json + local.json.',
+      ));
+    }
+  } else if (monolito) {
+    const projectStateRead = readJsonSafely(KYRO_STATE_PATH);
+    if (projectStateRead.error) {
+      return [fail('project state', `${KYRO_STATE_PATH}: ${projectStateRead.error}`, 'Repair or recreate kyro.json, or migrate to project.json + local.json via install.')];
+    }
+    const projectIssues = validateProjectStateShape(projectStateRead.value, KYRO_STATE_PATH);
+    if (projectIssues.length > 0) {
+      checks.push(fail(
+        'kyro.json',
+        `${KYRO_STATE_PATH} is incomplete (${formatIssues(projectIssues)})`,
+        'Fix kyro.json so scopes[] are objects { id, title, status } and schemaVersion is 4, or run kyro install to repopulate/migrate to layers.',
+      ));
+      return checks;
+    }
+    checks.push(pass('kyro.json', 'Valid v4 schema (legacy monolito dual-read).'));
   }
-  const projectIssues = validateProjectStateShape(projectStateRead.value, KYRO_STATE_PATH);
-  if (projectIssues.length > 0) {
-    checks.push(fail('kyro.json', formatIssues(projectIssues), 'Fix kyro.json so scopes[] are objects { id, title, status } and schemaVersion is 4, or run kyro install to repopulate.'));
+
+  // Effective façade for scope resolution (layers or monolito). Never creates files.
+  const projectState = readProjectState();
+  if (!projectState) {
+    checks.push(fail(
+      'project state',
+      'Persisted state files exist but effective project state could not be resolved',
+      formatBootstrapRemedy(),
+    ));
     return checks;
   }
-  checks.push(pass('kyro.json', 'Valid v4 schema.'));
-
-  const projectState = asProjectState(projectStateRead.value);
-  if (!projectState) return checks;
-
+  // Effective shape should match the façade; asProjectState is for monolito raw only — use live state.
   const scopeNames = resolveScopeNames(projectState.scopes, projectState.activeScope, options.kyroScope);
   if (scopeNames.length === 0) {
     checks.push(warn('artifact scopes', 'no scopes found', 'Run /kyro:forge (INIT) to create the first scope.'));
@@ -202,8 +280,8 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   }
   const sprintRead = readJsonSafely(sprintJsonPath(scope));
   const sprintDigest = sprintRead.exists && !sprintRead.error ? sha256(sprintRead.value) : null;
-  const projectRead = readJsonSafely(KYRO_STATE_PATH);
-  const project = asProjectState(projectRead.value);
+  // Prefer effective layered/monolito state so checkpoint scope digests work after migration.
+  const project = readProjectState() ?? asProjectState(readJsonSafely(KYRO_STATE_PATH).value);
   const projectEntry = project?.scopes.find((entry) => entry.id === scope);
   const projectDigest = projectEntry ? sha256(projectEntry) : null;
 

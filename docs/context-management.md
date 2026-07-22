@@ -74,7 +74,7 @@ JSON packs also include **`cliRecipes[]`**: copy-paste commands for the current 
 
 Prefer scope packs at session start. Prefer task packs when executing a specific sprint task. Use bare `--task` to default to the sprint's next pending task.
 
-If `--kyro-scope` is omitted, the command uses `activeScope` from `.agents/kyro/kyro.json`.
+If `--kyro-scope` is omitted, the command uses `activeScope` from layered project state (`local.json` / effective merge).
 
 ---
 

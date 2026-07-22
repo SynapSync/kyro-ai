@@ -2,26 +2,58 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
-import { ARTIFACT_ROOT, COMMAND_NAMES, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
+import {
+  ARTIFACT_ROOT,
+  COMMAND_NAMES,
+  KYRO_GLOBAL_ROOT,
+  KYRO_MANIFEST_PATH,
+  KYRO_STATE_PATH,
+  LOCAL_STATE_PATH,
+  PACKAGE_ROOT,
+  PROJECT_STATE_PATH,
+} from '../constants';
 import { getPersistedKyroInvocation, isEphemeralPackageManagerPath, resolveKyroBinaryPath } from '../invocation';
 import { managedPathExists, readJsonFromPackage, readPackageText, resolveManagedPath } from '../fs';
 import { readPackageVersion } from '../help';
-import { readManifest, readProjectState } from '../state';
+import {
+  formatBootstrapRemedy,
+  hasLayeredProjectStateOnDisk,
+  hasMonolitoProjectStateOnDisk,
+  hasPersistedProjectStateOnDisk,
+  PROJECT_STATE_BOOTSTRAP_REMEDY,
+  readLocalProjectState,
+  readManifest,
+  readMonolitoProjectState,
+  readProjectState,
+  readSharedProjectState,
+} from '../state';
 import { KyroCoreError } from '../core/errors';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { guardEnforcement } from '../adapters/registry-types';
 import { getCommandSkillPath, parseSkillRuntimeVersion } from '../adapters/command-skills';
 import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
 import { detectPackageRootMode, FULL_PACKAGE_INSTALL_REMEDY, FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
+import {
+  validateLocalProjectStateShape,
+  validateProjectStateShape,
+  validateSharedProjectStateShape,
+  type ValidationIssue,
+} from '../artifacts/schema';
 import { runTokenAuditChecks } from './token-audit';
 import { listScopes, unregisteredScopeFolders } from '../core/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
 
-const PROJECT_STATE_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
+const PROJECT_STATE_INSTALL_REMEDY = PROJECT_STATE_BOOTSTRAP_REMEDY;
 const GLOBAL_RUNTIME_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
 const GLOBAL_RUNTIME_SYNC_REMEDY = FULL_PACKAGE_SYNC_REMEDY;
+const MONOLITO_MIGRATE_REMEDY =
+  'Run: npx kyro-ai install --init-workspace --yes (or npx kyro-ai sync) to migrate leftover kyro.json into project.json + local.json and archive the monolito.';
+const PRINCIPLES_ON_LOCAL_REMEDY =
+  'Move principles to .agents/kyro/project.json (shared team constitution) and remove them from local.json, then re-run install/sync if needed.';
+const TEAM_MIN_PACKAGE_REMEDY =
+  'Upgrade Kyro to at least the team minPackageVersion (npx kyro-ai@latest install / sync from the full npm package).';
 const CLI_INVOCATION_REMEDY =
   'Re-run once: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) from the full npm package so ~/.agents/kyro/current/manifest.json.kyroInvocation is refreshed (global for all workspaces). Agents should use that form (often `node ~/.agents/kyro/current/dist/cli.js`), not a bare `kyro` that only existed during npx.';
 
@@ -50,8 +82,9 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
 
   const checks = [
     ...packagingChecks,
-    checkProjectState(),
+    ...checkProjectState(),
     checkUnregisteredScopes(),
+    checkTeamMinPackageVersion(),
     checkGlobalRuntime(),
     checkCliInvocation(),
     checkSkillRuntimeSkew(),
@@ -192,16 +225,116 @@ function checkClaudePlugin(): CheckResult {
   return { status: 'pass', name: 'Claude plugin adapter', detail: 'first-class adapter assets present' };
 }
 
-function checkProjectState(): CheckResult {
-  const state = readProjectState();
-  if (!state) {
-    return {
+/**
+ * Layered project-state health (R7): effective façade + per-layer shapes + monolito leftover WARN.
+ * Read-only — never creates project.json / local.json / kyro.json (D7a).
+ */
+function checkProjectState(): CheckResult[] {
+  const results: CheckResult[] = [];
+
+  if (!hasPersistedProjectStateOnDisk()) {
+    results.push({
       status: 'warn',
       name: 'project state',
-      detail: `${KYRO_STATE_PATH} not found`,
-      remedy: PROJECT_STATE_INSTALL_REMEDY,
-    };
+      detail: 'No project state on disk (expected project.json + local.json, or legacy kyro.json)',
+      remedy: formatBootstrapRemedy(),
+    });
+    return results;
   }
+
+  const layered = hasLayeredProjectStateOnDisk();
+  const monolito = hasMonolitoProjectStateOnDisk();
+  const sharedRaw = readSharedProjectState();
+  const localRaw = readLocalProjectState();
+
+  if (sharedRaw !== null) {
+    const sharedIssues = validateSharedProjectStateShape(sharedRaw, PROJECT_STATE_PATH);
+    if (sharedIssues.length > 0) {
+      results.push({
+        status: 'fail',
+        name: 'project.json',
+        detail: formatValidationIssues(sharedIssues),
+        remedy: `${PROJECT_STATE_INSTALL_REMEDY} Or fix shared fields (never store activeScope on project.json).`,
+      });
+    } else {
+      results.push({ status: 'pass', name: 'project.json', detail: `${PROJECT_STATE_PATH} shape is valid` });
+    }
+  }
+
+  if (localRaw !== null) {
+    const localIssues = validateLocalProjectStateShape(localRaw, LOCAL_STATE_PATH);
+    if (localIssues.length > 0) {
+      results.push({
+        status: 'fail',
+        name: 'local.json',
+        detail: formatValidationIssues(localIssues),
+        remedy: `${PROJECT_STATE_INSTALL_REMEDY} Or fix local fields (principles/team belong on project.json).`,
+      });
+    } else {
+      results.push({ status: 'pass', name: 'local.json', detail: `${LOCAL_STATE_PATH} shape is valid` });
+    }
+  }
+
+  // Principles stranded only on local (malformed overlay / bad hand-edit) — team constitution must be shared.
+  const localRecord = localRaw as unknown as Record<string, unknown> | null;
+  const localPrinciples = localRecord && Array.isArray(localRecord.principles) ? localRecord.principles : null;
+  if (localPrinciples && localPrinciples.length > 0) {
+    const sharedPrinciples = sharedRaw && Array.isArray(sharedRaw.principles) ? sharedRaw.principles : [];
+    if (sharedPrinciples.length === 0) {
+      results.push({
+        status: 'warn',
+        name: 'principles placement',
+        detail: 'principles appear on local.json but not on project.json (team constitution must be shared)',
+        remedy: PRINCIPLES_ON_LOCAL_REMEDY,
+      });
+    }
+  }
+
+  if (layered && monolito) {
+    results.push({
+      status: 'warn',
+      name: 'legacy monolito',
+      detail: `${KYRO_STATE_PATH} still present alongside layered project state (dual-read leftover)`,
+      remedy: MONOLITO_MIGRATE_REMEDY,
+    });
+  } else if (!layered && monolito) {
+    const monoRaw = readMonolitoProjectState();
+    if (monoRaw) {
+      const monoIssues = validateProjectStateShape(monoRaw, KYRO_STATE_PATH);
+      if (monoIssues.length > 0) {
+        results.push({
+          status: 'fail',
+          name: 'project state',
+          detail: `${KYRO_STATE_PATH} is incomplete (${formatValidationIssues(monoIssues)})`,
+          remedy: `${PROJECT_STATE_INSTALL_REMEDY} Scopes are preserved when migrating to layers.`,
+        });
+        // Incomplete monolito: do not report a green effective façade (defaults may mask holes).
+        return results;
+      }
+      results.push({
+        status: 'pass',
+        name: 'kyro.json',
+        detail: `${KYRO_STATE_PATH} dual-read shape is valid (prefer project.json + local.json)`,
+      });
+    }
+  }
+
+  // Layer shape failures are already reported; still evaluate effective façade when readable.
+  const layerShapeFailed = results.some(
+    (check) => (check.name === 'project.json' || check.name === 'local.json') && check.status === 'fail',
+  );
+
+  const state = readProjectState();
+  if (!state) {
+    results.push({
+      status: 'fail',
+      name: 'project state',
+      detail: 'Persisted state files exist but effective project state could not be resolved',
+      remedy: PROJECT_STATE_INSTALL_REMEDY,
+    });
+    return results;
+  }
+
   const missing: string[] = [];
   if (state.artifactRoot !== ARTIFACT_ROOT) missing.push('artifactRoot');
   if (!Array.isArray(state.scopes)) missing.push('scopes');
@@ -209,20 +342,40 @@ function checkProjectState(): CheckResult {
   if (!Array.isArray(state.installedAdapters)) missing.push('installedAdapters');
 
   if (state.schemaVersion !== 4 || missing.length > 0) {
-    // schemaVersion wrong/absent or fields missing — an incomplete file (e.g. hand-written by an
-    // agent that never ran kyro install). install/sync repopulates the fields, preserving scopes.
     const gaps = [...(state.schemaVersion !== 4 ? ['schemaVersion'] : []), ...missing];
-    return {
+    results.push({
       status: 'fail',
       name: 'project state',
-      detail: `${KYRO_STATE_PATH} is incomplete (missing/invalid: ${gaps.join(', ')})`,
+      detail: `effective project state is incomplete (missing/invalid: ${gaps.join(', ')})`,
       remedy: `${PROJECT_STATE_INSTALL_REMEDY} Scopes are preserved.`,
-    };
+    });
+    return results;
   }
-  return { status: 'pass', name: 'project state', detail: `${KYRO_STATE_PATH} is valid` };
+
+  if (layerShapeFailed) {
+    results.push({
+      status: 'fail',
+      name: 'project state',
+      detail: 'effective project state readable but one or more layer files failed shape validation',
+      remedy: PROJECT_STATE_INSTALL_REMEDY,
+    });
+    return results;
+  }
+
+  const source = layered
+    ? monolito
+      ? 'layered (+ leftover monolito)'
+      : 'layered (project.json + local.json)'
+    : 'legacy monolito (kyro.json dual-read)';
+  results.push({
+    status: 'pass',
+    name: 'project state',
+    detail: `effective project state is valid (${source})`,
+  });
+  return results;
 }
 
-/** Advisory: scope folders on disk that never made it into the local registry (e.g. gitignored kyro.json). */
+/** Advisory: scope folders on disk that never made it into the project registry. */
 function checkUnregisteredScopes(): CheckResult {
   const state = readProjectState();
   if (!state || !Array.isArray(state.scopes)) {
@@ -237,15 +390,93 @@ function checkUnregisteredScopes(): CheckResult {
     return {
       status: 'pass',
       name: 'scope registry',
-      detail: 'all on-disk scopes are registered in kyro.json',
+      detail: 'all on-disk scopes are registered in project state',
     };
   }
   return {
     status: 'warn',
     name: 'scope registry',
-    detail: `${missing.length} scope folder(s) on disk missing from kyro.json.scopes[]: ${missing.sort().join(', ')}`,
-    remedy: 'Run: npx kyro-ai install --init-workspace (or npx kyro-ai sync) to register existing scopes. Then kyro scope set-active <scope> --yes if needed.',
+    detail: `${missing.length} scope folder(s) on disk missing from project state scopes[]: ${missing.sort().join(', ')}`,
+    remedy: formatBootstrapRemedy(
+      `${missing.length} on-disk scope(s) not registered in project state: ${missing.sort().join(', ')}`,
+    ),
   };
+}
+
+/**
+ * Optional team policy (R10 / D6): WARN when runtime package is older than shared minPackageVersion.
+ * Non-blocking by default — never fails solely for this check.
+ */
+function checkTeamMinPackageVersion(): CheckResult {
+  const state = readProjectState();
+  const minRaw = state?.team?.minPackageVersion;
+  if (typeof minRaw !== 'string' || !minRaw.trim()) {
+    return {
+      status: 'pass',
+      name: 'team minPackageVersion',
+      detail: 'not set (no package floor)',
+    };
+  }
+  const minVersion = minRaw.trim();
+  let runtimeVersion: string;
+  try {
+    runtimeVersion = readPackageVersion();
+  } catch (error: unknown) {
+    return {
+      status: 'warn',
+      name: 'team minPackageVersion',
+      detail: `team requires >= ${minVersion} but runtime package version is unknown (${errorMessage(error)})`,
+      remedy: TEAM_MIN_PACKAGE_REMEDY,
+    };
+  }
+
+  const cmp = compareSemverLike(runtimeVersion, minVersion);
+  if (cmp === null) {
+    return {
+      status: 'warn',
+      name: 'team minPackageVersion',
+      detail: `could not compare runtime ${runtimeVersion} to team minPackageVersion ${minVersion}`,
+      remedy: TEAM_MIN_PACKAGE_REMEDY,
+    };
+  }
+  if (cmp < 0) {
+    return {
+      status: 'warn',
+      name: 'team minPackageVersion',
+      detail: `runtime ${runtimeVersion} is older than team minPackageVersion ${minVersion}`,
+      remedy: TEAM_MIN_PACKAGE_REMEDY,
+    };
+  }
+  return {
+    status: 'pass',
+    name: 'team minPackageVersion',
+    detail: `runtime ${runtimeVersion} meets team minPackageVersion ${minVersion}`,
+  };
+}
+
+/** Compare dotted numeric versions (optional prerelease suffix ignored for floor checks). Returns -1/0/1 or null if unparsable. */
+export function compareSemverLike(left: string, right: string): number | null {
+  const a = parseVersionCore(left);
+  const b = parseVersionCore(right);
+  if (!a || !b) return null;
+  const len = Math.max(a.length, b.length);
+  for (let i = 0; i < len; i += 1) {
+    const lv = a[i] ?? 0;
+    const rv = b[i] ?? 0;
+    if (lv < rv) return -1;
+    if (lv > rv) return 1;
+  }
+  return 0;
+}
+
+function parseVersionCore(raw: string): number[] | null {
+  const core = raw.trim().replace(/^v/i, '').split(/[-+]/)[0] ?? '';
+  if (!core || !/^\d+(\.\d+)*$/.test(core)) return null;
+  return core.split('.').map((part) => Number(part));
+}
+
+function formatValidationIssues(issues: ValidationIssue[]): string {
+  return issues.map((issue) => `${issue.path}:${issue.field} ${issue.message}`).join('; ');
 }
 
 function checkGlobalRuntime(): CheckResult {

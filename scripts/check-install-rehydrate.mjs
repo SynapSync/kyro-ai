@@ -1,6 +1,7 @@
 /**
- * Install/sync rehydrates on-disk scope folders into kyro.json.scopes[].
- * Covers the multi-dev pattern: scopes committed, kyro.json gitignored.
+ * Install/sync rehydrates on-disk scope folders into layered project state
+ * (project.json scopes[] + local.json personal overlay).
+ * Covers the multi-dev pattern: scopes + project.json committed, local.json gitignored.
  */
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -151,8 +152,53 @@ function writeScope(cwd, scope, sprint) {
   }
 }
 
-function readState(cwd) {
-  return JSON.parse(readFileSync(join(cwd, '.agents', 'kyro', 'kyro.json'), 'utf-8'));
+function kyroDir(cwd) {
+  return join(cwd, '.agents', 'kyro');
+}
+
+/** Effective layered state (shared + local), matching readProjectState merge rules. */
+function readEffectiveState(cwd) {
+  const root = kyroDir(cwd);
+  const projectPath = join(root, 'project.json');
+  const localPath = join(root, 'local.json');
+  const monolitoPath = join(root, 'kyro.json');
+  const hasLayers = existsSync(projectPath) || existsSync(localPath);
+  if (hasLayers) {
+    const shared = existsSync(projectPath)
+      ? JSON.parse(readFileSync(projectPath, 'utf-8'))
+      : { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [] };
+    const local = existsSync(localPath)
+      ? JSON.parse(readFileSync(localPath, 'utf-8'))
+      : { schemaVersion: 4, activeScope: null, installedAdapters: [] };
+    return {
+      schemaVersion: 4,
+      artifactRoot: shared.artifactRoot ?? '.agents/kyro/scopes',
+      scopes: Array.isArray(shared.scopes) ? shared.scopes : [],
+      activeScope: local.activeScope ?? null,
+      runtimePath: local.runtimePath ?? '~/.agents/kyro/current',
+      installedAdapters: Array.isArray(local.installedAdapters) ? local.installedAdapters : [],
+      ...(shared.principles !== undefined ? { principles: shared.principles } : {}),
+      ...(shared.team !== undefined ? { team: shared.team } : {}),
+    };
+  }
+  if (existsSync(monolitoPath)) {
+    return JSON.parse(readFileSync(monolitoPath, 'utf-8'));
+  }
+  throw new Error(`No layered or monolito project state under ${root}`);
+}
+
+function assertLayeredInstall(cwd, label) {
+  const root = kyroDir(cwd);
+  assert(existsSync(join(root, 'project.json')), `${label}: project.json must exist after install`);
+  assert(existsSync(join(root, 'local.json')), `${label}: local.json must exist after install`);
+  assert(!existsSync(join(root, 'kyro.json')), `${label}: live kyro.json must not remain as SoT after install`);
+  const gitignorePath = join(root, '.gitignore');
+  assert(existsSync(gitignorePath), `${label}: .agents/kyro/.gitignore must exist`);
+  const gitignore = readFileSync(gitignorePath, 'utf-8');
+  assert(gitignore.includes('local.json'), `${label}: gitignore must list local.json`);
+  assert(gitignore.includes('kyro.json'), `${label}: gitignore must list kyro.json`);
+  assert(!/^project\.json\s*$/m.test(gitignore), `${label}: gitignore must not ignore project.json`);
+  assert(!/^scopes\/?\s*$/m.test(gitignore), `${label}: gitignore must not ignore scopes/`);
 }
 
 // --- prompt helper (no TTY) ---
@@ -179,7 +225,8 @@ withWorkspace('kyro-rehydrate-multi-', (cwd) => {
   writeScope(cwd, 'empty-folder'); // no sprint.json
 
   captureLogs(() => install(cliOptions({ agents: [standard], initWorkspace: true })));
-  const state = readState(cwd);
+  assertLayeredInstall(cwd, 'multi');
+  const state = readEffectiveState(cwd);
   assert(Array.isArray(state.scopes), 'multi: scopes array present');
   assert(state.scopes.length === 3, `multi: expected 3 scopes, got ${state.scopes.length}`);
   assert(state.activeScope === null, 'multi: activeScope must stay null with multiple scopes');
@@ -196,6 +243,14 @@ withWorkspace('kyro-rehydrate-multi-', (cwd) => {
   const checks = runDoctorChecks(false, false, false, false, null);
   const registry = checks.find((c) => c.name === 'scope registry');
   assert(registry?.status === 'pass', `multi: doctor registry should pass, got ${registry?.status}: ${registry?.detail}`);
+
+  // Re-install is idempotent for gitignore required lines
+  const gitignoreBefore = readFileSync(join(kyroDir(cwd), '.gitignore'), 'utf-8');
+  writeFileSync(join(kyroDir(cwd), '.gitignore'), `${gitignoreBefore}# custom keep\n`, 'utf-8');
+  captureLogs(() => install(cliOptions({ agents: [standard] })));
+  const gitignoreAfter = readFileSync(join(kyroDir(cwd), '.gitignore'), 'utf-8');
+  assert(gitignoreAfter.includes('# custom keep'), 'multi: re-install must not drop custom gitignore lines');
+  assert(gitignoreAfter.includes('local.json'), 'multi: re-install keeps local.json ignore');
 });
 
 // --- single-scope sets activeScope ---
@@ -206,7 +261,8 @@ withWorkspace('kyro-rehydrate-single-', (cwd) => {
 
   writeScope(cwd, 'solo-scope', minimalSprint('solo-scope', 'Solo Scope'));
   captureLogs(() => install(cliOptions({ agents: [standard], initWorkspace: true })));
-  const state = readState(cwd);
+  assertLayeredInstall(cwd, 'single');
+  const state = readEffectiveState(cwd);
   assert(state.scopes.length === 1, 'single: one scope registered');
   assert(state.activeScope === 'solo-scope', 'single: activeScope auto-set when only one scope');
   assert(state.scopes[0].title === 'Solo Scope', 'single: title preserved from sprint');
@@ -221,7 +277,8 @@ withWorkspace('kyro-rehydrate-preserve-', (cwd) => {
   writeScope(cwd, 'known', minimalSprint('known', 'Known From Disk'));
   writeScope(cwd, 'orphan', minimalSprint('orphan', 'Orphan On Disk'));
 
-  // Seed kyro.json with empty scopes + a principle + one hand-registered entry with custom title
+  // Seed legacy monolito with a principle + one hand-registered entry with custom title.
+  // Install must migrate to layers without field loss.
   mkdirSync(join(cwd, '.agents', 'kyro'), { recursive: true });
   writeFileSync(
     join(cwd, '.agents', 'kyro', 'kyro.json'),
@@ -242,21 +299,29 @@ withWorkspace('kyro-rehydrate-preserve-', (cwd) => {
   );
 
   captureLogs(() => install(cliOptions({ agents: [standard] })));
-  let state = readState(cwd);
+  assertLayeredInstall(cwd, 'preserve');
+  assert(
+    existsSync(join(cwd, '.agents', 'kyro', 'kyro.json.migrated')),
+    'preserve: monolito must be archived to kyro.json.migrated',
+  );
+  let state = readEffectiveState(cwd);
   const known = state.scopes.find((s) => s.id === 'known');
   assert(known?.title === 'Custom Title Keep Me', 'preserve: must not clobber existing title');
   assert(known?.status === 'blocked', 'preserve: must not clobber existing status');
   assert(state.activeScope === 'known', 'preserve: must not clobber activeScope');
-  assert(state.principles?.[0]?.id === 'p1', 'preserve: principles kept');
+  assert(state.principles?.[0]?.id === 'p1', 'preserve: principles kept on shared layer');
   assert(state.scopes.some((s) => s.id === 'orphan' && s.title === 'Orphan On Disk'), 'preserve: orphan folder registered');
 
-  // Explicit empty scopes[] then sync rehydrates without dropping activeScope if still set — rewrite empty
-  state.scopes = [];
-  writeFileSync(join(cwd, '.agents', 'kyro', 'kyro.json'), `${JSON.stringify(state, null, 2)}\n`, 'utf-8');
+  // Empty shared scopes[] then sync rehydrates without dropping activeScope.
+  const projectPath = join(cwd, '.agents', 'kyro', 'project.json');
+  const project = JSON.parse(readFileSync(projectPath, 'utf-8'));
+  project.scopes = [];
+  writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`, 'utf-8');
   captureLogs(() => sync(cliOptions({ agents: [standard] })));
-  state = readState(cwd);
+  state = readEffectiveState(cwd);
   assert(state.scopes.map((s) => s.id).sort().join(',') === 'known,orphan', 'sync: rehydrates both folders');
   assert(state.activeScope === 'known', 'sync: keeps existing activeScope');
+  assert(state.principles?.[0]?.id === 'p1', 'sync: principles remain on shared layer');
 });
 
 // --- no-init-workspace does not create kyro.json even with scopes on disk ---
@@ -268,6 +333,23 @@ withWorkspace('kyro-rehydrate-no-init-', (cwd) => {
   writeScope(cwd, 'ghost', minimalSprint('ghost', 'Ghost'));
   captureLogs(() => install(cliOptions({ agents: [standard], noInitWorkspace: true })));
   assert(!existsSync(join(cwd, '.agents', 'kyro', 'kyro.json')), 'no-init: must not write kyro.json');
+  assert(!existsSync(join(cwd, '.agents', 'kyro', 'project.json')), 'no-init: must not write project.json');
+  assert(!existsSync(join(cwd, '.agents', 'kyro', 'local.json')), 'no-init: must not write local.json');
+});
+
+// --- clone-like: scopes on disk only, init creates layers and registers scopes ---
+withWorkspace('kyro-rehydrate-clone-', (cwd) => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install } = require(join(repo, 'dist/cli/commands/install.js'));
+  const standard = parseAgent('standard');
+
+  writeScope(cwd, 'from-clone', minimalSprint('from-clone', 'From Clone', { active: true }));
+  assert(!existsSync(join(cwd, '.agents', 'kyro', 'project.json')), 'clone: no layers before install');
+  captureLogs(() => install(cliOptions({ agents: [standard], initWorkspace: true })));
+  assertLayeredInstall(cwd, 'clone');
+  const state = readEffectiveState(cwd);
+  assert(state.scopes.some((s) => s.id === 'from-clone'), 'clone: scope registered from disk');
+  assert(state.activeScope === 'from-clone', 'clone: single-scope auto-activeScope');
 });
 
 // --- doctor warns when registry lags disk ---
@@ -278,6 +360,7 @@ withWorkspace('kyro-rehydrate-doctor-', (cwd) => {
   const standard = parseAgent('standard');
 
   captureLogs(() => install(cliOptions({ agents: [standard], initWorkspace: true })));
+  assertLayeredInstall(cwd, 'doctor');
   writeScope(cwd, 'late-arrival', minimalSprint('late-arrival', 'Late'));
 
   const checks = runDoctorChecks(false, false, false, false, null);

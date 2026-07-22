@@ -1,9 +1,16 @@
 import { existsSync } from 'node:fs';
+import { LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { applyPlan, printPlan, resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
-import { projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
+import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { readProjectState } from '../state';
+import {
+  hasLayeredProjectStateOnDisk,
+  readProjectState,
+  sanitizeLocalForWrite,
+  sanitizeSharedForWrite,
+  splitMonolitoToLayers,
+} from '../state';
 import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
 import type { ActiveSprint, CliOptions, OperationPlan, Phase } from '../types';
 import { resolveScope } from '../core/scope-resolution';
@@ -61,8 +68,7 @@ export function buildRepairPlan(scope: string): OperationPlan[] {
     throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot repair ${scope}: sprint.json has shape drift that needs manual review — ${detail}`, 'Fix the reported fields manually.');
   }
   const plan: OperationPlan[] = [{ action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(normalized, null, 2)}\n` }];
-  const statePlan = buildScopeStatusReconcilePlan(scope, normalized);
-  if (statePlan) plan.push(statePlan);
+  plan.push(...buildScopeStatusReconcilePlan(scope, normalized));
   return plan;
 }
 
@@ -89,16 +95,29 @@ function normalizeStatus(value: unknown): unknown {
   return clone;
 }
 
-/** Reconcile the kyro.json scope-status cache with the derived scope status (also maps legacy values). */
-function buildScopeStatusReconcilePlan(scope: string, normalizedSprint: unknown): OperationPlan | null {
+/**
+ * Reconcile the shared scopes[] status cache with the derived scope status.
+ * Writes layered project files (never dumps full effective state to monolito kyro.json).
+ */
+function buildScopeStatusReconcilePlan(scope: string, normalizedSprint: unknown): OperationPlan[] {
   const state = readProjectState();
-  if (!state) return null;
+  if (!state) return [];
   const entry = state.scopes.find((s) => s.id === scope);
-  if (!entry) return null;
+  if (!entry) return [];
   const sprint = asSprintFile(normalizedSprint);
-  if (!sprint) return null;
+  if (!sprint) return [];
   const derived = deriveScopeStatus(sprint, Boolean(sprint.activeSprint));
-  if (entry.status === derived) return null;
+  if (entry.status === derived) return [];
   const updated = { ...state, scopes: state.scopes.map((s) => (s.id === scope ? { ...s, status: derived } : s)) };
-  return { action: 'write', path: projectStatePath(), content: `${JSON.stringify(updated, null, 2)}\n` };
+  const { shared, local } = splitMonolitoToLayers(updated);
+  const sharedContent = `${JSON.stringify(sanitizeSharedForWrite(shared), null, 2)}\n`;
+  // When layers already exist, only the shared registry cache changes.
+  if (hasLayeredProjectStateOnDisk()) {
+    return [{ action: 'write', path: PROJECT_STATE_PATH, content: sharedContent }];
+  }
+  // Monolito-only (or missing layers): materialize both layers so dual-read prefers them.
+  return [
+    { action: 'write', path: PROJECT_STATE_PATH, content: sharedContent },
+    { action: 'write', path: LOCAL_STATE_PATH, content: `${JSON.stringify(sanitizeLocalForWrite(local), null, 2)}\n` },
+  ];
 }

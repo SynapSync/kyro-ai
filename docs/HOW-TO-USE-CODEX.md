@@ -13,7 +13,7 @@ This installs:
 
 - global runtime: `~/.agents/kyro/current/`
 - global command skills: `~/.agents/skills/kyro-*`
-- project state: `.agents/kyro/kyro.json`
+- project state: `.agents/kyro/project.json` + `local.json` (legacy `kyro.json` dual-read)
 - a small Kyro managed block in root `AGENTS.md`
 
 ## Usage

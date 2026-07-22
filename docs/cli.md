@@ -100,7 +100,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 **Source of truth is global only:** `~/.agents/kyro/current/manifest.json.kyroInvocation`.
 
-Install/sync probe PATH once, write the result into the **runtime manifest**, and substitute it for `{{KYRO_CLI}}` in projected modes under `current/`. Project `.agents/kyro/kyro.json` does **not** store `kyroInvocation` (legacy copies are stripped on the next install/sync of that workspace). One machine-wide refresh is enough for all projects.
+Install/sync probe PATH once, write the result into the **runtime manifest**, and substitute it for `{{KYRO_CLI}}` in projected modes under `current/`. Project state files (`.agents/kyro/project.json`, `local.json`, or legacy `kyro.json`) do **not** store `kyroInvocation` (legacy copies are stripped on the next install/sync of that workspace). One machine-wide refresh is enough for all projects.
 
 | Situation | Persisted invocation (manifest) |
 | --------- | -------------------- |
@@ -130,17 +130,21 @@ Global command skills are installed for agent discovery:
 └── kyro-idea/SKILL.md
 ```
 
-The project keeps only state and artifacts:
+The project keeps only state and artifacts (layered):
 
 ```text
 .agents/kyro/
-├── kyro.json                    # registry: scopes[], activeScope, principles[]
+├── project.json                 # SHARED — commit: principles, team policy, scopes registry cache
+├── local.json                   # LOCAL — gitignored: activeScope, installedAdapters
+├── .gitignore                   # install/sync assist (local-only files; never project.json/scopes/)
 └── scopes/
     └── {scope}/
         ├── sprint.json          # single source of truth
         ├── archive/             # write-only, at sprint close
         └── findings/            # write-only INIT analysis evidence
 ```
+
+Legacy `.agents/kyro/kyro.json` (pre-layered monolito) remains dual-readable until install migrates it. Full commit matrix: [Teams](teams.md).
 
 ## Adapters
 
@@ -160,7 +164,7 @@ npx kyro-ai@latest install --scope workspace --dry-run
 npx kyro-ai@latest install --scope workspace --init-workspace --yes
 ```
 
-`--init-workspace` non-interactively writes `./.agents/kyro/kyro.json` (and rehydrates on-disk `scopes/`). Without it, a non-interactive install may install only the global runtime. `--yes` alone does not initialize a new workspace.
+`--init-workspace` non-interactively writes layered project state (`project.json` + `local.json`), ensures `.agents/kyro/.gitignore` for local-only files, and rehydrates on-disk `scopes/`. Without it, a non-interactive install may install only the global runtime. `--yes` alone does not initialize a new workspace.
 
 Agent-specific installs (from the project root):
 
@@ -201,19 +205,25 @@ The uninstall output includes a summary with overlay, purged file, and empty-dir
 
 ## State Model
 
-`kyro install` (with workspace init) and `kyro sync` write root project state:
+`kyro install` (with workspace init) and `kyro sync` write **layered** project state:
 
 ```text
-.agents/kyro/kyro.json
+.agents/kyro/project.json   # shared (commit)
+.agents/kyro/local.json     # personal/machine (gitignored)
+.agents/kyro/.gitignore     # local-only ignore assist
 ```
 
 They do not create per-scope files. Each scope's `sprint.json` (the single source of truth for that scope) is created later by forge/INIT or `kyro plan`.
 
-**Rehydrate from disk:** if `.agents/kyro/scopes/{id}/` directories already exist (common after clone when `kyro.json` is gitignored but scopes are committed), install/sync **registers** those folders into `scopes[]`. Title and status come from each scope's `sprint.json` when readable; existing registry entries are never overwritten. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
+**Effective state** is a deterministic merge of shared + local (plus dual-read of legacy monolito `kyro.json` when layers are absent). Readers use one façade (`readProjectState`); writers target the correct layer only.
+
+**Rehydrate from disk:** if `.agents/kyro/scopes/{id}/` directories already exist (common after clone when scopes + `project.json` are committed but `local.json` is not), install/sync **registers** those folders into the shared scopes registry. Title and status come from each scope's `sprint.json` when readable; existing registry entries are never overwritten. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
 
 Bare interactive install (`npx kyro-ai@latest install`) asks whether to initialize the workspace; when scopes already exist on disk, the prompt lists them so a **y** answer registers them intentionally.
 
-Initial state shape (no scopes on disk yet):
+**Read-only commands never create state files** (`status`, `doctor`, `context-pack`). If layers are missing, they surface an install bootstrap remedy instead of writing `project.json` / `local.json` (D7a).
+
+Initial **effective** shape after merge (no scopes on disk yet):
 
 ```json
 {
@@ -226,15 +236,25 @@ Initial state shape (no scopes on disk yet):
 }
 ```
 
+Shared file omits `activeScope` / `installedAdapters`. Local file omits `principles` / `team`.
+
 ### Multi-developer note
 
-`activeScope` is personal (who is working on what). Teams often gitignore `.agents/kyro/kyro.json` and commit `.agents/kyro/scopes/**`. After clone:
+`activeScope` is personal (who is working on what). The supported multi-dev model is:
+
+| Commit | Do not commit |
+| ------ | ------------- |
+| `project.json`, `scopes/**`, `.agents/kyro/.gitignore` | `local.json`, live legacy `kyro.json` |
+
+You no longer need to gitignore the entire `.agents/kyro/` tree or treat monolito `kyro.json` as the only multi-dev strategy. See [Teams](teams.md).
+
+After clone:
 
 1. `cd` into the cloned project root (not your home directory).
-2. `npx kyro-ai@latest install --init-workspace --yes` (or interactive install and answer **y**) so `kyro.json` is created here and scopes are registered.
+2. `npx kyro-ai@latest install --init-workspace --yes` (or interactive install and answer **y**) so layers exist here and scopes are registered.
 3. If more than one scope: `kyro scope set-active <yours> --yes` (or the projected `node ~/.agents/kyro/current/dist/cli.js …` form).
 
-`kyro doctor` WARNs when folders on disk are missing from the local registry.
+`kyro doctor` validates layered shapes, WARNs on leftover live monolito when layers exist, WARNs on unregistered on-disk scopes, and may WARN when `team.minPackageVersion` is newer than the runtime (non-blocking).
 
 The project state intentionally does not copy runtime infrastructure fields. Kyro has one global active runtime: authoritative `packageVersion` and `kyroInvocation` live on `~/.agents/kyro/current/manifest.json`. Install and sync remove legacy project-local `runtimeVersion` and `kyroInvocation` while preserving scopes, principles, adapters, and custom metadata.
 
@@ -319,7 +339,7 @@ kyro scope set-active auth-refactor --yes
 
 ## Sync Semantics
 
-`kyro sync` without `--agent` refreshes the adapters already recorded in `.agents/kyro/kyro.json`.
+`kyro sync` without `--agent` refreshes the adapters already recorded in local project state (`local.json` / effective `installedAdapters`).
 
 It must not add the default `standard` adapter to an existing workspace unless the user explicitly passes it:
 
@@ -444,7 +464,7 @@ Appends a full v4 `AdrRecord` to `sprint.adrs[]`. Prefer this over hand-editing 
 
 `kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]` is tool-owned and validated, so the agent never hand-authors the full v4 `sprint.json` document. It has two modes, **auto-detected from the resolved scope's state** — not from the `--from` file's shape:
 
-- **Init mode** — the scope has no `sprint.json` yet. Materializes the scope's initial `sprint.json` (spec + roadmap, `activeSprint: null`) from a compact lean plan JSON file. Refuses with `SCOPE_ALREADY_INITIALIZED` if the scope already has a `sprint.json` (never overwrites). Also registers the scope in `kyro.json.scopes[]` (and sets `activeScope` if unset).
+- **Init mode** — the scope has no `sprint.json` yet. Materializes the scope's initial `sprint.json` (spec + roadmap, `activeSprint: null`) from a compact lean plan JSON file. Refuses with `SCOPE_ALREADY_INITIALIZED` if the scope already has a `sprint.json` (never overwrites). Also registers the scope in the shared scopes registry on `project.json` (and sets local `activeScope` if unset).
 - **Sprint mode** — the scope's `sprint.json` exists, `activeSprint` is `null`, and `handoff.nextAction === 'plan_sprint'`. Materializes the next `activeSprint` (all tasks `pending`, `evidence: null`, `verdict: null`) from a lean sprint-plan JSON file. Writes only `sprint.json`. Refuses with `SPRINT_ALREADY_ACTIVE` if a sprint is already active, or `NOT_READY_TO_PLAN` if the handoff isn't at `plan_sprint` yet (e.g. still `clarify`).
 
 `[NEEDS CLARIFICATION]` markers are allowed in both modes' output (they legitimately route `handoff.nextAction` to `clarify`); this is separate from the O5 clarification gate on execute-phase commands.
