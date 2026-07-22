@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.34.0] - 2026-07-22
+
+### Added
+
+- **`kyro scenario add` / `kyro scenario link`** — tool-owned scenario graph mutations after a sprint is active (append `spec.scenarios`, attach `task.scenario_refs`) so agents do not hand-edit `sprint.json` for post-plan coverage refine.
+- **`kyro adr add`** — tool-owned full v4 ADR append (`title`/`context`/`decision`/`consequence`/`alternative`, optional id/status/date).
+- **`context-pack.cliRecipes[]`** — copy-paste CLI commands for the current `nextAction` using the canonical agent entrypoint (plus status/doctor preflight).
+- **Projected skill stubs pin `metadata.runtimeVersion`** and print the durable **CLI** invocation line so agents discover the entrypoint without tribal knowledge.
+- **`kyro doctor` skill/runtime version check** — WARN when projected `kyro-*` skill stubs lag or lack a pin vs `manifest.packageVersion`.
+
+### Changed
+
+- **`kyro analyze` scenario coverage is ledger-aware.** Scenarios linked on tasks in closed sprints (via ledger `checkpoint` / `snapshot` archives) no longer report MEDIUM "has no task coverage" on the next active sprint. Truly uncovered scenarios still MEDIUM.
+- **`kyro doctor` CLI invocation PASS line** now labels the **canonical agent entrypoint** explicitly.
+- **ADR shape validation** names missing fields and includes a full example object plus `kyro adr add` remedy.
+- **`kyro status` human output** clarifies that `activeSprint.status: planned` with `nextAction: execute_task` is coherent (progress vs routing).
+
+### Fixed
+
+- **`check:lossless-checkpoints` heartbeat stall cases use a CI-safe 1s test lease** (was 300ms) and a longer readiness budget, so Worker renewals under loaded GitHub runners are not fail-stopped before the first post-ready tick.
+
 ## [4.33.2] - 2026-07-22
 
 ### Fixed

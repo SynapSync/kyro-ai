@@ -340,9 +340,17 @@ function validateConvention(value: unknown, path: string, prefix: string, issues
   requireNumber(value, 'addedSprint', path, issues, `${prefix}.addedSprint`);
 }
 
+const ADR_SHAPE_EXAMPLE =
+  '{ "id": "ADR-0001", "title": "Short title", "status": "accepted", "date": "2026-07-22", "context": "Why this decision is needed", "decision": "What we decided", "consequences": ["Follow-on impact"], "alternatives": ["Option we rejected"] }';
+
 function validateAdrRecord(value: unknown, path: string, prefix: string, issues: ValidationIssue[], adrIds: Set<string>): void {
+  const before = issues.length;
   if (!isRecord(value)) {
-    issues.push({ path, field: prefix, message: 'must be an object { id, title, status, date, context, decision, consequences, alternatives }' });
+    issues.push({
+      path,
+      field: prefix,
+      message: `must be an object with fields id, title, status, date, context, decision, consequences, alternatives — example: ${ADR_SHAPE_EXAMPLE}`,
+    });
     return;
   }
   requireAdrId(value, 'id', path, issues, `${prefix}.id`);
@@ -354,6 +362,14 @@ function validateAdrRecord(value: unknown, path: string, prefix: string, issues:
   requireNonEmptyStringArrayField(value, 'consequences', path, issues, `${prefix}.consequences`);
   requireNonEmptyStringArrayField(value, 'alternatives', path, issues, `${prefix}.alternatives`);
   if ('links' in value) validateAdrLinks(value.links, value.id, path, `${prefix}.links`, issues, adrIds);
+  // When any field failed, append one actionable example so agents do not guess free-form ADR prose.
+  if (issues.length > before) {
+    issues.push({
+      path,
+      field: prefix,
+      message: `incomplete or invalid ADR shape — required example: ${ADR_SHAPE_EXAMPLE}. Prefer: kyro adr add --title ... --context ... --decision ... --consequence ... --alternative ...`,
+    });
+  }
 }
 
 function collectAdrIds(values: unknown[]): Set<string> {

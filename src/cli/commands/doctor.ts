@@ -1,15 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
-import { ARTIFACT_ROOT, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
+import { ARTIFACT_ROOT, COMMAND_NAMES, KYRO_GLOBAL_ROOT, KYRO_MANIFEST_PATH, KYRO_STATE_PATH, PACKAGE_ROOT } from '../constants';
 import { getPersistedKyroInvocation, isEphemeralPackageManagerPath, resolveKyroBinaryPath } from '../invocation';
-import { managedPathExists, readJsonFromPackage, readPackageText } from '../fs';
+import { managedPathExists, readJsonFromPackage, readPackageText, resolveManagedPath } from '../fs';
 import { readPackageVersion } from '../help';
 import { readManifest, readProjectState } from '../state';
 import { KyroCoreError } from '../core/errors';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { guardEnforcement } from '../adapters/registry-types';
+import { getCommandSkillPath, parseSkillRuntimeVersion } from '../adapters/command-skills';
 import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
 import { detectPackageRootMode, FULL_PACKAGE_INSTALL_REMEDY, FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 import { runTokenAuditChecks } from './token-audit';
@@ -53,6 +54,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
     checkUnregisteredScopes(),
     checkGlobalRuntime(),
     checkCliInvocation(),
+    checkSkillRuntimeSkew(),
     ...checkAdapterProjections(),
   ];
 
@@ -312,10 +314,99 @@ function checkCliInvocation(): CheckResult {
     // bare binary — split into command + args and expand `~` before exec, which does neither.
     const [command, ...args] = raw.trim().split(/\s+/).map(expandHome);
     execFileSync(command, [...args, '--version'], { stdio: 'ignore', timeout: 5000 });
-    return { status: 'pass', name: 'CLI invocation', detail: `${raw} --version runs` };
+    // Always surface the canonical agent entrypoint in the PASS line so hosts without `kyro` on
+    // PATH still see how to invoke the harness (post-mortem #2 F1).
+    return {
+      status: 'pass',
+      name: 'CLI invocation',
+      detail: `canonical agent entrypoint: ${raw} (--version runs). Prefer this form over bare \`kyro\` when PATH is empty.`,
+    };
   } catch (error: unknown) {
     return { status: 'fail', name: 'CLI invocation', detail: errorMessage(error), remedy };
   }
+}
+
+/**
+ * WARN when projected host skill stubs lag the global runtime package version (post-mortem #2 F2).
+ * Stubs without runtimeVersion are treated as pre-pin legacy → WARN with reinstall remedy.
+ */
+function checkSkillRuntimeSkew(): CheckResult {
+  const manifest = readManifest();
+  const runtimeVersion = typeof manifest?.packageVersion === 'string' && manifest.packageVersion.trim()
+    ? manifest.packageVersion.trim()
+    : null;
+  if (!runtimeVersion) {
+    return {
+      status: 'warn',
+      name: 'skill/runtime version',
+      detail: 'global runtime packageVersion unknown; cannot compare projected skill stubs',
+      remedy: GLOBAL_RUNTIME_INSTALL_REMEDY,
+    };
+  }
+
+  const mismatched: string[] = [];
+  const missingPin: string[] = [];
+  const missingFile: string[] = [];
+
+  for (const command of COMMAND_NAMES) {
+    const managed = getCommandSkillPath(command);
+    let absolute: string;
+    try {
+      absolute = resolveManagedPath(managed);
+    } catch {
+      missingFile.push(`kyro-${command}`);
+      continue;
+    }
+    if (!existsSync(absolute)) {
+      missingFile.push(`kyro-${command}`);
+      continue;
+    }
+    let body: string;
+    try {
+      body = readFileSync(absolute, 'utf-8');
+    } catch {
+      missingFile.push(`kyro-${command}`);
+      continue;
+    }
+    const pinned = parseSkillRuntimeVersion(body);
+    if (!pinned) {
+      missingPin.push(`kyro-${command}`);
+      continue;
+    }
+    if (pinned !== runtimeVersion) {
+      mismatched.push(`kyro-${command}@${pinned}`);
+    }
+  }
+
+  if (missingFile.length > 0) {
+    return {
+      status: 'warn',
+      name: 'skill/runtime version',
+      detail: `projected skill stub(s) missing: ${missingFile.join(', ')} (runtime ${runtimeVersion})`,
+      remedy: GLOBAL_RUNTIME_SYNC_REMEDY,
+    };
+  }
+  if (mismatched.length > 0) {
+    return {
+      status: 'warn',
+      name: 'skill/runtime version',
+      detail: `skill stub runtimeVersion skew vs runtime ${runtimeVersion}: ${mismatched.join(', ')}`,
+      remedy: GLOBAL_RUNTIME_SYNC_REMEDY,
+    };
+  }
+  if (missingPin.length > 0) {
+    return {
+      status: 'warn',
+      name: 'skill/runtime version',
+      detail: `skill stub(s) lack runtimeVersion pin (re-sync to align with runtime ${runtimeVersion}): ${missingPin.join(', ')}`,
+      remedy: GLOBAL_RUNTIME_SYNC_REMEDY,
+    };
+  }
+  return {
+    status: 'pass',
+    name: 'skill/runtime version',
+    detail: `projected skill stubs match runtime ${runtimeVersion}`,
+  };
 }
 
 function checkAdapterProjections(): CheckResult[] {

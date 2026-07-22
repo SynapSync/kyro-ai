@@ -13,8 +13,18 @@ enforced by `check:status`.
 | Function | Rule |
 |---|---|
 | `derivePhaseStatus(phase)` | no tasks → `pending`; any task `blocked` → `blocked`; all `done` → `done`; any `in_progress` or a done/pending mix → `active`; else `pending` |
-| `deriveActiveSprintStatus(active)` | no tasks → `planned`; all `done` → `complete`; else `executing` |
+| `deriveActiveSprintStatus(active)` | no tasks → `planned`; all tasks still `pending` → `planned`; all `done` → `complete`; else `executing` |
 | `deriveScopeStatus(sprint, hasActiveSprint)` | active sprint with a blocked task or `handoff.blockers` → `blocked`; active sprint → `active`; all roadmap sprints closed → `completed`; else `planning` |
+
+These three signals answer different questions:
+
+| Signal | Meaning |
+|---|---|
+| Roadmap sprint `state: active` | Which roadmap slot is currently live |
+| `activeSprint.status` (`planned` / `executing` / `complete`) | How far **task leaves** have progressed inside that sprint |
+| `handoff.nextAction` | What the agent should do next (routing) |
+
+So `activeSprint.status: planned` with `nextAction: execute_task` is **coherent**: the sprint is materialised and ready, but no task has started yet. `kyro status` human output prints a short gloss in that case so agents do not treat it as a bug.
 
 `normalizeStoredPhaseStatus` maps historical vocabulary (`executing`/`in_progress` → `active`,
 `complete`/`completed` → `done`) so vocabulary drift is not mistaken for real drift.

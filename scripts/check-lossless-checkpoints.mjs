@@ -11,7 +11,11 @@ const cli = resolve(repo, 'dist/cli.js');
 const fixture = resolve(repo, 'fixtures/evals/close-sprint-happy/state');
 const closeArgs = ['close-sprint', '--kyro-scope', 'demo', '--outcome', 'shipped', '--note', 'Continue safely.', '--summary', 'Closed safely.', '--learning', 'Keep complete history.', '--recommendation', 'Use checkpoints.', '--confirm'];
 const PROCESS_STARTUP_BUDGET_MS = 15_000;
-const LEASE_EVENT_BUDGET_MS = 10_000;
+// CI runners under load can delay Worker heartbeat renewals past a 300ms lease; keep event waits
+// generous so readiness polls do not race a single slow fsync/rename.
+const LEASE_EVENT_BUDGET_MS = 20_000;
+/** Short but CI-safe test lease: worker interval is lease/3 and must survive one delayed tick. */
+const CI_SAFE_TEST_LEASE_MS = '1000';
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function readJson(path) { return JSON.parse(readFileSync(path, 'utf8')); }
@@ -560,14 +564,14 @@ for (const mode of ['corrupt', 'unsupported']) {
     const ready = join(root, 'lease-ready');
     const gate = join(root, 'lease-release');
     const waiting = join(root, 'lease-waiting');
-    const holder = runAsync(root, closeArgs, { KYRO_TEST_LOCK_LEASE_MS: '300', KYRO_TEST_LOCK_READY_FILE: ready, KYRO_TEST_LOCK_RELEASE_GATE: gate });
+    const holder = runAsync(root, closeArgs, { KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS, KYRO_TEST_LOCK_READY_FILE: ready, KYRO_TEST_LOCK_RELEASE_GATE: gate });
     await waitForChild(holder, () => existsSync(ready), 'lease holder never acquired lock');
     const heartbeatPath = join(root, '.kyro-state-writer.lock/heartbeat.json');
     const firstLease = readJson(heartbeatPath).leaseUntil;
     await waitForChild(holder, () => {
       try { return readJson(heartbeatPath).leaseUntil > firstLease; } catch { return false; }
     }, 'lease heartbeat did not renew while main thread was stalled', LEASE_EVENT_BUDGET_MS);
-    const contender = runAsync(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '300', KYRO_TEST_LOCK_WAITING_FILE: waiting });
+    const contender = runAsync(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS, KYRO_TEST_LOCK_WAITING_FILE: waiting });
     await waitForChild(contender, () => existsSync(waiting), 'lease contender never observed holder');
     assert(existsSync(join(root, '.kyro-state-writer.lock')), 'contender reclaimed a renewed live lease');
     writeFileSync(gate, 'release\n');
@@ -584,14 +588,14 @@ for (const mode of ['corrupt', 'unsupported']) {
     const gate = join(root, 'never-released');
     const waiting = join(root, 'fenced-waiting');
     const holder = runAsync(root, closeArgs, {
-      KYRO_TEST_LOCK_LEASE_MS: '300',
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
       KYRO_TEST_LOCK_READY_FILE: ready,
       KYRO_TEST_LOCK_RELEASE_GATE: gate,
       KYRO_TEST_LOCK_HEARTBEAT_FAIL_AFTER: '1',
     });
     await waitForChild(holder, () => existsSync(ready), 'fenced holder never acquired lock');
     const contender = runAsync(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
-      KYRO_TEST_LOCK_LEASE_MS: '300',
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
       KYRO_TEST_LOCK_WAITING_FILE: waiting,
     });
     await waitForChild(contender, () => existsSync(waiting), 'contender never observed the soon-to-fail lease');

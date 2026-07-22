@@ -46,11 +46,15 @@ This is not OpenSpec and does not create separate spec files. It is a small, too
 | `task.scenario_refs[]` points to a missing scenario | HIGH | Broken graph; blocks close |
 | duplicate requirement or scenario id | MEDIUM | Visible consistency issue |
 | requirement has no scenario | MEDIUM | Coverage gap |
-| scenario has no task | MEDIUM | Coverage gap |
+| scenario has no **active or closed-sprint** task coverage | MEDIUM | Coverage gap (historical ledger/checkpoint refs count as covered) |
 | `spec.openQuestions[]` is non-empty | MEDIUM | Clarify should drain the queue |
 | done + pass task has no `scenario_refs` | MEDIUM | Shipped work is untraceable to the spec |
 
 Kyro checks the traceability graph is connected. It does not verify that a scenario truly validates its requirement or that a task truly implements a scenario; that judgment remains yours.
+
+### Closed-sprint coverage
+
+After `close-sprint`, scenarios that were linked on tasks in the closed sprint remain in `spec.scenarios`. Analyze reads ledger `checkpoint` / `snapshot` archives and treats those historical `scenario_refs` as covered so the next active sprint does not re-flag them as MEDIUM "no task coverage". Do **not** delete historical scenarios to silence analyze.
 
 ## Authorship model
 
@@ -58,9 +62,12 @@ Planning modes author the spec through the existing Artifact Write Contract:
 
 - `INIT.md` may seed `requirements`, `nonGoals`, and `openQuestions`.
 - `clarify.md` drains `openQuestions` into stable requirements or clarifications.
-- `plan-sprint.md` writes Given/When/Then scenarios and task `scenario_refs`.
+- `plan-sprint.md` / `kyro plan --from` writes Given/When/Then scenarios and task `scenario_refs`.
+- After a sprint is active, agents refine the graph with tool-owned CLI (no hand-edit):
+  - `kyro scenario add --id S# --requirement R# --given … --when … --then …`
+  - `kyro scenario link --task T# --scenario S#`
 
-There is no `kyro spec` writer command. The tool owns validation, not planning authorship.
+The tool owns validation and these graph mutations; agents must not whole-file rewrite `sprint.json` for scenario coverage.
 
 ## Runtime surfaces
 

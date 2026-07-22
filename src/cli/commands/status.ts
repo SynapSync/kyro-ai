@@ -342,6 +342,11 @@ function printBriefStatus(report: BriefStatusReport): void {
   console.log(`Active sprint: ${formatActiveSprint(report.activeSprint)}`);
   console.log(`Next action: ${report.nextAction}`);
   console.log(`Next task: ${formatTaskReference(report.nextTask)}`);
+  // Gloss: progress status (planned/executing/complete) is derived from task leaves; nextAction is
+  // handoff routing. "planned" + execute_task is coherent — the sprint is ready, no task started yet.
+  if (report.activeSprint?.status === 'planned' && report.nextAction === 'execute_task') {
+    console.log('Note: sprint progress is "planned" (no task started yet); nextAction "execute_task" is the routing handoff — not a conflict.');
+  }
   console.log(`Open debt: ${report.openDebtCount}`);
   console.log(`Pending review: ${report.pendingReviewCount}`);
   if (report.blockers.length > 0) console.log(`Blockers: ${report.blockers.join(' | ')}`);

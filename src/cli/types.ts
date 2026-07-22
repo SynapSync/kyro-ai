@@ -534,6 +534,14 @@ export interface NextTaskReview {
   checkerFindings: string[];
 }
 
+/** Copy-paste CLI recipe for the current handoff (context-pack agent UX). */
+export interface ContextPackCliRecipe {
+  id: string;
+  purpose: string;
+  /** Full shell-invocable command string using the canonical agent entrypoint. */
+  command: string;
+}
+
 export interface ContextPackOutput {
   schemaVersion: 4;
   packMode: ContextPackMode;
@@ -562,6 +570,8 @@ export interface ContextPackOutput {
   nextTaskReview: NextTaskReview | null;
   conventions: ContextPackConvention[];
   adrs: ContextPackAdr[];
+  /** Copy-paste CLI argv for the current nextAction (+ common preflight). */
+  cliRecipes: ContextPackCliRecipe[];
   warnings: string[];
   estimatedTokens: number;
   routing: { modes: string[] };
