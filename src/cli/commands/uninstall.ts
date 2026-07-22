@@ -1,8 +1,15 @@
-import { KYRO_STATE_PATH } from '../constants';
+import { KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { getInstalledAdapterDefinitions } from '../adapters/registry';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope } from '../options';
-import { readProjectState } from '../state';
+import {
+  hasLayeredProjectStateOnDisk,
+  hasMonolitoProjectStateOnDisk,
+  readProjectState,
+  sanitizeLocalForWrite,
+  sanitizeSharedForWrite,
+  splitMonolitoToLayers,
+} from '../state';
 import type { CliOptions, OperationPlan } from '../types';
 
 export function uninstall(options: CliOptions): void {
@@ -30,7 +37,22 @@ export function uninstall(options: CliOptions): void {
     plan.push({ action: 'rmdir-if-empty', path: directory });
   }
 
-  plan.push({ action: 'write', path: KYRO_STATE_PATH, content: `${JSON.stringify(nextState, null, 2)}\n` });
+  // Clear installedAdapters on the correct layer; never recreate monolito when layers exist.
+  if (hasLayeredProjectStateOnDisk() || !hasMonolitoProjectStateOnDisk()) {
+    const { shared, local } = splitMonolitoToLayers(nextState);
+    plan.push({
+      action: 'write',
+      path: PROJECT_STATE_PATH,
+      content: `${JSON.stringify(sanitizeSharedForWrite(shared), null, 2)}\n`,
+    });
+    plan.push({
+      action: 'write',
+      path: LOCAL_STATE_PATH,
+      content: `${JSON.stringify(sanitizeLocalForWrite(local), null, 2)}\n`,
+    });
+  } else {
+    plan.push({ action: 'write', path: KYRO_STATE_PATH, content: `${JSON.stringify(nextState, null, 2)}\n` });
+  }
 
   printPlan('Uninstall plan', plan);
   printUninstallSummary(plan, options.purgeAdapterAssets);
@@ -47,7 +69,10 @@ export function uninstall(options: CliOptions): void {
   } else {
     console.log('Adapter-owned entrypoint files were preserved. Use --purge-adapter-assets to remove them.');
   }
-  console.log(`Note: ${KYRO_STATE_PATH}, scope artifacts, and global runtime were preserved.`);
+  const preservedState = hasLayeredProjectStateOnDisk() || !hasMonolitoProjectStateOnDisk()
+    ? `${PROJECT_STATE_PATH} + ${LOCAL_STATE_PATH}`
+    : KYRO_STATE_PATH;
+  console.log(`Note: ${preservedState}, scope artifacts, and global runtime were preserved.`);
 }
 
 function parentPath(path: string): string {

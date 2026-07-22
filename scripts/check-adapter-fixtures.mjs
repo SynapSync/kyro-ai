@@ -152,21 +152,26 @@ withWorkspace('kyro-runtime-only-install-', (cwd) => {
   const { install, sync } = require(join(repo, 'dist/cli/commands/install.js'));
   const codex = parseAgent('codex');
   const home = join(cwd, '.home');
-  const statePath = join(cwd, '.agents', 'kyro', 'kyro.json');
+  const monoPath = join(cwd, '.agents', 'kyro', 'kyro.json');
+  const sharedPath = join(cwd, '.agents', 'kyro', 'project.json');
+  const localPath = join(cwd, '.agents', 'kyro', 'local.json');
+  const hasWorkspaceState = () => existsSync(sharedPath) || existsSync(localPath) || existsSync(monoPath);
 
   const runtimeDryRun = captureLogs(() => install(cliOptions({ agents: [codex], dryRun: true })));
   assert(runtimeDryRun.includes('Workspace: skipped'), 'runtime-only dry-run: should report skipped workspace');
   assert(runtimeDryRun.includes('- remove ~/.agents/kyro/current'), 'runtime-only dry-run: should update runtime');
-  assert(!runtimeDryRun.includes('- write .agents/kyro/kyro.json'), 'runtime-only dry-run: should not write workspace state');
-  assert(!existsSync(statePath), 'runtime-only dry-run: should not create workspace state');
+  assert(!runtimeDryRun.includes('- write .agents/kyro/kyro.json'), 'runtime-only dry-run: should not write monolito state');
+  assert(!runtimeDryRun.includes('- write .agents/kyro/project.json'), 'runtime-only dry-run: should not write project.json');
+  assert(!runtimeDryRun.includes('- write .agents/kyro/local.json'), 'runtime-only dry-run: should not write local.json');
+  assert(!hasWorkspaceState(), 'runtime-only dry-run: should not create workspace state');
 
   const runtimeOutput = captureLogs(() => install(cliOptions({ agents: [codex] })));
   assert(runtimeOutput.includes('Workspace: skipped'), 'runtime-only install: should report skipped workspace');
   assert(existsSync(join(home, '.agents', 'kyro', 'current', 'manifest.json')), 'runtime-only install: should write runtime manifest');
-  assert(!existsSync(statePath), 'runtime-only install: should not create workspace state');
+  assert(!hasWorkspaceState(), 'runtime-only install: should not create workspace state');
 
   captureLogs(() => install(cliOptions({ agents: [codex], noInitWorkspace: true })));
-  assert(!existsSync(statePath), 'no-init-workspace: should not create workspace state');
+  assert(!hasWorkspaceState(), 'no-init-workspace: should not create workspace state');
 
   let syncFailed = false;
   try {
@@ -179,7 +184,8 @@ withWorkspace('kyro-runtime-only-install-', (cwd) => {
   assert(syncFailed, 'sync without workspace: expected failure');
 
   captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
-  assert(existsSync(statePath), 'init-workspace: should create workspace state');
+  assert(existsSync(sharedPath) && existsSync(localPath), 'init-workspace: should create layered project.json + local.json');
+  assert(!existsSync(monoPath), 'init-workspace: should not leave live monolito kyro.json');
 });
 
 withWorkspace('kyro-adapter-preflight-', () => {
@@ -349,13 +355,19 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(countIncludes(agentsText, '<!-- kyro-ai:agents-md:end -->') === 1, 'sync: duplicated Kyro end marker');
   assert(agentsText.includes('Keep this user content.'), 'sync: user AGENTS.md content was not preserved');
 
-  const statePath = join(installDir, '.agents', 'kyro', 'kyro.json');
-  const stateBeforeUpgrade = JSON.parse(readFileSync(statePath, 'utf-8'));
-  assert(!Object.hasOwn(stateBeforeUpgrade, 'runtimeVersion'), 'install: project state should not include runtimeVersion');
-  assert(!Object.hasOwn(stateBeforeUpgrade, 'kyroInvocation'), 'install: project state should not include kyroInvocation');
+  const sharedPath = join(installDir, '.agents', 'kyro', 'project.json');
+  const localPath = join(installDir, '.agents', 'kyro', 'local.json');
+  const monoPath = join(installDir, '.agents', 'kyro', 'kyro.json');
+  assert(existsSync(sharedPath) && existsSync(localPath), 'install: should create layered project state');
+  assert(!existsSync(monoPath), 'install: should not leave live monolito kyro.json');
+  const sharedBeforeUpgrade = JSON.parse(readFileSync(sharedPath, 'utf-8'));
+  const localBeforeUpgrade = JSON.parse(readFileSync(localPath, 'utf-8'));
+  assert(!Object.hasOwn(sharedBeforeUpgrade, 'runtimeVersion'), 'install: shared state should not include runtimeVersion');
+  assert(!Object.hasOwn(sharedBeforeUpgrade, 'kyroInvocation'), 'install: shared state should not include kyroInvocation');
+  assert(!Object.hasOwn(localBeforeUpgrade, 'kyroInvocation'), 'install: local state should not include kyroInvocation');
   const staleCodexInstalledAt = '2000-01-01T00:00:00.000Z';
   const staleStandardInstalledAt = '2001-01-01T00:00:00.000Z';
-  stateBeforeUpgrade.principles = [
+  const principles = [
     {
       id: 'preserve-principles',
       rule: 'Project principles must survive install and sync.',
@@ -363,14 +375,17 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
       rationale: 'Install and sync are runtime projection commands, not project policy reset commands.',
     },
   ];
-  stateBeforeUpgrade.customMetadata = { owner: 'fixture', preserve: true };
-  stateBeforeUpgrade.runtimeVersion = '0.0.0-legacy';
-  // Legacy project-local invocation (pre-global-SoT) must be stripped on sync/install.
-  stateBeforeUpgrade.kyroInvocation = 'kyro';
-  stateBeforeUpgrade.scopes = [{ id: 'upgrade-scope', title: 'Upgrade Scope', status: 'active' }];
-  stateBeforeUpgrade.activeScope = 'upgrade-scope';
-  stateBeforeUpgrade.installedAdapters = [
-    { ...stateBeforeUpgrade.installedAdapters[0], installedAt: staleCodexInstalledAt },
+  const scopes = [{ id: 'upgrade-scope', title: 'Upgrade Scope', status: 'active' }];
+  sharedBeforeUpgrade.principles = principles;
+  sharedBeforeUpgrade.scopes = scopes;
+  // Inject retired fields that install/sync must strip from layers.
+  sharedBeforeUpgrade.runtimeVersion = '0.0.0-legacy';
+  sharedBeforeUpgrade.kyroInvocation = 'kyro';
+  localBeforeUpgrade.activeScope = 'upgrade-scope';
+  localBeforeUpgrade.kyroInvocation = 'kyro';
+  localBeforeUpgrade.runtimeVersion = '0.0.0-legacy';
+  localBeforeUpgrade.installedAdapters = [
+    { ...localBeforeUpgrade.installedAdapters[0], installedAt: staleCodexInstalledAt },
     {
       agent: 'standard',
       scope: 'workspace',
@@ -378,38 +393,47 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
       corePath: '~/.agents/kyro/current',
     },
   ];
-  writeFileSync(statePath, `${JSON.stringify(stateBeforeUpgrade, null, 2)}\n`, 'utf-8');
+  writeFileSync(sharedPath, `${JSON.stringify(sharedBeforeUpgrade, null, 2)}\n`, 'utf-8');
+  writeFileSync(localPath, `${JSON.stringify(localBeforeUpgrade, null, 2)}\n`, 'utf-8');
 
   captureLogs(() => sync(cliOptions({ agents: [codex] })));
-  const stateAfterSync = JSON.parse(readFileSync(statePath, 'utf-8'));
-  assert(JSON.stringify(stateAfterSync.principles) === JSON.stringify(stateBeforeUpgrade.principles), 'sync: principles were not preserved');
-  assert(JSON.stringify(stateAfterSync.customMetadata) === JSON.stringify(stateBeforeUpgrade.customMetadata), 'sync: custom metadata was not preserved');
-  assert(JSON.stringify(stateAfterSync.scopes) === JSON.stringify(stateBeforeUpgrade.scopes), 'sync: scopes were not preserved');
-  assert(stateAfterSync.activeScope === 'upgrade-scope', 'sync: activeScope was not preserved');
-  assert(!Object.hasOwn(stateAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed');
-  assert(!Object.hasOwn(stateAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from project state');
-  const syncedCodex = stateAfterSync.installedAdapters.find((adapter) => adapter.agent === 'codex');
-  const syncedStandard = stateAfterSync.installedAdapters.find((adapter) => adapter.agent === 'standard');
+  const sharedAfterSync = JSON.parse(readFileSync(sharedPath, 'utf-8'));
+  const localAfterSync = JSON.parse(readFileSync(localPath, 'utf-8'));
+  assert(JSON.stringify(sharedAfterSync.principles) === JSON.stringify(principles), 'sync: principles were not preserved');
+  assert(JSON.stringify(sharedAfterSync.scopes) === JSON.stringify(scopes), 'sync: scopes were not preserved');
+  assert(localAfterSync.activeScope === 'upgrade-scope', 'sync: activeScope was not preserved');
+  assert(!Object.hasOwn(sharedAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed from shared');
+  assert(!Object.hasOwn(sharedAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from shared');
+  assert(!Object.hasOwn(localAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed from local');
+  assert(!Object.hasOwn(localAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from local');
+  const syncedCodex = localAfterSync.installedAdapters.find((adapter) => adapter.agent === 'codex');
+  const syncedStandard = localAfterSync.installedAdapters.find((adapter) => adapter.agent === 'standard');
   assert(syncedCodex.installedAt !== staleCodexInstalledAt, 'sync: selected adapter installedAt was not refreshed');
   assert(syncedStandard.installedAt === staleStandardInstalledAt, 'sync: unselected adapter installedAt should be preserved');
 
   const staleReinstallInstalledAt = '2002-01-01T00:00:00.000Z';
   syncedCodex.installedAt = staleReinstallInstalledAt;
-  stateAfterSync.runtimeVersion = '0.0.0-legacy';
-  stateAfterSync.kyroInvocation = 'kyro';
-  writeFileSync(statePath, `${JSON.stringify(stateAfterSync, null, 2)}\n`, 'utf-8');
+  localAfterSync.runtimeVersion = '0.0.0-legacy';
+  localAfterSync.kyroInvocation = 'kyro';
+  sharedAfterSync.runtimeVersion = '0.0.0-legacy';
+  sharedAfterSync.kyroInvocation = 'kyro';
+  writeFileSync(sharedPath, `${JSON.stringify(sharedAfterSync, null, 2)}\n`, 'utf-8');
+  writeFileSync(localPath, `${JSON.stringify(localAfterSync, null, 2)}\n`, 'utf-8');
   captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
-  const stateAfterReinstall = JSON.parse(readFileSync(statePath, 'utf-8'));
-  const reinstalledCodex = stateAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
-  const reinstalledStandard = stateAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
-  assert(JSON.stringify(stateAfterReinstall.principles) === JSON.stringify(stateBeforeUpgrade.principles), 'reinstall: principles were not preserved');
-  assert(JSON.stringify(stateAfterReinstall.customMetadata) === JSON.stringify(stateBeforeUpgrade.customMetadata), 'reinstall: custom metadata was not preserved');
-  assert(JSON.stringify(stateAfterReinstall.scopes) === JSON.stringify(stateBeforeUpgrade.scopes), 'reinstall: scopes were not preserved');
-  assert(stateAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
-  assert(!Object.hasOwn(stateAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed');
-  assert(!Object.hasOwn(stateAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from project state');
+  const sharedAfterReinstall = JSON.parse(readFileSync(sharedPath, 'utf-8'));
+  const localAfterReinstall = JSON.parse(readFileSync(localPath, 'utf-8'));
+  const reinstalledCodex = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
+  const reinstalledStandard = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
+  assert(JSON.stringify(sharedAfterReinstall.principles) === JSON.stringify(principles), 'reinstall: principles were not preserved');
+  assert(JSON.stringify(sharedAfterReinstall.scopes) === JSON.stringify(scopes), 'reinstall: scopes were not preserved');
+  assert(localAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
+  assert(!Object.hasOwn(sharedAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed from shared');
+  assert(!Object.hasOwn(sharedAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from shared');
+  assert(!Object.hasOwn(localAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed from local');
+  assert(!Object.hasOwn(localAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from local');
   assert(reinstalledCodex.installedAt !== staleReinstallInstalledAt, 'reinstall: selected adapter installedAt was not refreshed');
   assert(reinstalledStandard.installedAt === staleStandardInstalledAt, 'reinstall: unselected adapter installedAt should be preserved');
+  assert(!existsSync(monoPath), 'reinstall: must not recreate live monolito kyro.json');
 
   captureLogs(() => uninstall(cliOptions()));
   agentsText = readFileSync(join(installDir, 'AGENTS.md'), 'utf-8');

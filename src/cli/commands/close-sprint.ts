@@ -9,7 +9,8 @@ import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
 import { readJsonSafely } from '../artifacts/json';
-import { archiveDir, projectStatePath, scopeRoot, sprintJsonPath } from '../artifacts/paths';
+import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
+import { projectScopeWritePath } from '../checkpoints/sprint-close';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import {
   applySprintCloseTransaction,
@@ -193,7 +194,7 @@ export function buildClosePlan(
   const snapshotPath = `${archiveDir(scope)}/sprint-${nnn}-${active.slug}.json`;
   const narrativePath = `${archiveDir(scope)}/sprint-${nnn}-${active.slug}.md`;
   const checkpointPath = `${archiveDir(scope)}/sprint-${nnn}-${active.slug}.checkpoint.json`;
-  for (const path of [snapshotPath, narrativePath, checkpointPath, sprintJsonPath(scope), projectStatePath()]) assertSafeManagedPath(path);
+  for (const path of [snapshotPath, narrativePath, checkpointPath, sprintJsonPath(scope), projectScopeWritePath()]) assertSafeManagedPath(path);
 
   // Audit-trail protection: never overwrite an existing snapshot. A collision means this sprint
   // number was already closed — exactly the double-close that destroyed Sprint 1 data before.
@@ -217,7 +218,11 @@ export function buildClosePlan(
   const state = readProjectState();
   const projectScopeBefore = state?.scopes.find((entry) => entry.id === scope);
   if (!state || !projectScopeBefore) {
-    throw new KyroCoreError('STATE_DIVERGED', `Cannot checkpoint ${scope}: its KyroScopeEntry is missing from kyro.json.`, 'Repair kyro.json before closing so the checkpoint can preserve scope state.');
+    throw new KyroCoreError(
+      'STATE_DIVERGED',
+      `Cannot checkpoint ${scope}: its KyroScopeEntry is missing from project state.`,
+      'Repair project.json (or legacy kyro.json) scopes[] before closing so the checkpoint can preserve scope state.',
+    );
   }
   const createdAt = new Date().toISOString();
   const closedAt = createdAt.slice(0, 10);
@@ -392,7 +397,7 @@ function closePlanResult(sprint: SprintFile, transaction: SprintCloseTransaction
     { action: 'write', path: sprintJsonPath(checkpoint.identity.scope), content: `${JSON.stringify(checkpoint.intendedAfterClose, null, 2)}\n` },
   ];
   if (canonicalJson(checkpoint.projectScopeBefore) !== canonicalJson(checkpoint.projectScopeAfter)) {
-    plan.push({ action: 'write', path: projectStatePath() });
+    plan.push({ action: 'write', path: projectScopeWritePath() });
   }
   return { sprint, plan, snapshotPath: checkpoint.paths.legacySnapshot, checkpointPath: transaction.checkpointPath, transaction };
 }

@@ -96,10 +96,17 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
   assert(typeof manifest.kyroInvocation === 'string', 'check-cli-bundle-assets: manifest.json missing kyroInvocation');
   assert(isValidInvocation(manifest.kyroInvocation), `check-cli-bundle-assets: unexpected manifest.kyroInvocation shape "${manifest.kyroInvocation}"`);
 
-  const statePath = join(cwd, '.agents', 'kyro', 'kyro.json');
-  assert(existsSync(statePath), `check-cli-bundle-assets: missing ${statePath}`);
-  const state = JSON.parse(readFileSync(statePath, 'utf-8'));
-  assert(!Object.hasOwn(state, 'kyroInvocation'), 'check-cli-bundle-assets: kyro.json must not store kyroInvocation (global manifest is SoT)');
+  const sharedPath = join(cwd, '.agents', 'kyro', 'project.json');
+  const localPath = join(cwd, '.agents', 'kyro', 'local.json');
+  const monoPath = join(cwd, '.agents', 'kyro', 'kyro.json');
+  assert(existsSync(sharedPath), `check-cli-bundle-assets: missing ${sharedPath}`);
+  assert(existsSync(localPath), `check-cli-bundle-assets: missing ${localPath}`);
+  assert(!existsSync(monoPath), 'check-cli-bundle-assets: live monolito kyro.json must not remain after install');
+  const shared = JSON.parse(readFileSync(sharedPath, 'utf-8'));
+  const local = JSON.parse(readFileSync(localPath, 'utf-8'));
+  assert(!Object.hasOwn(shared, 'kyroInvocation'), 'check-cli-bundle-assets: project.json must not store kyroInvocation (global manifest is SoT)');
+  assert(!Object.hasOwn(local, 'kyroInvocation'), 'check-cli-bundle-assets: local.json must not store kyroInvocation (global manifest is SoT)');
+  assert(!Object.hasOwn(shared, 'activeScope'), 'check-cli-bundle-assets: project.json must not store activeScope');
 
   const strayRuntimeFile = join(runtimeDir, 'stray-old-binary.js');
   const legacyVersionDir = join(home, '.agents', 'kyro', 'versions', '0.0.0');

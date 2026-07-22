@@ -162,11 +162,38 @@ function paths(root) {
   const archive = join(root, '.agents/kyro/scopes/demo/archive');
   return {
     sprint: join(root, '.agents/kyro/scopes/demo/sprint.json'),
+    /** Legacy monolito (fixture dual-read). Prefer readProjectStateFiles() after layer writers. */
     project: join(root, '.agents/kyro/kyro.json'),
+    shared: join(root, '.agents/kyro/project.json'),
+    local: join(root, '.agents/kyro/local.json'),
     checkpoint: join(archive, 'sprint-001-demo-sprint.checkpoint.json'),
     snapshot: join(archive, 'sprint-001-demo-sprint.json'),
     narrative: join(archive, 'sprint-001-demo-sprint.md'),
   };
+}
+
+/** Effective project state for assertions: layers when present, else monolito. */
+function readProjectStateFiles(root) {
+  const p = paths(root);
+  if (existsSync(p.shared) || existsSync(p.local)) {
+    const shared = existsSync(p.shared) ? readJson(p.shared) : { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [] };
+    const local = existsSync(p.local) ? readJson(p.local) : { schemaVersion: 4, activeScope: null, installedAdapters: [] };
+    return {
+      schemaVersion: 4,
+      artifactRoot: shared.artifactRoot ?? '.agents/kyro/scopes',
+      scopes: Array.isArray(shared.scopes) ? shared.scopes : [],
+      activeScope: local.activeScope ?? null,
+      installedAdapters: Array.isArray(local.installedAdapters) ? local.installedAdapters : [],
+      runtimePath: local.runtimePath,
+      principles: shared.principles,
+      team: shared.team,
+      layered: true,
+    };
+  }
+  if (existsSync(p.project)) {
+    return { ...readJson(p.project), layered: false };
+  }
+  throw new Error(`no project state under ${root}`);
 }
 
 function closeSuccessfully(root) {
@@ -753,9 +780,46 @@ for (const mode of ['corrupt', 'unsupported']) {
     tui.child.stdin.end('1\n');
     const tuiResult = await tui.completed;
     assert(tuiResult.status === 0, `TUI install failed: ${tuiResult.text}`);
-    const state = readJson(paths(root).project);
+    // set-active migrates monolito → layers; install must not clobber local activeScope or shared scopes.
+    const state = readProjectStateFiles(root);
+    assert(state.layered === true, 'set-active/install should leave layered project state');
     assert(state.activeScope === 'unrelated', 'TUI install applied a stale plan and clobbered activeScope');
-    assert(state.runtimeExtension?.keep === true, 'TUI install clobbered unrelated project extensions');
+    assert(
+      state.scopes.some((scope) => scope.id === 'unrelated' && scope.status === 'blocked'),
+      'TUI install clobbered unrelated scope registry entry',
+    );
+    assert(
+      state.scopes.some((scope) => scope.id === 'demo'),
+      'TUI install dropped demo scope from shared registry',
+    );
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Layered-only workspace: close-sprint CAS updates project.json (not monolito).
+{
+  const root = makeSandbox();
+  try {
+    const mono = readJson(paths(root).project);
+    writeJson(paths(root).shared, {
+      schemaVersion: 4,
+      artifactRoot: mono.artifactRoot ?? '.agents/kyro/scopes',
+      scopes: mono.scopes.map(({ id, title, status }) => ({ id, title, status })),
+    });
+    writeJson(paths(root).local, {
+      schemaVersion: 4,
+      activeScope: mono.activeScope ?? 'demo',
+      installedAdapters: mono.installedAdapters ?? [],
+      ...(mono.runtimePath ? { runtimePath: mono.runtimePath } : {}),
+    });
+    unlinkSync(paths(root).project);
+    const checkpoint = closeSuccessfully(root);
+    assert(checkpoint.projectScopeAfter.status === 'completed', 'layered final close must complete scope');
+    assert(existsSync(paths(root).shared), 'layered close must keep project.json');
+    assert(!existsSync(paths(root).project), 'layered close must not recreate live monolito kyro.json');
+    const shared = readJson(paths(root).shared);
+    assert(shared.scopes.find((scope) => scope.id === 'demo')?.status === 'completed', 'layered close must mark demo completed on project.json');
+    assert(shared.scopes.some((scope) => scope.id === 'unrelated'), 'layered close must preserve unrelated scopes on project.json');
+    assert(!('activeScope' in shared), 'shared project.json must never gain activeScope on close');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
