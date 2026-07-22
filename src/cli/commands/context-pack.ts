@@ -9,9 +9,22 @@ import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { emitTraceEvent } from '../core/trace';
 import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
+import { getPersistedKyroInvocation } from '../invocation';
 import { scopeFindingsToTask } from './review';
 import { readProjectState } from '../state';
-import type { ActiveSprint, AdrRecord, CliOptions, ContextPackMode, ContextPackOutput, NextTaskReview, PackVerbosity, SpecScenario, SprintFile, Task } from '../types';
+import type {
+  ActiveSprint,
+  AdrRecord,
+  CliOptions,
+  ContextPackCliRecipe,
+  ContextPackMode,
+  ContextPackOutput,
+  NextTaskReview,
+  PackVerbosity,
+  SpecScenario,
+  SprintFile,
+  Task,
+} from '../types';
 
 export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json' | 'verbosity'>): void {
   const scope = resolveKyroScope(options.kyroScope);
@@ -92,6 +105,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     nextTaskReview,
     conventions,
     adrs,
+    cliRecipes: buildCliRecipes(scope, sprint, task),
     warnings,
     routing: { modes: [...routing.modes] },
     budgetClass: routing.budgetClass,
@@ -100,6 +114,100 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     budgetGuidance: concise ? '' : routing.budgetGuidance,
   };
   return { ...packWithoutTokens, estimatedTokens: estimatePackTokens(packWithoutTokens) };
+}
+
+/**
+ * Copy-paste CLI recipes for the current handoff using the canonical agent entrypoint
+ * (post-mortem #2 F1 / R6). Keeps progressive disclosure thin: recipes live on the pack,
+ * not in re-inflated skill stubs.
+ */
+export function buildCliRecipes(scope: string, sprint: SprintFile, task: Task | null): ContextPackCliRecipe[] {
+  const cli = getPersistedKyroInvocation();
+  const scopeFlag = `--kyro-scope ${shellQuote(scope)}`;
+  const recipes: ContextPackCliRecipe[] = [
+    {
+      id: 'status',
+      purpose: 'Read routing signal (scope progress + nextAction)',
+      command: `${cli} status ${scopeFlag}`,
+    },
+    {
+      id: 'doctor-artifacts',
+      purpose: 'Pre-flight integrity before writes',
+      command: `${cli} doctor --artifacts ${scopeFlag}`,
+    },
+  ];
+
+  const nextAction = sprint.handoff.nextAction;
+  const taskId = task?.id ?? sprint.handoff.nextTaskId;
+
+  switch (nextAction) {
+    case 'execute_task':
+      recipes.push({
+        id: 'context-pack-task',
+        purpose: 'Load lean task pack for the next execute_task',
+        command: taskId
+          ? `${cli} context-pack ${scopeFlag} --task ${shellQuote(taskId)} --json`
+          : `${cli} context-pack ${scopeFlag} --json`,
+      });
+      recipes.push({
+        id: 'record-evidence',
+        purpose: 'Tool-owned maker evidence write after implementation (fill flags)',
+        command: taskId
+          ? `${cli} record-evidence ${shellQuote(taskId)} ${scopeFlag} --summary "..." --validation "..." --file <path>`
+          : `${cli} record-evidence <taskId> ${scopeFlag} --summary "..." --validation "..."`,
+      });
+      break;
+    case 'review_task':
+      recipes.push({
+        id: 'review',
+        purpose: 'Tool-owned checker verdict for the task pending review',
+        command: taskId
+          ? `${cli} review ${shellQuote(taskId)} ${scopeFlag} --verdict pass --yes`
+          : `${cli} review <taskId> ${scopeFlag} --verdict pass --yes`,
+      });
+      break;
+    case 'close_sprint':
+      recipes.push({
+        id: 'close-sprint',
+        purpose: 'Lossless close of the active sprint',
+        command: `${cli} close-sprint ${scopeFlag} --outcome shipped --yes`,
+      });
+      break;
+    case 'plan_sprint':
+      recipes.push({
+        id: 'plan-from',
+        purpose: 'Materialize next sprint from a lean plan file',
+        command: `${cli} plan --from <lean-sprint.json> ${scopeFlag}`,
+      });
+      break;
+    case 'clarify':
+      recipes.push({
+        id: 'analyze',
+        purpose: 'Surface remaining clarification/spec findings',
+        command: `${cli} analyze ${scopeFlag}`,
+      });
+      break;
+    case 'done':
+      recipes.push({
+        id: 'status-done',
+        purpose: 'Confirm scope is terminal (no further forge modes)',
+        command: `${cli} status ${scopeFlag}`,
+      });
+      break;
+    default:
+      recipes.push({
+        id: 'analyze',
+        purpose: 'Semantic cross-check of the scope',
+        command: `${cli} analyze ${scopeFlag}`,
+      });
+  }
+
+  return recipes;
+}
+
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_./:@-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 function resolvePackMode(taskOption: string | null, sprint: SprintFile, warnings: string[]): ContextPackMode {
@@ -205,6 +313,7 @@ function estimatePackTokens(pack: Omit<ContextPackOutput, 'estimatedTokens'>): n
     ...pack.taskScenarios.map((scenario) => `${scenario.id} ${scenario.given} ${scenario.when} ${scenario.then}`),
     ...pack.blockers, ...pack.conventions.map((c) => c.rule),
     ...pack.adrs.map((adr) => `${adr.id} ${adr.title} ${adr.status} ${adr.context} ${adr.decision} ${adr.consequences.join(' ')} ${adr.alternatives.join(' ')}`),
+    ...pack.cliRecipes.map((recipe) => `${recipe.id} ${recipe.purpose} ${recipe.command}`),
   ].filter(Boolean).join(' ');
   return Math.ceil(text.length / 4);
 }
@@ -232,6 +341,12 @@ function printContextPackText(pack: ContextPackOutput): void {
   if (pack.handoffNote) console.log(`\nResume note: ${pack.handoffNote}`);
   if (pack.conventions.length) console.log(`Conventions: ${pack.conventions.map((c) => c.rule).join(' | ')}`);
   if (pack.adrs.length) console.log(`ADRs: ${pack.adrs.map((adr) => `${adr.id} ${adr.title} (${adr.status})`).join(' | ')}`);
+  if (pack.cliRecipes.length) {
+    console.log('\nCLI recipes:');
+    for (const recipe of pack.cliRecipes) {
+      console.log(`- ${recipe.id}: ${recipe.command}`);
+    }
+  }
   console.log(`\nBudget: ${pack.budgetClass} (${pack.reasoningTier}, ~${pack.estimatedTokens}/${pack.maxContextTokens} tokens)`);
   for (const w of pack.warnings) console.log(`! ${w}`);
 }

@@ -18,6 +18,8 @@ Usage:
   kyro review <task> [options] Tool-owned maker/checker verdict write
   kyro debt <subcommand>       Tool-owned debt mutation: add, start, resolve, defer, escalate
   kyro add-emergent [options]  Tool-owned append to activeSprint.emergentTasks[]
+  kyro scenario <subcommand>   Tool-owned scenario add / task link (no hand-edit)
+  kyro adr <subcommand>        Tool-owned ADR append (full v4 record)
   kyro repair [options]        Validate and normalize a scope's sprint.json
   kyro status [mode]           Read-only scope progress, review debt, and debt report
   kyro close-sprint [options]  Checkpoint + close the active sprint (lossless, tool-owned)
@@ -62,6 +64,9 @@ Examples:
   kyro review T1.1 --kyro-scope auth-refactor --verdict pass --yes
   kyro debt add --title "Missing test" --priority high --kyro-scope auth-refactor
   kyro add-emergent --title "Add missing migration" --description "..." --acceptance "Migration runs clean." --kyro-scope auth-refactor
+  kyro scenario add --id S10 --requirement R1 --given "..." --when "..." --then "..." --kyro-scope auth-refactor
+  kyro scenario link --task T1.2 --scenario S10 --kyro-scope auth-refactor
+  kyro adr add --title "..." --context "..." --decision "..." --consequence "..." --alternative "..." --kyro-scope auth-refactor
   kyro context-pack --kyro-scope 01-token-cost-optimization --json
   kyro eval --json
   kyro trace --kyro-scope auth-refactor --tail 20
@@ -97,6 +102,12 @@ export function printCommandHelp(command: string): void {
   kyro debt escalate <id> --priority <critical|high|medium|low> [--kyro-scope <scope>] [--dry-run]`);
   } else if (command === 'add-emergent') {
     console.log('Usage: kyro add-emergent --title <text> --description <text> --acceptance <text> [--acceptance <text> ...] [--file <path> ...] [--context <text>] [--depends-on <id> ...] [--kyro-scope <scope>] [--dry-run]');
+  } else if (command === 'scenario') {
+    console.log(`Usage:
+  kyro scenario add --id <S#> --requirement <R#> --given <text> --when <text> --then <text> [--kyro-scope <scope>] [--dry-run]
+  kyro scenario link --task <T#> --scenario <S#> [--kyro-scope <scope>] [--dry-run]`);
+  } else if (command === 'adr') {
+    console.log('Usage: kyro adr add --title <text> --context <text> --decision <text> --consequence <text> [--consequence ...] --alternative <text> [--alternative ...] [--id ADR-0001] [--status accepted|proposed|rejected|superseded] [--date YYYY-MM-DD] [--kyro-scope <scope>] [--dry-run]');
   } else if (command === 'close-sprint') {
     console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {

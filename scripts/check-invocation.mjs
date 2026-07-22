@@ -114,4 +114,18 @@ if (process.platform !== 'win32') {
   );
 }
 
+// Projected skill stubs pin runtimeVersion and print a CLI line (post-mortem #2 F1/F2).
+{
+  const { buildCommandSkill, parseSkillRuntimeVersion } = require(resolve(repo, 'dist/cli/adapters/command-skills.js'));
+  const { readPackageVersion } = require(resolve(repo, 'dist/cli/help.js'));
+  const skill = buildCommandSkill('forge');
+  const version = readPackageVersion();
+  assert(skill.includes(`runtimeVersion: "${version}"`), `skill stub must pin runtimeVersion ${version}`);
+  assert(parseSkillRuntimeVersion(skill) === version, 'parseSkillRuntimeVersion must read pin');
+  assert(skill.includes('CLI: `'), 'skill stub must print CLI entrypoint line');
+  assert(skill.includes('prefer this projected runtime over any host plugin cache path'), 'skill stub must warn against plugin cache paths');
+  assert(parseSkillRuntimeVersion('---\nname: x\n---\n') === null, 'missing pin parses as null');
+  assert(parseSkillRuntimeVersion('runtimeVersion: "9.9.9"') === '9.9.9', 'parse bare pin line');
+}
+
 console.log('check:invocation — durable vs ephemeral invocation resolution passed');

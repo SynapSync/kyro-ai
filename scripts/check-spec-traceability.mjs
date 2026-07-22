@@ -108,6 +108,12 @@ function assertContextPackAndDoctor() {
     assert(taskPack.status === 0, `task context-pack should pass: ${taskPack.stdout}${taskPack.stderr}`);
     const taskJson = JSON.parse(taskPack.stdout);
     assert(taskJson.taskScenarios.length === 1 && taskJson.taskScenarios[0].id === 'S1', 'task pack should resolve task scenarios');
+    assert(Array.isArray(scopeJson.cliRecipes) && scopeJson.cliRecipes.length > 0, 'scope pack should include cliRecipes');
+    assert(scopeJson.cliRecipes.every((r) => typeof r.command === 'string' && r.command.length > 0), 'cliRecipes need commands');
+    assert(
+      scopeJson.cliRecipes.some((r) => r.id === 'status' || r.command.includes('status')),
+      'cliRecipes should include a status preflight',
+    );
 
     const doctor = run(['doctor', '--adapters'], root);
     assert(doctor.status === 0, `doctor --adapters should pass: ${doctor.stdout}${doctor.stderr}`);
@@ -162,8 +168,101 @@ function main() {
     includes: ['no semantic issues found'],
     excludes: ['scenario', 'requirement'],
   });
+  assertHistoricalScenarioCoverageSilencesMedium();
   assertContextPackAndDoctor();
   console.log('check:spec-traceability — spec graph invariants passed');
+}
+
+/**
+ * After a close, S1 remains in spec but has no active-sprint task refs. With a ledger snapshot
+ * that carried S1 on the closed activeSprint, analyze must NOT emit MEDIUM no-task-coverage for S1.
+ * A truly new uncovered S-new still MEDIUM.
+ */
+function assertHistoricalScenarioCoverageSilencesMedium() {
+  const root = sandbox('close-sprint-happy');
+  try {
+    const sprint = readSprint(root);
+    addSpec(sprint, {
+      scenarios: [
+        { id: 'S1', requirement: 'R1', given: 'closed work', when: 'sprint closed', then: 'shipped' },
+        { id: 'S-new', requirement: 'R1', given: 'new', when: 'analyze', then: 'flagged' },
+      ],
+    });
+    const closedActive = JSON.parse(JSON.stringify(sprint.activeSprint));
+    closedActive.phases[0].tasks[0].scenario_refs = ['S1'];
+    closedActive.phases[0].tasks[0].status = 'done';
+    closedActive.phases[0].tasks[0].verdict = {
+      result: 'pass',
+      checked_criteria: closedActive.phases[0].tasks[0].acceptance_criteria ?? ['ok'],
+      waived_criteria: [],
+      findings: [],
+      by: 'checker',
+      reviewedAt: '2026-07-01T00:00:00.000Z',
+    };
+
+    const archiveDir = join(root, '.agents/kyro/scopes/demo/archive');
+    mkdirSync(archiveDir, { recursive: true });
+    const snapshotRel = 'archive/sprint-001-closed.json';
+    writeFileSync(join(root, '.agents/kyro/scopes/demo', snapshotRel), `${JSON.stringify(closedActive, null, 2)}\n`);
+
+    sprint.ledger = [
+      {
+        n: 1,
+        slug: 'closed',
+        outcome: 'shipped',
+        closedAt: '2026-07-01',
+        archive: 'archive/sprint-001-closed.md',
+        snapshot: snapshotRel,
+      },
+    ];
+    // Next sprint active: no task references S1 (historical only). S-new is uncovered.
+    sprint.activeSprint = {
+      n: 2,
+      slug: 'next',
+      title: 'Next',
+      objective: 'Next sprint',
+      status: 'planned',
+      definitionOfDone: ['done'],
+      phases: [
+        {
+          id: 'P1',
+          title: 'P1',
+          objective: 'P1',
+          status: 'pending',
+          tasks: [
+            {
+              id: 'T2.1',
+              title: 'Next task',
+              description: 'Work',
+              files_to_touch: [],
+              context: '',
+              acceptance_criteria: ['works'],
+              depends_on: [],
+              scenario_refs: [],
+              status: 'pending',
+              evidence: null,
+              verdict: null,
+            },
+          ],
+        },
+      ],
+      emergentTasks: [],
+    };
+    writeSprint(root, sprint);
+
+    const result = run(['analyze', '--kyro-scope', 'demo'], root);
+    assert(result.status === 0, `analyze after historical close should exit 0: ${result.stdout}${result.stderr}`);
+    assert(
+      !result.stdout.includes('scenario S1 has no task coverage'),
+      `historical S1 must not MEDIUM: ${result.stdout}`,
+    );
+    assert(
+      result.stdout.includes('scenario S-new has no task coverage'),
+      `uncovered S-new must still MEDIUM: ${result.stdout}`,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 }
 
 main();

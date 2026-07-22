@@ -1,8 +1,19 @@
 import { readJsonSafely } from '../artifacts/json';
-import { sprintJsonPath } from '../artifacts/paths';
+import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, asTaskEvidence, asTaskVerdict, taskEvidenceIssues } from '../artifacts/schema';
+import { resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
-import type { ActiveSprint, AnalysisFinding, AnalysisSeverity, Phase, Principle, PrincipleCheck, SprintFile, Task } from '../types';
+import type {
+  ActiveSprint,
+  AnalysisFinding,
+  AnalysisSeverity,
+  Phase,
+  Principle,
+  PrincipleCheck,
+  SprintCloseCheckpointV1,
+  SprintFile,
+  Task,
+} from '../types';
 import { KyroCoreError } from './errors';
 import { makerCheckerPolicy, policyIssues } from './policy';
 import { resolveScope } from './scope-resolution';
@@ -112,7 +123,7 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
       add('MEDIUM', 'coherence', `kyro.json scope status "${scopeEntry.status}" is stale (scope is "${derivedScope}")`, 'Run kyro repair to reconcile kyro.json with the sprint.');
     }
   }
-  for (const finding of collectSpecFindings(sprint)) {
+  for (const finding of collectSpecFindings(sprint, { historicalScenarioRefs: collectHistoricalScenarioRefs(sprint.scope, sprint) })) {
     n += 1;
     out.push({ ...finding, id: `A${String(n).padStart(3, '0')}` });
   }
@@ -135,7 +146,16 @@ export function countClarificationMarkers(sprint: SprintFile): number {
   return count;
 }
 
-export function collectSpecFindings(sprint: SprintFile): AnalysisFinding[] {
+export interface SpecFindingsOptions {
+  /**
+   * Scenario ids already linked by tasks in closed sprints (ledger checkpoints/snapshots).
+   * Active-sprint coverage still uses live tasks; historical ids suppress "no task coverage"
+   * MEDIUM noise after close without deleting scenarios.
+   */
+  historicalScenarioRefs?: Iterable<string>;
+}
+
+export function collectSpecFindings(sprint: SprintFile, options: SpecFindingsOptions = {}): AnalysisFinding[] {
   const spec = sprint.spec;
   if (!spec) return [];
 
@@ -150,7 +170,8 @@ export function collectSpecFindings(sprint: SprintFile): AnalysisFinding[] {
   const scenarioIds = new Set(spec.scenarios.map((scenario) => scenario.id));
   const tasks = sprint.activeSprint ? allTasks(sprint.activeSprint) : [];
   const referencedRequirements = new Set<string>();
-  const referencedScenarios = new Set<string>();
+  const activeReferencedScenarios = new Set<string>();
+  const historicalScenarioRefs = new Set(options.historicalScenarioRefs ?? []);
 
   for (const id of duplicateStrings(spec.requirements.map((requirement) => requirement.id))) {
     add('MEDIUM', `duplicate spec requirement id "${id}"`, 'Requirement ids must be unique within sprint.spec.requirements.');
@@ -170,7 +191,7 @@ export function collectSpecFindings(sprint: SprintFile): AnalysisFinding[] {
   for (const task of tasks) {
     for (const scenarioRef of task.scenario_refs ?? []) {
       if (scenarioIds.has(scenarioRef)) {
-        referencedScenarios.add(scenarioRef);
+        activeReferencedScenarios.add(scenarioRef);
       } else {
         add('HIGH', `task ${task.id} scenario_refs "${scenarioRef}" which does not exist`, 'Fix task.scenario_refs or add the missing scenario.');
       }
@@ -183,9 +204,9 @@ export function collectSpecFindings(sprint: SprintFile): AnalysisFinding[] {
     }
   }
   for (const scenario of spec.scenarios) {
-    if (!referencedScenarios.has(scenario.id)) {
-      add('MEDIUM', `scenario ${scenario.id} has no task coverage`, 'Add scenario_refs to at least one task, or remove/defer the scenario.');
-    }
+    if (activeReferencedScenarios.has(scenario.id)) continue;
+    if (historicalScenarioRefs.has(scenario.id)) continue;
+    add('MEDIUM', `scenario ${scenario.id} has no task coverage`, 'Add scenario_refs to at least one active task (kyro scenario link), or remove/defer the scenario. Closed-sprint coverage is already counted from ledger archives.');
   }
   if (spec.openQuestions.length > 0) {
     add('MEDIUM', `${spec.openQuestions.length} spec open question(s) remain`, 'Resolve open questions via clarify before treating the spec as stable.');
@@ -199,6 +220,67 @@ export function collectSpecFindings(sprint: SprintFile): AnalysisFinding[] {
   }
 
   return out;
+}
+
+/**
+ * Collect scenario ids referenced by tasks in closed sprints, from ledger checkpoint/snapshot
+ * artifacts. Missing or unreadable archives are skipped (doctor --artifacts owns integrity).
+ * Pure wrt live sprint mutation: read-only archive I/O only.
+ */
+export function collectHistoricalScenarioRefs(scope: string, sprint: SprintFile): Set<string> {
+  const refs = new Set<string>();
+  for (const entry of sprint.ledger ?? []) {
+    if (typeof entry.checkpoint === 'string' && entry.checkpoint.trim()) {
+      for (const id of scenarioRefsFromCheckpoint(scope, entry.checkpoint)) refs.add(id);
+      continue;
+    }
+    if (typeof entry.snapshot === 'string' && entry.snapshot.trim()) {
+      for (const id of scenarioRefsFromActiveSprintSnapshot(scope, entry.snapshot)) refs.add(id);
+    }
+  }
+  return refs;
+}
+
+function scenarioRefsFromCheckpoint(scope: string, relativePath: string): string[] {
+  const absolute = resolveLedgerArtifact(scope, relativePath);
+  if (!absolute) return [];
+  const read = readJsonSafely(absolute);
+  if (!read.exists || read.error || !read.value || typeof read.value !== 'object') return [];
+  const checkpoint = read.value as Partial<SprintCloseCheckpointV1>;
+  const before = checkpoint.beforeClose;
+  if (!before || typeof before !== 'object' || !before.activeSprint) return [];
+  return scenarioRefsFromActive(before.activeSprint as ActiveSprint);
+}
+
+function scenarioRefsFromActiveSprintSnapshot(scope: string, relativePath: string): string[] {
+  const absolute = resolveLedgerArtifact(scope, relativePath);
+  if (!absolute) return [];
+  const read = readJsonSafely(absolute);
+  if (!read.exists || read.error || !read.value || typeof read.value !== 'object') return [];
+  return scenarioRefsFromActive(read.value as ActiveSprint);
+}
+
+function scenarioRefsFromActive(active: ActiveSprint): string[] {
+  const out: string[] = [];
+  for (const task of allTasks(active)) {
+    for (const ref of task.scenario_refs ?? []) {
+      if (typeof ref === 'string' && ref.trim()) out.push(ref);
+    }
+  }
+  return out;
+}
+
+/** Return a managed relative path under the scope, or null if the ledger path escapes the scope tree. */
+function resolveLedgerArtifact(scope: string, relativePath: string): string | null {
+  const normalized = relativePath.replace(/^\.\//, '');
+  if (!normalized || normalized.includes('..') || normalized.startsWith('/') || normalized.includes('\\')) return null;
+  const managed = `${scopeRoot(scope)}/${normalized}`;
+  try {
+    resolveManagedPath(managed);
+    return managed;
+  } catch {
+    return null;
+  }
 }
 
 export function collectCheckerFindings(sprint: SprintFile, principles: Principle[]): AnalysisFinding[] {

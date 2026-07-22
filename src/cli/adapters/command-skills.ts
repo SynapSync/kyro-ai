@@ -1,4 +1,6 @@
 import { AGENT_SKILLS_ROOT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
+import { readPackageVersion } from '../help';
+import { resolveKyroInvocation } from '../invocation';
 import type { KyroCommandName, OperationPlan } from '../types';
 
 export function addCommandSkillProjection(plan: OperationPlan[]): void {
@@ -35,10 +37,24 @@ export function getCommandSkillPathForRoot(command: KyroCommandName, skillsRoot:
   return `${skillsRoot}/kyro-${command}/SKILL.md`;
 }
 
-function buildCommandSkill(command: KyroCommandName): string {
+/**
+ * Projected host skill stub. Pins runtimeVersion so doctor can detect skill/runtime skew
+ * (post-mortem #2 F2) and prints the durable CLI invocation so agents never rediscover it.
+ */
+export function buildCommandSkill(command: KyroCommandName): string {
   const title = getCommandTitle(command);
   const description = getCommandDescription(command);
-  return `---\nname: kyro-${command}\ndescription: ${description}\nlicense: Apache-2.0\nmetadata:\n  author: synapsync\n  version: "1.0"\n  scope: [root]\n---\n\n# ${title}\n\nCommand stub. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`, then load only the files that router requests.\n\nRuntime: \`${KYRO_ROOT}/\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nCLI workflow: use the invocation already substituted in runtime modes (\`status\`, \`doctor --artifacts\`, \`analyze\`, \`repair\`, \`close-sprint\`).\nInstall/update Kyro: only via the full npm package (\`npx kyro-ai install …\` or global \`kyro install\`). Do not treat \`${KYRO_ROOT}\` as the install source.\n\nDo not ask the user to restate this workflow in natural language.\n`;
+  const packageVersion = readPackageVersion();
+  const cli = resolveKyroInvocation().raw;
+  return `---\nname: kyro-${command}\ndescription: ${description}\nlicense: Apache-2.0\nmetadata:\n  author: synapsync\n  version: "1.0"\n  runtimeVersion: "${packageVersion}"\n  scope: [root]\n---\n\n# ${title}\n\nCommand stub. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`, then load only the files that router requests.\n\nRuntime package: ${packageVersion}\nRuntime: \`${KYRO_ROOT}/\`\nCLI: \`${cli}\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nAlways prefer this projected runtime over any host plugin cache path (older version trees under plugin caches are not the SoT).\n\nCLI workflow: invoke via the CLI line above (or the same form in runtime modes): \`status\`, \`doctor --artifacts\`, \`analyze\`, \`scenario add|link\`, \`record-evidence\`, \`review\`, \`repair\`, \`close-sprint\`, \`plan --from\`.\nInstall/update Kyro: only via the full npm package (\`npx kyro-ai install …\` or global \`kyro install\`). Do not treat \`${KYRO_ROOT}\` as the install source.\n\nDo not ask the user to restate this workflow in natural language.\n`;
+}
+
+/** Extract metadata.runtimeVersion from a projected skill stub body (null if absent/unparseable). */
+export function parseSkillRuntimeVersion(skillMarkdown: string): string | null {
+  const match = skillMarkdown.match(/^\s*runtimeVersion:\s*["']?([^"'#\n]+?)["']?\s*$/m);
+  if (!match) return null;
+  const value = match[1]?.trim();
+  return value ? value : null;
 }
 
 function getCommandDescription(command: KyroCommandName): string {

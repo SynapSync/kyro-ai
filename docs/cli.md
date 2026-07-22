@@ -116,7 +116,7 @@ Install/sync probe PATH once, write the result into the **runtime manifest**, an
 
 **Safe from either root (including the projected runtime CLI):**
 
-- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `record-evidence`, `review`, `context-pack`, and other scope workflow commands
+- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `record-evidence`, `review`, `scenario add|link`, `context-pack`, and other scope workflow commands
 
 Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai@latest` remedy.
 
@@ -413,6 +413,32 @@ Unknown ids fail with `DEBT_NOT_FOUND`. Run `kyro status debt` to inspect the re
 ## Tool-owned emergent-task append (`kyro add-emergent`)
 
 `kyro add-emergent --title <t> --description <d> --acceptance <a> [--acceptance <a> ...] [--file <p> ...] [--context <c>] [--depends-on <id> ...] [--kyro-scope <scope>] [--dry-run]` appends a task to `activeSprint.emergentTasks[]` deterministically, so the agent never hand-edits `sprint.json` for required work discovered mid-sprint. `--title`, `--description`, and at least one `--acceptance` are required. The new task gets a fresh, never-reused `E<N>` id, `status: pending`, `evidence: null`, `verdict: null` — `kyro record-evidence` and `kyro review` then operate on it exactly like a phase task. Each `--depends-on` must reference an existing task id (phase or emergent) already in the sprint, or the command refuses with `TASK_NOT_FOUND`; with no active sprint it refuses with `NO_ACTIVE_SPRINT`. Nothing is written on refusal.
+
+## Tool-owned scenario graph (`kyro scenario`)
+
+After a sprint is active, agents refine the requirement→scenario→task graph without hand-editing `sprint.json`:
+
+```bash
+kyro scenario add --id S10 --requirement R1 --given "…" --when "…" --then "…" [--kyro-scope <scope>] [--dry-run]
+kyro scenario link --task T1.2 --scenario S10 [--kyro-scope <scope>] [--dry-run]
+```
+
+- **`add`** appends to `spec.scenarios`. The requirement id must already exist; scenario ids must be unique.
+- **`link`** appends to an active-sprint task's `scenario_refs` (phase or emergent). Unknown task/scenario ids refuse with zero write.
+
+Prefer these over whole-file mutate when analyze flags coverage gaps mid-sprint. See [spec-traceability.md](spec-traceability.md) for closed-sprint coverage (historical refs from ledger checkpoints do not re-fire MEDIUM after close).
+
+## Tool-owned ADR append (`kyro adr add`)
+
+```bash
+kyro adr add --title "…" --context "…" --decision "…" \
+  --consequence "…" [--consequence "…"] \
+  --alternative "…" [--alternative "…"] \
+  [--id ADR-0001] [--status accepted|proposed|rejected|superseded] [--date YYYY-MM-DD] \
+  [--kyro-scope <scope>] [--dry-run]
+```
+
+Appends a full v4 `AdrRecord` to `sprint.adrs[]`. Prefer this over hand-editing ADR prose. Incomplete ADR objects fail validation with a full example shape and a `kyro adr add` remedy.
 
 ## Tool-owned scope bootstrap and sprint planning (`kyro plan`)
 
