@@ -10,7 +10,7 @@
 //     marker routing to clarify, SPRINT_ALREADY_ACTIVE refusal, wrong sprint.n, bad depends_on /
 //     scenario_refs references, and --dry-run.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +26,7 @@ function sandbox() {
   const root = join(tmpdir(), `kyro-plan-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   mkdirSync(join(root, '.home'), { recursive: true });
   mkdirSync(join(root, '.agents/kyro'), { recursive: true });
+  // Seed legacy monolito; plan registry writes migrate to project.json + local.json.
   writeFileSync(
     kyroJsonPath(root),
     `${JSON.stringify(
@@ -48,6 +49,14 @@ function kyroJsonPath(root) {
   return join(root, '.agents/kyro/kyro.json');
 }
 
+function projectJsonPath(root) {
+  return join(root, '.agents/kyro/project.json');
+}
+
+function localJsonPath(root) {
+  return join(root, '.agents/kyro/local.json');
+}
+
 function sprintPath(root, scope) {
   return join(root, `.agents/kyro/scopes/${scope}/sprint.json`);
 }
@@ -56,7 +65,27 @@ function readSprint(root, scope) {
   return JSON.parse(readFileSync(sprintPath(root, scope), 'utf-8'));
 }
 
+/** Effective project state: layered merge when present, else legacy monolito. */
 function readKyroJson(root) {
+  const projectPath = projectJsonPath(root);
+  const localPath = localJsonPath(root);
+  if (existsSync(projectPath) || existsSync(localPath)) {
+    const shared = existsSync(projectPath)
+      ? JSON.parse(readFileSync(projectPath, 'utf-8'))
+      : { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [] };
+    const local = existsSync(localPath)
+      ? JSON.parse(readFileSync(localPath, 'utf-8'))
+      : { schemaVersion: 4, activeScope: null, installedAdapters: [] };
+    return {
+      schemaVersion: 4,
+      artifactRoot: shared.artifactRoot ?? '.agents/kyro/scopes',
+      scopes: shared.scopes ?? [],
+      activeScope: local.activeScope ?? null,
+      runtimePath: local.runtimePath ?? '~/.agents/kyro/current',
+      installedAdapters: local.installedAdapters ?? [],
+      ...(shared.principles !== undefined ? { principles: shared.principles } : {}),
+    };
+  }
   return JSON.parse(readFileSync(kyroJsonPath(root), 'utf-8'));
 }
 

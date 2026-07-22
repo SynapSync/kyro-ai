@@ -1,17 +1,16 @@
-import { existsSync, writeFileSync } from 'node:fs';
-import { ARTIFACT_ROOT, KYRO_STATE_PATH } from '../constants';
+import { existsSync } from 'node:fs';
+import { ARTIFACT_ROOT, KYRO_PROJECT_ROOT } from '../constants';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
 import { resolveManagedPath } from '../fs';
-import { readProjectState } from '../state';
+import { readProjectState, updateProjectStateLayers } from '../state';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved } from '../core/trace';
 import { inspectScope } from './artifact-doctor';
 import { listScopeNames } from '../artifacts/scopes';
 import type { KyroProjectState } from '../types';
-import { assertStateWriterLeaseHealthy } from '../pipeline/state-writer-lock';
 
 export function runScopeCommand(args: string[]): void {
   const [subcommand = '', maybeScope = ''] = args;
@@ -81,7 +80,13 @@ function printScopeSummary(scope: string): void {
 
 function setActiveScope(scope: string, yes: boolean, dryRun: boolean): void {
   const state = readProjectState();
-  if (!state) throw new KyroCoreError('INVALID_INPUT', `Kyro project state not found: ${KYRO_STATE_PATH}`, 'Run kyro install to create it.');
+  if (!state) {
+    throw new KyroCoreError(
+      'INVALID_INPUT',
+      `Kyro project state not found under ${KYRO_PROJECT_ROOT}/`,
+      'Run kyro install --init-workspace to create project state.',
+    );
+  }
   if (!scopeExists(scope, state)) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see available scopes.');
   const guard = evaluateGuard('scope_set_active', { surface: 'cli', scope, confirmed: yes });
   if (guard.kind === 'blocked') {
@@ -93,18 +98,24 @@ function setActiveScope(scope: string, yes: boolean, dryRun: boolean): void {
     throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
   }
   const scopes = [...state.scopes];
+  let scopesChanged = false;
   if (!scopes.some((entry) => entry.id === scope)) {
     scopes.push({ id: scope, title: scope, status: 'active' });
+    scopes.sort((a, b) => a.id.localeCompare(b.id));
+    scopesChanged = true;
   }
-  scopes.sort((a, b) => a.id.localeCompare(b.id));
-  const nextState: KyroProjectState = { ...state, scopes, activeScope: scope };
   if (dryRun) {
     console.log(`Would set active Kyro scope to: ${scope}`);
     return;
   }
   emitGateApproved(scope, 'scope_set_active');
-  assertStateWriterLeaseHealthy();
-  writeFileSync(resolveManagedPath(KYRO_STATE_PATH), `${JSON.stringify(nextState, null, 2)}\n`, 'utf-8');
+  // Layer-targeted: activeScope → local only; scopes registry → shared only when the entry was added.
+  // Monolito-only workspaces migrate to layers on first personal write.
+  if (scopesChanged) {
+    updateProjectStateLayers({ scopes, activeScope: scope });
+  } else {
+    updateProjectStateLayers({ activeScope: scope });
+  }
   console.log(`Active Kyro scope set to: ${scope}`);
 }
 

@@ -243,6 +243,85 @@ export function writeProjectLayersUnlocked(layers: ProjectLayerWrite): void {
   if (layers.local) writeLocalProjectStateUnlocked(layers.local);
 }
 
+/** Partial update applied on top of the current effective project state. */
+export interface ProjectStateLayerUpdate {
+  scopes?: KyroScopeEntry[];
+  activeScope?: string | null;
+  installedAdapters?: KyroInstalledAdapter[];
+  principles?: Principle[];
+  team?: TeamPolicy;
+  artifactRoot?: string;
+  runtimePath?: string;
+}
+
+/**
+ * Apply a partial update to the correct layer(s). Never writes monolito.
+ *
+ * - When layered files are missing but monolito exists: split the merged next state into layers,
+ *   write both, archive monolito.
+ * - When layers exist: write only the layers touched by the update (shared for scopes/principles/team/
+ *   artifactRoot; local for activeScope/installedAdapters/runtimePath).
+ * - When neither exists: create both layers from the update merged with defaults.
+ */
+export function updateProjectStateLayers(update: ProjectStateLayerUpdate): void {
+  withStateWriterLock(() => updateProjectStateLayersUnlocked(update));
+}
+
+export function updateProjectStateLayersUnlocked(update: ProjectStateLayerUpdate): void {
+  assertStateWriterLeaseHealthy();
+  const current = readProjectState();
+  const base: KyroProjectState = current ?? {
+    schemaVersion: 4,
+    artifactRoot: ARTIFACT_ROOT,
+    scopes: [],
+    activeScope: null,
+    runtimePath: KYRO_ROOT,
+    installedAdapters: [],
+  };
+  const next: KyroProjectState = {
+    ...base,
+    ...(update.artifactRoot !== undefined ? { artifactRoot: update.artifactRoot } : {}),
+    ...(update.scopes !== undefined ? { scopes: update.scopes } : {}),
+    ...(update.activeScope !== undefined ? { activeScope: update.activeScope } : {}),
+    ...(update.installedAdapters !== undefined ? { installedAdapters: update.installedAdapters } : {}),
+    ...(update.runtimePath !== undefined ? { runtimePath: update.runtimePath } : {}),
+    ...(update.principles !== undefined ? { principles: update.principles } : {}),
+    ...(update.team !== undefined ? { team: update.team } : {}),
+  };
+
+  const touchShared =
+    update.scopes !== undefined
+    || update.principles !== undefined
+    || update.team !== undefined
+    || update.artifactRoot !== undefined;
+  const touchLocal =
+    update.activeScope !== undefined
+    || update.installedAdapters !== undefined
+    || update.runtimePath !== undefined;
+
+  const { shared, local } = splitMonolitoToLayers(next);
+
+  if (!hasLayeredProjectStateOnDisk()) {
+    writeProjectLayersUnlocked({ shared, local });
+    archiveMonolitoIfPresentUnlocked();
+    return;
+  }
+
+  if (touchShared) writeSharedProjectStateUnlocked(shared);
+  if (touchLocal) writeLocalProjectStateUnlocked(local);
+  // If update is empty, still a no-op; callers always pass at least one field.
+  if (!touchShared && !touchLocal) {
+    writeProjectLayersUnlocked({ shared, local });
+  }
+}
+
+function archiveMonolitoIfPresentUnlocked(): void {
+  if (!workspacePathExists(KYRO_STATE_PATH)) return;
+  const from = assertSafeManagedPath(KYRO_STATE_PATH);
+  const to = assertSafeManagedPath(KYRO_STATE_MIGRATED_PATH);
+  renameSync(from, to);
+}
+
 // ---------------------------------------------------------------------------
 // Sanitizers / normalizers
 // ---------------------------------------------------------------------------
