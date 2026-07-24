@@ -464,8 +464,8 @@ Appends a full v4 `AdrRecord` to `sprint.adrs[]`. Prefer this over hand-editing 
 
 `kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]` is tool-owned and validated, so the agent never hand-authors the full v4 `sprint.json` document. It has two modes, **auto-detected from the resolved scope's state** — not from the `--from` file's shape:
 
-- **Init mode** — the scope has no `sprint.json` yet. Materializes the scope's initial `sprint.json` (spec + roadmap, `activeSprint: null`) from a compact lean plan JSON file. Refuses with `SCOPE_ALREADY_INITIALIZED` if the scope already has a `sprint.json` (never overwrites). Also registers the scope in the shared scopes registry on `project.json` (and sets local `activeScope` if unset).
-- **Sprint mode** — the scope's `sprint.json` exists, `activeSprint` is `null`, and `handoff.nextAction === 'plan_sprint'`. Materializes the next `activeSprint` (all tasks `pending`, `evidence: null`, `verdict: null`) from a lean sprint-plan JSON file. Writes only `sprint.json`. Refuses with `SPRINT_ALREADY_ACTIVE` if a sprint is already active, or `NOT_READY_TO_PLAN` if the handoff isn't at `plan_sprint` yet (e.g. still `clarify`).
+- **Init mode** — the scope has no `sprint.json` yet. Materializes the scope's initial `sprint.json` (spec + roadmap, `activeSprint: null`) from a compact lean plan JSON file. Refuses with `SCOPE_ALREADY_INITIALIZED` if the scope already has a `sprint.json` (never overwrites). Also registers the scope in the shared scopes registry on `project.json` (and sets local `activeScope` if unset). When either `git config user.name` or a schema-valid `user.email` resolves, writes optional `sprint.json.author` (`name?`, `email?`, `source: "git"`, `capturedAt`) with the available fields; drops malformed emails and omits the field when nothing usable remains. Author is best-effort only and **never blocks init**. Author is **not** accepted from the lean file.
+- **Sprint mode** — the scope's `sprint.json` exists, `activeSprint` is `null`, and `handoff.nextAction === 'plan_sprint'`. Materializes the next `activeSprint` (all tasks `pending`, `evidence: null`, `verdict: null`) from a lean sprint-plan JSON file. Writes only `sprint.json` and **preserves** any existing `author`. Refuses with `SPRINT_ALREADY_ACTIVE` if a sprint is already active, or `NOT_READY_TO_PLAN` if the handoff isn't at `plan_sprint` yet (e.g. still `clarify`).
 
 `[NEEDS CLARIFICATION]` markers are allowed in both modes' output (they legitimately route `handoff.nextAction` to `clarify`); this is separate from the O5 clarification gate on execute-phase commands.
 
@@ -492,7 +492,18 @@ Lean plan file shape:
 }
 ```
 
-`scope` may be omitted from the file if `--kyro-scope` is given (and vice versa); if both are present they must agree. `spec` is optional; missing sub-arrays default to `[]`. `spec.scenarios` is never read from this file — init always writes `scenarios: []` (sprint mode adds scenarios later). Every `roadmap.sprints[]` entry needs `n`, `slug`, `title`; `roadmap.plannedSprintCount` must equal `roadmap.sprints.length`.
+`scope` may be omitted from the file if `--kyro-scope` is given (and vice versa); if both are present they must agree. `spec` is optional; missing sub-arrays default to `[]`. `spec.scenarios` is never read from this file — init always writes `scenarios: []` (sprint mode adds scenarios later). Every `roadmap.sprints[]` entry needs `n`, `slug`, `title`; `roadmap.plannedSprintCount` must equal `roadmap.sprints.length`. Do not put `author` in the lean file — the CLI captures it from git at write time when available. Example written field:
+
+```json
+"author": {
+  "name": "Ada Lovelace",
+  "email": "ada@example.com",
+  "source": "git",
+  "capturedAt": "2026-07-24T18:30:00.000Z"
+}
+```
+
+`kyro scope inspect` and `kyro status full` surface author when present; `status brief` does not.
 
 ### Sprint mode
 

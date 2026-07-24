@@ -3,6 +3,7 @@ import { ARTIFACT_ROOT, KYRO_PROJECT_ROOT } from '../constants';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
+import { formatScopeAuthor } from '../core/actor';
 import { resolveManagedPath } from '../fs';
 import { readProjectState, updateProjectStateLayers } from '../state';
 import { KyroCoreError } from '../core/errors';
@@ -68,6 +69,9 @@ function printScopeSummary(scope: string): void {
   console.log(`Scope: ${scope}`);
   if (sprint) {
     console.log(`Status: ${sprint.status}`);
+    if (sprint.author) {
+      console.log(`Author: ${formatScopeAuthor(sprint.author)}`);
+    }
     console.log(`Active sprint: ${sprint.activeSprint ? `${sprint.activeSprint.n} — ${sprint.activeSprint.slug}` : 'none'}`);
     console.log(`Next action: ${sprint.handoff.nextAction}`);
     console.log(`Next task: ${sprint.handoff.nextTaskId ?? 'none'}`);

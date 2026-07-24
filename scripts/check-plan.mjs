@@ -89,12 +89,50 @@ function readKyroJson(root) {
   return JSON.parse(readFileSync(kyroJsonPath(root), 'utf-8'));
 }
 
-function run(args, root) {
+/**
+ * Isolate git identity from the host machine so author capture is deterministic.
+ * Pass `gitConfig` as a path to a gitconfig file (with user.name/email) to enable author.
+ * Default: empty global + no system config → no author.
+ */
+function run(args, root, { gitConfig = null } = {}) {
+  const emptyConfig = join(root, '.home', 'gitconfig-empty');
+  if (!existsSync(emptyConfig)) writeFileSync(emptyConfig, '');
   return spawnSync(process.execPath, [cli, ...args], {
     cwd: root,
-    env: { ...process.env, HOME: join(root, '.home') },
+    env: {
+      ...process.env,
+      HOME: join(root, '.home'),
+      GIT_CONFIG_GLOBAL: gitConfig ?? emptyConfig,
+      GIT_CONFIG_SYSTEM: emptyConfig,
+      GIT_CONFIG_NOSYSTEM: '1',
+    },
     encoding: 'utf-8',
   });
+}
+
+function writeGitConfig(root, { name, email } = {}) {
+  const path = join(root, '.home', 'gitconfig-author');
+  const body = ['[user]'];
+  if (name !== undefined) body.push(`\tname = ${name}`);
+  if (email !== undefined) body.push(`\temail = ${email}`);
+  writeFileSync(path, `${body.join('\n')}\n`);
+  return path;
+}
+
+function assertAuthorShape(author, expectedName, expectedEmail) {
+  assert(author && typeof author === 'object', 'author must be an object');
+  if (expectedName === undefined) {
+    assert(!Object.hasOwn(author, 'name'), 'author.name must be omitted when not provided');
+  } else {
+    assert(author.name === expectedName, `author.name expected ${expectedName}, got ${author.name}`);
+  }
+  if (expectedEmail === undefined) {
+    assert(!Object.hasOwn(author, 'email'), 'author.email must be omitted when not provided');
+  } else {
+    assert(author.email === expectedEmail, `author.email expected ${expectedEmail}, got ${author.email}`);
+  }
+  assert(author.source === 'git', `author.source must be git, got ${author.source}`);
+  assert(typeof author.capturedAt === 'string' && !Number.isNaN(Date.parse(author.capturedAt)), 'author.capturedAt must be ISO-parseable');
 }
 
 function validLeanPlan(overrides = {}) {
@@ -187,6 +225,8 @@ function initScope(root, scope = 'demo-scope') {
     assert(Array.isArray(sprint.spec.scenarios) && sprint.spec.scenarios.length === 0, 'spec.scenarios must always be empty in init mode');
     assert(sprint.roadmap.plannedSprintCount === 2 && sprint.roadmap.sprints.length === 2, 'roadmap should match input');
     assert(sprint.roadmap.sprints.every((s) => s.state === 'planned'), 'roadmap sprints should be state: planned');
+    // Default sandbox isolates git config → author key must be omitted (not null).
+    assert(!Object.hasOwn(sprint, 'author'), 'author must be omitted when git identity is unavailable');
 
     const kyroJson = readKyroJson(root);
     assert(kyroJson.scopes.some((entry) => entry.id === 'demo-scope'), 'kyro.json should register the new scope');
@@ -300,6 +340,125 @@ function initScope(root, scope = 'demo-scope') {
     let sprintWritten = true;
     try { readSprint(root, 'demo-scope'); } catch { sprintWritten = false; }
     assert(!sprintWritten, 'dry-run must not write sprint.json');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 6b) Init with complete git identity captures optional sprint.json.author.
+{
+  const root = sandbox();
+  try {
+    const gitConfig = writeGitConfig(root, { name: 'Ada Lovelace', email: 'ada@example.com' });
+    const leanPath = writeLeanPlan(root, validLeanPlan({ scope: 'author-scope' }));
+    const result = run(['plan', '--from', leanPath], root, { gitConfig });
+    assert(result.status === 0, `plan with git identity should succeed: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'author-scope');
+    assertAuthorShape(sprint.author, 'Ada Lovelace', 'ada@example.com');
+    // Registry must not carry author (cache stays id/title/status only).
+    const kyroJson = readKyroJson(root);
+    const entry = kyroJson.scopes.find((s) => s.id === 'author-scope');
+    assert(entry && !Object.hasOwn(entry, 'author'), 'project scopes registry must not store author');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 6c) Partial git identity (name only) captures author without email.
+{
+  const root = sandbox();
+  try {
+    const gitConfig = writeGitConfig(root, { name: 'Only Name' });
+    const leanPath = writeLeanPlan(root, validLeanPlan({ scope: 'partial-author' }));
+    const result = run(['plan', '--from', leanPath], root, { gitConfig });
+    assert(result.status === 0, `plan with name-only git should succeed: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'partial-author');
+    assertAuthorShape(sprint.author, 'Only Name', undefined);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 6d) Partial git identity (email only) captures author without name.
+{
+  const root = sandbox();
+  try {
+    const gitConfig = writeGitConfig(root, { email: 'only@example.com' });
+    const leanPath = writeLeanPlan(root, validLeanPlan({ scope: 'partial-email' }));
+    const result = run(['plan', '--from', leanPath], root, { gitConfig });
+    assert(result.status === 0, `plan with email-only git should succeed: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'partial-email');
+    assertAuthorShape(sprint.author, undefined, 'only@example.com');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 6e) Sprint mode preserves author from init (immutable after create).
+{
+  const root = sandbox();
+  try {
+    const gitConfig = writeGitConfig(root, { name: 'Ada Lovelace', email: 'ada@example.com' });
+    const leanPath = writeLeanPlan(root, validLeanPlan({ scope: 'preserve-author' }));
+    const initResult = run(['plan', '--from', leanPath], root, { gitConfig });
+    assert(initResult.status === 0, `init should succeed: ${initResult.stdout}${initResult.stderr}`);
+    const afterInit = readSprint(root, 'preserve-author');
+    assertAuthorShape(afterInit.author, 'Ada Lovelace', 'ada@example.com');
+    const authorSnapshot = JSON.stringify(afterInit.author);
+
+    const sprintLean = writeLeanSprintPlan(root, validLeanSprintPlan());
+    // Sprint mode without git identity must still keep the stored author.
+    const sprintResult = run(['plan', '--from', sprintLean, '--kyro-scope', 'preserve-author'], root);
+    assert(sprintResult.status === 0, `sprint plan should succeed: ${sprintResult.stdout}${sprintResult.stderr}`);
+    const afterSprint = readSprint(root, 'preserve-author');
+    assert(JSON.stringify(afterSprint.author) === authorSnapshot, 'sprint mode must preserve author byte-for-byte');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 6f) Malformed author on disk fails validateSprintFile / doctor --artifacts.
+{
+  const root = sandbox();
+  try {
+    const leanPath = writeLeanPlan(root, validLeanPlan({ scope: 'bad-author' }));
+    const result = run(['plan', '--from', leanPath], root);
+    assert(result.status === 0, `init should succeed: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'bad-author');
+    sprint.author = { name: '', email: 'x@y.com', source: 'git', capturedAt: '2026-07-24T00:00:00.000Z' };
+    writeFileSync(sprintPath(root, 'bad-author'), `${JSON.stringify(sprint, null, 2)}\n`);
+    const doctorResult = run(['doctor', '--artifacts', '--kyro-scope', 'bad-author'], root);
+    assert(doctorResult.status !== 0, 'doctor --artifacts should fail on empty author.name');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 6g) Invalid git email alone must NOT block init — omit author entirely.
+{
+  const root = sandbox();
+  try {
+    const gitConfig = writeGitConfig(root, { email: 'not-an-email' });
+    const leanPath = writeLeanPlan(root, validLeanPlan({ scope: 'bad-git-email' }));
+    const result = run(['plan', '--from', leanPath], root, { gitConfig });
+    assert(result.status === 0, `init must succeed with invalid git email: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'bad-git-email');
+    assert(!Object.hasOwn(sprint, 'author'), 'author must be omitted when git email is schema-invalid');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 6h) Valid name + invalid git email: keep name, drop email, init succeeds.
+{
+  const root = sandbox();
+  try {
+    const gitConfig = writeGitConfig(root, { name: 'Ada', email: 'not-an-email' });
+    const leanPath = writeLeanPlan(root, validLeanPlan({ scope: 'name-bad-email' }));
+    const result = run(['plan', '--from', leanPath], root, { gitConfig });
+    assert(result.status === 0, `init must succeed with name + invalid email: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'name-bad-email');
+    assertAuthorShape(sprint.author, 'Ada', undefined);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -135,7 +135,7 @@ After INIT, a scope looks like:
 └── findings/            # write-only INIT analysis evidence
 ```
 
-`sprint.json` holds the objective, success criteria, roadmap, active sprint, debt, conventions, ADRs, and handoff routing. `archive/` receives a verbatim snapshot plus a human narrative each time a sprint closes.
+`sprint.json` holds the objective, success criteria, roadmap, active sprint, debt, conventions, ADRs, and handoff routing. When the scope is created via `kyro plan` and at least one of git `user.name` or a valid `user.email` is set, it also stores an optional immutable `author` (scope creator; present fields only; never blocks init). `archive/` receives a verbatim snapshot plus a human narrative each time a sprint closes.
 
 ## Verify
 
