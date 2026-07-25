@@ -373,6 +373,23 @@ export interface Handoff {
   lastUpdated: string;
 }
 
+/** Provenance of a captured scope creator identity. Extensible later (e.g. env, manual). */
+export type ScopeAuthorSource = 'git';
+
+/**
+ * Optional person who created the scope. Written only at init when at least one of git
+ * `user.name` or `user.email` is set. Present fields only — missing name or email is omitted,
+ * not empty. Immutable after write — later sprint plan/close must preserve it. Omitted (not null)
+ * when neither identity field is available or on pre-feature scopes.
+ */
+export interface ScopeAuthor {
+  name?: string;
+  email?: string;
+  source: ScopeAuthorSource;
+  /** ISO-8601 timestamp when identity was captured. */
+  capturedAt: string;
+}
+
 export interface SprintFile {
   schemaVersion: 4;
   scope: string;
@@ -381,6 +398,11 @@ export interface SprintFile {
   objective: string;
   /** Technology-agnostic, measurable outcomes for the scope (the WHAT/WHY layer). */
   successCriteria: string[];
+  /**
+   * Optional scope creator captured at init from git user.name and/or user.email.
+   * Omitted when neither is available or on pre-feature scopes.
+   */
+  author?: ScopeAuthor;
   /** Optional minimal spec layer for Requirement → Scenario → Task traceability. */
   spec?: Spec;
   /** Resolved ambiguities, appended one per accepted clarify answer. */

@@ -283,6 +283,12 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
   requireString(value, 'status', path, issues);
   requireString(value, 'objective', path, issues);
 
+  // author is optional (captured at init from git when available). Present-only so pre-feature
+  // scopes and sandboxes without git identity still validate.
+  if ('author' in value) {
+    validateScopeAuthor(value.author, path, 'author', issues);
+  }
+
   // successCriteria / clarifications are v4.1 additions — validate shape only if present so
   // scopes created before 4.1 (which omit them) are not failed by close-sprint's gate.
   if ('successCriteria' in value && !Array.isArray(value.successCriteria)) {
@@ -385,6 +391,34 @@ function validateSpec(value: unknown, path: string, prefix: string, issues: Vali
   }
   requireStringArrayField(value, 'nonGoals', path, issues, `${prefix}.nonGoals`);
   requireStringArrayField(value, 'openQuestions', path, issues, `${prefix}.openQuestions`);
+}
+
+function validateScopeAuthor(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { name?, email?, source, capturedAt } with at least one of name/email' });
+    return;
+  }
+  const hasName = 'name' in value;
+  const hasEmail = 'email' in value;
+  if (!hasName && !hasEmail) {
+    issues.push({ path, field: prefix, message: 'must include at least one of name or email' });
+  }
+  if (hasName) {
+    requireNonEmptyString(value, 'name', path, issues, `${prefix}.name`);
+  }
+  if (hasEmail) {
+    requireNonEmptyString(value, 'email', path, issues, `${prefix}.email`);
+    if (typeof value.email === 'string' && value.email.trim() !== '') {
+      const email = value.email.trim();
+      // Lightweight shape check only — not full RFC validation.
+      // Keep in sync with isPlausibleAuthorEmail in core/actor.ts (capture path uses the same rule).
+      if (!email.includes('@') || /\s/.test(email)) {
+        issues.push({ path, field: `${prefix}.email`, message: 'must look like an email (contain @, no whitespace)' });
+      }
+    }
+  }
+  requireLiteralSet(value, 'source', ['git'], path, issues, `${prefix}.source`);
+  requireIsoString(value, 'capturedAt', path, issues, `${prefix}.capturedAt`);
 }
 
 function validateSpecRequirement(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {

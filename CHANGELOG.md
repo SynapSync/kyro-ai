@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.36.0] - 2026-07-24
+
+### Added
+
+- **Optional scope `author` on init** — `kyro plan` (init mode) captures `sprint.json.author` from git `user.name` and/or a schema-valid `user.email` when at least one is set (`source: "git"`, `capturedAt`; present fields only). Malformed git email is dropped (name-only still captured when present). Omits the field when nothing usable remains. **Never blocks init** — author is best-effort enrichment only. Not accepted from the lean plan file. Sprint mode preserves an existing author. Surfaced on `kyro scope inspect` and `kyro status full`.
+
 ## [4.35.0] - 2026-07-22
 
 ### Added

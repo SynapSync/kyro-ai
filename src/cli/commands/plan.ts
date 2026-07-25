@@ -3,12 +3,13 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { resolveScopeAuthorFromGit } from '../core/actor';
 import { KyroCoreError } from '../core/errors';
 import { countClarificationMarkers } from '../core/analysis';
 import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
 import { emitToolCommandRun } from '../core/trace';
 import { readProjectState, updateProjectStateLayers } from '../state';
-import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
+import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, ScopeAuthor, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
 
 const KEBAB_CASE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SPEC_REQUIREMENT_PRIORITIES = ['must', 'should', 'could'] as const;
@@ -209,9 +210,14 @@ export function buildPlanInitPlan(scope: string, input: LeanPlanInput): { sprint
     sprints: input.roadmap.sprints.map((sprint) => ({ ...sprint, state: 'planned' })),
   };
 
+  // Best-effort scope creator from git. Optional enrichment only — never blocks init.
+  // resolveScopeAuthorFromGit never throws; still strip author if a draft would fail schema
+  // solely because of it (belt-and-suspenders so this feature cannot break plan).
+  const author = resolveScopeAuthorFromGit();
+
   // Compute markers on a draft with an empty handoff.note so the note text itself can never be
   // mistaken for a marker payload.
-  const draftSprint: SprintFile = {
+  const baseSprint: SprintFile = {
     schemaVersion: 4,
     scope,
     title: input.title,
@@ -229,6 +235,7 @@ export function buildPlanInitPlan(scope: string, input: LeanPlanInput): { sprint
     debt: [],
     handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: '', lastUpdated: today },
   };
+  const draftSprint = attachAuthorIfValid(baseSprint, author);
 
   const markers = countClarificationMarkers(draftSprint);
   const nextAction: NextAction = markers > 0 ? 'clarify' : 'plan_sprint';
@@ -243,6 +250,26 @@ export function buildPlanInitPlan(scope: string, input: LeanPlanInput): { sprint
 
   const plan: OperationPlan[] = [{ action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(sprint, null, 2)}\n` }];
   return { sprint, plan };
+}
+
+/**
+ * Attach optional author only when the resulting document still validates.
+ * If author is the sole cause of shape failure, drop it — this feature must never break plan init.
+ */
+function attachAuthorIfValid(base: SprintFile, author: ScopeAuthor | null): SprintFile {
+  if (!author) return base;
+  try {
+    const candidate: SprintFile = { ...base, author };
+    const issues = validateSprintFile(candidate, 'plan-init-draft');
+    if (issues.length === 0) return candidate;
+    const onlyAuthor = issues.every((issue) => issue.field === 'author' || issue.field.startsWith('author.'));
+    if (onlyAuthor) return base;
+    // Non-author issues on a draft we just built should be impossible for author attach;
+    // still prefer writing without author rather than inventing a failure path here.
+    return base;
+  } catch {
+    return base;
+  }
 }
 
 /**
@@ -660,11 +687,14 @@ function printPlanHelp(): void {
 Two modes, auto-detected from the resolved scope's state (not from the --from file shape):
   - init mode: no sprint.json yet for the scope. Materializes the scope's initial sprint.json
     (spec + roadmap, activeSprint: null). Also registers the scope in kyro.json (scopes[],
-    activeScope if unset).
+    activeScope if unset). When git user.name and/or a valid user.email is set, writes optional
+    sprint.json.author { name?, email?, source: "git", capturedAt } with usable fields only
+    (malformed email dropped). Omits author when nothing usable remains. Never blocks init —
+    author is best-effort only. Not accepted from the lean file (machine identity at write time).
   - sprint mode: sprint.json exists, activeSprint is null, and handoff.nextAction is "plan_sprint".
     Materializes the next activeSprint (phases/tasks all pending) from a lean sprint-plan file.
     Refuses with SPRINT_ALREADY_ACTIVE if a sprint is already active, or NOT_READY_TO_PLAN if the
-    handoff isn't at plan_sprint yet. Writes only sprint.json.
+    handoff isn't at plan_sprint yet. Writes only sprint.json (preserves existing author).
 Both modes are tool-owned and validated, so the agent never hand-writes the full v4 document.
 
 Init-mode lean plan file shape:

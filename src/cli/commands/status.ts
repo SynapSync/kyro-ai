@@ -1,13 +1,14 @@
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
+import { formatScopeAuthor } from '../core/actor';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { unregisteredScopeFolders } from '../core/scopes';
 import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
 import { ADR_STATUS } from '../types';
-import type { ActiveSprint, AdrRecord, AdrStatus, Debt, SprintFile, Task, TaskStatus } from '../types';
+import type { ActiveSprint, AdrRecord, AdrStatus, Debt, ScopeAuthor, SprintFile, Task, TaskStatus } from '../types';
 
 const STATUS_MODE = {
   BRIEF: 'brief',
@@ -109,6 +110,8 @@ interface TaskSummary {
 }
 
 interface FullStatusReport extends BriefStatusReport {
+  /** Scope creator when captured at init; null when absent (pre-feature or no git identity). */
+  author: ScopeAuthor | null;
   phaseSummary: PhaseSummary[];
   taskSummary: TaskSummary;
   reviewDebt: ReviewDebtItem[];
@@ -237,6 +240,7 @@ function buildFullStatusReport(scope: string, sprint: SprintFile): FullStatusRep
   const activeSprint = sprint.activeSprint;
   return {
     ...brief,
+    author: sprint.author ?? null,
     phaseSummary: activeSprint ? activeSprint.phases.map((phase) => {
       const counts = countTasksByStatus(phase.tasks);
       return {
@@ -367,6 +371,9 @@ function printBriefStatus(report: BriefStatusReport): void {
 
 function printFullStatus(report: FullStatusReport): void {
   printBriefStatus(report);
+  if (report.author) {
+    console.log(`Author: ${formatScopeAuthor(report.author)}`);
+  }
   if (report.phaseSummary.length > 0) {
     console.log('\nPhases:');
     for (const phase of report.phaseSummary) {
@@ -421,7 +428,7 @@ function printStatusHelp(): void {
 
 Modes:
   brief   Read-only summary of scope, active sprint, next action, debt, and review debt (default)
-  full    Brief report plus phase/task summary, review debt, and ADR summary
+  full    Brief report plus author (when present), phase/task summary, review debt, and ADR summary
   debt    Debt grouped by status and priority
 
 Notes:
