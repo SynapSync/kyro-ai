@@ -9,7 +9,7 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 | Path | Commit? | Owner | Contents |
 | ---- | ------- | ----- | -------- |
 | `.agents/kyro/project.json` | **Yes** | Team / shared | `schemaVersion`, `artifactRoot`, `scopes[]` registry cache, `principles[]`, optional `team` policy |
-| `.agents/kyro/local.json` | **No** | Personal / machine | `activeScope`, `installedAdapters`, optional `runtimePath` |
+| `.agents/kyro/local.json` | **No** | Personal / machine | `activeScope`, `installedAdapters`, optional `runtimePath`, optional `execution.minionEnabled` (L1 minion opt-in) |
 | `.agents/kyro/scopes/**` | **Yes** | Team | Per-scope `sprint.json`, archives, findings |
 | `.agents/kyro/.gitignore` | **Yes** (recommended) | Team | Written/updated by install/sync so local-only files stay untracked |
 | Legacy `.agents/kyro/kyro.json` | **No** | Migration only | Pre-layered monolito; dual-read until install archives it |

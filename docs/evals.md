@@ -83,3 +83,17 @@ The repository ships a seed suite under `fixtures/evals/` covering:
 - adapter filtering through `detect --agent opencode --json`.
 
 `npm run check` runs the suite through `check:eval`.
+
+## L0 Orchestrator–Minion manual eval checklist
+
+These are **protocol checks** for agents following the L0 minion path in execute/review modes. They are not automated `kyro eval` replay cases. See [orchestrator-minion-l0.md](orchestrator-minion-l0.md) and `skills/sprint-forge/assets/modes/execute-task.md`.
+
+| # | Check | Pass when |
+|---|-------|-----------|
+| 1 | SoT integrity | Minion path never hand-edits `sprint.json`, `project.json`, or `local.json` |
+| 2 | CLI-owned ledger | Evidence and review land only through `kyro record-evidence` and `kyro review` |
+| 3 | Blocked handoff | `blocked` status does not advance `handoff` to the next task without policy |
+| 4 | Subagent fallback | When the host cannot spawn workers, execute falls back to single-agent without failing |
+| 5 | Phase UX | "Run phase with minions" means orchestrator loops tasks — no minion owns the phase |
+
+Run manually after changing execute/review modes or the L0 docs.
