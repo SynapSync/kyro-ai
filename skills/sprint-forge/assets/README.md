@@ -31,6 +31,7 @@ Kyro assets are designed for progressive disclosure: load the router first, then
 | [analyzer.md](helpers/analyzer.md) | Scope analysis support |
 | [metrics.md](helpers/metrics.md) | Velocity & debt analytics from `sprint.json` |
 | [reviewer.md](helpers/reviewer.md) | Review classification |
+| [delegated-execution.md](helpers/delegated-execution.md) | L0/L1/L2 delegation protocol (lazy; load only when opt-in) |
 | [handoff.md](helpers/handoff.md) | Resume context in `sprint.json.handoff` |
 
 ## protocols/

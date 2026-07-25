@@ -47,9 +47,9 @@ By default the orchestrator executes tasks alone. **Delegates** are optional hos
 
 | Layer | Behavior |
 |-------|----------|
-| **L0** | Protocol in `execute-task` / `review-task` modes — user or orchestrator opts in per task; no new CLI flags |
-| **L1** | Personal `local.json` `execution.delegationEnabled` — `context-pack` surfaces `delegationEnabled`; modes load `delegates/implementer.md` or `delegates/checker.md` |
-| **L2** | Host-specific launchers (e.g. tmux + agent CLI) — reference patterns only; not part of core runtime |
+| **L0** | Modes stay slim routers; full protocol is lazy-loaded from `helpers/delegated-execution.md` when the user or orchestrator opts in per task — no new CLI flags |
+| **L1** | Personal `local.json` `execution.delegationEnabled` — `context-pack` surfaces `delegationEnabled`; modes load `delegated-execution.md` plus `delegates/implementer.md` or `delegates/checker.md` |
+| **L2** | Host-specific launchers (e.g. tmux + agent CLI) — documented in `delegated-execution.md`; not part of core runtime |
 
 | Aspect | Rule |
 |--------|------|
