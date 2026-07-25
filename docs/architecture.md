@@ -41,7 +41,7 @@ The orchestrator coordinates the full sprint lifecycle. It performs read-only an
 
 Skills provide domain knowledge that the orchestrator consumes. They are **loaded as instruction files** (the router reads `SKILL.md` and the routed mode), not spawned as subagents — the only Kyro agent is `orchestrator`. To generate or materialize a sprint, use `/kyro:forge` or the tool-owned `kyro plan --from` verb; never invoke `sprint-forge` through the Task/Agent tool.
 
-For an **opt-in L0 minion execution protocol** (delegate a single task to a worker without changing the default single-agent forge), see [orchestrator-minion-l0.md](orchestrator-minion-l0.md).
+For an **opt-in L0 minion execution protocol** (delegate a single task to a worker without changing the default single-agent forge), see [orchestrator-minion-l0.md](orchestrator-minion-l0.md). For **L1** personal opt-in (`local.json` flag + minion helpers), see [orchestrator-minion-l1.md](orchestrator-minion-l1.md).
 
 | Skill | Knowledge Domain |
 |-------|-----------------|

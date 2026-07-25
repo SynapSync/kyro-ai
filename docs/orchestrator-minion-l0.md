@@ -32,6 +32,8 @@ Kyro already has one agent (`orchestrator`). Skills and modes are instruction fi
 
 **Fallback** — if the host cannot spawn subagents, execute/review fall back to the existing single-agent path without failing.
 
+For **L1 opt-in** (`local.json` `execution.minionEnabled`), role helpers, and `context-pack` surfacing, see [orchestrator-minion-l1.md](orchestrator-minion-l1.md).
+
 ## Where it lives in the repo
 
 | Surface | Path |

@@ -21,7 +21,17 @@ Validate completed work and record the verdict through the Kyro checker tool.
 
 ## Opt-in checker minion (L0)
 
-**Default:** orchestrator reviews in this mode (steps 1–5). **Opt-in:** spawn a **fresh-context checker minion** when maker-checker separation or a clean second opinion is needed.
+**Default:** orchestrator reviews in this mode (steps 1–5). **Opt-in:** spawn a **fresh-context checker minion** when maker-checker separation or a clean second opinion is needed, or when `context-pack` reports `minionEnabled: true`.
+
+### L1 routing (`minionEnabled` from context-pack)
+
+When the task pack JSON includes `"minionEnabled": true`:
+
+1. Load `../minions/checker.md` — findings-only contract for the checker worker.
+2. Follow the L0 checker rules below; materialize verdict only via `{{KYRO_CLI}} review`.
+3. If the host cannot spawn a subagent, fall back to orchestrator-led review (steps 1–5).
+
+When `minionEnabled` is `false` or absent, use steps 1–5 only (L0 checker minion prose applies when the user explicitly requests it).
 
 ### When to use
 
@@ -52,7 +62,7 @@ The checker minion receives a brief from the task pack (same lean principle as e
 
 If subagents are unavailable, fall back to orchestrator-led review in this mode (steps 1–5).
 
-See also: `docs/orchestrator-minion-l0.md`.
+See also: `docs/orchestrator-minion-l0.md`, `docs/orchestrator-minion-l1.md`.
 
 ## Principles gate
 

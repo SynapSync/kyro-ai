@@ -310,6 +310,8 @@ It emits scope status, next action, roadmap and sprint summaries, next task, art
 
 Prefer `context-pack` over manual file selection at session start, after compaction, or when resuming a scope through summary-first routing.
 
+JSON packs include `minionEnabled` (boolean) from `local.json` `execution.minionEnabled` — `false` when unset. When `true`, execute/review modes load minion role helpers (see [orchestrator-minion-l1.md](orchestrator-minion-l1.md)).
+
 ## Artifact Integrity
 
 Use `kyro doctor --artifacts` to validate the project knowledge contract:

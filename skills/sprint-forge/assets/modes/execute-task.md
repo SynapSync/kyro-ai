@@ -18,7 +18,17 @@ Execute the active sprint task by task, recording evidence through the Kyro CLI.
 
 ## Opt-in minion execution (L0)
 
-**Default:** execute as a single agent (steps 1–3 above). **Opt-in:** when the user asks to run the current task with a minion/worker/subagent, delegate implementation to a worker and keep workflow ownership.
+**Default:** execute as a single agent (steps 1–3 above). **Opt-in:** when the user asks to run the current task with a minion/worker/subagent, or when `context-pack` reports `minionEnabled: true`, delegate implementation to a worker and keep workflow ownership.
+
+### L1 routing (`minionEnabled` from context-pack)
+
+When the task pack JSON includes `"minionEnabled": true`:
+
+1. Load `../minions/implementer.md` — role contract for the worker.
+2. Follow the L0 brief/status/write-matrix rules below.
+3. If the host cannot spawn a subagent, fall back to single-agent steps 1–3 (never fail).
+
+When `minionEnabled` is `false` or absent, use single-agent steps 1–3 only (L0 prose applies when the user explicitly asks for a minion anyway).
 
 ### When to use
 
@@ -86,7 +96,7 @@ If the worker dies mid-run: re-read the working tree and task state, then re-bri
 
 If the host cannot spawn a worker (no Task/subagent tool, spawn fails, or user did not opt in): **fall back silently** to the single-agent workflow (steps 1–3). Never block the forge because minions are unavailable.
 
-See also: `docs/orchestrator-minion-l0.md`.
+See also: `docs/orchestrator-minion-l0.md`, `docs/orchestrator-minion-l1.md`.
 
 ## Rules
 
