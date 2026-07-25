@@ -25,6 +25,27 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 | `scopes[]` | shared cache + disk | Presence SoT is folders under `scopes/`; install/sync rehydrates |
 | `activeScope` | local only | Personal — never on `project.json` |
 | `installedAdapters` | local only | Per-machine adapter records |
+| `execution.minionEnabled` | local only | L1 minion opt-in; default off; surfaced on `context-pack` JSON |
+
+### Minion opt-in (L1)
+
+Add to `.agents/kyro/local.json` (gitignored):
+
+```json
+{
+  "execution": {
+    "minionEnabled": true
+  }
+}
+```
+
+| Rule | Detail |
+|------|--------|
+| Default | Absent or `false` → single-agent forge |
+| Storage | **local.json only** — not `project.json` |
+| Verify | `kyro context-pack --json \| jq .minionEnabled` → `true` |
+
+Never auto-enable on install/sync. See [Architecture — Orchestrator–Minion](architecture.md#orchestrator-minion-protocol-opt-in).
 
 ## Clone bootstrap
 

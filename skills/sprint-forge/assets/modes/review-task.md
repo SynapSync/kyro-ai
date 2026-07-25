@@ -62,7 +62,7 @@ The checker minion receives a brief from the task pack (same lean principle as e
 
 If subagents are unavailable, fall back to orchestrator-led review in this mode (steps 1–5).
 
-See also: `docs/orchestrator-minion-l0.md`, `docs/orchestrator-minion-l1.md`.
+See also: `docs/architecture.md` (Orchestrator–Minion protocol), `docs/maker-checker.md` (checker minion).
 
 ## Principles gate
 

@@ -96,7 +96,25 @@ If the worker dies mid-run: re-read the working tree and task state, then re-bri
 
 If the host cannot spawn a worker (no Task/subagent tool, spawn fails, or user did not opt in): **fall back silently** to the single-agent workflow (steps 1–3). Never block the forge because minions are unavailable.
 
-See also: `docs/orchestrator-minion-l0.md`, `docs/orchestrator-minion-l1.md`.
+### L2 tmux host (optional)
+
+When you need process isolation, attach/detach, or a non-IDE agent CLI, use an **L2 host adapter** instead of in-process subagents:
+
+| Layer | When | Pattern |
+|-------|------|---------|
+| **L0/L1** | Default | In-process subagent (`Task` tool) or single-agent execute |
+| **L2** | Isolated shell, long runs, or alternate CLI | tmux (or similar) session + agent CLI + status JSON handoff |
+
+Consumer repos may ship a local launcher script (tmux + `agent --print` or `codex exec`). Flow:
+
+1. Orchestrator runs `kyro context-pack --task <id> --json`
+2. Launcher spawns tmux + agent (`agent --print` or `codex exec`)
+3. Minion writes `runs/<taskId>-status.json` (implementer contract)
+4. Orchestrator reads status, runs `record-evidence` and `review` via CLI only
+
+No new CLI flags — L2 is a consumer-repo script pattern, not a Kyro verb. Fallback to in-process or single-agent execute remains unchanged.
+
+See also: `docs/architecture.md` (Orchestrator–Minion protocol), `docs/context-management.md` (task packs), `docs/maker-checker.md` (checker minion).
 
 ## Rules
 

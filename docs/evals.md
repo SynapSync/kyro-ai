@@ -86,7 +86,7 @@ The repository ships a seed suite under `fixtures/evals/` covering:
 
 ## L0 Orchestrator–Minion manual eval checklist
 
-These are **protocol checks** for agents following the L0 minion path in execute/review modes. They are not automated `kyro eval` replay cases. See [orchestrator-minion-l0.md](orchestrator-minion-l0.md) and `skills/sprint-forge/assets/modes/execute-task.md`.
+These are **protocol checks** for agents following the minion path in execute/review modes. They are not automated `kyro eval` replay cases. Protocol summary: [Architecture — Orchestrator–Minion](architecture.md#orchestrator-minion-protocol-opt-in). Mode detail: `skills/sprint-forge/assets/modes/execute-task.md` and `review-task.md`.
 
 | # | Check | Pass when |
 |---|-------|-----------|
@@ -96,4 +96,4 @@ These are **protocol checks** for agents following the L0 minion path in execute
 | 4 | Subagent fallback | When the host cannot spawn workers, execute falls back to single-agent without failing |
 | 5 | Phase UX | "Run phase with minions" means orchestrator loops tasks — no minion owns the phase |
 
-Run manually after changing execute/review modes or the L0 docs.
+Run manually after changing execute/review modes or minion helpers.

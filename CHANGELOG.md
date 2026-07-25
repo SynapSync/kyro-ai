@@ -6,12 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Minion protocol in core docs** — L0/L1 behavior consolidated into `architecture.md`, `maker-checker.md`, `context-management.md`, `teams.md`, and `cli.md`; removed links to deleted standalone minion pages.
+
 ## [4.37.0] - 2026-07-25
 
 ### Added
 
-- **L0 Orchestrator–Minion execution protocol** — opt-in minion delegation documented on `execute-task` and `review-task` modes: lean brief from `context-pack --task`, structured status JSON, write matrix (orchestrator + CLI own workflow state), single-agent fallback when subagents are unavailable. Product overview in `docs/orchestrator-minion-l0.md` and manual eval checklist in `docs/evals.md`.
-- **L1 minion opt-in** — personal `local.json` `execution.minionEnabled` flag (default off), `minionEnabled` on `context-pack`, `minions/implementer` and `minions/checker` role helpers, and conditional mode routing when enabled. Documented in `docs/orchestrator-minion-l1.md`.
+- **L0 Orchestrator–Minion execution protocol** — opt-in minion delegation documented on `execute-task` and `review-task` modes: lean brief from `context-pack --task`, structured status JSON, write matrix (orchestrator + CLI own workflow state), single-agent fallback when subagents are unavailable. Overview in `docs/architecture.md`; manual eval checklist in `docs/evals.md`.
+- **L1 minion opt-in** — personal `local.json` `execution.minionEnabled` flag (default off), `minionEnabled` on `context-pack`, `minions/implementer` and `minions/checker` role helpers, and conditional mode routing when enabled. Documented in `docs/teams.md` and `docs/cli.md`.
 
 ## [4.36.0] - 2026-07-24
 

@@ -1,0 +1,37 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "context-pack-minion-disabled",
+  "title": "Context pack surfaces minionEnabled false from local.json overlay",
+  "kind": "replay",
+  "tags": [
+    "context-pack",
+    "routing",
+    "minion",
+    "happy"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "context-pack",
+        "--kyro-scope",
+        "demo",
+        "--task",
+        "T1.1",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "\"minionEnabled\": false",
+          "\"packMode\": \"task\"",
+          "\"taskId\": \"T1.1\""
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}

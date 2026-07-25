@@ -84,6 +84,19 @@ kyro review T1.1 --kyro-scope demo --verdict fail --finding critical:"Missing te
 
 When enabled, a `pass` where `verdict.by === evidence.by` is blocked as `SELF_REVIEW_BLOCKED`.
 
+## Checker minion (opt-in)
+
+During `review_task`, the orchestrator may spawn a **fresh-context checker minion** when maker-checker separation is needed or when `context-pack` reports `minionEnabled: true` (L1).
+
+| Rule | Detail |
+|------|--------|
+| Input | Lean brief from `kyro context-pack --task` — not full `sprint.json` |
+| Output | Findings-only JSON (`findings[]`, `checkedCriteria[]`, `notes`) — no verdict |
+| Verdict | **Only** `kyro review` writes `task.verdict` |
+| Self-review | The implementer minion must not be the checker when `requireSeparateChecker` applies |
+
+If subagents are unavailable, the orchestrator reviews in `review-task` mode directly. See [Architecture — Orchestrator–Minion](architecture.md#orchestrator-minion-protocol-opt-in).
+
 ## Error codes
 
 - `CONFIRMATION_REQUIRED` — a guarded operation needs explicit confirmation (only for review when `review_task` is set to `confirm` in policy).

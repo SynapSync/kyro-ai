@@ -43,4 +43,4 @@ Only `kyro review` materializes `task.verdict`.
 
 If no subagent is available, review in `review-task.md` single-agent mode (steps 1–5).
 
-See: `docs/orchestrator-minion-l0.md`, `docs/orchestrator-minion-l1.md`.
+See: `docs/architecture.md`, `docs/maker-checker.md`, `docs/context-management.md`.

@@ -58,4 +58,4 @@ The orchestrator (not the worker) invokes `{{KYRO_CLI}} record-evidence` and adv
 
 If you are the orchestrator running without a spawnable subagent, execute the task yourself per `execute-task.md` (single-agent path). Never fail the forge because minions are unavailable.
 
-See: `docs/orchestrator-minion-l0.md`, `docs/orchestrator-minion-l1.md`.
+See: `docs/architecture.md`, `docs/context-management.md`, `docs/maker-checker.md`.
