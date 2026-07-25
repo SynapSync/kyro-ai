@@ -37,7 +37,7 @@ The orchestrator interprets findings, may run additional checks, then invokes:
 - Pass: `{{KYRO_CLI}} review <task-id> --kyro-scope {scope} --verdict pass --yes`
 - Fail: `{{KYRO_CLI}} review <task-id> --kyro-scope {scope} --verdict fail --finding critical:"…" --yes`
 
-Only `kyro review` materializes `task.verdict`.
+Only `{{KYRO_CLI}} review` materializes `task.verdict`.
 
 ## Fallback
 

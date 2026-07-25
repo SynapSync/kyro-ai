@@ -107,7 +107,7 @@ When you need process isolation, attach/detach, or a non-IDE agent CLI, use an *
 
 Consumer repos may ship a local launcher script (tmux + `agent --print` or `codex exec`). Flow:
 
-1. Orchestrator runs `kyro context-pack --task <id> --json`
+1. Orchestrator runs `{{KYRO_CLI}} context-pack --task <id> --json`
 2. Launcher spawns tmux + agent (`agent --print` or `codex exec`)
 3. Delegate writes `runs/<taskId>-status.json` (implementer contract)
 4. Orchestrator reads status, runs `record-evidence` and `review` via CLI only

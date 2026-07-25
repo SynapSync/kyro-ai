@@ -58,7 +58,7 @@ The checker delegate receives a brief from the task pack (same lean principle as
 |------|--------|
 | Verdict write | **Only** `{{KYRO_CLI}} review` materializes `task.verdict` — the checker delegate does not hand-edit sprint state |
 | Self-review | The **same** delegate that implemented the task must **not** be the checker when maker-checker policy applies |
-| Orchestrator role | Interpret findings, run targeted checks if needed, then invoke `kyro review` with `--verdict pass` or `--finding critical:…` |
+| Orchestrator role | Interpret findings, run targeted checks if needed, then invoke `{{KYRO_CLI}} review` with `--verdict pass` or `--finding critical:…` |
 
 If subagents are unavailable, fall back to orchestrator-led review in this mode (steps 1–5).
 
