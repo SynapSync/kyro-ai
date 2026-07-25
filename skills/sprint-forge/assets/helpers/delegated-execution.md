@@ -1,6 +1,6 @@
 # Helper — Delegated execution (L0/L1/L2)
 
-Load **only** when the user opts into delegation or `context-pack` reports `delegationEnabled: true`. Keep single-agent execute/review as the default path.
+Load **only** when the user opts into delegation or `context-pack` reports `delegationEnabled: true`. Modes already state the hard safety contract (CLI owns SoT; worker never mutates workflow state); this file is the full protocol. Keep single-agent execute/review as the default path.
 
 ## L1 routing
 

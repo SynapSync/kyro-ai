@@ -6,11 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.38.0] - 2026-07-25
+
 ### Added
 
+- **`docs/delegation-flow.md`** — practical end-to-end overview (7 sections + Mermaid diagrams) from scope/sprint/task planning through execute/review with optional L0/L1 delegates; linked from architecture and getting-started.
 - **Delegation terminology** — rename `minion` / `minionEnabled` to `delegate` / `delegationEnabled`; move role helpers to `delegates/`; update docs, modes, CLI, and eval fixtures (`context-pack-delegation-*`).
-
 - **Delegation protocol in core docs** — L0/L1 behavior consolidated into `architecture.md`, `maker-checker.md`, `context-management.md`, `teams.md`, and `cli.md`.
+
+### Changed
+
+- **Delegation fail-safe on slim modes** — `execute-task` / `review-task` keep a hard safety contract on the opt-in path (must load protocol + role helpers; CLI owns SoT; no invented evidence/verdict) so L0/L1 still works if the lazy helper is skipped; orchestrator lists delegated-execution under Lazy Protocols.
+- **Slim execute/review modes under token budgets** — move full L0/L1/L2 protocol into lazy `helpers/delegated-execution.md` so eager `kyro-forge:execute` / `kyro-forge:review` runtime paths stay under doctor token ceilings.
+
+### Fixed
+
+- **Bare `kyro` CLI literals in sprint-forge assets** — use `{{KYRO_CLI}}` placeholders so `check:no-placeholder` and projected runtimes resolve the installed CLI path.
 
 ## [4.37.0] - 2026-07-25
 

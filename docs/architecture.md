@@ -65,7 +65,7 @@ By default the orchestrator executes tasks alone. **Delegates** are optional hos
 | Delegate | Edit product code, run validation, return status or findings JSON | Mutate `sprint.json` / project layers; self-approve review |
 | Kyro CLI | `record-evidence`, `review`, `plan`, `close-sprint`, … | — |
 
-Enable L1: set `execution.delegationEnabled: true` in `.agents/kyro/local.json` (see [Teams](teams.md)). Briefs come from `kyro context-pack --task` (see [Context Management](context-management.md)). Checker separation: [Maker/Checker](maker-checker.md). **Usage in forge:** [Getting started — Delegated execution](getting-started.md#delegated-execution-optional).
+Enable L1: set `execution.delegationEnabled: true` in `.agents/kyro/local.json` (see [Teams](teams.md)). Briefs come from `kyro context-pack --task` (see [Context Management](context-management.md)). Checker separation: [Maker/Checker](maker-checker.md). **Usage in forge:** [Getting started — Delegated execution](getting-started.md#delegated-execution-optional). **End-to-end diagrams (scope → sprint → task → delegate → review):** [Delegation flow](delegation-flow.md).
 
 | Skill | Knowledge Domain |
 |-------|-----------------|

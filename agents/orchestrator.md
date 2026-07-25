@@ -66,6 +66,7 @@ Load these only when the routed mode needs details:
 | validation tiers | `assets/protocols/validation.md` |
 | failure recovery | `assets/protocols/debug.md` |
 | gate copy | `assets/protocols/gates.md` |
+| delegated execute/review (opt-in) | `assets/helpers/delegated-execution.md` + `assets/delegates/{implementer,checker}.md` |
 
 ## Non-negotiables
 

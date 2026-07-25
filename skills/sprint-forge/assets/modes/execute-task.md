@@ -18,11 +18,12 @@ Execute the active sprint task, recording evidence through the Kyro CLI.
 
 ## Opt-in delegated execution
 
-**Default:** steps 1–3. **Opt-in** when the user asks to delegate or `delegationEnabled: true`:
+**Default:** steps 1–3. **Opt-in** when the user asks to delegate or pack `delegationEnabled: true`:
 
-1. Load `../helpers/delegated-execution.md` and `../delegates/implementer.md`.
-2. Lean brief from the task pack; only the orchestrator runs `record-evidence`.
-3. No subagent → fall back to steps 1–3 (never block the forge).
+1. **Must load** `../helpers/delegated-execution.md` and `../delegates/implementer.md` before spawning.
+2. Brief from the task pack only. Worker returns status JSON; **only the orchestrator** runs `record-evidence`.
+3. Worker must not edit `sprint.json`, invent evidence, or run plan/close/review CLI.
+4. Weak/`done` without validation → re-brief; do not invent evidence. No subagent → steps 1–3 (never block the forge).
 
 ## Rules
 
