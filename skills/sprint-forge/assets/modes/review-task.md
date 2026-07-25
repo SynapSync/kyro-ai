@@ -21,11 +21,11 @@ Validate completed work and record the verdict through the Kyro checker tool.
 
 ## Opt-in checker delegate
 
-**Default:** steps 1–5. **Opt-in** for maker-checker separation, independent review, or `delegationEnabled: true`:
+**Default:** steps 1–5. **Opt-in** for maker-checker, independent review, or pack `delegationEnabled: true`:
 
-1. Load `../helpers/delegated-execution.md` and `../delegates/checker.md` (findings only).
-2. Verdict only via `{{KYRO_CLI}} review`.
-3. No subagent → steps 1–5.
+1. **Must load** `../helpers/delegated-execution.md` and `../delegates/checker.md` before spawning.
+2. Checker returns findings only; **only** `{{KYRO_CLI}} review` writes `task.verdict`.
+3. Same maker must not be the checker when policy applies. No subagent → steps 1–5.
 
 ## Principles gate
 
