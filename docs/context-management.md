@@ -76,6 +76,33 @@ Prefer scope packs at session start. Prefer task packs when executing a specific
 
 If `--kyro-scope` is omitted, the command uses `activeScope` from layered project state (`local.json` / effective merge).
 
+### Task packs for delegate briefs
+
+When delegating to an implementer or checker delegate, the orchestrator builds the brief from a **task pack**, not the full `sprint.json`:
+
+```bash
+kyro context-pack --kyro-scope <scope> --task <id> --json
+```
+
+The pack includes task identity, `files_to_touch`, acceptance criteria, conventions, and routing fields. JSON also includes `delegationEnabled` from `local.json` `execution.delegationEnabled` (`false` when unset). When `true`, execute/review modes load `delegates/implementer.md` or `delegates/checker.md`.
+
+**Implementer status contract** (returned to orchestrator):
+
+```json
+{
+  "taskId": "T1.1",
+  "status": "done",
+  "summary": "...",
+  "filesChanged": ["path/..."],
+  "validation": { "ran": true, "command": "...", "ok": true },
+  "blockers": []
+}
+```
+
+The orchestrator maps `done` + valid validation → `kyro record-evidence`; `blocked` → evidence with `--status blocked`. Delegates must not run `record-evidence` or `review` themselves.
+
+See [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in) and [CLI — Context Pack](cli.md#context-pack).
+
 ---
 
 ## Search Output Guard

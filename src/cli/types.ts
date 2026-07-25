@@ -50,10 +50,10 @@ export interface TeamPolicy {
   recommendedAdapters?: string[];
 }
 
-/** Personal execution preferences on the local overlay (L1 minion opt-in). */
+/** Personal execution preferences on the local overlay (L1 delegation opt-in). */
 export interface ExecutionPreferences {
-  /** When true, execute/review modes load minion role helpers. Default false when absent. */
-  minionEnabled?: boolean;
+  /** When true, execute/review modes load delegate role helpers. Default false when absent. */
+  delegationEnabled?: boolean;
 }
 
 /**
@@ -68,7 +68,7 @@ export interface ExecutionPreferences {
  * | scopes             | shared cache + disk rehydrate | Presence SoT is scopes/ folders |
  * | activeScope        | **local only**                | Never on shared (git thrash) |
  * | installedAdapters  | **local only**                | Per-machine adapter install records |
- * | execution          | **local only**                | Personal minion opt-in (L1); default off |
+ * | execution          | **local only**                | Personal delegation opt-in (L1); default off |
  * | runtimePath        | effective default / local     | Informational; not a git conflict surface |
  * | kyroInvocation     | **neither** (global only)     | `~/.agents/kyro/current/manifest.json` |
  *
@@ -95,7 +95,7 @@ export interface KyroLocalProjectState {
   installedAdapters: KyroInstalledAdapter[];
   /** Optional informational runtime path; defaults to global current when absent. */
   runtimePath?: string;
-  /** Optional personal execution preferences (minion opt-in). */
+  /** Optional personal execution preferences (delegation opt-in). */
   execution?: ExecutionPreferences;
 }
 
@@ -667,6 +667,6 @@ export interface ContextPackOutput {
   reasoningTier: ReasoningTier;
   maxContextTokens: number;
   budgetGuidance: string;
-  /** Personal minion opt-in from local.json execution.minionEnabled (false when unset). */
-  minionEnabled: boolean;
+  /** Personal delegation opt-in from local.json execution.delegationEnabled (false when unset). */
+  delegationEnabled: boolean;
 }

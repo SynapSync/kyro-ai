@@ -124,6 +124,109 @@ Kyro routes progressively:
 4. route on `sprint.json.handoff.nextAction` and load only the required mode: INIT, clarify, plan, execute, review, close, done, or recover
 5. record task evidence and status through **tool-owned CLI verbs** during execution (`record-evidence`, then `review` for the checker verdict — **no hand-editing** of `sprint.json`), then close via `close-sprint`
 
+## Delegated execution (optional)
+
+By default, `/kyro:forge` runs as a **single agent**: the orchestrator implements, records evidence, and reviews. You can opt in to **delegated execution** so a host subagent implements or reviews **one task** while the orchestrator keeps ownership of `sprint.json` through the Kyro CLI.
+
+There is **no** separate slash command or CLI verb such as `kyro delegate`. Activation is configuration plus natural language inside forge.
+
+### Activation
+
+| Layer | How to enable | Effect |
+| ----- | ------------- | ------ |
+| **L1 (automatic)** | Set `execution.delegationEnabled: true` in `.agents/kyro/local.json` | `context-pack` surfaces `delegationEnabled: true`; execute/review modes load delegate role helpers |
+| **L0 (per task)** | Ask in chat during forge (even when L1 is off) | Orchestrator follows the delegation protocol for that task only |
+
+L1 example (personal, gitignored):
+
+```json
+{
+  "schemaVersion": 4,
+  "activeScope": "my-scope",
+  "execution": {
+    "delegationEnabled": true
+  }
+}
+```
+
+Verify:
+
+```bash
+node ~/.agents/kyro/current/dist/cli.js context-pack \
+  --kyro-scope my-scope --task T1.1 --json | jq .delegationEnabled
+# → true
+```
+
+Full field contract: [Teams — Delegation opt-in](teams.md#delegation-opt-in-l1). Protocol detail: [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in).
+
+### How to tell the agent to run task X with a delegate
+
+Entry point is still **`/kyro:forge`** (or `kyro-forge`). Name the scope and task id.
+
+**With L1 enabled** — delegation is automatic during `execute_task`:
+
+```text
+/kyro:forge
+
+Continue scope my-scope. Execute task T1.1.
+```
+
+**Without L1** — ask explicitly:
+
+```text
+/kyro:forge
+
+Scope: my-scope
+Execute task T1.1 with a delegate implementer.
+Load delegates/implementer.md. You orchestrate record-evidence and review via CLI.
+```
+
+**Checker delegate during review:**
+
+```text
+/kyro:forge
+
+Review task T1.1 with a fresh checker delegate (delegates/checker.md).
+You apply findings through kyro review — the delegate does not touch sprint.json.
+```
+
+### What each role does
+
+| Role | Does | Does not |
+| ---- | ---- | -------- |
+| **Orchestrator** | `context-pack`, brief, spawn delegate, `record-evidence`, `review`, handoff | Delegate all sprint ownership |
+| **Implementer delegate** | Product code, scoped validation, status JSON | `record-evidence`, `review`, edit `sprint.json` |
+| **Checker delegate** | Independent review, findings JSON | Self-approve; mutate project state |
+
+One task = one implementer delegate. "Run the phase with delegates" means the orchestrator **loops** tasks — no delegate owns a whole phase.
+
+### Typical CLI checks before delegating
+
+```bash
+node ~/.agents/kyro/current/dist/cli.js status --kyro-scope my-scope
+node ~/.agents/kyro/current/dist/cli.js context-pack \
+  --kyro-scope my-scope --task T1.1 --json
+```
+
+The task pack (`taskDescription`, `taskFiles`, acceptance criteria, `delegationEnabled`) is the brief source — not the full `sprint.json`.
+
+### Copy-paste orchestrator prompt
+
+```text
+/kyro:forge
+
+Scope: my-scope
+Runtime: node ~/.agents/kyro/current/dist/cli.js
+
+Execute T1.1 with delegate implementer.
+1. context-pack --task T1.1
+2. Spawn delegate per delegates/implementer.md (one task, one delegate)
+3. Delegate returns status JSON only
+4. You: record-evidence T1.1, then review T1.1
+```
+
+If the host cannot spawn subagents, the orchestrator falls back to single-agent execution — forge does not fail.
+
 ## Scope output
 
 After INIT, a scope looks like:
@@ -151,7 +254,8 @@ Use the **full npm package** (`npx kyro-ai@latest` or a global `kyro` from `npm 
 ## Next steps
 
 - [CLI](cli.md)
-- [Teams & multi-dev](teams.md)
+- [Teams & multi-dev](teams.md) — includes `delegationEnabled` in `local.json`
+- [Delegated execution](getting-started.md#delegated-execution-optional) — activate and prompt the orchestrator
 - [Agent adapters](agent-adapters.md)
 - [Commands reference](commands-reference.md)
 - [Architecture](architecture.md)

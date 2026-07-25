@@ -93,6 +93,31 @@ At each gate, the orchestrator presents a summary and waits for your decision:
 | `adjust` | Modify the output before continuing (describe what to change) |
 | `cancel` | Stop the workflow |
 
+### Delegated execution (opt-in)
+
+No separate `/kyro:delegate` command. During `execute_task` or `review_task`, the orchestrator may spawn a **host subagent** for one task while Kyro CLI ownership stays with the orchestrator.
+
+| Activation | How |
+| ---------- | --- |
+| **L1** | `execution.delegationEnabled: true` in `.agents/kyro/local.json` — `context-pack` exposes `delegationEnabled` |
+| **L0** | Ask in chat: e.g. "Execute T1.1 with delegate implementer" |
+
+Example (L1 on — delegation automatic for each task):
+
+```text
+/kyro:forge
+Continue scope my-scope. Execute task T1.1.
+```
+
+Example (L0 — explicit per task):
+
+```text
+/kyro:forge
+Scope: my-scope — run T1.1 with delegates/implementer.md; you record-evidence and review.
+```
+
+Step-by-step guide: [Getting started — Delegated execution](getting-started.md#delegated-execution-optional).
+
 ### Orchestrator Protocols
 
 - **Command router** -- chooses the next mode from structured state

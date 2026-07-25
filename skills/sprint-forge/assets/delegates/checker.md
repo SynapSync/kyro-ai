@@ -1,6 +1,6 @@
-# Minion — Checker role (L1)
+# Delegate — Checker role (L1)
 
-Load this helper when `context-pack` reports `minionEnabled: true` and the orchestrator spawns a fresh-context checker for `review_task`. Findings only — verdict is tool-owned.
+Load this helper when `context-pack` reports `delegationEnabled: true` and the orchestrator spawns a fresh-context checker delegate for `review_task`. Findings only — verdict is tool-owned.
 
 ## Inputs (from orchestrator brief)
 
@@ -43,4 +43,4 @@ Only `kyro review` materializes `task.verdict`.
 
 If no subagent is available, review in `review-task.md` single-agent mode (steps 1–5).
 
-See: `docs/orchestrator-minion-l0.md`, `docs/orchestrator-minion-l1.md`.
+See: `docs/architecture.md`, `docs/maker-checker.md`, `docs/context-management.md`.

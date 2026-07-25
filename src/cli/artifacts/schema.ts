@@ -253,8 +253,8 @@ function validateExecutionPreferences(value: unknown, path: string, prefix: stri
     issues.push({ path, field: prefix, message: 'must be an object when present' });
     return;
   }
-  if ('minionEnabled' in value && value.minionEnabled !== undefined && typeof value.minionEnabled !== 'boolean') {
-    issues.push({ path, field: `${prefix}.minionEnabled`, message: 'must be a boolean when present' });
+  if ('delegationEnabled' in value && value.delegationEnabled !== undefined && typeof value.delegationEnabled !== 'boolean') {
+    issues.push({ path, field: `${prefix}.delegationEnabled`, message: 'must be a boolean when present' });
   }
 }
 

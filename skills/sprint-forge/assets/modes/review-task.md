@@ -19,19 +19,19 @@ Validate completed work and record the verdict through the Kyro checker tool.
    - Use `--by <actor-id>` when the checker actor id is known.
 5. If the tool refuses a pass, treat the refusal as a blocking checker finding and route back to execution.
 
-## Opt-in checker minion (L0)
+## Opt-in checker delegate (L0)
 
-**Default:** orchestrator reviews in this mode (steps 1–5). **Opt-in:** spawn a **fresh-context checker minion** when maker-checker separation or a clean second opinion is needed, or when `context-pack` reports `minionEnabled: true`.
+**Default:** orchestrator reviews in this mode (steps 1–5). **Opt-in:** spawn a **fresh-context checker delegate** when maker-checker separation or a clean second opinion is needed, or when `context-pack` reports `delegationEnabled: true`.
 
-### L1 routing (`minionEnabled` from context-pack)
+### L1 routing (`delegationEnabled` from context-pack)
 
-When the task pack JSON includes `"minionEnabled": true`:
+When the task pack JSON includes `"delegationEnabled": true`:
 
-1. Load `../minions/checker.md` — findings-only contract for the checker worker.
+1. Load `../delegates/checker.md` — findings-only contract for the checker worker.
 2. Follow the L0 checker rules below; materialize verdict only via `{{KYRO_CLI}} review`.
 3. If the host cannot spawn a subagent, fall back to orchestrator-led review (steps 1–5).
 
-When `minionEnabled` is `false` or absent, use steps 1–5 only (L0 checker minion prose applies when the user explicitly requests it).
+When `delegationEnabled` is `false` or absent, use steps 1–5 only (L0 checker delegate prose applies when the user explicitly requests it).
 
 ### When to use
 
@@ -39,9 +39,9 @@ When `minionEnabled` is `false` or absent, use steps 1–5 only (L0 checker mini
 - User asks for an independent review pass.
 - Task risk warrants a separate context (security, architecture).
 
-### Checker minion contract
+### Checker delegate contract
 
-The checker minion receives a brief from the task pack (same lean principle as execute — no full `sprint.json`). It returns **findings only**, for example:
+The checker delegate receives a brief from the task pack (same lean principle as execute — no full `sprint.json`). It returns **findings only**, for example:
 
 ```json
 {
@@ -56,13 +56,13 @@ The checker minion receives a brief from the task pack (same lean principle as e
 
 | Rule | Detail |
 |------|--------|
-| Verdict write | **Only** `{{KYRO_CLI}} review` materializes `task.verdict` — the checker minion does not hand-edit sprint state |
-| Self-review | The **same** minion that implemented the task must **not** be the checker when maker-checker policy applies |
+| Verdict write | **Only** `{{KYRO_CLI}} review` materializes `task.verdict` — the checker delegate does not hand-edit sprint state |
+| Self-review | The **same** delegate that implemented the task must **not** be the checker when maker-checker policy applies |
 | Orchestrator role | Interpret findings, run targeted checks if needed, then invoke `kyro review` with `--verdict pass` or `--finding critical:…` |
 
 If subagents are unavailable, fall back to orchestrator-led review in this mode (steps 1–5).
 
-See also: `docs/orchestrator-minion-l0.md`, `docs/orchestrator-minion-l1.md`.
+See also: `docs/architecture.md` (delegated execution protocol), `docs/maker-checker.md` (checker delegate).
 
 ## Principles gate
 
