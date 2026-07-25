@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.37.0] - 2026-07-25
+
+### Added
+
+- **L0 Orchestrator–Minion execution protocol** — opt-in minion delegation documented on `execute-task` and `review-task` modes: lean brief from `context-pack --task`, structured status JSON, write matrix (orchestrator + CLI own workflow state), single-agent fallback when subagents are unavailable. Product overview in `docs/orchestrator-minion-l0.md` and manual eval checklist in `docs/evals.md`.
+
 ## [4.36.0] - 2026-07-24
 
 ### Added
