@@ -6,15 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`docs/delegation-flow.md`** — practical end-to-end overview (7 sections + Mermaid diagrams) from scope/sprint/task planning through execute/review with optional L0/L1 delegates; linked from architecture and getting-started.
+- **Delegation terminology** — rename `minion` / `minionEnabled` to `delegate` / `delegationEnabled`; move role helpers to `delegates/`; update docs, modes, CLI, and eval fixtures (`context-pack-delegation-*`).
+- **Delegation protocol in core docs** — L0/L1 behavior consolidated into `architecture.md`, `maker-checker.md`, `context-management.md`, `teams.md`, and `cli.md`.
+
 ### Changed
 
 - **Delegation fail-safe on slim modes** — `execute-task` / `review-task` keep a hard safety contract on the opt-in path (must load protocol + role helpers; CLI owns SoT; no invented evidence/verdict) so L0/L1 still works if the lazy helper is skipped; orchestrator lists delegated-execution under Lazy Protocols.
-
-### Added
-
-- **Delegation terminology** — rename `minion` / `minionEnabled` to `delegate` / `delegationEnabled`; move role helpers to `delegates/`; update docs, modes, CLI, and eval fixtures (`context-pack-delegation-*`).
-
-- **Delegation protocol in core docs** — L0/L1 behavior consolidated into `architecture.md`, `maker-checker.md`, `context-management.md`, `teams.md`, and `cli.md`.
 
 ## [4.37.0] - 2026-07-25
 

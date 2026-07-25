@@ -157,7 +157,7 @@ node ~/.agents/kyro/current/dist/cli.js context-pack \
 # → true
 ```
 
-Full field contract: [Teams — Delegation opt-in](teams.md#delegation-opt-in-l1). Protocol detail: [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in).
+Full field contract: [Teams — Delegation opt-in](teams.md#delegation-opt-in-l1). Protocol detail: [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in). **Practical walkthrough with flow diagrams:** [Delegation flow](delegation-flow.md).
 
 ### How to tell the agent to run task X with a delegate
 
