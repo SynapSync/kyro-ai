@@ -41,31 +41,31 @@ The orchestrator coordinates the full sprint lifecycle. It performs read-only an
 
 Skills provide domain knowledge that the orchestrator consumes. They are **loaded as instruction files** (the router reads `SKILL.md` and the routed mode), not spawned as subagents — the only Kyro agent is `orchestrator`. To generate or materialize a sprint, use `/kyro:forge` or the tool-owned `kyro plan --from` verb; never invoke `sprint-forge` through the Task/Agent tool.
 
-### Orchestrator–Minion protocol (opt-in)
+### Delegated execution protocol (opt-in)
 
-By default the orchestrator executes tasks alone. **Minions** are optional host workers (subagent, tmux session, etc.) that implement or review **one task** while the orchestrator and Kyro CLI keep ownership of `sprint.json`.
+By default the orchestrator executes tasks alone. **Delegates** are optional host workers (subagent, tmux session, etc.) that implement or review **one task** while the orchestrator and Kyro CLI keep ownership of `sprint.json`.
 
 | Layer | Behavior |
 |-------|----------|
 | **L0** | Protocol in `execute-task` / `review-task` modes — user or orchestrator opts in per task; no new CLI flags |
-| **L1** | Personal `local.json` `execution.minionEnabled` — `context-pack` surfaces `minionEnabled`; modes load `minions/implementer.md` or `minions/checker.md` |
+| **L1** | Personal `local.json` `execution.delegationEnabled` — `context-pack` surfaces `delegationEnabled`; modes load `delegates/implementer.md` or `delegates/checker.md` |
 | **L2** | Host-specific launchers (e.g. tmux + agent CLI) — reference patterns only; not part of core runtime |
 
 | Aspect | Rule |
 |--------|------|
 | Unit of delegation | **Task** (`handoff.nextTaskId`) — not phase, sprint, or scope |
-| Phase UX | "Run phase with minions" = orchestrator **loops** tasks; no minion owns a phase |
-| Default | Single-agent forge unchanged when minions are off or unavailable |
+| Phase UX | "Run the phase with delegates" = orchestrator **loops** tasks; no delegate owns a phase |
+| Default | Single-agent forge unchanged when delegation is off or unavailable |
 
 **Write matrix:**
 
 | Actor | May | Must not |
 |-------|-----|----------|
-| Orchestrator | Brief, spawn/skip worker, interpret status/findings, Kyro CLI, handoff | Give SoT ownership to a minion |
-| Minion | Edit product code, run validation, return status or findings JSON | Mutate `sprint.json` / project layers; self-approve review |
+| Orchestrator | Brief, spawn/skip worker, interpret status/findings, Kyro CLI, handoff | Give SoT ownership to a delegate |
+| Delegate | Edit product code, run validation, return status or findings JSON | Mutate `sprint.json` / project layers; self-approve review |
 | Kyro CLI | `record-evidence`, `review`, `plan`, `close-sprint`, … | — |
 
-Enable L1: set `execution.minionEnabled: true` in `.agents/kyro/local.json` (see [Teams](teams.md)). Briefs come from `kyro context-pack --task` (see [Context Management](context-management.md)). Checker separation: [Maker/Checker](maker-checker.md).
+Enable L1: set `execution.delegationEnabled: true` in `.agents/kyro/local.json` (see [Teams](teams.md)). Briefs come from `kyro context-pack --task` (see [Context Management](context-management.md)). Checker separation: [Maker/Checker](maker-checker.md). **Usage in forge:** [Getting started — Delegated execution](getting-started.md#delegated-execution-optional).
 
 | Skill | Knowledge Domain |
 |-------|-----------------|

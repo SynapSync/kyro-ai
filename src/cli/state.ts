@@ -37,10 +37,10 @@ export function readLocalProjectState(): KyroLocalProjectState | null {
   return readJsonFromWorkspace<KyroLocalProjectState>(LOCAL_STATE_PATH);
 }
 
-/** True when local.json sets execution.minionEnabled to true; false when absent or false. */
-export function resolveMinionEnabled(): boolean {
+/** True when local.json sets execution.delegationEnabled to true; false when absent or false. */
+export function resolveDelegationEnabled(): boolean {
   const local = readLocalProjectState();
-  return local?.execution?.minionEnabled === true;
+  return local?.execution?.delegationEnabled === true;
 }
 
 /** Raw legacy monolito file only — does not merge layers. */
@@ -428,9 +428,9 @@ export function sanitizeLocalForWrite(local: KyroLocalProjectState): KyroLocalPr
     typeof cleaned.execution === 'object'
     && cleaned.execution !== null
     && !Array.isArray(cleaned.execution)
-    && typeof (cleaned.execution as { minionEnabled?: unknown }).minionEnabled === 'boolean'
+    && typeof (cleaned.execution as { delegationEnabled?: unknown }).delegationEnabled === 'boolean'
   ) {
-    result.execution = { minionEnabled: (cleaned.execution as { minionEnabled: boolean }).minionEnabled };
+    result.execution = { delegationEnabled: (cleaned.execution as { delegationEnabled: boolean }).delegationEnabled };
   }
   return result;
 }
@@ -484,8 +484,8 @@ function normalizeLocal(raw: KyroLocalProjectState | null): KyroLocalProjectStat
     ...(typeof stripped.execution === 'object'
       && stripped.execution !== null
       && !Array.isArray(stripped.execution)
-      && typeof (stripped.execution as { minionEnabled?: unknown }).minionEnabled === 'boolean'
-      ? { execution: { minionEnabled: (stripped.execution as { minionEnabled: boolean }).minionEnabled } }
+      && typeof (stripped.execution as { delegationEnabled?: unknown }).delegationEnabled === 'boolean'
+      ? { execution: { delegationEnabled: (stripped.execution as { delegationEnabled: boolean }).delegationEnabled } }
       : {}),
   };
 }

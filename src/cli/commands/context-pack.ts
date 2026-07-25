@@ -26,7 +26,7 @@ import type {
   SprintFile,
   Task,
 } from '../types';
-import { resolveMinionEnabled } from '../state';
+import { resolveDelegationEnabled } from '../state';
 
 export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json' | 'verbosity'>): void {
   const scope = resolveKyroScope(options.kyroScope);
@@ -78,7 +78,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   // D7a: never create project state from context-pack; surface install remedy when layers missing.
   const bootstrapRemedy = detectProjectStateBootstrapNeed(unregisteredScopeFolders(readProjectState()));
   if (bootstrapRemedy) warnings.push(bootstrapRemedy);
-  const minionEnabled = resolveMinionEnabled();
+  const delegationEnabled = resolveDelegationEnabled();
 
   // Concise trims long-form advisory prose (context, budget guidance) an agent does not need to
   // route/execute; the structured routing/task fields it acts on are always present. Detailed keeps
@@ -118,7 +118,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     reasoningTier: routing.reasoningTier as ContextPackOutput['reasoningTier'],
     maxContextTokens: routing.maxContextTokens,
     budgetGuidance: concise ? '' : routing.budgetGuidance,
-    minionEnabled,
+    delegationEnabled,
   };
   return { ...packWithoutTokens, estimatedTokens: estimatePackTokens(packWithoutTokens) };
 }
@@ -329,7 +329,7 @@ function printContextPackText(pack: ContextPackOutput): void {
   console.log(`Scope: ${pack.scope} (${pack.status})`);
   console.log(`Objective: ${pack.objective ?? '—'}`);
   console.log(`Next action: ${pack.nextAction ?? '—'}  Next task: ${pack.nextTaskId ?? '—'}`);
-  console.log(`Minion mode: ${pack.minionEnabled ? 'enabled' : 'disabled'}`);
+  console.log(`Delegation: ${pack.delegationEnabled ? 'enabled' : 'disabled'}`);
   if (pack.activeSprintSlug) console.log(`Active sprint: ${pack.activeSprintSlug} — ${pack.activeSprintObjective ?? ''}`);
   if (pack.specRequirements.length) console.log(`Requirements: ${pack.specRequirements.map((r) => `${r.id}: ${r.statement}`).join(' | ')}`);
   if (pack.specNonGoals.length) console.log(`Non-goals: ${pack.specNonGoals.join(' | ')}`);

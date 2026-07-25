@@ -1,6 +1,6 @@
-# Minion — Checker role (L1)
+# Delegate — Checker role (L1)
 
-Load this helper when `context-pack` reports `minionEnabled: true` and the orchestrator spawns a fresh-context checker for `review_task`. Findings only — verdict is tool-owned.
+Load this helper when `context-pack` reports `delegationEnabled: true` and the orchestrator spawns a fresh-context checker delegate for `review_task`. Findings only — verdict is tool-owned.
 
 ## Inputs (from orchestrator brief)
 

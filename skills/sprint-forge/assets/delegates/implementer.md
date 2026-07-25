@@ -1,6 +1,6 @@
-# Minion — Implementer role (L1)
+# Delegate — Implementer role (L1)
 
-Load this helper when `context-pack` reports `minionEnabled: true` and the orchestrator delegates the current task to a worker. The orchestrator builds the brief; this helper defines how the worker executes and reports.
+Load this helper when `context-pack` reports `delegationEnabled: true` and the orchestrator delegates the current task to a worker. The orchestrator builds the brief; this helper defines how the delegate executes and reports.
 
 ## Inputs (from orchestrator brief)
 
@@ -45,17 +45,17 @@ Built from `{{KYRO_CLI}} context-pack --kyro-scope {scope} --task <id> --json` �
 
 ## Status → orchestrator mapping
 
-| Worker `status` | Orchestrator action |
-|-----------------|---------------------|
+| Delegate `status` | Orchestrator action |
+|-------------------|---------------------|
 | `in_progress` | Log only; do not mark task done |
 | `blocked` | `record-evidence … --status blocked` |
 | `done` + `validation.ok` | Orchestrator verifies, then `record-evidence` → `review_task` |
 | `done` weak | Reject; re-brief or fix — do not invent evidence |
 
-The orchestrator (not the worker) invokes `{{KYRO_CLI}} record-evidence` and advances handoff.
+The orchestrator (not the delegate) invokes `{{KYRO_CLI}} record-evidence` and advances handoff.
 
 ## Fallback
 
-If you are the orchestrator running without a spawnable subagent, execute the task yourself per `execute-task.md` (single-agent path). Never fail the forge because minions are unavailable.
+If you are the orchestrator running without a spawnable subagent, execute the task yourself per `execute-task.md` (single-agent path). Never fail the forge because delegation is unavailable.
 
 See: `docs/architecture.md`, `docs/context-management.md`, `docs/maker-checker.md`.
