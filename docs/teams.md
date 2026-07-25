@@ -9,7 +9,7 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 | Path | Commit? | Owner | Contents |
 | ---- | ------- | ----- | -------- |
 | `.agents/kyro/project.json` | **Yes** | Team / shared | `schemaVersion`, `artifactRoot`, `scopes[]` registry cache, `principles[]`, optional `team` policy |
-| `.agents/kyro/local.json` | **No** | Personal / machine | `activeScope`, `installedAdapters`, optional `runtimePath` |
+| `.agents/kyro/local.json` | **No** | Personal / machine | `activeScope`, `installedAdapters`, optional `runtimePath`, optional `execution.delegationEnabled` (L1 delegation opt-in) |
 | `.agents/kyro/scopes/**` | **Yes** | Team | Per-scope `sprint.json`, archives, findings |
 | `.agents/kyro/.gitignore` | **Yes** (recommended) | Team | Written/updated by install/sync so local-only files stay untracked |
 | Legacy `.agents/kyro/kyro.json` | **No** | Migration only | Pre-layered monolito; dual-read until install archives it |
@@ -25,6 +25,29 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 | `scopes[]` | shared cache + disk | Presence SoT is folders under `scopes/`; install/sync rehydrates |
 | `activeScope` | local only | Personal — never on `project.json` |
 | `installedAdapters` | local only | Per-machine adapter records |
+| `execution.delegationEnabled` | local only | L1 delegation opt-in; default off; surfaced on `context-pack` JSON |
+
+### Delegation opt-in (L1)
+
+Add to `.agents/kyro/local.json` (gitignored):
+
+```json
+{
+  "execution": {
+    "delegationEnabled": true
+  }
+}
+```
+
+| Rule | Detail |
+|------|--------|
+| Default | Absent or `false` → single-agent forge |
+| Storage | **local.json only** — not `project.json` |
+| Verify | `kyro context-pack --json \| jq .delegationEnabled` → `true` |
+
+Never auto-enable on install/sync. See [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in).
+
+**How to use it in forge** (prompts, L0 vs L1, role split): [Getting started — Delegated execution](getting-started.md#delegated-execution-optional).
 
 ## Clone bootstrap
 

@@ -37,6 +37,12 @@ export function readLocalProjectState(): KyroLocalProjectState | null {
   return readJsonFromWorkspace<KyroLocalProjectState>(LOCAL_STATE_PATH);
 }
 
+/** True when local.json sets execution.delegationEnabled to true; false when absent or false. */
+export function resolveDelegationEnabled(): boolean {
+  const local = readLocalProjectState();
+  return local?.execution?.delegationEnabled === true;
+}
+
 /** Raw legacy monolito file only — does not merge layers. */
 export function readMonolitoProjectState(): KyroProjectState | null {
   return readJsonFromWorkspace<KyroProjectState>(KYRO_STATE_PATH);
@@ -418,6 +424,14 @@ export function sanitizeLocalForWrite(local: KyroLocalProjectState): KyroLocalPr
   if (typeof cleaned.runtimePath === 'string' && cleaned.runtimePath) {
     result.runtimePath = cleaned.runtimePath;
   }
+  if (
+    typeof cleaned.execution === 'object'
+    && cleaned.execution !== null
+    && !Array.isArray(cleaned.execution)
+    && typeof (cleaned.execution as { delegationEnabled?: unknown }).delegationEnabled === 'boolean'
+  ) {
+    result.execution = { delegationEnabled: (cleaned.execution as { delegationEnabled: boolean }).delegationEnabled };
+  }
   return result;
 }
 
@@ -466,6 +480,12 @@ function normalizeLocal(raw: KyroLocalProjectState | null): KyroLocalProjectStat
     installedAdapters: Array.isArray(stripped.installedAdapters) ? stripped.installedAdapters : [],
     ...(typeof stripped.runtimePath === 'string' && stripped.runtimePath
       ? { runtimePath: stripped.runtimePath }
+      : {}),
+    ...(typeof stripped.execution === 'object'
+      && stripped.execution !== null
+      && !Array.isArray(stripped.execution)
+      && typeof (stripped.execution as { delegationEnabled?: unknown }).delegationEnabled === 'boolean'
+      ? { execution: { delegationEnabled: (stripped.execution as { delegationEnabled: boolean }).delegationEnabled } }
       : {}),
   };
 }

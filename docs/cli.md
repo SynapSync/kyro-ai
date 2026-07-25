@@ -310,6 +310,8 @@ It emits scope status, next action, roadmap and sprint summaries, next task, art
 
 Prefer `context-pack` over manual file selection at session start, after compaction, or when resuming a scope through summary-first routing.
 
+JSON packs include `delegationEnabled` (boolean) from `local.json` `execution.delegationEnabled` — `false` when unset. When `true`, execute/review modes load delegate role helpers from `skills/sprint-forge/assets/delegates/`. See [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in) and [Teams](teams.md).
+
 ## Artifact Integrity
 
 Use `kyro doctor --artifacts` to validate the project knowledge contract:

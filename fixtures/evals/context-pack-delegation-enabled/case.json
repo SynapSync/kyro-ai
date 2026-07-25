@@ -1,0 +1,37 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "context-pack-delegation-enabled",
+  "title": "Context pack surfaces delegationEnabled true from local.json overlay",
+  "kind": "replay",
+  "tags": [
+    "context-pack",
+    "routing",
+    "delegation",
+    "happy"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "context-pack",
+        "--kyro-scope",
+        "demo",
+        "--task",
+        "T1.1",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "\"delegationEnabled\": true",
+          "\"packMode\": \"task\"",
+          "\"taskId\": \"T1.1\""
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false
+}

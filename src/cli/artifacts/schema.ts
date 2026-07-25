@@ -184,6 +184,9 @@ export function validateSharedProjectStateShape(value: unknown, path: string): V
   if ('installedAdapters' in value) {
     issues.push({ path, field: 'installedAdapters', message: 'must not be present on shared project state (local-only field)' });
   }
+  if ('execution' in value) {
+    issues.push({ path, field: 'execution', message: 'must not be present on shared project state (local-only field)' });
+  }
   if ('kyroInvocation' in value) {
     issues.push({ path, field: 'kyroInvocation', message: 'must not be present on project files (global manifest only)' });
   }
@@ -219,6 +222,9 @@ export function validateLocalProjectStateShape(value: unknown, path: string): Va
   if ('team' in value) {
     issues.push({ path, field: 'team', message: 'must not be present on local overlay (shared-only field)' });
   }
+  if ('execution' in value && value.execution !== undefined) {
+    validateExecutionPreferences(value.execution, path, 'execution', issues);
+  }
   if ('kyroInvocation' in value) {
     issues.push({ path, field: 'kyroInvocation', message: 'must not be present on project files (global manifest only)' });
   }
@@ -239,6 +245,16 @@ function validateTeamPolicy(value: unknown, path: string, prefix: string, issues
     } else if (!value.recommendedAdapters.every((entry) => typeof entry === 'string')) {
       issues.push({ path, field: `${prefix}.recommendedAdapters`, message: 'must be an array of strings when present' });
     }
+  }
+}
+
+function validateExecutionPreferences(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object when present' });
+    return;
+  }
+  if ('delegationEnabled' in value && value.delegationEnabled !== undefined && typeof value.delegationEnabled !== 'boolean') {
+    issues.push({ path, field: `${prefix}.delegationEnabled`, message: 'must be a boolean when present' });
   }
 }
 

@@ -83,3 +83,17 @@ The repository ships a seed suite under `fixtures/evals/` covering:
 - adapter filtering through `detect --agent opencode --json`.
 
 `npm run check` runs the suite through `check:eval`.
+
+## L0 delegated execution manual eval checklist
+
+These are **protocol checks** for agents following the delegation path in execute/review modes. They are not automated `kyro eval` replay cases. Protocol summary: [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in). Mode routers: `execute-task.md` / `review-task.md`; full protocol: `skills/sprint-forge/assets/helpers/delegated-execution.md` plus `delegates/implementer.md` / `delegates/checker.md`.
+
+| # | Check | Pass when |
+|---|-------|-----------|
+| 1 | SoT integrity | Delegate path never hand-edits `sprint.json`, `project.json`, or `local.json` |
+| 2 | CLI-owned ledger | Evidence and review land only through `kyro record-evidence` and `kyro review` |
+| 3 | Blocked handoff | `blocked` status does not advance `handoff` to the next task without policy |
+| 4 | Subagent fallback | When the host cannot spawn workers, execute falls back to single-agent without failing |
+| 5 | Phase UX | "Run phase with delegates" means orchestrator loops tasks — no delegate owns the phase |
+
+Run manually after changing execute/review modes or delegate helpers.

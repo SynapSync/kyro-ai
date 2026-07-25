@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Delegation terminology** — rename `minion` / `minionEnabled` to `delegate` / `delegationEnabled`; move role helpers to `delegates/`; update docs, modes, CLI, and eval fixtures (`context-pack-delegation-*`).
+
+- **Delegation protocol in core docs** — L0/L1 behavior consolidated into `architecture.md`, `maker-checker.md`, `context-management.md`, `teams.md`, and `cli.md`.
+
+## [4.37.0] - 2026-07-25
+
+### Added
+
+- **L0 delegated execution protocol** — opt-in task delegation documented on `execute-task` and `review-task` modes: lean brief from `context-pack --task`, structured status JSON, write matrix (orchestrator + CLI own workflow state), single-agent fallback when subagents are unavailable. Overview in `docs/architecture.md`; manual eval checklist in `docs/evals.md`.
+- **L1 delegation opt-in** — personal `local.json` `execution.delegationEnabled` flag (default off), `delegationEnabled` on `context-pack`, `delegates/implementer` and `delegates/checker` role helpers, and conditional mode routing when enabled. Documented in `docs/teams.md` and `docs/cli.md`.
+
 ## [4.36.0] - 2026-07-24
 
 ### Added
