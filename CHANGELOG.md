@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.39.0] - 2026-07-27
+
+### Fixed
+
+- **`docs/delegation-flow.md`, `docs/getting-started.md`, `docs/maker-checker.md`** — add explicit warnings that `record-evidence` does not accept `--yes`/`--confirm` (those flags belong to `review`); prevent orchestrator CLI flag trap.
+- **`skills/sprint-forge/assets/helpers/delegated-execution.md`, `skills/sprint-forge/assets/modes/execute-task.md`** — document CLI flag restriction on `record-evidence` to prevent `INVALID_INPUT` errors.
+
 ## [4.38.0] - 2026-07-25
 
 ### Added
