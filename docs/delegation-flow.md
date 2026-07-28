@@ -237,7 +237,7 @@ Continue oauth-login. Run the active task.
 | 1 | Orch | `context-pack --task` → pack + `delegationEnabled: true` |
 | 2 | Orch | Load `delegated-execution.md` + `implementer.md` |
 | 3 | **Implementer** | Implementa routes; devuelve `{ status: "done", validation: { ok: true } }` |
-| 4 | Orch | Verifica; `record-evidence T1.1 …` |
+| 4 | Orch | Verifica; `record-evidence T1.1 …` (**sin** `--yes`) |
 | 5 | Orch | handoff → `review_task` |
 | 6 | Orch | Load protocol + `checker.md` |
 | 7 | **Checker** | Findings JSON (sin tocar SoT) |

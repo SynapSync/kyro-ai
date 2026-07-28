@@ -46,6 +46,8 @@ Implementer returns status JSON (see `implementer.md`). Orchestrator maps:
 
 Worker dies mid-run: re-read tree + task state, re-brief (idempotent).
 
+**CLI flag trap (observed):** `record-evidence` does **not** accept `--yes` / `--confirm`. Those flags belong to `review` (and a few other verbs). Copying `--yes` onto `record-evidence` fails with `INVALID_INPUT` — drop it and retry with only the flags in the usage line (`--summary`, `--validation`, `--file`, `--status`, …).
+
 ## Checker findings (review)
 
 Checker returns findings only (see `checker.md`). Orchestrator interprets, may re-check, then:
