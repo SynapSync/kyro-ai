@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.39.0] - 2026-07-27
+
+### Fixed
+
+- **`docs/delegation-flow.md`, `docs/getting-started.md`, `docs/maker-checker.md`** — add explicit warnings that `record-evidence` does not accept `--yes`/`--confirm` (those flags belong to `review`); prevent orchestrator CLI flag trap.
+- **`skills/sprint-forge/assets/helpers/delegated-execution.md`, `skills/sprint-forge/assets/modes/execute-task.md`** — document CLI flag restriction on `record-evidence` to prevent `INVALID_INPUT` errors.
+
+## [4.38.0] - 2026-07-25
+
 ### Added
 
 - **`docs/delegation-flow.md`** — practical end-to-end overview (7 sections + Mermaid diagrams) from scope/sprint/task planning through execute/review with optional L0/L1 delegates; linked from architecture and getting-started.
@@ -15,6 +24,11 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 
 - **Delegation fail-safe on slim modes** — `execute-task` / `review-task` keep a hard safety contract on the opt-in path (must load protocol + role helpers; CLI owns SoT; no invented evidence/verdict) so L0/L1 still works if the lazy helper is skipped; orchestrator lists delegated-execution under Lazy Protocols.
+- **Slim execute/review modes under token budgets** — move full L0/L1/L2 protocol into lazy `helpers/delegated-execution.md` so eager `kyro-forge:execute` / `kyro-forge:review` runtime paths stay under doctor token ceilings.
+
+### Fixed
+
+- **Bare `kyro` CLI literals in sprint-forge assets** — use `{{KYRO_CLI}}` placeholders so `check:no-placeholder` and projected runtimes resolve the installed CLI path.
 
 ## [4.37.0] - 2026-07-25
 

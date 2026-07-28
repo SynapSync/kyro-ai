@@ -222,8 +222,10 @@ Execute T1.1 with delegate implementer.
 1. context-pack --task T1.1
 2. Spawn delegate per delegates/implementer.md (one task, one delegate)
 3. Delegate returns status JSON only
-4. You: record-evidence T1.1, then review T1.1
+4. You: record-evidence T1.1 (no --yes), then review T1.1 --verdict pass|fail --yes
 ```
+
+CLI reminder: `record-evidence` never takes `--yes`; `review` does. Mixing them is a common orchestrator slip.
 
 If the host cannot spawn subagents, the orchestrator falls back to single-agent execution — forge does not fail.
 

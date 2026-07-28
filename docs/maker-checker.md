@@ -56,6 +56,9 @@ kyro record-evidence T1.1 --kyro-scope demo \
   --file src/demo.ts
 ```
 
+No `--yes` / `--confirm` on `record-evidence` (those flags are for `kyro review` and similar confirm
+verbs). Passing `--yes` here fails with `INVALID_INPUT`.
+
 It writes `task.evidence`, sets `task.status` (`done` by default; `--status blocked` after repeated
 failures), and routes `handoff` to `review_task`. It never writes `task.verdict` — the checker owns
 that. Multiple `--validation`/`--file` flags are accepted; `--by` defaults to `maker`.
