@@ -14,6 +14,7 @@ Execute the active sprint task, recording evidence through the Kyro CLI.
 3. Record evidence via CLI — never hand-edit `sprint.json`:
    `{{KYRO_CLI}} record-evidence <task-id> --kyro-scope {scope} --summary "..." --validation "<check>" [--validation ...] [--file <path> ...] [--notes "..."] [--status blocked]`
    Writes `task.evidence`, sets `task.status` (`done` default; `blocked` after three failed rounds), routes `handoff` to `review_task`.
+   **No `--yes` here** — that flag is for `review` (and similar confirm verbs), not `record-evidence`.
 4. Emergent work: `{{KYRO_CLI}} add-emergent --title <t> --description <d> --acceptance <a>` when it blocks the objective; new debt via `{{KYRO_CLI}} debt add`.
 
 ## Opt-in delegated execution
