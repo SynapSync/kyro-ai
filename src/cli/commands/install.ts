@@ -7,6 +7,7 @@ import { assertWorkspaceScope, uniqueAgents } from '../options';
 import { readProjectState } from '../state';
 import { formatWorkspaceInitPrompt } from '../core/scopes';
 import { KyroCoreError } from '../core/errors';
+import { isInteractiveTerminal } from '../core/tty';
 import { AGENT, KYRO_ROOT, LOCAL_STATE_PATH, PROJECT_STATE_PATH, SCOPE } from '../constants';
 import { requireFullPackageFor } from '../package-root-mode';
 import type { Agent, CliOptions } from '../types';
@@ -114,10 +115,6 @@ function shouldInstallWorkspace(options: CliOptions, hasWorkspaceState: boolean)
   if (options.dryRun) return false;
   if (!isInteractiveTerminal()) return false;
   return confirmWorkspaceInit();
-}
-
-function isInteractiveTerminal(): boolean {
-  return input.isTTY === true && output.isTTY === true;
 }
 
 async function confirmWorkspaceInit(): Promise<boolean> {

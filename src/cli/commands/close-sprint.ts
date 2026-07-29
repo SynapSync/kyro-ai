@@ -6,6 +6,7 @@ import { readProjectState } from '../state';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { collectFindings } from '../core/analysis';
 import { KyroCoreError } from '../core/errors';
+import { isInteractiveTerminal } from '../core/tty';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
 import { readJsonSafely } from '../artifacts/json';
@@ -66,6 +67,15 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
     return;
   }
   if (!args.yes) {
+    // Prompting where stdin cannot answer (agent harness, CI, piped shell) blocks until the caller
+    // times out instead of closing. Fail fast with the flag that completes the gate non-interactively.
+    if (!isInteractiveTerminal()) {
+      throw new KyroCoreError(
+        'CONFIRMATION_REQUIRED',
+        `Cannot close sprint ${identity.sprintN} in scope "${scope}": confirmation is required but this is not an interactive terminal.`,
+        'Re-run with --yes to confirm the close non-interactively, or --dry-run to preview it.',
+      );
+    }
     const confirmed = await confirm(`Checkpoint and close sprint ${identity.sprintN} in scope "${scope}"? [y/N] `);
     if (!confirmed) {
       console.log('No changes made.');
