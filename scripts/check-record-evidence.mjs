@@ -170,4 +170,61 @@ function run(args, root) {
   }
 }
 
+// 8) Hand-forged evidence with a future recordedAt is refused by the checker (integrity guard):
+//    record-evidence stamps its own clock, so a recordedAt beyond skew tolerance proves a hand-edit.
+//    (Dynamic timestamps are why this lives here and not in a static fixtures/evals case.)
+{
+  const root = sandbox();
+  try {
+    const taskId = readSprint(root).activeSprint.phases[0].tasks[0].id;
+    run(['record-evidence', taskId, '--kyro-scope', 'demo', '--summary', 'Real work.', '--validation', 'tsc'], root);
+
+    const forged = readSprint(root);
+    forged.activeSprint.phases[0].tasks[0].evidence.recordedAt = new Date(Date.now() + 3600_000).toISOString();
+    writeFileSync(sprintPath(root), `${JSON.stringify(forged, null, 2)}\n`);
+
+    const review = run(['review', taskId, '--kyro-scope', 'demo', '--verdict', 'pass', '--yes'], root);
+    assert(review.status !== 0, 'checker must refuse pass on future-dated evidence');
+    assert((review.stderr + review.stdout).includes('recordedAt is in the future'), `expected future-recordedAt finding: ${review.stdout}${review.stderr}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 9) recordedAt within the skew tolerance (+60s) still passes — pins the 5-minute tolerance.
+{
+  const root = sandbox();
+  try {
+    const taskId = readSprint(root).activeSprint.phases[0].tasks[0].id;
+    run(['record-evidence', taskId, '--kyro-scope', 'demo', '--summary', 'Real work.', '--validation', 'tsc'], root);
+
+    const skewed = readSprint(root);
+    skewed.activeSprint.phases[0].tasks[0].evidence.recordedAt = new Date(Date.now() + 60_000).toISOString();
+    writeFileSync(sprintPath(root), `${JSON.stringify(skewed, null, 2)}\n`);
+
+    const review = run(['review', taskId, '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+    assert(review.status === 0, `small clock skew must not block the checker: ${review.stdout}${review.stderr}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 10) Unparsable recordedAt is refused (NaN previously slipped past both timestamp checks).
+{
+  const root = sandbox();
+  try {
+    const taskId = readSprint(root).activeSprint.phases[0].tasks[0].id;
+    run(['record-evidence', taskId, '--kyro-scope', 'demo', '--summary', 'Real work.', '--validation', 'tsc'], root);
+
+    const forged = readSprint(root);
+    forged.activeSprint.phases[0].tasks[0].evidence.recordedAt = 'not-a-timestamp';
+    writeFileSync(sprintPath(root), `${JSON.stringify(forged, null, 2)}\n`);
+
+    const review = run(['review', taskId, '--kyro-scope', 'demo', '--verdict', 'pass', '--yes'], root);
+    assert(review.status !== 0, 'checker must refuse pass on unparsable recordedAt');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 console.log('check:record-evidence — tool-owned evidence write verified end-to-end');

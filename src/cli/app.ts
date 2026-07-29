@@ -19,6 +19,7 @@ import { runDebtCommand } from './commands/debt';
 import { runAddEmergentCommand } from './commands/add-emergent';
 import { runScenarioCommand } from './commands/scenario';
 import { runAdrCommand } from './commands/adr';
+import { runCapabilitiesCommand } from './commands/capabilities';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
 import { KyroCoreError } from './core/errors';
@@ -47,6 +48,11 @@ export async function runCli(): Promise<void> {
 
   if (command === '--version' || command === '-v' || command === 'version') {
     console.log(readPackageVersion());
+    return;
+  }
+
+  if (command === 'capabilities') {
+    runCapabilitiesCommand(args);
     return;
   }
 

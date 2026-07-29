@@ -38,6 +38,7 @@ export function runReviewCommand(rawArgs: string[]): void {
     return;
   }
   if (!args.taskId) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro review <task> [--verdict pass|fail] [--yes]', 'Pass the task id to review.');
+  if (args.dryRun && args.yes) throw new KyroCoreError('INVALID_INPUT', '--dry-run and --yes are mutually exclusive.', 'Use --dry-run to preview, or --yes to confirm the write — not both.');
 
   const scope = resolveScope(args.scope);
   const { sprint, plan, findings } = buildReviewPlan(scope, args);

@@ -43,4 +43,6 @@ Only `{{KYRO_CLI}} review` materializes `task.verdict`.
 
 If no subagent is available, review in `review-task.md` single-agent mode (steps 1–5).
 
+A missing CLI verb is NOT a delegation fallback: if `review` is unknown to the CLI, abort the forge and report the runtime version — never write a verdict by hand.
+
 See: `docs/architecture.md`, `docs/maker-checker.md`, `docs/context-management.md`.

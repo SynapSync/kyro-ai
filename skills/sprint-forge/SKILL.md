@@ -40,6 +40,7 @@ One scope = one `sprint.json`. Agents read `kyro.json` + the scope's lean pack, 
 6. Closing a sprint is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
 7. Findings and archives are write-only evidence; agents never re-read them to route.
 8. **Admit unknowns, never guess.** Write `[NEEDS CLARIFICATION: <gap>]` and route to `clarify`. `{{KYRO_CLI}} doctor`/`analyze` FAIL while any marker remains — a deterministic gate.
+9. **Tool-owned verbs require a CLI that exposes them.** Verify with `{{KYRO_CLI}} capabilities` at startup; a missing verb — or the command itself being unknown — means the runtime is too old. Abort and request an upgrade. There is no manual fallback.
 
 ## Read Path Contract (context-pack first) — MANDATORY
 

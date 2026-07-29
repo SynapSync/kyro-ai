@@ -63,12 +63,25 @@ It writes `task.evidence`, sets `task.status` (`done` by default; `--status bloc
 failures), and routes `handoff` to `review_task`. It never writes `task.verdict` — the checker owns
 that. Multiple `--validation`/`--file` flags are accepted; `--by` defaults to `maker`.
 
+`record-evidence` always stamps `recordedAt` with its own clock — evidence is safe by construction
+at write time. The checker enforces this at read time: a `recordedAt` more than 5 minutes ahead of
+the review clock (or unparsable) proves a hand-edit and vetoes the pass. The same 5-minute skew
+tolerance applies to the verdict-predates-evidence ordering check, so honest cross-host clock drift
+does not false-positive.
+
+If the CLI rejects `record-evidence` or `review` as an unknown command, the installed runtime
+predates these verbs. That is an abort condition — report `kyro --version` and upgrade — never a
+license to hand-write evidence or verdicts. The orchestrator verifies this up front with the
+`kyro capabilities` handshake (see [cli.md](cli.md)).
+
 ## Tool-owned review
 
 ```bash
 kyro review T1.1 --kyro-scope demo --verdict pass --yes
 kyro review T1.1 --kyro-scope demo --verdict fail --finding critical:"Missing test evidence" --yes
 ```
+
+`--dry-run` and `--yes` are mutually exclusive on `review` (and `close-sprint`): preview or confirm, not both.
 
 `review_task` defaults to `tool_owned`: the deterministic checker (coverage, evidence, self-review, principle vetoes) is the gate, and per-task review is reversible, so a pass does not need `--yes`. A project that wants a human confirmation on every review can set `review_task` to `confirm` in `policy.json`, after which CLI review needs `--yes` (the flag above is always safe to pass either way).
 

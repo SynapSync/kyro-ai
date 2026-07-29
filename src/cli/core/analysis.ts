@@ -283,6 +283,10 @@ function resolveLedgerArtifact(scope: string, relativePath: string): string | nu
   }
 }
 
+// Tolerance for host/container clock skew when judging evidence.recordedAt against the review
+// clock. record-evidence stamps its own clock, so anything further ahead than this is hand-written.
+const FUTURE_EVIDENCE_TOLERANCE_MS = 5 * 60 * 1000;
+
 export function collectCheckerFindings(sprint: SprintFile, principles: Principle[]): AnalysisFinding[] {
   const out: AnalysisFinding[] = [];
   let n = 0;
@@ -317,6 +321,16 @@ export function collectCheckerFindings(sprint: SprintFile, principles: Principle
     if (task.status === 'done' && !verdict) {
       add('CRITICAL', `task ${task.id} is done but has missing or malformed verdict`, 'Run kyro review for the task so the tool owns the verdict write.');
     }
+    // Evidence timestamps must run before the verdict gate below: at kyro review time no verdict
+    // exists yet, and these are the findings that must block a pass on hand-forged evidence.
+    if (evidence) {
+      const recordedAtMs = Date.parse(evidence.recordedAt);
+      if (Number.isNaN(recordedAtMs)) {
+        add('HIGH', `task ${task.id} evidence recordedAt is not a parsable timestamp`, 'Evidence must be written by kyro record-evidence, which stamps its own clock. Delete the hand-written evidence and re-run kyro record-evidence.');
+      } else if (recordedAtMs > Date.now() + FUTURE_EVIDENCE_TOLERANCE_MS) {
+        add('HIGH', `task ${task.id} evidence recordedAt is in the future`, 'Evidence must be written by kyro record-evidence, which stamps its own clock. Delete the hand-written evidence and re-run kyro record-evidence.');
+      }
+    }
     if (!verdict || verdict.result !== 'pass') continue;
     // A pass verdict is only meaningful on an executed task. Without this, a pass written onto a
     // still-pending task produces no finding (every check below is done-gated), so review's own gate
@@ -333,7 +347,7 @@ export function collectCheckerFindings(sprint: SprintFile, principles: Principle
     if (nonNegotiableViolations.length > 0) {
       add('CRITICAL', `task ${task.id} has pass verdict while non-negotiable principle(s) are violated (${nonNegotiableViolations.map((p) => p.id).join(', ')})`, 'A non-negotiable principle violation must fail the review; fix the principle breach before passing the task.');
     }
-    if (evidence && Date.parse(verdict.reviewedAt) < Date.parse(evidence.recordedAt)) {
+    if (evidence && Date.parse(verdict.reviewedAt) + FUTURE_EVIDENCE_TOLERANCE_MS < Date.parse(evidence.recordedAt)) {
       add('HIGH', `task ${task.id} verdict predates its evidence`, 'Re-run kyro review after recording the current task evidence.');
     }
     if (requireSeparateChecker && evidence && verdict.by === evidence.by) {
