@@ -15,9 +15,9 @@ Kyro preserves quality by loading the smallest contract needed for the current l
 
 1. Read `.agents/kyro/kyro.json` if present.
 2. Resolve scope from user input, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
-3. Capability handshake: run `{{KYRO_CLI}} capabilities --json`. If the command is unknown, or `record-evidence`/`review` are absent from the list, the installed runtime is too old for these skill assets — ABORT, report `{{KYRO_CLI}} --version`, and ask the user to upgrade. Never work around a missing verb by hand.
+3. Capability handshake: run `{{KYRO_CLI}} capabilities --json`. Unknown command, or `record-evidence`/`review` missing — runtime too old: ABORT, report `{{KYRO_CLI}} --version`. Never work around it by hand.
 4. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack: `nextAction`, `nextTaskId`, `reviewPending`, `conventions`, budget). Do not open the full `sprint.json` to route. No `sprint.json` → INIT.
-4. Load `skills/sprint-forge/SKILL.md`, then the single mode named by the pack's `nextAction`.
+5. Load `skills/sprint-forge/SKILL.md`, then the single mode named by the pack's `nextAction`.
 
 Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint`/status-full (see SKILL.md Read Path Contract).
 

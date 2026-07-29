@@ -37,4 +37,4 @@ Validate completed work and record the verdict through the Kyro checker tool.
 - No complete task without evidence and a passing verdict.
 - Suggestions do not block; keep them in `task.verdict.findings` for retro.
 - Do not hand-edit `task.verdict`.
-- If the CLI rejects `review` as unknown, the runtime is too old: ABORT the forge, report `{{KYRO_CLI}} --version`, and request an upgrade. Hand-writing a verdict is never a permitted fallback.
+- Unknown `review` command → runtime too old: ABORT (Startup handshake). Never hand-write a verdict.
