@@ -341,6 +341,10 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const ideaSkill = readFileSync(join(home, '.agents', 'skills', 'kyro-idea', 'SKILL.md'), 'utf-8');
   assert(ideaSkill.includes('rough or mature idea'), 'install: kyro-idea skill missing adaptive input description');
   assert(ideaSkill.includes('execution-ready pre-scope plan'), 'install: kyro-idea skill missing plan-grade outcome');
+  const executorSkill = readFileSync(join(home, '.agents', 'skills', 'kyro-sprint-executor', 'SKILL.md'), 'utf-8');
+  assert(!executorSkill.includes('{{KYRO_CLI}}'), 'install: kyro-sprint-executor skill left {{KYRO_CLI}} unsubstituted');
+  assert(/runtimeVersion: "/.test(executorSkill), 'install: kyro-sprint-executor skill missing runtimeVersion pin');
+  assert(executorSkill.includes('capabilities --json'), 'install: kyro-sprint-executor skill missing capability handshake');
   assert(existsSync(join(home, '.agents', 'kyro', 'current', 'manifest.json')), 'install: missing runtime manifest');
   assert(existsSync(join(home, '.agents', 'kyro', 'current')), 'install: missing active runtime');
 
@@ -476,6 +480,8 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
     const commandText = readFileSync(commandPath, 'utf-8');
     assert(commandText.includes(`kyro-${command}/SKILL.md`), `opencode install: command ${command} should route to native skill`);
   }
+  const openCodeExecutorSkill = readFileSync(join(home, '.config', 'opencode', 'skills', 'kyro-sprint-executor', 'SKILL.md'), 'utf-8');
+  assert(!openCodeExecutorSkill.includes('{{KYRO_CLI}}'), 'opencode install: kyro-sprint-executor skill left {{KYRO_CLI}} unsubstituted');
   const openCodeIdeaCommand = readFileSync(join(home, '.config', 'opencode', 'commands', 'kyro', 'idea.md'), 'utf-8');
   const openCodeIdeaSkill = readFileSync(join(home, '.config', 'opencode', 'skills', 'kyro-idea', 'SKILL.md'), 'utf-8');
   assert(openCodeIdeaCommand.includes('rough or mature idea'), 'opencode install: idea command missing adaptive input description');

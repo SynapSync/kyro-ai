@@ -1,5 +1,4 @@
 {
-  "$schema": "https://synapsync.dev/schemas/cognitive-manifest.json",
   "name": "sprint-forge",
   "type": "skill",
   "version": "2.1.0",

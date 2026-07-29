@@ -1,0 +1,55 @@
+{
+  "name": "kyro-sprint-executor",
+  "type": "skill",
+  "version": "2.0.0",
+  "description": "Strict end-to-end Kyro sprint execution: capability handshake, per-task context-pack -> implement -> validate -> record-evidence -> review, fail-closed on missing CLI verbs, user-approved sprint close",
+  "author": {
+    "name": "SynapSync",
+    "url": "https://github.com/SynapSync",
+    "email": "hello@synapsync.dev"
+  },
+  "license": "Apache-2.0",
+  "category": "workflow",
+  "tags": [
+    "kyro",
+    "sprint",
+    "execution",
+    "workflow",
+    "task-management",
+    "validation",
+    "verification",
+    "quality-gate",
+    "maker-checker"
+  ],
+  "providers": [
+    "claude",
+    "openai",
+    "cursor",
+    "windsurf",
+    "copilot",
+    "gemini",
+    "codex"
+  ],
+  "file": "SKILL.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SynapSync/kyro-ai"
+  },
+  "homepage": "https://github.com/SynapSync/kyro-ai",
+  "changelog": [
+    {
+      "version": "2.0.0",
+      "date": "2026-07-29",
+      "changes": [
+        "Rewrite as a thin strict executor that defers routing to context-pack and never duplicates sprint-forge modes",
+        "Exact tool-owned CLI usage lines with scope/task flags for every stage",
+        "Step 0 capability handshake: abort fail-closed when the runtime lacks record-evidence/review",
+        "Full task cycle: blocked-after-3-rounds, emergent tasks, debt, clarification gate, checker veto semantics",
+        "Sprint close requires explicit user approval (lifecycle gate)",
+        "Projected to agent skill roots on install/sync with runtimeVersion pin"
+      ]
+    }
+  ],
+  "createdAt": "2026-07-29T00:00:00Z",
+  "updatedAt": "2026-07-29T00:00:00Z"
+}
