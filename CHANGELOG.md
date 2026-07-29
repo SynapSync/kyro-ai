@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.40.0] - 2026-07-29
+
+Closes the three integrity gaps surfaced by the Codex field test: version drift with no handshake, no fail-closed path when a tool-owned verb is missing, and hand-forged evidence that the checker could not distinguish from tool-written evidence.
+
+### Added
+
+- New skill `skills/kyro-sprint-executor` — strict standalone sprint executor for external hosts (Codex, OpenCode, …) that don't load the full plugin. Thin by design: defers routing to `context-pack` and never duplicates sprint-forge modes; opens with the Step 0 capability handshake, gives exact tool-owned CLI usage lines per stage (pack → implement → validate → `record-evidence` → `review`), covers `--status blocked` after three failed rounds, emergent tasks, debt, the clarification gate, and checker-veto semantics, and gates `close-sprint` behind explicit user approval. Projected to every agent skill root (`~/.agents/skills/`, OpenCode skills dir) on install/sync with `{{KYRO_CLI}}` substitution and a `runtimeVersion` pin, managed like the command stubs (sync replaces, uninstall/preflight/drift/doctor cover it, `skill/runtime version` skew check includes it).
+- `kyro capabilities [--json]` — runtime capability handshake. Lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start; an `UNKNOWN_COMMAND` failure on the command itself proves the installed runtime predates the handshake, so fail-closed works even against old binaries. New `scripts/check-capabilities.mjs` in the `npm run check` chain.
+- `kyro doctor` — new `CLI capabilities` check: probes the installed runtime (persisted invocation) with `capabilities --json` and FAILs when any verb the shipped skill assets invoke is missing. Catches exactly the field failure: new skill assets projected next to an old installed binary.
+
+### Changed
+
+- Skill assets now define the fail-closed path for a missing CLI verb (`agents/orchestrator.md` startup handshake step; `skills/sprint-forge/SKILL.md` invariant 9; `execute-task.md`, `review-task.md`, `delegated-execution.md`, `delegates/implementer.md`, `delegates/checker.md`): if `record-evidence`/`review` is unknown to the CLI, ABORT the forge and report `kyro --version` — hand-writing evidence or verdicts is never a permitted fallback. Previously the assets prohibited hand-edits but named no action for the missing-verb case, which is the gap the field agent rationalized through.
+
+### Fixed
+
+- Checker now vetoes hand-forged evidence timestamps: `evidence.recordedAt` more than 5 minutes ahead of the review clock — or unparsable — is a HIGH finding that blocks `kyro review --verdict pass`. `record-evidence` stamps its own clock, so a future `recordedAt` proves a hand-edit; no write-time change was needed. The pre-existing verdict-predates-evidence ordering check gained the same 5-minute skew tolerance so honest cross-host clock drift does not false-positive.
+- `kyro review` and `kyro close-sprint` reject `--dry-run --yes` as mutually exclusive (`INVALID_INPUT`). Previously dry-run silently short-circuited and the `--yes` was ignored.
+
 ## [4.39.0] - 2026-07-27
 
 ### Fixed

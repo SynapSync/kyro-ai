@@ -32,18 +32,19 @@ One scope = one `sprint.json`. Agents read `kyro.json` + the scope's lean pack, 
 
 ## Core Invariants
 
-1. `sprint.json` is the single source of truth; one file to update per action (read it via the pack — see Read Path Contract).
+1. `sprint.json` is the single source of truth; one file to update per action (see Read Path Contract).
 2. Route on the pack's `nextAction` (mirrors `handoff.nextAction`); never infer from file presence.
 3. Generate one sprint; never pre-generate.
 4. Tasks are self-contained: every task carries `description`, `files_to_touch`, `context`, `acceptance_criteria`.
 5. Debt never disappears; it only changes `status` (`open → in_progress → resolved | deferred`).
-6. Closing a sprint is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand. The closed sprint becomes one `ledger[]` entry.
-7. Findings and archives are write-only evidence; agents never re-read them to route.
-8. **Admit unknowns, never guess.** Write `[NEEDS CLARIFICATION: <gap>]` and route to `clarify`. `{{KYRO_CLI}} doctor`/`analyze` FAIL while any marker remains — a deterministic gate.
+6. Closing a sprint is owned by `{{KYRO_CLI}} close-sprint` — never null `activeSprint` by hand; it becomes one `ledger[]` entry.
+7. Findings/archives are write-only evidence; never re-read to route.
+8. **Admit unknowns, never guess.** Write `[NEEDS CLARIFICATION: <gap>]` and route to `clarify`. `{{KYRO_CLI}} doctor`/`analyze` FAIL while any marker remains.
+9. **Tool-owned verbs require a CLI that exposes them** (Startup handshake). A missing verb means the runtime is too old — abort; never fall back by hand.
 
 ## Read Path Contract (context-pack first) — MANDATORY
 
-The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open the full file only to write or in `plan_sprint`/`close_sprint`/status-full (invariant 7: never re-read `archive/`/`findings/`).
+The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open the full file only to write or in `plan_sprint`/`close_sprint`/status-full (invariant 7).
 
 ## Artifact Write Contract (MANDATORY)
 
@@ -51,7 +52,7 @@ Every mutation of `sprint.json` or `kyro.json` MUST be a **safe write**:
 
 > Read the whole file → `JSON.parse` → mutate the object → serialize → overwrite in one write → re-parse to confirm. If the re-parse fails, restore and report.
 
-NEVER partial/string-replace for structural changes (nulling `activeSprint`, removing a nested block) — it orphans the JSON body and corrupts the source of truth. Only exception: the per-sprint archive snapshot (a fresh file, pure write, never re-read).
+NEVER partial/string-replace structural changes (nulling `activeSprint`, removing a nested block) — it orphans and corrupts the JSON. Exception: the archive snapshot (fresh file, pure write).
 
 ## Tool-owned operations (use the CLI, do not hand-roll)
 
@@ -59,9 +60,9 @@ Irreversible or schema-critical operations are CLI-owned, never hand-rolled:
 
 | Command | What it owns |
 |---------|--------------|
-| `{{KYRO_CLI}} close-sprint --kyro-scope <scope> --outcome <...>` | Lossless close: publishes the immutable checkpoint, snapshots the sprint into `ledger[]`, renders the narrative, reconciles state, and resumes matching retries. |
+| `{{KYRO_CLI}} close-sprint --kyro-scope <scope> --outcome <...>` | Lossless close: publishes the checkpoint, snapshots into `ledger[]`, reconciles state. |
 | `{{KYRO_CLI}} doctor --artifacts --kyro-scope <scope>` | Validates shape drift, checkpoint state/digests/artifacts, legacy snapshots, and unresolved `[NEEDS CLARIFICATION]`. |
-| `{{KYRO_CLI}} analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, deps, debt, principles), severity-triaged; non-zero on CRITICAL/HIGH. Gate before close. |
+| `{{KYRO_CLI}} analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, deps, debt, principles); non-zero on CRITICAL/HIGH. Gate before close. |
 | `{{KYRO_CLI}} repair --kyro-scope <scope>` | Normalizes `sprint.json` formatting. |
 
 Claude Code's `PreToolUse` hook blocks edits nulling `activeSprint`; others rely on this contract.
@@ -84,19 +85,19 @@ Templates are loaded only immediately before writing their artifact.
 
 ## Principles, conventions, ADRs
 
-- `principles[]` in `kyro.json`: authored gates; `non-negotiable` blocks. Built-in checks run in `{{KYRO_CLI}} analyze`; free-text gates apply in planning/review.
+- `principles[]` in `kyro.json`: authored gates; `non-negotiable` blocks. Checked in `{{KYRO_CLI}} analyze`; free-text gates apply in review.
 - `conventions[]` in `sprint.json`: operational learned rules from retros/corrections; fold into task context.
-- `adrs[]` in `sprint.json`: durable scope-local architecture decisions with context/tradeoffs. No markdown ADR files or ADR command in v1.
+- `adrs[]` in `sprint.json`: durable scope-local architecture decisions with context/tradeoffs.
 
 ## Artifact Contract
 
 | File | Role |
 |------|------|
-| `.agents/kyro/kyro.json` | Global registry: `scopes[]` (objects `{id,title,status}`), `activeScope`, optional `principles[]` |
+| `.agents/kyro/kyro.json` | Global registry: `scopes[]`, `activeScope`, optional `principles[]` |
 | `.agents/kyro/scopes/{scope}/sprint.json` | Single source of truth (see template) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.md` | Human narrative at close (write-only) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |
-| `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.checkpoint.json` | Versioned lossless scope checkpoint with before/intended-after state (write-only) |
+| `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.checkpoint.json` | Versioned lossless checkpoint (before/after state, write-only) |
 | `.agents/kyro/scopes/{scope}/findings/NN-slug.md` | INIT analysis evidence (write-only) |
 
 ## Boundaries

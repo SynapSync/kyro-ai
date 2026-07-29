@@ -51,6 +51,7 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
     printCloseSprintHelp();
     return;
   }
+  if (args.dryRun && args.yes) throw new KyroCoreError('INVALID_INPUT', '--dry-run and --yes are mutually exclusive.', 'Use --dry-run to preview, or --yes to confirm the write — not both.');
 
   const scope = resolveKyroScope(args.scope);
   const prepared = buildClosePlan(scope, args);

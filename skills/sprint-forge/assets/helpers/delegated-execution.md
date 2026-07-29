@@ -29,7 +29,7 @@ Source from the task pack (`context-pack --task`), **not** the full `sprint.json
 | `acceptance_criteria` | Task pack |
 | Scope conventions | Task pack `conventions` |
 | Expected validation | Derived from acceptance criteria |
-| **Prohibitions** | Worker must NOT mutate `sprint.json` / project layers; must NOT run `close-sprint`, `plan`, or hand-edit evidence/verdict |
+| **Prohibitions** | Worker must NOT mutate `sprint.json` / project layers; must NOT run `close-sprint`, `plan`, or hand-edit evidence/verdict; a missing CLI verb is an abort condition, never a license to hand-write state |
 
 Pass only what the worker needs.
 
@@ -47,6 +47,8 @@ Implementer returns status JSON (see `implementer.md`). Orchestrator maps:
 Worker dies mid-run: re-read tree + task state, re-brief (idempotent).
 
 **CLI flag trap (observed):** `record-evidence` does **not** accept `--yes` / `--confirm`. Those flags belong to `review` (and a few other verbs). Copying `--yes` onto `record-evidence` fails with `INVALID_INPUT` — drop it and retry with only the flags in the usage line (`--summary`, `--validation`, `--file`, `--status`, …).
+
+**CLI verb missing (observed):** if `record-evidence` or `review` fails as an unknown command, the installed runtime is too old for these skill assets. ABORT the forge, report `{{KYRO_CLI}} --version`, and request an upgrade. Hand-writing evidence or verdicts into `sprint.json` is never a permitted fallback.
 
 ## Checker findings (review)
 

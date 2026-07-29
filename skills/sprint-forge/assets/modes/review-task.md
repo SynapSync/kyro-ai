@@ -37,3 +37,4 @@ Validate completed work and record the verdict through the Kyro checker tool.
 - No complete task without evidence and a passing verdict.
 - Suggestions do not block; keep them in `task.verdict.findings` for retro.
 - Do not hand-edit `task.verdict`.
+- Unknown `review` command → runtime too old: ABORT (Startup handshake). Never hand-write a verdict.

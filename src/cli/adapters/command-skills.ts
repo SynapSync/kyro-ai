@@ -1,7 +1,13 @@
 import { AGENT_SKILLS_ROOT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
+import { readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { resolveKyroInvocation } from '../invocation';
 import type { KyroCommandName, OperationPlan } from '../types';
+
+// Full skills (not command stubs) projected verbatim into each agent skill root, so external
+// hosts (Codex, OpenCode, ...) get the strict executor without loading the whole plugin.
+export const PROJECTED_FULL_SKILLS = ['kyro-sprint-executor'] as const;
+export type ProjectedFullSkillName = (typeof PROJECTED_FULL_SKILLS)[number];
 
 export function addCommandSkillProjection(plan: OperationPlan[]): void {
   addCommandSkillProjectionToRoot(plan, AGENT_SKILLS_ROOT);
@@ -19,6 +25,17 @@ export function addCommandSkillProjectionToRoot(plan: OperationPlan[], skillsRoo
       content: buildCommandSkill(command),
     });
   }
+  for (const skill of PROJECTED_FULL_SKILLS) {
+    const path = getFullSkillPathForRoot(skill, skillsRoot);
+    if (plan.some((operation) => operation.path === path)) {
+      continue;
+    }
+    plan.push({
+      action: 'write',
+      path,
+      content: buildFullSkill(skill),
+    });
+  }
 }
 
 export function buildCommandSkillManagedFiles(): string[] {
@@ -26,7 +43,30 @@ export function buildCommandSkillManagedFiles(): string[] {
 }
 
 export function buildCommandSkillManagedFilesForRoot(skillsRoot: string): string[] {
-  return COMMAND_NAMES.map((command) => getCommandSkillPathForRoot(command, skillsRoot));
+  return [
+    ...COMMAND_NAMES.map((command) => getCommandSkillPathForRoot(command, skillsRoot)),
+    ...PROJECTED_FULL_SKILLS.map((skill) => getFullSkillPathForRoot(skill, skillsRoot)),
+  ];
+}
+
+export function getFullSkillPath(skill: ProjectedFullSkillName): string {
+  return getFullSkillPathForRoot(skill, AGENT_SKILLS_ROOT);
+}
+
+export function getFullSkillPathForRoot(skill: ProjectedFullSkillName, skillsRoot: string): string {
+  return `${skillsRoot}/${skill}/SKILL.md`;
+}
+
+/**
+ * Projects a packaged full skill: substitutes {{KYRO_CLI}} with the durable invocation and pins
+ * runtimeVersion in the frontmatter so checkSkillRuntimeSkew covers it like the command stubs.
+ */
+export function buildFullSkill(skill: ProjectedFullSkillName): string {
+  const source = readPackageText(`skills/${skill}/SKILL.md`);
+  const cli = resolveKyroInvocation().raw;
+  const substituted = source.replaceAll('{{KYRO_CLI}}', cli);
+  const packageVersion = readPackageVersion();
+  return substituted.replace(/^(  version: "[^"\n]+")$/m, `$1\n  runtimeVersion: "${packageVersion}"`);
 }
 
 export function getCommandSkillPath(command: KyroCommandName): string {

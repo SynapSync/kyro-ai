@@ -28,9 +28,10 @@ import {
   readSharedProjectState,
 } from '../state';
 import { KyroCoreError } from '../core/errors';
+import { TOOL_OWNED_VERBS } from '../core/capabilities';
 import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
 import { guardEnforcement } from '../adapters/registry-types';
-import { getCommandSkillPath, parseSkillRuntimeVersion } from '../adapters/command-skills';
+import { getCommandSkillPath, getFullSkillPath, PROJECTED_FULL_SKILLS, parseSkillRuntimeVersion } from '../adapters/command-skills';
 import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
 import { detectPackageRootMode, FULL_PACKAGE_INSTALL_REMEDY, FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 import {
@@ -87,6 +88,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
     checkTeamMinPackageVersion(),
     checkGlobalRuntime(),
     checkCliInvocation(),
+    checkCliCapabilities(),
     checkSkillRuntimeSkew(),
     ...checkAdapterProjections(),
   ];
@@ -558,6 +560,34 @@ function checkCliInvocation(): CheckResult {
 }
 
 /**
+ * FAIL when the installed runtime does not expose every tool-owned verb the shipped skill assets
+ * invoke. This is the capability handshake against version drift: new skill assets + old binary
+ * left agents improvising hand-edits in the field. An UNKNOWN_COMMAND on `capabilities` itself
+ * proves the runtime predates the handshake.
+ */
+function checkCliCapabilities(): CheckResult {
+  const remedy = 'Installed kyro CLI predates the capability handshake or is missing verbs the skill assets require. Upgrade the kyro package and re-run kyro sync.';
+  try {
+    const manifest = readManifest();
+    if (!manifest) {
+      return { status: 'warn', name: 'CLI capabilities', detail: `${KYRO_MANIFEST_PATH} not found; no installed runtime to probe`, remedy };
+    }
+    const raw = getPersistedKyroInvocation();
+    const [command, ...args] = raw.trim().split(/\s+/).map(expandHome);
+    const stdout = execFileSync(command, [...args, 'capabilities', '--json'], { encoding: 'utf8', timeout: 5000 });
+    const payload = JSON.parse(stdout) as { version?: unknown; capabilities?: unknown };
+    const verbs = Array.isArray(payload.capabilities) ? payload.capabilities : [];
+    const missing = TOOL_OWNED_VERBS.filter((verb) => !verbs.includes(verb));
+    if (missing.length > 0) {
+      return { status: 'fail', name: 'CLI capabilities', detail: `installed runtime (${String(payload.version ?? 'unknown version')}) is missing tool-owned verb(s): ${missing.join(', ')}`, remedy };
+    }
+    return { status: 'pass', name: 'CLI capabilities', detail: `installed runtime ${String(payload.version ?? '')} exposes all ${TOOL_OWNED_VERBS.length} tool-owned verbs` };
+  } catch (error: unknown) {
+    return { status: 'fail', name: 'CLI capabilities', detail: errorMessage(error), remedy };
+  }
+}
+
+/**
  * WARN when projected host skill stubs lag the global runtime package version (post-mortem #2 F2).
  * Stubs without runtimeVersion are treated as pre-pin legacy → WARN with reinstall remedy.
  */
@@ -579,33 +609,37 @@ function checkSkillRuntimeSkew(): CheckResult {
   const missingPin: string[] = [];
   const missingFile: string[] = [];
 
-  for (const command of COMMAND_NAMES) {
-    const managed = getCommandSkillPath(command);
+  const projectedStubs: Array<{ label: string; managed: string }> = [
+    ...COMMAND_NAMES.map((command) => ({ label: `kyro-${command}`, managed: getCommandSkillPath(command) })),
+    ...PROJECTED_FULL_SKILLS.map((skill) => ({ label: skill, managed: getFullSkillPath(skill) })),
+  ];
+
+  for (const { label, managed } of projectedStubs) {
     let absolute: string;
     try {
       absolute = resolveManagedPath(managed);
     } catch {
-      missingFile.push(`kyro-${command}`);
+      missingFile.push(label);
       continue;
     }
     if (!existsSync(absolute)) {
-      missingFile.push(`kyro-${command}`);
+      missingFile.push(label);
       continue;
     }
     let body: string;
     try {
       body = readFileSync(absolute, 'utf-8');
     } catch {
-      missingFile.push(`kyro-${command}`);
+      missingFile.push(label);
       continue;
     }
     const pinned = parseSkillRuntimeVersion(body);
     if (!pinned) {
-      missingPin.push(`kyro-${command}`);
+      missingPin.push(label);
       continue;
     }
     if (pinned !== runtimeVersion) {
-      mismatched.push(`kyro-${command}@${pinned}`);
+      mismatched.push(`${label}@${pinned}`);
     }
   }
 

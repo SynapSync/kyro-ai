@@ -24,6 +24,7 @@ Usage:
   kyro status [mode]           Read-only scope progress, review debt, and debt report
   kyro close-sprint [options]  Checkpoint + close the active sprint (lossless, tool-owned)
   kyro context-pack [options]  Emit a context package for a scope from sprint.json
+  kyro capabilities [--json]   List supported tool-owned verbs (runtime handshake)
   kyro eval [options]          Run deterministic behavioral eval cases
   kyro mcp <subcommand>        Run or inspect the Kyro MCP server
   kyro trace [options]          Read or clear the append-only scope trace

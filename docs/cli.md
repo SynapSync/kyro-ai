@@ -13,6 +13,7 @@ kyro status             # Read-only brief status for the active Kyro scope
 kyro status full        # Read-only phase/task summary and review debt
 kyro status debt        # Read-only debt grouped by status and priority
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
+kyro capabilities       # List supported tool-owned verbs + version (runtime handshake)
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
 kyro scope set-active <scope> --yes  # Change active scope with guardrail confirmation
@@ -418,7 +419,11 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 ## Maker/checker review
 
-`kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. See [maker-checker.md](maker-checker.md).
+`kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. `--dry-run` and `--yes` are mutually exclusive (preview or confirm, not both) — the same applies to `kyro close-sprint`. See [maker-checker.md](maker-checker.md).
+
+## Runtime capability handshake (`kyro capabilities`)
+
+`kyro capabilities [--json]` lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start: a missing verb — or an `UNKNOWN_COMMAND` failure on the command itself — means the installed runtime predates the skill assets and the forge must abort with an upgrade request instead of improvising hand-edits. `kyro doctor` probes the installed runtime with the same handshake (`CLI capabilities` check).
 
 ## Tool-owned debt mutation (`kyro debt`)
 

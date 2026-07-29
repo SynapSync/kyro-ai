@@ -10,7 +10,6 @@ dist/
 
 # AI runtime state
 /.agents/
-.claude-plugin/
 .cursor/
 .commandcode/
 openspec/

@@ -58,4 +58,6 @@ The orchestrator (not the delegate) invokes `{{KYRO_CLI}} record-evidence` and a
 
 If you are the orchestrator running without a spawnable subagent, execute the task yourself per `execute-task.md` (single-agent path). Never fail the forge because delegation is unavailable.
 
+A missing CLI verb is NOT a delegation fallback: if `record-evidence` is unknown to the CLI, return `blocked` and abort the forge — never fabricate evidence by hand.
+
 See: `docs/architecture.md`, `docs/context-management.md`, `docs/maker-checker.md`.

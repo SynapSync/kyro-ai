@@ -241,6 +241,28 @@ function assertSingleDecisionSite() {
   assert(offenders.length === 0, `checker decision logic outside core/analysis.ts:\n${offenders.join('\n')}`);
 }
 
+function assertDryRunYesExclusive() {
+  // --dry-run previews and --yes confirms a write; together they are contradictory. Before this
+  // guard, dry-run silently short-circuited and the --yes was ignored — ambiguous for agents.
+  const combos = [
+    ['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass', '--dry-run', '--yes'],
+    ['close-sprint', '--kyro-scope', 'demo', '--dry-run', '--yes'],
+  ];
+  for (const args of combos) {
+    const root = sandbox();
+    try {
+      prepareDoneTask(root);
+      const before = sig(sprintPath(root));
+      const result = run(args, root);
+      assert(result.status === 1 && (result.stderr + result.stdout).includes('mutually exclusive'), `${args[0]} --dry-run --yes should be rejected as mutually exclusive: ${result.stdout}${result.stderr}`);
+      const after = sig(sprintPath(root));
+      assert(before.bytes === after.bytes && before.mtimeMs === after.mtimeMs, `rejected ${args[0]} combo must not write`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+}
+
 function main() {
   assertSingleDecisionSite();
   assertCoverageVetoAndZeroWrite();
@@ -249,6 +271,7 @@ function main() {
   assertSelfReviewPolicy();
   assertReviewConfirmationPolicy();
   assertNormalizedCriterionMatching();
+  assertDryRunYesExclusive();
   console.log('check:maker-checker — deterministic maker/checker invariants passed');
 }
 
