@@ -13,11 +13,16 @@ Kyro preserves quality by loading the smallest contract needed for the current l
 
 ## Startup
 
-1. Read `.agents/kyro/kyro.json` if present.
-2. Resolve scope from user input, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
-3. Capability handshake: run `{{KYRO_CLI}} capabilities --json`. Unknown command, or `record-evidence`/`review` missing — runtime too old: ABORT, report `{{KYRO_CLI}} --version`. Never work around it by hand.
-4. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack: `nextAction`, `nextTaskId`, `reviewPending`, `conventions`, budget). Do not open the full `sprint.json` to route. No `sprint.json` → INIT.
-5. Load `skills/sprint-forge/SKILL.md`, then the single mode named by the pack's `nextAction`.
+1. **Resolve `{{KYRO_CLI}}`, once per session, before anything else below.** This token is normally substituted at install time by `npx kyro-ai install`/`sync`. If you are reading this from a channel that never ran that substitution (for example, installed as a Claude Code plugin from the marketplace), the literal 12 characters `{{KYRO_CLI}}` are still sitting in this file — resolve them yourself:
+   - Run `kyro --version`. If it exits 0, `{{KYRO_CLI}}` means bare `kyro` for the rest of this session.
+   - Else, check whether `~/.agents/kyro/current/dist/cli.js` exists. If it does, `{{KYRO_CLI}}` means `node ~/.agents/kyro/current/dist/cli.js`.
+   - Else, Kyro's runtime is not installed on this machine. STOP — tell the user to run `npx kyro-ai@latest install --scope workspace --init-workspace --yes` once, then retry. This is not a license to hand-edit `sprint.json` or improvise; same rule as a missing verb in Step 4.
+   Substitute the resolved value mentally everywhere `{{KYRO_CLI}}` appears in this or any other loaded skill asset for the rest of the session — never run the eight literal characters `{{KYRO_CLI}}`.
+2. Read `.agents/kyro/kyro.json` if present.
+3. Resolve scope from user input, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
+4. Capability handshake: run `{{KYRO_CLI}} capabilities --json`. Unknown command, or `record-evidence`/`review` missing — runtime too old: ABORT, report `{{KYRO_CLI}} --version`. Never work around it by hand.
+5. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack: `nextAction`, `nextTaskId`, `reviewPending`, `conventions`, budget). Do not open the full `sprint.json` to route. No `sprint.json` → INIT.
+6. Load `skills/sprint-forge/SKILL.md`, then the single mode named by the pack's `nextAction`.
 
 Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint`/status-full (see SKILL.md Read Path Contract).
 

@@ -19,6 +19,8 @@ Execute the active Kyro sprint exclusively through the Kyro CLI. All state lives
 
 ## Step 0 — Capability handshake (MANDATORY, once per session)
 
+**First, resolve `{{KYRO_CLI}}` if it hasn't been substituted.** This token is normally replaced at install time by `npx kyro-ai install`/`sync`. Since this skill is explicitly designed for external hosts that may load it standalone (never having run that installer), the literal characters `{{KYRO_CLI}}` may still be present below — resolve once per session, before anything else: try `kyro --version`; if that exits 0, use bare `kyro` for the rest of this session. Else check whether `~/.agents/kyro/current/dist/cli.js` exists and use `node ~/.agents/kyro/current/dist/cli.js`. Else Kyro's runtime is not installed on this machine — STOP, tell the user to run `npx kyro-ai@latest install --scope workspace --init-workspace --yes` once, then retry. This is not a license to hand-edit `sprint.json` or improvise — same rule as a missing verb below.
+
 Run `{{KYRO_CLI}} capabilities --json`.
 
 - If the command is unknown, or `record-evidence`/`review` are absent from the list, the installed runtime is too old for this skill. **ABORT**: report `{{KYRO_CLI}} --version` output and ask the user to upgrade. There is NO manual fallback.

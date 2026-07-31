@@ -128,6 +128,7 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
     out.push({ ...finding, id: `A${String(n).padStart(3, '0')}` });
   }
   if (!Array.isArray(sprint.successCriteria) || sprint.successCriteria.length === 0) add('MEDIUM', 'spec', 'scope has no successCriteria', 'Add 2–5 technology-agnostic, measurable outcomes (see INIT).');
+  if (!sprint.author) add('LOW', 'metadata', 'scope has no author (git identity was not captured at init)', 'Best-effort only — no action required. Future scopes: ensure INIT used `kyro plan --from <file>` so git identity is captured automatically.');
   return out.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
 }
 

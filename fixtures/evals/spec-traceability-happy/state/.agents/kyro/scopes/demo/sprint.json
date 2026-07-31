@@ -4,6 +4,12 @@
   "title": "Demo",
   "status": "active",
   "objective": "Demo objective",
+  "author": {
+    "name": "Ada Lovelace",
+    "email": "ada@example.com",
+    "source": "git",
+    "capturedAt": "2026-07-01T00:00:00.000Z"
+  },
   "successCriteria": [
     "Demo works."
   ],

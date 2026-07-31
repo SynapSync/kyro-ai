@@ -52,11 +52,13 @@ Load `../templates/sprint.json`. Fill:
 - `roadmap` from the sizing above.
 - `conventions: []` (operational learned rules populated later by `learner.md`), `adrs: []` (durable architectural decisions, no markdown ADR files), `clarifications: []` (populated by `clarify.md`), `activeSprint: null`.
 - `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write `[NEEDS CLARIFICATION: ...]` markers rather than guessing), otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.
-- **Do not invent `author`.** Scope creator identity is machine-captured only by `{{KYRO_CLI}} plan` from git `user.name` and/or `user.email` when at least one is set. On the hand-write fallback, **omit** the `author` field entirely.
+- **Do not invent `author`.** Scope creator identity is machine-captured only by `{{KYRO_CLI}} plan` from git `user.name` and/or `user.email` when at least one is set. Hand-writing `sprint.json` never captures it — see the mandatory path below.
 
 **Plan-grade Seedbed mapping:** when a matured-idea document is referenced, load `../helpers/seedbed-init-mapping.md` and apply its exact schema-safe mapping. Account for every material item before writing. Do not load this helper on the normal one-line INIT path.
 
-Preferred: write a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap` — **no `author` field**) and run `{{KYRO_CLI}} plan --from <file>` — tool-owned and validated, it materializes `sprint.json` (including optional `author` from git when available) and registers `kyro.json` for you (skip to Step 6's verification only). Fallback: hand-write the document without inventing `author`.
+**Mandatory: materialize `sprint.json` via the CLI, not by hand.** Write a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap` — **no `author` field**) and run `{{KYRO_CLI}} plan --from <file>`. This is tool-owned and validated: it materializes `sprint.json` (including optional `author` captured from git when available) and registers `kyro.json` for you — skip straight to Step 6's verification. The startup capability handshake (`{{KYRO_CLI}} capabilities --json`, orchestrator Step 3) already confirms `plan` is supported before INIT ever runs, so there is essentially never a legitimate reason to skip this.
+
+If `{{KYRO_CLI}} plan --from <file>` returns a validation error (e.g. `INVALID_INPUT`, `INVALID_SPRINT_SHAPE`), **fix the lean plan JSON and retry the CLI** — do not fall back to hand-writing. Hand-writing `sprint.json` directly is a **recovery-only fallback**, reserved for when the CLI genuinely cannot run (`UNKNOWN_COMMAND`, missing binary, crash) — never a routine choice. On that narrow fallback, hand-write the document without inventing `author`.
 
 Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`: read the current target when present, serialize the complete v4 document, write atomically, then re-read and parse it before continuing. Create `archive/` and `findings/` beside it. Do not update `kyro.json` until this verification succeeds.
 
