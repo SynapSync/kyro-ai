@@ -93,6 +93,8 @@ Full multi-dev commit matrix: [Teams](teams.md).
 
 `npx kyro-ai@latest install` does **not** permanently put `kyro` on PATH. Install/sync records a durable invocation in the **global** `manifest.json` only (bare `kyro` only if a real global bin exists; otherwise `node ~/.agents/kyro/current/dist/cli.js`). Projected modes under `current/` substitute that string for agents. Project state files are not the source of truth for the CLI string — one install/sync refreshes invocation for every workspace on the machine.
 
+Installed as a **Claude Code plugin** instead (marketplace install, no `npx kyro-ai install` ever run)? The plugin channel ships the raw skill/agent files unsubstituted — the orchestrator resolves the CLI invocation itself at the start of every session (same `kyro` vs. `node ~/.agents/kyro/current/dist/cli.js` decision, see `agents/orchestrator.md`'s Startup Step 1), so no separate setup is required for that path either.
+
 After upgrades (from the project root):
 
 ```bash
