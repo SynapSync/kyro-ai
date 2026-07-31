@@ -163,7 +163,9 @@ function main() {
     includes: ['MEDIUM', 'shipped without a scenario reference'],
   });
   assertAnalyze({
-    mutate: () => {},
+    // author set explicitly to isolate this from the unrelated "scope has no author" LOW finding
+    // (analysis.ts) — this case tests absence of spec findings only.
+    mutate: (sprint) => { sprint.author = { name: 'Ada Lovelace', source: 'git', capturedAt: '2026-01-01T00:00:00.000Z' }; },
     status: 0,
     includes: ['no semantic issues found'],
     excludes: ['scenario', 'requirement'],
