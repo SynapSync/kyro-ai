@@ -589,7 +589,13 @@ function checkCliCapabilities(): CheckResult {
 
 /**
  * WARN when projected host skill stubs lag the global runtime package version (post-mortem #2 F2).
- * Stubs without runtimeVersion are treated as pre-pin legacy → WARN with reinstall remedy.
+ *
+ * A missing runtimeVersion pin means different things by projection kind, so the severity differs.
+ * Command stubs predate the pin, so an unpinned one is legacy → WARN. Full skills
+ * (PROJECTED_FULL_SKILLS) only ever shipped WITH a pin, so an unpinned file at that managed path
+ * cannot be legacy — it is foreign or hand-edited content shadowing the projected skill → FAIL.
+ * That is the drift that silently ran an old kyro-sprint-executor draft with no capability
+ * handshake and no close gate, and it must not be dismissible as a warning.
  */
 function checkSkillRuntimeSkew(): CheckResult {
   const manifest = readManifest();
@@ -606,15 +612,16 @@ function checkSkillRuntimeSkew(): CheckResult {
   }
 
   const mismatched: string[] = [];
-  const missingPin: string[] = [];
+  const missingPinStub: string[] = [];
+  const missingPinFull: string[] = [];
   const missingFile: string[] = [];
 
-  const projectedStubs: Array<{ label: string; managed: string }> = [
-    ...COMMAND_NAMES.map((command) => ({ label: `kyro-${command}`, managed: getCommandSkillPath(command) })),
-    ...PROJECTED_FULL_SKILLS.map((skill) => ({ label: skill, managed: getFullSkillPath(skill) })),
+  const projectedStubs: Array<{ label: string; managed: string; full: boolean }> = [
+    ...COMMAND_NAMES.map((command) => ({ label: `kyro-${command}`, managed: getCommandSkillPath(command), full: false })),
+    ...PROJECTED_FULL_SKILLS.map((skill) => ({ label: skill, managed: getFullSkillPath(skill), full: true })),
   ];
 
-  for (const { label, managed } of projectedStubs) {
+  for (const { label, managed, full } of projectedStubs) {
     let absolute: string;
     try {
       absolute = resolveManagedPath(managed);
@@ -635,7 +642,7 @@ function checkSkillRuntimeSkew(): CheckResult {
     }
     const pinned = parseSkillRuntimeVersion(body);
     if (!pinned) {
-      missingPin.push(label);
+      (full ? missingPinFull : missingPinStub).push(label);
       continue;
     }
     if (pinned !== runtimeVersion) {
@@ -643,6 +650,16 @@ function checkSkillRuntimeSkew(): CheckResult {
     }
   }
 
+  // A full skill with no pin is unmanaged content at a managed path — not lag. Report it first and
+  // hard-fail, because loading it means running instructions Kyro did not project.
+  if (missingPinFull.length > 0) {
+    return {
+      status: 'fail',
+      name: 'skill/runtime version',
+      detail: `projected skill(s) lack a runtimeVersion pin, so the file at the managed path is not the skill Kyro projects: ${missingPinFull.join(', ')} (runtime ${runtimeVersion})`,
+      remedy: GLOBAL_RUNTIME_SYNC_REMEDY,
+    };
+  }
   if (missingFile.length > 0) {
     return {
       status: 'warn',
@@ -659,11 +676,11 @@ function checkSkillRuntimeSkew(): CheckResult {
       remedy: GLOBAL_RUNTIME_SYNC_REMEDY,
     };
   }
-  if (missingPin.length > 0) {
+  if (missingPinStub.length > 0) {
     return {
       status: 'warn',
       name: 'skill/runtime version',
-      detail: `skill stub(s) lack runtimeVersion pin (re-sync to align with runtime ${runtimeVersion}): ${missingPin.join(', ')}`,
+      detail: `skill stub(s) lack runtimeVersion pin (re-sync to align with runtime ${runtimeVersion}): ${missingPinStub.join(', ')}`,
       remedy: GLOBAL_RUNTIME_SYNC_REMEDY,
     };
   }

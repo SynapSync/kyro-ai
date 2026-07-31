@@ -512,7 +512,9 @@ for (const mode of ['corrupt', 'unsupported']) {
   const root = makeSandbox();
   try {
     const interactiveArgs = closeArgs.filter((arg) => arg !== '--confirm');
-    const close = runAsync(root, interactiveArgs);
+    // Outside a TTY close-sprint now refuses rather than prompting into a pipe that may never answer,
+    // so opt this pipe-driven case back into the interactive path to keep exercising the prompt.
+    const close = runAsync(root, interactiveArgs, { KYRO_TEST_ASSUME_TTY: '1' });
     await waitForChild(close, () => close.text().includes('[y/N]'), 'interactive close did not reach confirmation prompt');
     assert(!existsSync(join(root, '.kyro-state-writer.lock')), 'interactive prompt held the writer lock');
     const ready = join(root, 'repair-ready');
