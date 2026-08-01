@@ -1,10 +1,21 @@
 import { readPackageVersion } from '../help';
 
-// Every {{KYRO_CLI}} verb the shipped skill assets (skills/, agents/, commands/) invoke. The
-// orchestrator verifies this list at forge start; a runtime missing any of these verbs — or the
-// capabilities command itself — is too old for the installed skill assets and must be upgraded.
+/**
+ * The verbs the orchestrator verifies at forge start. A runtime missing any of them — or the
+ * capabilities command itself — is too old for the installed skill assets and must be upgraded.
+ *
+ * Inclusion rule (enforced by scripts/check-capabilities.mjs): a verb belongs here if the shipped
+ * assets invoke it as `{{KYRO_CLI}} <verb>`, OR it is a tool-owned state writer documented for
+ * agent use. `scenario`, `adr`, and `rule` qualify under the second half (they mutate Kyro state — see
+ * isMutatingInvocation in app.ts — and docs/spec-traceability.md drives agents to them).
+ *
+ * Deliberately excluded: install, sync, uninstall, detect, eval, tui, mcp, trace, scope —
+ * operator/runtime surface, not sprint-lifecycle verbs. Also excluded: `capabilities` itself, since
+ * the handshake cannot verify itself; its absence IS the staleness signal.
+ */
 export const TOOL_OWNED_VERBS = [
   'add-emergent',
+  'adr',
   'analyze',
   'close-sprint',
   'context-pack',
@@ -14,6 +25,9 @@ export const TOOL_OWNED_VERBS = [
   'record-evidence',
   'repair',
   'review',
+  'rule',
+  'scenario',
+  'status',
 ] as const;
 
 export interface CapabilitiesPayload {

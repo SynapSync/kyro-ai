@@ -18,6 +18,7 @@ import type {
   KyroSharedProjectState,
   KyroInstalledAdapter,
   KyroScopeEntry,
+  Convention,
   Principle,
   TeamPolicy,
 } from './types';
@@ -133,7 +134,7 @@ export function readManifest(): KyroManifest | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Deterministic merge: shared owns principles/team/scopes/artifactRoot;
+ * Deterministic merge: shared owns principles/conventions/team/scopes/artifactRoot;
  * local owns activeScope/installedAdapters (+ optional runtimePath).
  */
 export function mergeProjectLayers(
@@ -151,6 +152,7 @@ export function mergeProjectLayers(
     installedAdapters: local.installedAdapters,
   };
   if (shared.principles !== undefined) effective.principles = shared.principles;
+  if (shared.conventions !== undefined) effective.conventions = shared.conventions;
   if (shared.team !== undefined) effective.team = shared.team;
   return stripLegacyProjectFields(effective);
 }
@@ -165,6 +167,7 @@ export function effectiveFromMonolito(monolito: KyroProjectState): KyroProjectSt
     runtimePath: typeof base.runtimePath === 'string' && base.runtimePath ? base.runtimePath : KYRO_ROOT,
     installedAdapters: Array.isArray(base.installedAdapters) ? base.installedAdapters : [],
     ...(base.principles !== undefined ? { principles: base.principles } : {}),
+    ...(base.conventions !== undefined ? { conventions: base.conventions } : {}),
     ...(base.team !== undefined ? { team: base.team } : {}),
   };
 }
@@ -191,6 +194,9 @@ export function splitMonolitoToLayers(monolito: KyroProjectState): SplitMonolito
   };
   if (effective.principles !== undefined) {
     shared.principles = effective.principles.map(clonePrinciple);
+  }
+  if (effective.conventions !== undefined) {
+    shared.conventions = effective.conventions.map(cloneConvention);
   }
   if (effective.team !== undefined) {
     shared.team = cloneTeamPolicy(effective.team);
@@ -302,6 +308,7 @@ export interface ProjectStateLayerUpdate {
   activeScope?: string | null;
   installedAdapters?: KyroInstalledAdapter[];
   principles?: Principle[];
+  conventions?: Convention[];
   team?: TeamPolicy;
   artifactRoot?: string;
   runtimePath?: string;
@@ -339,12 +346,14 @@ export function updateProjectStateLayersUnlocked(update: ProjectStateLayerUpdate
     ...(update.installedAdapters !== undefined ? { installedAdapters: update.installedAdapters } : {}),
     ...(update.runtimePath !== undefined ? { runtimePath: update.runtimePath } : {}),
     ...(update.principles !== undefined ? { principles: update.principles } : {}),
+    ...(update.conventions !== undefined ? { conventions: update.conventions } : {}),
     ...(update.team !== undefined ? { team: update.team } : {}),
   };
 
   const touchShared =
     update.scopes !== undefined
     || update.principles !== undefined
+    || update.conventions !== undefined
     || update.team !== undefined
     || update.artifactRoot !== undefined;
   const touchLocal =
@@ -385,6 +394,7 @@ export function sanitizeSharedForWrite(shared: KyroSharedProjectState): KyroShar
     artifactRoot: shared.artifactRoot || ARTIFACT_ROOT,
     scopes: Array.isArray(shared.scopes) ? shared.scopes.map(cloneScopeEntry) : [],
     ...(shared.principles !== undefined ? { principles: shared.principles.map(clonePrinciple) } : {}),
+    ...(shared.conventions !== undefined ? { conventions: shared.conventions.map(cloneConvention) } : {}),
     ...(shared.team !== undefined ? { team: cloneTeamPolicy(shared.team) } : {}),
   }) as KyroSharedProjectState & Record<string, unknown>;
   delete cleaned.activeScope;
@@ -397,6 +407,7 @@ export function sanitizeSharedForWrite(shared: KyroSharedProjectState): KyroShar
     artifactRoot: cleaned.artifactRoot,
     scopes: cleaned.scopes,
     ...(cleaned.principles !== undefined ? { principles: cleaned.principles as Principle[] } : {}),
+    ...(cleaned.conventions !== undefined ? { conventions: cleaned.conventions as Convention[] } : {}),
     ...(cleaned.team !== undefined ? { team: cleaned.team as TeamPolicy } : {}),
   };
 }
@@ -411,6 +422,7 @@ export function sanitizeLocalForWrite(local: KyroLocalProjectState): KyroLocalPr
     ...(local.runtimePath !== undefined ? { runtimePath: local.runtimePath } : {}),
   }) as KyroLocalProjectState & Record<string, unknown>;
   delete cleaned.principles;
+  delete cleaned.conventions;
   delete cleaned.team;
   delete cleaned.scopes;
   delete cleaned.artifactRoot;
@@ -460,6 +472,7 @@ function normalizeShared(raw: KyroSharedProjectState | null): KyroSharedProjectS
       : ARTIFACT_ROOT,
     scopes: Array.isArray(stripped.scopes) ? stripped.scopes : [],
     ...(stripped.principles !== undefined ? { principles: stripped.principles } : {}),
+    ...(stripped.conventions !== undefined ? { conventions: stripped.conventions } : {}),
     ...(stripped.team !== undefined ? { team: stripped.team } : {}),
   };
 }
@@ -470,9 +483,11 @@ function normalizeLocal(raw: KyroLocalProjectState | null): KyroLocalProjectStat
   }
   const stripped = stripLegacyProjectFields({ ...raw }) as KyroLocalProjectState & {
     principles?: unknown;
+    conventions?: unknown;
     team?: unknown;
   };
   delete stripped.principles;
+  delete stripped.conventions;
   delete stripped.team;
   return {
     schemaVersion: 4,
@@ -511,6 +526,15 @@ function clonePrinciple(principle: Principle): Principle {
     severity: principle.severity,
     rationale: principle.rationale,
     ...(principle.check !== undefined ? { check: principle.check } : {}),
+  };
+}
+
+function cloneConvention(convention: Convention): Convention {
+  return {
+    id: convention.id,
+    rule: convention.rule,
+    tags: [...convention.tags],
+    addedSprint: convention.addedSprint,
   };
 }
 

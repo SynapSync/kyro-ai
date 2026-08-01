@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `kyro rule add` registers an operational convention in the active scope without hand-editing `sprint.json`. Agents now ask whether the rule should also persist globally; `--global` writes it to shared `project.json.conventions[]`, and `context-pack` inherits global rules into every scope.
+- `scripts/check-rule.mjs` covers scope-only registration, global promotion, cross-scope inheritance, duplicate refusal, missing layered-state refusal, and the agent-facing “ask before global” contract.
+
+### Changed
+
+- Sprint-forge, the standalone sprint executor, and the orchestrator now define “register a Kyro rule” explicitly and prohibit `RULES.md`/`rules.md` fallbacks. Missing `rule` capability is an upgrade blocker, never permission to edit managed JSON manually.
+
+## [4.41.0] - 2026-07-29
+
+Follow-up to 4.40.0 from a second Codex field test (~7h, 6 sprints closed). The 4.40.0 handshake and close gate both held; this release closes the three defects the run exposed instead.
+
+### Added
+
+- `kyro capabilities` now advertises `status`, `scenario`, and `adr`. `status` was already invoked by the shipped assets (`{{KYRO_CLI}} status full`) while absent from the payload, so an agent validating its verbs strictly would abort on a verb the CLI has. `scenario` and `adr` are tool-owned `sprint.json` writers documented for agent use.
+- `scripts/check-capabilities.mjs` enforces the capability contract in both directions, so it cannot silently drift again: every `{{KYRO_CLI}} <verb>` the shipped assets invoke must be advertised (exempting `capabilities` itself, which cannot verify itself), and every advertised verb must be dispatchable by the CLI.
+
+### Changed
+
+- `kyro doctor` escalates an unpinned projected full skill from WARN to FAIL. Command stubs predate the `runtimeVersion` pin, so an unpinned one is legacy (still WARN); full skills only ever shipped with a pin, so an unpinned file at that managed path is foreign or hand-edited content shadowing the projected skill. That is how an old `kyro-sprint-executor` draft with no capability handshake and no close gate ran unnoticed for two sprints — both closed without the user approval the gate requires.
+
+### Fixed
+
+- `kyro close-sprint` no longer hangs outside a TTY. It is the only verb that confirms interactively; in an agent harness, CI, or a piped shell the `[y/N]` prompt blocked on stdin that never arrives until the caller timed out. It now fails immediately with `CONFIRMATION_REQUIRED` and a remedy naming `--yes`. The MCP path is unaffected (it calls `buildClosePlan` directly).
+
 ## [4.40.0] - 2026-07-29
 
 Closes the three integrity gaps surfaced by the Codex field test: version drift with no handshake, no fail-closed path when a tool-owned verb is missing, and hand-forged evidence that the checker could not distinguish from tool-written evidence.

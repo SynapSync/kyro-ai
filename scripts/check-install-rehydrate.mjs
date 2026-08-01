@@ -370,4 +370,31 @@ withWorkspace('kyro-rehydrate-doctor-', (cwd) => {
   assert(registry?.remedy?.includes('install'), 'doctor: remedy mentions install/sync');
 });
 
+// --- doctor FAILS (not warns) when a projected full skill has no runtimeVersion pin ---
+// Full skills only ever shipped WITH a pin, so an unpinned file at that managed path is foreign or
+// hand-edited content shadowing the projected skill. That is how an old kyro-sprint-executor draft
+// with no capability handshake and no close gate ran unnoticed, so it must not be a dismissible warn.
+withWorkspace('kyro-rehydrate-skill-pin-', (cwd) => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install } = require(join(repo, 'dist/cli/commands/install.js'));
+  const { runDoctorChecks } = require(join(repo, 'dist/cli/commands/doctor.js'));
+  const standard = parseAgent('standard');
+
+  captureLogs(() => install(cliOptions({ agents: [standard], initWorkspace: true })));
+
+  const skillPath = join(cwd, '.home', '.agents', 'skills', 'kyro-sprint-executor', 'SKILL.md');
+  const projected = readFileSync(skillPath, 'utf-8');
+  assert(/^\s*runtimeVersion: "/m.test(projected), 'skill pin: install should project a runtimeVersion pin');
+  assert(
+    runDoctorChecks(false, false, false, false, null).find((c) => c.name === 'skill/runtime version')?.status === 'pass',
+    'skill pin: a freshly projected skill should pass the skew check',
+  );
+
+  writeFileSync(skillPath, projected.replace(/^\s*runtimeVersion: "[^"\n]*"\n/m, ''), 'utf-8');
+  const skew = runDoctorChecks(false, false, false, false, null).find((c) => c.name === 'skill/runtime version');
+  assert(skew?.status === 'fail', `skill pin: unpinned full skill should FAIL, got ${skew?.status}`);
+  assert(skew?.detail?.includes('kyro-sprint-executor'), 'skill pin: detail should name the offending skill');
+  assert(skew?.remedy, 'skill pin: a failing skew check must carry a remedy');
+});
+
 console.log('Install rehydrate checks passed');

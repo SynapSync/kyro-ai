@@ -4,7 +4,7 @@ Close a sprint by publishing a versioned lossless scope checkpoint, retaining th
 
 **The destructive step is NOT done by hand. It is owned by the CLI.** The command first publishes an immutable checkpoint containing complete `sprint.json` and affected `kyro.json` scope state before and after close. It then writes the compatible ActiveSprint snapshot and narrative and reconciles live state with compare-and-swap checks. Do **not** manually null `activeSprint` or hand-write the ledger entry.
 
-Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse).
+Register conventions through `{{KYRO_CLI}} rule add`; debt uses its tool-owned CLI. Never hand-edit either collection.
 
 ## Inputs
 
@@ -17,7 +17,7 @@ Additive `sprint.json` mutations (conventions, debt) use the Artifact Write Cont
 1. Run the pre-close quality checkpoint. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason). **Run `{{KYRO_CLI}} analyze --kyro-scope {scope}` and do not proceed while any CRITICAL or HIGH finding remains** — resolve them first (route to `clarify` for `[NEEDS CLARIFICATION]` markers).
 2. Fill the retro reasoning: went well, did not go well, surprises, new debt. Capture recommendations for Sprint N+1 (you will pass them to the close command).
 3. **Additive writes first (safe-write).** These must happen before the close command, because the command re-serializes the current `sprint.json`:
-   - Extract learned rules as `conventions[]` objects via `../helpers/learner.md` — each `{ id, rule, tags, addedSprint }`. Append to `sprint.json.conventions[]`.
+   - Extract learned rules via `../helpers/learner.md`, ask whether each approved rule should also be global, then register it through `{{KYRO_CLI}} rule add` (with `--global` only after confirmation).
    - Update `debt[]` via `../helpers/debt-tracker.md`: mark resolved items `resolved`, defer with reason, add new debt objects.
 4. **Do NOT hand-write the narrative `.md`.** The CLI renders it deterministically from the snapshot (the title comes from `roadmap.sprints[]`, so it can never be `undefined`). You only supply the *judgment* text — learnings and recommendations — as flags to the close command in the next step.
 

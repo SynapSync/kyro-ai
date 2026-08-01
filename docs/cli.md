@@ -13,6 +13,7 @@ kyro status             # Read-only brief status for the active Kyro scope
 kyro status full        # Read-only phase/task summary and review debt
 kyro status debt        # Read-only debt grouped by status and priority
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
+kyro rule add           # Register a scope convention; optionally promote it globally
 kyro capabilities       # List supported tool-owned verbs + version (runtime handshake)
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
@@ -421,9 +422,13 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 `kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. `--dry-run` and `--yes` are mutually exclusive (preview or confirm, not both) — the same applies to `kyro close-sprint`. See [maker-checker.md](maker-checker.md).
 
+`kyro close-sprint` is the only verb that confirms interactively. Outside a TTY (agent harness, CI, piped shell) it fails immediately with `CONFIRMATION_REQUIRED` instead of prompting for input that can never arrive — pass `--yes` to complete the gate non-interactively, or `--dry-run` to preview it.
+
 ## Runtime capability handshake (`kyro capabilities`)
 
 `kyro capabilities [--json]` lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start: a missing verb — or an `UNKNOWN_COMMAND` failure on the command itself — means the installed runtime predates the skill assets and the forge must abort with an upgrade request instead of improvising hand-edits. `kyro doctor` probes the installed runtime with the same handshake (`CLI capabilities` check).
+
+The payload covers the sprint-lifecycle verbs plus the tool-owned state writers agents reach for (`scenario`, `adr`, `status`). It excludes operator surface (`install`, `sync`, `uninstall`, `detect`, `eval`, `tui`, `mcp`, `trace`, `scope`) and `capabilities` itself — the handshake cannot verify itself, since its absence is the staleness signal. `npm run check:capabilities` enforces both directions: every `{{KYRO_CLI}} <verb>` the shipped assets invoke must be advertised, and every advertised verb must be dispatchable.
 
 ## Tool-owned debt mutation (`kyro debt`)
 
@@ -466,6 +471,18 @@ kyro adr add --title "…" --context "…" --decision "…" \
 ```
 
 Appends a full v4 `AdrRecord` to `sprint.adrs[]`. Prefer this over hand-editing ADR prose. Incomplete ADR objects fail validation with a full example shape and a `kyro adr add` remedy.
+
+## Tool-owned rule registration (`kyro rule add`)
+
+```bash
+kyro rule add --rule "Keep the readiness checklist synchronized with verified evidence." \
+  --tag process [--id process-1] [--kyro-scope <scope>] [--dry-run]
+
+kyro rule add --rule "Run docs-check after OpenAPI changes." \
+  --tag process --global [--kyro-scope <scope>] [--dry-run]
+```
+
+The default destination is `sprint.json.conventions[]` in the active (or only) scope. Agents must ask whether the user wants project-wide persistence before adding `--global`; that flag also writes the convention to shared `project.json.conventions[]`. `context-pack` merges global conventions into every scope, with scope-local rules winning duplicate ids or normalized text. Never create `RULES.md` or hand-edit either JSON file.
 
 ## Tool-owned scope bootstrap and sprint planning (`kyro plan`)
 

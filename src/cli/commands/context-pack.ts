@@ -71,12 +71,13 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   });
   const openDebtCount = sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length;
   const concise = verbosity === 'concise';
-  const conventions = selectConventions(sprint, packMode, task, concise);
+  const projectState = readProjectState();
+  const conventions = selectConventions(sprint, projectState?.conventions ?? [], packMode, task, concise);
   const adrs = selectAdrs(sprint, concise);
   const taskScenarios = resolveTaskScenarios(sprint, task);
   const { reviewPending, nextTaskReview } = resolveReviewDebt(sprint, task);
   // D7a: never create project state from context-pack; surface install remedy when layers missing.
-  const bootstrapRemedy = detectProjectStateBootstrapNeed(unregisteredScopeFolders(readProjectState()));
+  const bootstrapRemedy = detectProjectStateBootstrapNeed(unregisteredScopeFolders(projectState));
   if (bootstrapRemedy) warnings.push(bootstrapRemedy);
   const delegationEnabled = resolveDelegationEnabled();
 
@@ -247,12 +248,28 @@ function findTask(activeSprint: ActiveSprint | null, taskId: string): Task | nul
   return activeSprint.emergentTasks.find((t) => t.id === taskId) ?? null;
 }
 
-function selectConventions(sprint: SprintFile, packMode: ContextPackMode, task: Task | null, concise: boolean): ContextPackOutput['conventions'] {
+function selectConventions(
+  sprint: SprintFile,
+  globalConventions: SprintFile['conventions'],
+  packMode: ContextPackMode,
+  task: Task | null,
+  concise: boolean,
+): ContextPackOutput['conventions'] {
   // Task packs (and any concise pack) return only testing/architecture/process-tagged conventions;
   // detailed scope packs return all of them.
+  // Scope-local entries win when a global rule has the same id or normalized text.
+  const seenIds = new Set<string>();
+  const seenRules = new Set<string>();
+  const merged = [...sprint.conventions, ...globalConventions].filter((convention) => {
+    const normalizedRule = convention.rule.trim().replace(/\s+/g, ' ').toLowerCase();
+    if (seenIds.has(convention.id) || seenRules.has(normalizedRule)) return false;
+    seenIds.add(convention.id);
+    seenRules.add(normalizedRule);
+    return true;
+  });
   const relevant = packMode === 'task' || concise
-    ? sprint.conventions.filter((c) => c.tags.some((t) => ['testing', 'architecture', 'process'].includes(t)))
-    : sprint.conventions;
+    ? merged.filter((c) => c.tags.some((t) => ['testing', 'architecture', 'process'].includes(t)))
+    : merged;
   void task;
   return relevant.map((c) => ({ id: c.id, rule: c.rule, tags: c.tags }));
 }

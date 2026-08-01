@@ -31,4 +31,5 @@ Continue Kyro work without loading the whole workflow upfront.
 - Load only the routed mode plus the helpers it names; never preload sprint/debt/learner helpers.
 - Enforce orchestrator gates from `agents/orchestrator.md` only at gate moments.
 - Every write to `sprint.json` follows the Artifact Write Contract in `skills/sprint-forge/SKILL.md` (read → parse → mutate → overwrite whole file → re-parse).
-- The only writes are `sprint.json`, `kyro.json`, and immutable `archive/` files at close.
+- When the user asks to register a Kyro rule, load the learner helper, ask whether it should also be global, and use `kyro rule add`; never create `RULES.md` or hand-edit conventions.
+- Kyro-managed state writes use the CLI; immutable `archive/` files are created only at close.

@@ -263,6 +263,34 @@ function assertDryRunYesExclusive() {
   }
 }
 
+function assertCloseSprintFailsFastWithoutTty() {
+  // close-sprint is the only verb that confirms interactively. spawnSync gives it piped stdio, so
+  // stdin can never answer the prompt — it used to block until the caller timed out. It must fail
+  // fast with the flag that completes the gate instead. This test also pins that behavior by
+  // returning at all: a regression re-introduces the hang and the check times out.
+  // A closeable sprint, so the run reaches the confirmation gate instead of stopping on findings.
+  const root = sandbox('close-sprint-happy');
+  try {
+    const before = sig(sprintPath(root));
+    // Bounded explicitly rather than via run(), so a regression fails loudly instead of hanging CI.
+    const result = spawnSync(process.execPath, [cli, 'close-sprint', '--kyro-scope', 'demo'], {
+      cwd: root,
+      env: { ...process.env, HOME: join(root, '.home') },
+      encoding: 'utf-8',
+      timeout: 20_000,
+    });
+    assert(result.signal === null, `close-sprint hung waiting on stdin instead of failing fast (killed by ${result.signal})`);
+    const combined = result.stderr + result.stdout;
+    assert(result.status === 1, `close-sprint without --yes in a non-TTY should exit 1, got ${result.status}: ${combined}`);
+    assert(combined.includes('CONFIRMATION_REQUIRED'), `close-sprint without --yes in a non-TTY should fail CONFIRMATION_REQUIRED: ${combined}`);
+    assert(combined.includes('--yes'), 'the remedy must name --yes as the non-interactive path');
+    const after = sig(sprintPath(root));
+    assert(before.bytes === after.bytes && before.mtimeMs === after.mtimeMs, 'an unconfirmed close must not write');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 function main() {
   assertSingleDecisionSite();
   assertCoverageVetoAndZeroWrite();
@@ -272,6 +300,7 @@ function main() {
   assertReviewConfirmationPolicy();
   assertNormalizedCriterionMatching();
   assertDryRunYesExclusive();
+  assertCloseSprintFailsFastWithoutTty();
   console.log('check:maker-checker — deterministic maker/checker invariants passed');
 }
 
