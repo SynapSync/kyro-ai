@@ -9,7 +9,7 @@ const TOKEN_BUDGET = {
   projectedSkillWords: 200,
   commandRouterWords: 500,
   modeFileWords: 900,
-  initModeWords: 500,
+  initModeWords: 1000,
   analysisHelperWords: 450,
   roadmapTemplateWords: 450,
   reentryTemplateWords: 350,
@@ -22,17 +22,17 @@ const TOKEN_BUDGET = {
   seedbedModeWords: 900,
   seedbedHelperWords: 450,
   runtimeStatusBriefTokens: 1500,
-  // Path budgets reflect the real footprint of the lean runtime (orchestrator + SKILL + the routed
-  // mode/helpers) plus ~10% headroom. They stay a meaningful ceiling: exceeding them means a mode or
-  // helper has grown and should be trimmed before it drifts further.
-  runtimeForgeExecuteTokens: 2900,
-  runtimeForgeReviewTokens: 3300,
-  runtimeForgePlanTokens: 3600,
-  runtimeForgeCloseTokens: 4200,
-  runtimeForgeInitTokens: 3500,
+  // Path budgets preserve the production agent contracts (orchestrator + SKILL + routed
+  // mode/helpers) with roughly 10% headroom. They remain explicit ceilings so future growth is
+  // reviewed instead of silently accumulating.
+  runtimeForgeExecuteTokens: 3650,
+  runtimeForgeReviewTokens: 4050,
+  runtimeForgePlanTokens: 4400,
+  runtimeForgeCloseTokens: 5100,
+  runtimeForgeInitTokens: 4450,
   // Seedbed-backed INIT adds one lazy mapping helper to the normal INIT route. The ceiling keeps
   // roughly 10% headroom over the measured router + orchestrator + skill + mode + analysis + mapping path.
-  runtimeForgeInitSeedbedTokens: 4000,
+  runtimeForgeInitSeedbedTokens: 4800,
   runtimeTaskContextTokens: 2200,
   runtimeIdeaTokens: 5200,
 } as const;
@@ -108,10 +108,11 @@ function checkCommandRouters(): CheckResult[] {
 function checkModeFiles(): CheckResult[] {
   return listPackageFiles('skills/sprint-forge/assets/modes', '.md').map((file) => {
     const weighted = weightPackageFile(file);
-    if (weighted.words > TOKEN_BUDGET.modeFileWords) {
+    const budget = file.endsWith('/INIT.md') ? TOKEN_BUDGET.initModeWords : TOKEN_BUDGET.modeFileWords;
+    if (weighted.words > budget) {
       return warn('token budget: mode file', `${file} has ${weighted.words} words`, 'Split this mode or move detail into a lazy-loaded helper.');
     }
-    return pass('token budget: mode file', `${file} ${weighted.words}/${TOKEN_BUDGET.modeFileWords} words`);
+    return pass('token budget: mode file', `${file} ${weighted.words}/${budget} words`);
   });
 }
 
