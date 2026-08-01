@@ -32,7 +32,12 @@ const PARTIAL_LOCK_GRACE_MS = 2_000;
 /** Reclaim claims must outlive publish→select under slow fsync/CI; test heartbeats may be ≤200ms. */
 const MIN_RECLAIM_CLAIM_MS = 2_000;
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const PORTABLE_DIRECTORY_SYNC_ERRORS = new Set(['EINVAL', 'ENOTSUP', 'EISDIR', 'EBADF']);
+const BASE_PORTABLE_DIRECTORY_SYNC_ERRORS = ['EINVAL', 'ENOTSUP', 'EISDIR', 'EBADF'];
+const USE_WINDOWS_DIRECTORY_SYNC_POLICY = process.platform === 'win32' || process.env.KYRO_TEST_LOCK_WIN32_POLICY === '1';
+const PORTABLE_DIRECTORY_SYNC_ERRORS = new Set([
+  ...BASE_PORTABLE_DIRECTORY_SYNC_ERRORS,
+  ...(USE_WINDOWS_DIRECTORY_SYNC_POLICY ? ['EPERM'] : []),
+]);
 
 interface LockOwner { pid: number; token: string; createdAt: number }
 interface LockHeartbeat { token: string; renewedAt: number; leaseUntil: number }
@@ -84,6 +89,7 @@ export function fsyncDirectory(directory: string): void {
   let fd: number | null = null;
   try {
     fd = openSync(directory, 'r');
+    throwInjectedDirectorySyncError();
     fsyncSync(fd);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
@@ -264,9 +270,7 @@ function tryReclaimStaleLock(lockPath: string, leaseMs: number): void {
     if (observedOwner !== null) unlinkSync(`${lockPath}/${OWNER_FILE}`);
     else unlinkSymlinkEntry(`${lockPath}/${OWNER_FILE}`);
     removeHeartbeatTemporaries(lockPath);
-    fsyncDirectory(lockPath);
-    rmdirSync(lockPath);
-    fsyncParentDirectory(lockPath);
+    removeDirectoryDurably(lockPath);
   } catch { /* State changed or another claimant won; never remove unverified ownership. */ }
   finally {
     cleanupOwnedClaim(claim.path, claim.identity, claim.raw);
@@ -279,9 +283,11 @@ function tryReclaimStaleLock(lockPath: string, leaseMs: number): void {
 function publishReclaimClaim(parent: string, target: LockIdentity, leaseMs: number): { path: string; identity: LockIdentity; raw: string; metadata: ReclaimClaim } | null {
   const token = randomUUID();
   const path = `${parent}/${RECLAIM_PREFIX}${token}`;
+  let identity: LockIdentity | null = null;
+  let raw: string | null = null;
   try {
     mkdirSync(path);
-    const identity = lockIdentity(path);
+    identity = lockIdentity(path);
     // Claim TTL is independent of short test heartbeats: fsync + winner selection must finish
     // while the claim is still selectable (see selectReclaimWinner leaseUntil check).
     const claimTtlMs = Math.max(leaseMs, MIN_RECLAIM_CLAIM_MS);
@@ -293,13 +299,14 @@ function publishReclaimClaim(parent: string, target: LockIdentity, leaseMs: numb
       createdAt,
       leaseUntil: createdAt + claimTtlMs,
     };
-    const raw = `${JSON.stringify(metadata)}\n`;
+    raw = `${JSON.stringify(metadata)}\n`;
     writeSyncedExclusive(`${path}/${OWNER_FILE}`, raw);
     fsyncDirectory(path);
     fsyncDirectory(parent);
     return { path, identity, raw, metadata };
   } catch {
-    try { rmdirSync(path); fsyncDirectory(parent); } catch { /* partial unique claim is recoverable */ }
+    if (identity) cleanupOwnedClaim(path, identity, raw);
+    else try { removeDirectoryDurably(path); } catch { /* partial unique claim is recoverable */ }
     return null;
   }
 }
@@ -333,9 +340,7 @@ function cleanupOwnedClaim(path: string, identity: LockIdentity, ownerRaw: strin
     if (!sameIdentity(lockIdentity(path), identity) || readRegularFileNoFollow(`${path}/${OWNER_FILE}`) !== ownerRaw) return;
     if (ownerRaw !== null) unlinkSync(`${path}/${OWNER_FILE}`);
     else unlinkSymlinkEntry(`${path}/${OWNER_FILE}`);
-    fsyncDirectory(path);
-    rmdirSync(path);
-    fsyncParentDirectory(path);
+    removeDirectoryDurably(path);
   } catch { /* A unique claim that changed ownership is never deleted. */ }
 }
 
@@ -352,22 +357,17 @@ function releaseOwnedLock(lockPath: string, identity: LockIdentity, ownerRaw: st
   }
   unlinkSync(`${lockPath}/${HEARTBEAT_FILE}`);
   unlinkSync(`${lockPath}/${OWNER_FILE}`);
-  fsyncDirectory(lockPath);
-  rmdirSync(lockPath);
-  fsyncParentDirectory(lockPath);
+  removeDirectoryDurably(lockPath);
 }
 
 function cleanupJustCreatedLock(lockPath: string, identity: LockIdentity): void {
-  try {
-    if (!sameIdentity(lockIdentity(lockPath), identity)) return;
-    for (const name of [HEARTBEAT_FILE, OWNER_FILE]) {
-      try { unlinkSync(`${lockPath}/${name}`); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-    }
-    removeHeartbeatTemporaries(lockPath);
-    fsyncDirectory(lockPath);
-    rmdirSync(lockPath);
-    fsyncParentDirectory(lockPath);
-  } catch { /* Preserve primary initialization failure; the partial lease remains recoverable. */ }
+  try { if (!sameIdentity(lockIdentity(lockPath), identity)) return; }
+  catch { return; }
+  for (const name of [HEARTBEAT_FILE, OWNER_FILE]) {
+    try { unlinkSync(`${lockPath}/${name}`); } catch { /* Preserve the primary initialization failure and keep cleaning. */ }
+  }
+  try { removeHeartbeatTemporaries(lockPath); } catch { /* Keep cleaning the verified lock directory. */ }
+  try { removeDirectoryDurably(lockPath); } catch { /* Preserve the primary initialization failure; partial state remains reclaimable. */ }
 }
 
 function writeHeartbeat(lockPath: string, token: string, leaseMs: number): void {
@@ -411,7 +411,7 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     };
     process.on('uncaughtException', failStop);
     process.on('unhandledRejection', failStop);
-    const syncDir = (directory) => { let fd; try { fd = fs.openSync(directory, 'r'); fs.fsyncSync(fd); } catch (error) { if (!['EINVAL','ENOTSUP','EISDIR','EBADF'].includes(error.code)) throw error; } finally { if (fd !== undefined) fs.closeSync(fd); } };
+    const syncDir = (directory) => { let fd; try { fd = fs.openSync(directory, 'r'); if (workerData.dirSyncErrorCode) { const error = new Error('Injected directory fsync failure (' + workerData.dirSyncErrorCode + ').'); error.code = workerData.dirSyncErrorCode; throw error; } fs.fsyncSync(fd); } catch (error) { if (!workerData.portableDirectorySyncErrors.includes(error.code)) throw error; } finally { if (fd !== undefined) fs.closeSync(fd); } };
     const verifyDirectory = () => {
       const stat = fs.lstatSync(workerData.lockPath, { bigint: true });
       if (!stat.isDirectory() || stat.isSymbolicLink() || String(stat.dev) !== workerData.dev || String(stat.ino) !== workerData.ino) throw new Error('Lease directory ownership changed');
@@ -503,6 +503,8 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     rawExitReadyFile: process.env.KYRO_TEST_LOCK_HEARTBEAT_RAW_EXIT_READY_FILE ?? null,
     pauseFile: process.env.KYRO_TEST_LOCK_HEARTBEAT_PAUSE_FILE ?? null,
     testTempToken: process.env.KYRO_TEST_LOCK_HEARTBEAT_TEMP_TOKEN ?? null,
+    dirSyncErrorCode: process.env.KYRO_TEST_LOCK_DIRSYNC_ERROR ?? null,
+    portableDirectorySyncErrors: [...PORTABLE_DIRECTORY_SYNC_ERRORS],
   } });
   const fenceParent = (): void => {
     if (Atomics.load(state, 4) !== 0) return;
@@ -566,6 +568,19 @@ function lockIdentity(path: string): LockIdentity {
 
 function sameIdentity(left: LockIdentity, right: LockIdentity): boolean {
   return String(left.dev) === String(right.dev) && String(left.ino) === String(right.ino);
+}
+
+/** Attempt the full durable removal sequence, but never leave an empty directory solely because a sync failed. */
+function removeDirectoryDurably(directory: string): void {
+  const failures: unknown[] = [];
+  try { fsyncDirectory(directory); } catch (error) { failures.push(error); }
+  let removed = false;
+  try { rmdirSync(directory); removed = true; } catch (error) { failures.push(error); }
+  if (removed) {
+    try { fsyncParentDirectory(directory); } catch (error) { failures.push(error); }
+  }
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, `Directory removal durability failed: ${directory}`);
 }
 
 function listClaimPaths(parent: string): string[] {
@@ -636,6 +651,14 @@ function leaseLost(detail: string): KyroCoreError {
 function configuredLeaseMs(): number {
   const configured = Number.parseInt(process.env.KYRO_TEST_LOCK_LEASE_MS ?? '', 10);
   return Number.isFinite(configured) && configured >= 100 ? configured : DEFAULT_LEASE_MS;
+}
+
+function throwInjectedDirectorySyncError(): void {
+  const code = process.env.KYRO_TEST_LOCK_DIRSYNC_ERROR;
+  if (!code) return;
+  const error = new Error(`Injected directory fsync failure (${code}).`) as NodeJS.ErrnoException;
+  error.code = code;
+  throw error;
 }
 
 function writeSyncedExclusive(path: string, content: string): void {

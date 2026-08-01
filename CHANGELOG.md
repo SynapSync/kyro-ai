@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.41.2] - 2026-08-01
+
+### Fixed
+
+- Windows installations no longer fail with `EPERM: operation not permitted, fsync` while acquiring or renewing the state-writer lock. Directory `fsync` treats Windows `EPERM` as an unsupported durability enhancement while file `fsync`, lock ownership, heartbeat, lease, and fencing remain strict.
+- Failed lock initialization, release, and stale-lock reclaim now attempt verified directory removal even when a directory sync fails, preventing empty lock or reclaim directories from wedging later writers.
+
+### Added
+
+- Windows CI covers Node.js 18, 20, and 22 with the lossless checkpoint suite, an `lstat`/`fstat` identity probe, and two consecutive workspace installs that must leave no state-writer lock residue.
+
+## [4.41.1] - 2026-08-01
+
 ### Added
 
 - `kyro rule add` registers an operational convention in the active scope without hand-editing `sprint.json`. Agents now ask whether the rule should also persist globally; `--global` writes it to shared `project.json.conventions[]`, and `context-pack` inherits global rules into every scope.
