@@ -23,13 +23,18 @@ When the user corrects the agent, or a pattern emerges from retro surprises or t
 
 1. Detect the correction or pattern.
 2. Propose the convention object (id, rule, tags, addedSprint).
-3. On approval, append it to `sprint.json.conventions[]` using the Artifact Write Contract in `../../SKILL.md` (read → parse → push to `conventions[]` → overwrite the whole file → re-parse).
+3. On approval, ask whether the user wants the rule persisted globally for every Kyro scope. If the user already specified scope-only or global persistence, do not ask again.
+4. Register it through the CLI:
+   - Scope only: `{{KYRO_CLI}} rule add --rule "<rule>" --tag <tag> [--id <id>] --kyro-scope <scope>`
+   - Scope + global project rule: add `--global` only after explicit confirmation. This writes the same convention to shared `project.json`, and every scope inherits it through `context-pack`.
 
-During `close-sprint`, conventions are extracted from the retro and task evidence and appended the same way (step 4 of `../modes/close-sprint.md`).
+Never hand-edit `sprint.json.conventions[]`, create `RULES.md`, or create any separate rule file. If `rule` is absent from the capability handshake or fails as unknown, abort and request a Kyro runtime upgrade.
+
+During `close-sprint`, conventions are extracted from the retro and task evidence and registered through `{{KYRO_CLI}} rule add` before the close transaction (step 4 of `../modes/close-sprint.md`).
 
 ## Rule application
 
-Conventions are already in context — every mode reads `sprint.json`, which contains `conventions[]`. No extra read.
+Conventions are already in context — `context-pack` merges global `project.json.conventions[]` with scope-local `sprint.json.conventions[]`. No extra read.
 
 - Before planning sprint estimates, check `estimation`-tagged conventions.
 - Before architecture decisions, check relevant `architecture`-tagged conventions and existing `adrs[]`.

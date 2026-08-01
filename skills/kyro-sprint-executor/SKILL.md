@@ -60,6 +60,18 @@ Never infer routing from file presence. Never open the full `sprint.json` to rou
 - Required work discovered mid-sprint: `{{KYRO_CLI}} add-emergent --title <t> --description <d> --acceptance <a> [--acceptance ...] --kyro-scope <scope>` — the new task then enters the same task loop.
 - Non-blocking issues: `{{KYRO_CLI}} debt add --title "..." --priority <critical|high|medium|low> --kyro-scope <scope>`. Debt never disappears; only its status changes.
 
+## Rule registration
+
+When the user asks to register, save, or remember a rule **with Kyro**, interpret it as a scope convention, never as a Markdown file:
+
+1. Resolve the active scope through `context-pack` or `scope list`; do not invent a destination.
+2. Propose a specific actionable rule and appropriate tags.
+3. Ask whether the rule should also be persisted globally for every Kyro scope. If the user already said scope-only or global, do not ask again.
+4. Scope only: `{{KYRO_CLI}} rule add --rule "<rule>" --tag <tag> --kyro-scope <scope>`.
+5. Scope + global: run the same command with `--global` only after explicit confirmation. Kyro writes scope `sprint.json.conventions[]` and shared `project.json.conventions[]`; future `context-pack` calls inherit the global rule.
+
+Never create `RULES.md`, `rules.md`, or another rule artifact. If `rule` is missing from `capabilities`, abort and request a runtime upgrade; never hand-edit Kyro state.
+
 ## Sprint close (USER GATE)
 
 When routing reports `close_sprint`:
@@ -70,7 +82,7 @@ When routing reports `close_sprint`:
 
 ## Hard rules (non-negotiable)
 
-- Never hand-edit `sprint.json`, evidence, verdicts, or any Kyro-managed state.
+- Never hand-edit `sprint.json`, `project.json`, evidence, verdicts, conventions, or any Kyro-managed state.
 - If any tool-owned verb fails as an unknown command, the runtime is too old: ABORT and report the version (Step 0). A missing verb is never a license to improvise.
 - Never fabricate, backdate, or adjust `recordedAt`/`reviewedAt` — the CLI stamps its own clocks and the checker vetoes tampering.
 - On any CLI refusal (`INVALID_INPUT`, `CHECKER_FAILED`, `CLARIFICATION_REQUIRED`, ...): read the `Remedy:` line and follow it exactly. Do not retry unchanged; do not route around it.

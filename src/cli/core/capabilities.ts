@@ -6,7 +6,7 @@ import { readPackageVersion } from '../help';
  *
  * Inclusion rule (enforced by scripts/check-capabilities.mjs): a verb belongs here if the shipped
  * assets invoke it as `{{KYRO_CLI}} <verb>`, OR it is a tool-owned state writer documented for
- * agent use. `scenario` and `adr` qualify under the second half (both mutate sprint.json — see
+ * agent use. `scenario`, `adr`, and `rule` qualify under the second half (they mutate Kyro state — see
  * isMutatingInvocation in app.ts — and docs/spec-traceability.md drives agents to them).
  *
  * Deliberately excluded: install, sync, uninstall, detect, eval, tui, mcp, trace, scope —
@@ -25,6 +25,7 @@ export const TOOL_OWNED_VERBS = [
   'record-evidence',
   'repair',
   'review',
+  'rule',
   'scenario',
   'status',
 ] as const;

@@ -25,7 +25,7 @@ npx kyro-ai@latest install --scope workspace --init-workspace --yes
 
 `--init-workspace` creates or refreshes **layered** project state in this directory (non-interactive):
 
-- `.agents/kyro/project.json` — shared (safe to commit): principles, team policy, scopes registry cache
+- `.agents/kyro/project.json` — shared (safe to commit): principles, global conventions, team policy, scopes registry cache
 - `.agents/kyro/local.json` — personal/machine (gitignored): `activeScope`, installed adapters
 - `.agents/kyro/.gitignore` — ignores local-only files; never ignores `project.json` or `scopes/`
 
@@ -242,7 +242,7 @@ After INIT, a scope looks like:
 └── findings/            # write-only INIT analysis evidence
 ```
 
-`sprint.json` holds the objective, success criteria, roadmap, active sprint, debt, conventions, ADRs, and handoff routing. When the scope is created via `kyro plan` and at least one of git `user.name` or a valid `user.email` is set, it also stores an optional immutable `author` (scope creator; present fields only; never blocks init). `archive/` receives a verbatim snapshot plus a human narrative each time a sprint closes.
+`sprint.json` holds the objective, success criteria, roadmap, active sprint, debt, scope conventions, ADRs, and handoff routing. Register a rule with `kyro rule add`; when the user confirms it should apply project-wide, add `--global` so Kyro also persists it in shared `project.json.conventions[]`. `context-pack` merges those global rules into every scope. When the scope is created via `kyro plan` and at least one of git `user.name` or a valid `user.email` is set, it also stores an optional immutable `author` (scope creator; present fields only; never blocks init). `archive/` receives a verbatim snapshot plus a human narrative each time a sprint closes.
 
 ## Verify
 

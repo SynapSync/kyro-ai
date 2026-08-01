@@ -13,6 +13,7 @@ kyro status             # Read-only brief status for the active Kyro scope
 kyro status full        # Read-only phase/task summary and review debt
 kyro status debt        # Read-only debt grouped by status and priority
 kyro context-pack       # Emit a summary-first context package for a Kyro scope
+kyro rule add           # Register a scope convention; optionally promote it globally
 kyro capabilities       # List supported tool-owned verbs + version (runtime handshake)
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
@@ -470,6 +471,18 @@ kyro adr add --title "…" --context "…" --decision "…" \
 ```
 
 Appends a full v4 `AdrRecord` to `sprint.adrs[]`. Prefer this over hand-editing ADR prose. Incomplete ADR objects fail validation with a full example shape and a `kyro adr add` remedy.
+
+## Tool-owned rule registration (`kyro rule add`)
+
+```bash
+kyro rule add --rule "Keep the readiness checklist synchronized with verified evidence." \
+  --tag process [--id process-1] [--kyro-scope <scope>] [--dry-run]
+
+kyro rule add --rule "Run docs-check after OpenAPI changes." \
+  --tag process --global [--kyro-scope <scope>] [--dry-run]
+```
+
+The default destination is `sprint.json.conventions[]` in the active (or only) scope. Agents must ask whether the user wants project-wide persistence before adding `--global`; that flag also writes the convention to shared `project.json.conventions[]`. `context-pack` merges global conventions into every scope, with scope-local rules winning duplicate ids or normalized text. Never create `RULES.md` or hand-edit either JSON file.
 
 ## Tool-owned scope bootstrap and sprint planning (`kyro plan`)
 
