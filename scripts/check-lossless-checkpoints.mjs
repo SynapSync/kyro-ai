@@ -119,17 +119,26 @@ function makeSandbox({ intermediate = false } = {}) {
   return root;
 }
 
+function testEnv(root, env = {}) {
+  const home = join(root, '.home');
+  return { ...process.env, HOME: home, USERPROFILE: home, ...env };
+}
+
 function run(root, args = closeArgs, env = {}) {
   return spawnSync(process.execPath, [cli, ...args], {
     cwd: root,
     encoding: 'utf8',
-    env: { ...process.env, HOME: join(root, '.home'), ...env },
+    env: testEnv(root, env),
   });
 }
 
 function output(result) { return `${result.stdout ?? ''}${result.stderr ?? ''}`; }
+function assertNoLockDebris(root, label) {
+  const debris = readdirSync(root).filter((name) => name.startsWith('.kyro-state-writer.lock'));
+  assert(debris.length === 0, `${label} left state-writer lock debris: ${debris.join(', ')}`);
+}
 function runAsync(root, args, env = {}, input = null) {
-  const child = spawn(process.execPath, [cli, ...args], { cwd: root, env: { ...process.env, HOME: join(root, '.home'), ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [cli, ...args], { cwd: root, env: testEnv(root, env), stdio: ['pipe', 'pipe', 'pipe'] });
   let text = '';
   let settled = null;
   child.stdout.on('data', (chunk) => { text += chunk; });
@@ -541,6 +550,62 @@ for (const mode of ['corrupt', 'unsupported']) {
     assert(reclaimed.status === 0 && !existsSync(lock), `malformed stale lock was not reclaimed: ${output(reclaimed)}`);
     const failedInit = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_INIT_FAIL: '1' });
     assert(failedInit.status === 1 && !existsSync(lock), `failed lock initialization left a permanent lock: ${output(failedInit)}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Directory-fsync injection stays strict unless the explicit Windows portability policy is active.
+{
+  const root = makeSandbox();
+  try {
+    const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
+      KYRO_TEST_LOCK_DIRSYNC_ERROR: 'EPERM',
+    });
+    assert(result.status === 1 && output(result).includes('EPERM'), `directory-fsync injection did not fail closed outside Windows policy: ${output(result)}`);
+    assertNoLockDebris(root, 'strict directory-fsync failure cleanup');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Windows treats EPERM from directory fsync as a portability limitation in both owner and worker.
+{
+  const root = makeSandbox();
+  try {
+    const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
+      KYRO_TEST_LOCK_DIRSYNC_ERROR: 'EPERM',
+      KYRO_TEST_LOCK_WIN32_POLICY: '1',
+    });
+    assert(result.status === 0, `Windows directory-fsync policy did not complete a lock round-trip: ${output(result)}`);
+    assertNoLockDebris(root, 'Windows directory-fsync round-trip');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Cleanup attempts directory removal even when an unexpected sync error follows an init failure.
+{
+  const root = makeSandbox();
+  try {
+    const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
+      KYRO_TEST_LOCK_INIT_FAIL: '1',
+      KYRO_TEST_LOCK_DIRSYNC_ERROR: 'EIO',
+    });
+    assert(result.status === 1 && output(result).includes('Injected state-writer lock initialization failure'), `init failure was not preserved: ${output(result)}`);
+    assertNoLockDebris(root, 'failed initialization cleanup');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// An empty partial lock remains reclaimable when Windows rejects directory fsync.
+{
+  const root = makeSandbox();
+  try {
+    const lock = join(root, '.kyro-state-writer.lock');
+    mkdirSync(lock);
+    const old = new Date(Date.now() - 10_000);
+    utimesSync(lock, old, old);
+    const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
+      KYRO_TEST_LOCK_DIRSYNC_ERROR: 'EPERM',
+      KYRO_TEST_LOCK_WIN32_POLICY: '1',
+      KYRO_TEST_LOCK_LEASE_MS: '500',
+    });
+    assert(result.status === 0, `Windows policy could not reclaim an empty partial lock: ${output(result)}`);
+    assertNoLockDebris(root, 'Windows empty-lock reclaim');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
