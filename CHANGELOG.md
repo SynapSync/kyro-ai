@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format is based on
 
 - Windows installations no longer fail with `EPERM: operation not permitted, fsync` while acquiring or renewing the state-writer lock. Directory `fsync` treats Windows `EPERM` as an unsupported durability enhancement while file `fsync`, lock ownership, heartbeat, lease, and fencing remain strict.
 - Failed lock initialization, release, and stale-lock reclaim now attempt verified directory removal even when a directory sync fails, preventing empty lock or reclaim directories from wedging later writers.
+- Stale-lock reclaim keeps Windows `dev`/`ino` identities as lossless `bigint` values through verification, avoiding false ownership changes when NTFS file IDs exceed JavaScript's safe integer range.
+- The directory-sync policy test can explicitly force strict non-Windows behavior, so Windows CI validates both the strict and portable `EPERM` branches.
 
 ### Added
 

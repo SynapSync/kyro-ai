@@ -33,7 +33,10 @@ const PARTIAL_LOCK_GRACE_MS = 2_000;
 const MIN_RECLAIM_CLAIM_MS = 2_000;
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const BASE_PORTABLE_DIRECTORY_SYNC_ERRORS = ['EINVAL', 'ENOTSUP', 'EISDIR', 'EBADF'];
-const USE_WINDOWS_DIRECTORY_SYNC_POLICY = process.platform === 'win32' || process.env.KYRO_TEST_LOCK_WIN32_POLICY === '1';
+// Tests may force either policy without changing the production platform default.
+const WINDOWS_DIRECTORY_SYNC_POLICY_OVERRIDE = process.env.KYRO_TEST_LOCK_WIN32_POLICY;
+const USE_WINDOWS_DIRECTORY_SYNC_POLICY = WINDOWS_DIRECTORY_SYNC_POLICY_OVERRIDE === '1'
+  || (WINDOWS_DIRECTORY_SYNC_POLICY_OVERRIDE !== '0' && process.platform === 'win32');
 const PORTABLE_DIRECTORY_SYNC_ERRORS = new Set([
   ...BASE_PORTABLE_DIRECTORY_SYNC_ERRORS,
   ...(USE_WINDOWS_DIRECTORY_SYNC_POLICY ? ['EPERM'] : []),
@@ -242,10 +245,11 @@ function tryReclaimStaleLock(lockPath: string, leaseMs: number): void {
   let observedHeartbeat: string | null;
   let lockAge: number;
   try {
-    const stat = lstatSync(lockPath);
+    // Windows file IDs can exceed Number.MAX_SAFE_INTEGER; keep identity lossless end to end.
+    const stat = lstatSync(lockPath, { bigint: true });
     if (!stat.isDirectory() || stat.isSymbolicLink()) return;
     observedIdentity = { dev: stat.dev, ino: stat.ino };
-    lockAge = Date.now() - stat.mtimeMs;
+    lockAge = Date.now() - Number(stat.mtimeMs);
     observedOwner = readRegularFileNoFollow(`${lockPath}/${OWNER_FILE}`);
     observedHeartbeat = readRegularFileNoFollow(`${lockPath}/${HEARTBEAT_FILE}`);
   } catch { return; }
@@ -326,7 +330,8 @@ function cleanupExpiredClaims(parent: string, target: LockIdentity): void {
   for (const path of listClaimPaths(parent)) {
     let identity: LockIdentity;
     let age: number;
-    try { const stat = lstatSync(path); if (!stat.isDirectory() || stat.isSymbolicLink()) continue; identity = { dev: stat.dev, ino: stat.ino }; age = now - stat.mtimeMs; }
+    // Match lockIdentity() so cleanup never rejects a claim because its inode was rounded.
+    try { const stat = lstatSync(path, { bigint: true }); if (!stat.isDirectory() || stat.isSymbolicLink()) continue; identity = { dev: stat.dev, ino: stat.ino }; age = now - Number(stat.mtimeMs); }
     catch { continue; }
     const raw = readRegularFileNoFollow(`${path}/${OWNER_FILE}`);
     const claim = parseClaimForPath(path, raw);

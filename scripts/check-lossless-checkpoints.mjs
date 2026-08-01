@@ -559,6 +559,7 @@ for (const mode of ['corrupt', 'unsupported']) {
   try {
     const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
       KYRO_TEST_LOCK_DIRSYNC_ERROR: 'EPERM',
+      KYRO_TEST_LOCK_WIN32_POLICY: '0',
     });
     assert(result.status === 1 && output(result).includes('EPERM'), `directory-fsync injection did not fail closed outside Windows policy: ${output(result)}`);
     assertNoLockDebris(root, 'strict directory-fsync failure cleanup');
