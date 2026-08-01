@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const routingDist = resolve(repo, 'dist/cli/routing.js');
@@ -14,7 +14,7 @@ function fail(message) {
 
 if (!existsSync(routingDist)) fail('dist/cli/routing.js missing. Run npm run build first.');
 
-const { ROUTING_TABLE, validateRoutingTableModes } = await import(`file://${routingDist}`);
+const { ROUTING_TABLE, validateRoutingTableModes } = await import(pathToFileURL(routingDist).href);
 const missingModes = validateRoutingTableModes();
 if (missingModes.length > 0) fail(`routing table references missing mode files: ${missingModes.join(', ')}`);
 

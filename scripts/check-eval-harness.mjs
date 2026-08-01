@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
@@ -86,7 +86,7 @@ try {
   assert(failing.status === 1 && failingReport.failed === 1, 'failing expectation should exit 1');
   rmSync(failingDir, { recursive: true, force: true });
 
-  const { normalizeSprintJson, deepEqualNormalized } = await import(`file://${resolve(repo, 'dist/cli/eval/normalize.js')}`);
+  const { normalizeSprintJson, deepEqualNormalized } = await import(pathToFileURL(resolve(repo, 'dist/cli/eval/normalize.js')).href);
   const normalized = normalizeSprintJson({ handoff: { lastUpdated: '2026-07-02' }, path: '/tmp/sandbox/file' }, '/tmp/sandbox');
   assert(deepEqualNormalized(normalized, { handoff: { lastUpdated: '<NORMALIZED>' }, path: '<SANDBOX>/file' }), 'normalizer should mask dates and sandbox paths');
 
