@@ -160,6 +160,7 @@ export function validateProjectStateShape(value: unknown, path: string): Validat
       value.principles.forEach((p, i) => validatePrinciple(p, path, `principles[${i}]`, issues));
     }
   }
+  validateOptionalConventions(value, path, issues);
   if ('team' in value) validateTeamPolicy(value.team, path, 'team', issues);
   return issues;
 }
@@ -197,6 +198,7 @@ export function validateSharedProjectStateShape(value: unknown, path: string): V
       value.principles.forEach((p, i) => validatePrinciple(p, path, `principles[${i}]`, issues));
     }
   }
+  validateOptionalConventions(value, path, issues);
   if ('team' in value) validateTeamPolicy(value.team, path, 'team', issues);
   return issues;
 }
@@ -218,6 +220,9 @@ export function validateLocalProjectStateShape(value: unknown, path: string): Va
   }
   if ('principles' in value) {
     issues.push({ path, field: 'principles', message: 'must not be present on local overlay (shared-only field)' });
+  }
+  if ('conventions' in value) {
+    issues.push({ path, field: 'conventions', message: 'must not be present on local overlay (shared-only field)' });
   }
   if ('team' in value) {
     issues.push({ path, field: 'team', message: 'must not be present on local overlay (shared-only field)' });
@@ -475,6 +480,15 @@ function validateConvention(value: unknown, path: string, prefix: string, issues
   requireString(value, 'rule', path, issues, `${prefix}.rule`);
   requireStringArrayField(value, 'tags', path, issues, `${prefix}.tags`);
   requireNumber(value, 'addedSprint', path, issues, `${prefix}.addedSprint`);
+}
+
+function validateOptionalConventions(value: Record<string, unknown>, path: string, issues: ValidationIssue[]): void {
+  if (!('conventions' in value)) return;
+  if (!Array.isArray(value.conventions)) {
+    issues.push({ path, field: 'conventions', message: 'must be an array when present' });
+    return;
+  }
+  value.conventions.forEach((convention, index) => validateConvention(convention, path, `conventions[${index}]`, issues));
 }
 
 const ADR_SHAPE_EXAMPLE =

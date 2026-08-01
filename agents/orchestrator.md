@@ -18,8 +18,8 @@ Kyro preserves quality by loading the smallest contract needed for the current l
    - Else, check whether `~/.agents/kyro/current/dist/cli.js` exists. If it does, `{{KYRO_CLI}}` means `node ~/.agents/kyro/current/dist/cli.js`.
    - Else, Kyro's runtime is not installed on this machine. STOP — tell the user to run `npx kyro-ai@latest install --scope workspace --init-workspace --yes` once, then retry. This is not a license to hand-edit `sprint.json` or improvise; same rule as a missing verb in Step 4.
    Substitute the resolved value mentally everywhere `{{KYRO_CLI}}` appears in this or any other loaded skill asset for the rest of the session — never run the eight literal characters `{{KYRO_CLI}}`.
-2. Read `.agents/kyro/kyro.json` if present.
-3. Resolve scope from user input, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
+2. Read `project.json` + `local.json` (`kyro.json` is dual-read).
+3. Resolve scope from user input, `local.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
 4. Capability handshake: run `{{KYRO_CLI}} capabilities --json`. Unknown command, or `record-evidence`/`review` missing — runtime too old: ABORT, report `{{KYRO_CLI}} --version`. Never work around it by hand.
 5. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack: `nextAction`, `nextTaskId`, `reviewPending`, `conventions`, budget). Do not open the full `sprint.json` to route. No `sprint.json` → INIT.
 6. Load `skills/sprint-forge/SKILL.md`, then the single mode named by the pack's `nextAction`.
@@ -51,9 +51,10 @@ All writes to `sprint.json` use the **Artifact Write Contract** in `SKILL.md` (r
 | Plan sprint | Set `activeSprint` and `handoff.nextAction: "execute_task"` in `sprint.json`. |
 | Task done | Set that task's `evidence` and `status` in `sprint.json`. |
 | Task reviewed | Set that task's `verdict` in `sprint.json`. |
-| Sprint close | Additive `debt[]`/`conventions[]` writes by hand; then run `{{KYRO_CLI}} close-sprint` — the CLI publishes a lossless scope checkpoint, retains the legacy ActiveSprint snapshot, appends `ledger[]`, and clears `activeSprint` atomically. Never null `activeSprint` by hand. When no sprints remain, the CLI sets `status: "completed"` and `handoff.nextAction: "done"`. Do not invent a post-close action. |
+| Rule learned | Ask global; use `{{KYRO_CLI}} rule add`; no rule Markdown. |
+| Sprint close | Register rules, then run `{{KYRO_CLI}} close-sprint`. It checkpoints, appends `ledger[]`, clears `activeSprint`, and routes finished scopes to `done`; never clear state by hand. |
 
-Never split a structural JSON change into a partial string edit. The only writes are `sprint.json`, `kyro.json`, and the write-only `archive/` + `findings/` files.
+Never split a structural JSON change into a partial string edit. Kyro-managed state writes go through the CLI; archives and findings remain write-only evidence.
 
 ## Gates and Quality
 

@@ -64,6 +64,7 @@ Irreversible or schema-critical operations are CLI-owned, never hand-rolled:
 | `{{KYRO_CLI}} doctor --artifacts --kyro-scope <scope>` | Validates shape drift, checkpoint state/digests/artifacts, legacy snapshots, and unresolved `[NEEDS CLARIFICATION]`. |
 | `{{KYRO_CLI}} analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, deps, debt, principles); non-zero on CRITICAL/HIGH. Gate before close. |
 | `{{KYRO_CLI}} repair --kyro-scope <scope>` | Normalizes `sprint.json` formatting. |
+| `{{KYRO_CLI}} rule add ... [--global]` | Adds a scope rule; `--global` also writes `project.json` after approval. |
 
 Claude Code's `PreToolUse` hook blocks edits nulling `activeSprint`; others rely on this contract.
 
@@ -85,15 +86,16 @@ Templates are loaded only immediately before writing their artifact.
 
 ## Principles, conventions, ADRs
 
-- `principles[]` in `kyro.json`: authored gates; `non-negotiable` blocks. Checked in `{{KYRO_CLI}} analyze`; free-text gates apply in review.
-- `conventions[]` in `sprint.json`: operational learned rules from retros/corrections; fold into task context.
-- `adrs[]` in `sprint.json`: durable scope-local architecture decisions with context/tradeoffs.
+- `principles[]` in `project.json`: authored gates; `non-negotiable` blocks.
+- `conventions[]`: scope rules live in `sprint.json`; approved globals also live in `project.json`. Use `{{KYRO_CLI}} rule add [--global]`.
+- `adrs[]` in `sprint.json`: durable scope architecture decisions with tradeoffs.
 
 ## Artifact Contract
 
 | File | Role |
 |------|------|
-| `.agents/kyro/kyro.json` | Global registry: `scopes[]`, `activeScope`, optional `principles[]` |
+| `.agents/kyro/project.json` | Shared registry: `scopes[]`, optional `principles[]`, optional global `conventions[]` |
+| `.agents/kyro/local.json` | Personal state: `activeScope`, installed adapters, execution preferences |
 | `.agents/kyro/scopes/{scope}/sprint.json` | Single source of truth (see template) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.md` | Human narrative at close (write-only) |
 | `.agents/kyro/scopes/{scope}/archive/sprint-NNN-slug.json` | Verbatim snapshot of the closed sprint (write-only) |

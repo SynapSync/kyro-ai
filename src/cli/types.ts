@@ -64,6 +64,7 @@ export interface ExecutionPreferences {
  * | schemaVersion      | shared + effective            | Stay 4; additive layers |
  * | artifactRoot       | shared + effective            | Team constant under `.agents/kyro/scopes` |
  * | principles         | **shared only**               | Team constitution; must travel with git |
+ * | conventions        | **shared only**               | Global operational rules; merged into every scope pack |
  * | team               | **shared only**               | TeamPolicy (minPackageVersion, …) |
  * | scopes             | shared cache + disk rehydrate | Presence SoT is scopes/ folders |
  * | activeScope        | **local only**                | Never on shared (git thrash) |
@@ -84,6 +85,8 @@ export interface KyroSharedProjectState {
   scopes: KyroScopeEntry[];
   /** Team constitution (optional until authored). */
   principles?: Principle[];
+  /** Global operational rules inherited by every scope context pack. */
+  conventions?: Convention[];
   /** Optional team policy shell (WARN-first). */
   team?: TeamPolicy;
 }
@@ -112,6 +115,8 @@ export interface KyroProjectState {
   installedAdapters: KyroInstalledAdapter[];
   /** Optional project-level principles (v4.1+). From shared layer after migration. */
   principles?: Principle[];
+  /** Optional global operational rules from the shared project layer. */
+  conventions?: Convention[];
   /** Optional team policy from shared layer (v4 layered). */
   team?: TeamPolicy;
   // kyroInvocation is intentionally NOT project state. Authoritative value lives on the

@@ -111,7 +111,7 @@ ORCHESTRATOR
 
 ## Artifact Layout
 
-Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, conventions, durable ADRs, and handoff routing. Agents read layered project state and `sprint.json` first, then route state changes through Kyro's tool-owned verbs (`kyro plan`, `record-evidence`, `review`, `debt`, `add-emergent`, `close-sprint`), which mutate `sprint.json` — the only routine mutation. See [Cost Model](cost-model.md) and [Teams](teams.md).
+Kyro keeps a single source of truth per scope: `sprint.json` holds the objective, success criteria, roadmap, the active sprint, debt, scope conventions, durable ADRs, and handoff routing. Shared `project.json.conventions[]` holds optional global operational rules inherited by every scope. Agents read layered project state and `sprint.json` first, then route state changes through Kyro's tool-owned verbs (`kyro plan`, `record-evidence`, `review`, `rule`, `debt`, `add-emergent`, `close-sprint`). See [Cost Model](cost-model.md) and [Teams](teams.md).
 
 ```
 .agents/kyro/
@@ -197,4 +197,5 @@ v2.0: User command -> orchestrator
 | Sprint workflow skill | `skills/sprint-forge/` |
 | QA review skill | `skills/qa-review/` |
 | Templates | `skills/sprint-forge/assets/templates/` |
-| Rules | `.agents/kyro/scopes/rules.md` in the target project |
+| Scope rules | `{scope}/sprint.json.conventions[]`, written by `kyro rule add` |
+| Global rules | `.agents/kyro/project.json.conventions[]`, written by `kyro rule add --global` |

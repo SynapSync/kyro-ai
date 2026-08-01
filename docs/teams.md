@@ -8,7 +8,7 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 
 | Path | Commit? | Owner | Contents |
 | ---- | ------- | ----- | -------- |
-| `.agents/kyro/project.json` | **Yes** | Team / shared | `schemaVersion`, `artifactRoot`, `scopes[]` registry cache, `principles[]`, optional `team` policy |
+| `.agents/kyro/project.json` | **Yes** | Team / shared | `schemaVersion`, `artifactRoot`, `scopes[]` registry cache, `principles[]`, global `conventions[]`, optional `team` policy |
 | `.agents/kyro/local.json` | **No** | Personal / machine | `activeScope`, `installedAdapters`, optional `runtimePath`, optional `execution.delegationEnabled` (L1 delegation opt-in) |
 | `.agents/kyro/scopes/**` | **Yes** | Team | Per-scope `sprint.json`, archives, findings |
 | `.agents/kyro/.gitignore` | **Yes** (recommended) | Team | Written/updated by install/sync so local-only files stay untracked |
@@ -21,6 +21,7 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 | Field | Layer | Notes |
 | ----- | ----- | ----- |
 | `principles` | shared only | Team constitution; travels with git |
+| `conventions[]` | shared only | Optional global operational rules inherited by every scope; add through `kyro rule add --global` |
 | `team` (e.g. `minPackageVersion`) | shared only | Optional fleet floor — doctor **WARN**s if runtime is older (non-blocking) |
 | `scopes[]` | shared cache + disk | Presence SoT is folders under `scopes/`; install/sync rehydrates |
 | `activeScope` | local only | Personal — never on `project.json` |

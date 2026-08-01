@@ -148,6 +148,7 @@ Thin routers over scope state — they load only what the current step needs.
 | `… record-evidence <task> …` | Maker evidence on a task |
 | `… review <task> --verdict pass\|fail …` | Checker verdict |
 | `… debt add\|start\|resolve\|…` | Formal debt lifecycle |
+| `… rule add --rule "…" --tag process [--global]` | Register a scope rule; optionally promote it to every scope |
 | `… close-sprint --outcome …` | Lossless close + checkpoint (never null `activeSprint` by hand) |
 | `… context-pack --json` | Lean read for routing (prefer over opening full `sprint.json`) |
 | `… doctor` / `… doctor --artifacts` | Health and artifact shape |
@@ -182,7 +183,7 @@ Unknowns become `[NEEDS CLARIFICATION]` markers; `doctor` / `analyze` fail until
 
 ```text
 .agents/kyro/
-├── project.json              # SHARED — commit: principles, team policy, scopes registry cache
+├── project.json              # SHARED — commit: principles, global conventions, team policy, scopes cache
 ├── local.json                # LOCAL — gitignored: activeScope, installedAdapters
 ├── .gitignore                # written by install/sync (local.json, legacy kyro.json, locks)
 └── scopes/{scope}/           # SHARED — commit sprint artifacts
@@ -193,7 +194,7 @@ Unknowns become `[NEEDS CLARIFICATION]` markers; `doctor` / `analyze` fail until
 
 | Path | Commit? | Holds |
 | ---- | ------- | ----- |
-| `project.json` | **Yes** | Team constitution (`principles`), optional `team.minPackageVersion`, scopes registry cache |
+| `project.json` | **Yes** | Team constitution (`principles`), global `conventions`, optional `team.minPackageVersion`, scopes registry cache |
 | `local.json` | **No** (gitignored) | Personal `activeScope`, machine `installedAdapters` |
 | `scopes/**` | **Yes** | Sprint work shared by the team |
 | Legacy `kyro.json` | **No** | Pre-layered monolito; dual-read until install migrates it to layers |

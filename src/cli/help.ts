@@ -20,6 +20,7 @@ Usage:
   kyro add-emergent [options]  Tool-owned append to activeSprint.emergentTasks[]
   kyro scenario <subcommand>   Tool-owned scenario add / task link (no hand-edit)
   kyro adr <subcommand>        Tool-owned ADR append (full v4 record)
+  kyro rule <subcommand>       Tool-owned scope/global convention append
   kyro repair [options]        Validate and normalize a scope's sprint.json
   kyro status [mode]           Read-only scope progress, review debt, and debt report
   kyro close-sprint [options]  Checkpoint + close the active sprint (lossless, tool-owned)
@@ -68,6 +69,7 @@ Examples:
   kyro scenario add --id S10 --requirement R1 --given "..." --when "..." --then "..." --kyro-scope auth-refactor
   kyro scenario link --task T1.2 --scenario S10 --kyro-scope auth-refactor
   kyro adr add --title "..." --context "..." --decision "..." --consequence "..." --alternative "..." --kyro-scope auth-refactor
+  kyro rule add --rule "..." --tag process [--global] --kyro-scope auth-refactor
   kyro context-pack --kyro-scope 01-token-cost-optimization --json
   kyro eval --json
   kyro trace --kyro-scope auth-refactor --tail 20
@@ -109,6 +111,8 @@ export function printCommandHelp(command: string): void {
   kyro scenario link --task <T#> --scenario <S#> [--kyro-scope <scope>] [--dry-run]`);
   } else if (command === 'adr') {
     console.log('Usage: kyro adr add --title <text> --context <text> --decision <text> --consequence <text> [--consequence ...] --alternative <text> [--alternative ...] [--id ADR-0001] [--status accepted|proposed|rejected|superseded] [--date YYYY-MM-DD] [--kyro-scope <scope>] [--dry-run]');
+  } else if (command === 'rule') {
+    console.log('Usage: kyro rule add --rule <text> [--tag <tag> ...] [--id <id>] [--global] [--kyro-scope <scope>] [--dry-run]');
   } else if (command === 'close-sprint') {
     console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {
