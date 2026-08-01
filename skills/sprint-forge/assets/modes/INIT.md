@@ -1,97 +1,48 @@
-# INIT Mode — Scope Analysis & sprint.json Bootstrap
+# INIT Mode — Scope Bootstrap
 
-Use INIT when a scope has no `sprint.json`. Produces exactly two things: a new `sprint.json` and an updated `kyro.json`. Nothing else (besides write-only `findings/`).
+Use INIT when a scope has no `sprint.json`. Analyze the request, then create project state through the Kyro CLI. Source code stays read-only; only Kyro state and write-only findings may be written.
 
-## Inputs
+## Inputs and routing
 
-- User request and current repository path.
-- `.agents/kyro/kyro.json` if present (to know existing scopes).
-- One work-type helper under `../helpers/analysis/` after work-type detection.
-- **Optional:** if the user references a matured-idea document, consume its plan-grade sections using the exact schema-safe mapping in Step 5. For legacy briefs, fall back to `Problem / Motivation`, `Who it's for`, and `What success looks like`. Never re-interview the user for facts or decisions already captured there.
+1. Resolve a kebab-case `scope`, repository path, and `.agents/kyro/scopes/{scope}/`. Existing `sprint.json` routes to `plan-sprint.md`.
+2. Classify the work as `feature`, `bugfix`, `audit`, `refactor`, `new-project`, or `tech-debt`; load only `../helpers/analysis/{workType}.md`.
+3. Read only what that helper requires. Write each distinct finding to `{outputDir}/findings/NN-slug.md` with summary, severity, affected files, and recommendation. Findings are write-only routing evidence.
 
-## Step 1 — Resolve scope
+## Size the roadmap
 
-Determine `scope` (kebab-case work topic) and `codebasePath`. Output dir: `.agents/kyro/scopes/{scope}/`. If `sprint.json` already exists there, stop and route to `plan-sprint.md` instead.
-
-## Step 2 — Detect work type
-
-Classify as `feature`, `bugfix`, `audit`, `refactor`, `new-project`, or `tech-debt`. Load only the matching helper: `../helpers/analysis/{workType}.md`.
-
-## Step 3 — Analyze
-
-Read only what the work type requires. Write each distinct finding to `{outputDir}/findings/NN-slug.md` (summary, severity, affected files, recommendation) — write-only, never re-read to route.
-
-## Step 4 — Size the roadmap
-
-Produce sizing before writing anything:
+Choose the smallest justified sprint count. Every sprint needs a distinct, verifiable objective; multiple sprints require explicit split triggers and a rationale for why fewer or more would be wrong. Produce:
 
 ```json
 {
   "plannedSprintCount": 2,
-  "sizingRationale": "Why this many sprints — explicit split triggers and why not fewer/more.",
+  "sizingRationale": "Explicit sizing rationale.",
   "sprints": [
-    { "n": 1, "slug": "foundation-cleanup", "title": "Foundation: cleanup", "state": "planned" },
-    { "n": 2, "slug": "validation-hardening", "title": "Validation hardening", "state": "planned" }
+    { "n": 1, "slug": "foundation", "title": "Foundation", "state": "planned" },
+    { "n": 2, "slug": "hardening", "title": "Hardening", "state": "planned" }
   ]
 }
 ```
 
-Rules: every sprint needs a distinct verifiable objective. Multi-sprint plans need explicit split triggers. Never pad to look thorough.
+Never pad the roadmap or generate Sprint 1 tasks here.
 
-## Step 5 — Write sprint.json
+## Materialize the scope
 
-Load `../templates/sprint.json`. Fill:
+Load `../templates/sprint.json`, then prepare a lean plan JSON containing:
 
-- `scope`, `title`, `status: "planning"`, `objective` (one sentence).
-- `successCriteria: [...]` — 2–5 **technology-agnostic, measurable** outcomes (WHAT/WHY, not HOW). Example: "A user completes checkout in under 2 minutes."
-- `spec` (optional but preferred when the scope has explicit product/business requirements):
-  - `requirements[]`: stable ids (`R1`, `R2`) with technology-agnostic statements, optional `priority` (`must|should|could`), and optional rationale.
-  - `nonGoals[]`: explicit out-of-scope outcomes.
-  - `openQuestions[]`: unresolved requirement-level questions that need `clarify.md`.
-  - `scenarios[]`: start empty here unless the scenario is already unambiguous; `plan-sprint.md` normally adds Given/When/Then scenarios.
-- `roadmap` from the sizing above.
-- `conventions: []` (operational learned rules populated later by `learner.md`), `adrs: []` (durable architectural decisions, no markdown ADR files), `clarifications: []` (populated by `clarify.md`), `activeSprint: null`.
-- `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write `[NEEDS CLARIFICATION: ...]` markers rather than guessing), otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.
-- **Do not invent `author`.** Scope creator identity is machine-captured only by `{{KYRO_CLI}} plan` from git `user.name` and/or `user.email` when at least one is set. Hand-writing `sprint.json` never captures it — see the mandatory path below.
+- `scope`, `title`, one-sentence `objective`, and 2–5 measurable, technology-agnostic `successCriteria`.
+- Optional `spec`: stable `requirements[]`, explicit `nonGoals[]`, unresolved `openQuestions[]`, and only already-unambiguous Given/When/Then `scenarios[]`.
+- The sized `roadmap`. Do not include `author`; the CLI captures available git identity.
 
-**Plan-grade Seedbed mapping:** when a matured-idea document is referenced, load `../helpers/seedbed-init-mapping.md` and apply its exact schema-safe mapping. Account for every material item before writing. Do not load this helper on the normal one-line INIT path.
+Unknown design-affecting details become `[NEEDS CLARIFICATION: <gap>]`; the CLI routes them to `clarify`. Never guess.
 
-**Mandatory: materialize `sprint.json` via the CLI, not by hand.** Write a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap` — **no `author` field**) and run `{{KYRO_CLI}} plan --from <file>`. This is tool-owned and validated: it materializes `sprint.json` (including optional `author` captured from git when available) and registers `kyro.json` for you — skip straight to Step 6's verification. The startup capability handshake (`{{KYRO_CLI}} capabilities --json`, orchestrator Step 3) already confirms `plan` is supported before INIT ever runs, so there is essentially never a legitimate reason to skip this.
+**Plan-grade Seedbed mapping:** for a matured-idea document, load `../helpers/seedbed-init-mapping.md` and apply its schema-safe mapping. Account for every material item. Do not load it on the normal one-line INIT path.
 
-If `{{KYRO_CLI}} plan --from <file>` returns a validation error (e.g. `INVALID_INPUT`, `INVALID_SPRINT_SHAPE`), **fix the lean plan JSON and retry the CLI** — do not fall back to hand-writing. Hand-writing `sprint.json` directly is a **recovery-only fallback**, reserved for when the CLI genuinely cannot run (`UNKNOWN_COMMAND`, missing binary, crash) — never a routine choice. On that narrow fallback, hand-write the document without inventing `author`.
+Run `{{KYRO_CLI}} plan --from <file>`. This validated, tool-owned command materializes `.agents/kyro/scopes/{scope}/sprint.json`, initializes conventions, ADRs, clarifications, and handoff, captures optional author identity, and registers project state.
 
-Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`: read the current target when present, serialize the complete v4 document, write atomically, then re-read and parse it before continuing. Create `archive/` and `findings/` beside it. Do not update `kyro.json` until this verification succeeds.
+On validation errors, fix the lean plan and retry. Direct writing is recovery-only when the CLI cannot run (`UNKNOWN_COMMAND`, missing binary, crash). In that case, use the Artifact Write Contract in `../../SKILL.md`: serialize the complete v4 document, write atomically, re-read, and parse. Never invent `author`. Do not update `kyro.json` until `sprint.json` verification succeeds.
 
-## Step 6 — Update kyro.json
-
-**If `.agents/kyro/kyro.json` exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }` (never a bare string — `{{KYRO_CLI}} doctor` fails it). Set `activeScope` if none is active. Use the Artifact Write Contract.
-
-**If it does NOT exist:** create it with the COMPLETE v4 shape — every required field, not just `scopes`/`activeScope` (a partial file is flagged by `{{KYRO_CLI}} doctor`). Write exactly:
-
-```json
-{
-  "schemaVersion": 4,
-  "artifactRoot": ".agents/kyro/scopes",
-  "scopes": [{ "id": "{scope}", "title": "{title}", "status": "planning" }],
-  "activeScope": "{scope}",
-  "runtimePath": "~/.agents/kyro/current",
-  "installedAdapters": []
-}
-```
-
-After creating it, recommend the human run `npx kyro-ai install --scope workspace --yes` once (full npm package only — never via the projected runtime CLI). Day-to-day workflow still uses `{{KYRO_CLI}}`. The active runtime version is read from `~/.agents/kyro/current/manifest.json.packageVersion`, not copied into project state.
-
-**Optional — seed `principles[]`:** if the user states non-negotiable project rules, add them to
-`kyro.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
-`check` (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`)
-when it maps to the rule, so `{{KYRO_CLI}} analyze` enforces it deterministically.
+If the user supplied non-negotiable principles, preserve them as project-level objects with `id`, `rule`, `severity`, `rationale`, and an applicable built-in `check`.
 
 ## Output
 
-Report: scope, work type, finding count, sprint count, sizing rationale, files created. Next action: run `/kyro:forge` to plan Sprint 1.
-
-## Rules
-
-- Write only `sprint.json` + `kyro.json` (plus write-only `findings/`). No other files.
-- Do not generate the first sprint — that is `plan-sprint.md`'s job.
-- Do not load sprint templates, debt tracker, execution modes, or unrelated analysis helpers during INIT.
+Report scope, work type, finding count, sprint count, sizing rationale, and created files. Next action is `/kyro:forge` to plan Sprint 1.
