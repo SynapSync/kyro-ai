@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format is based on
 - Failed lock initialization, release, and stale-lock reclaim now attempt verified directory removal even when a directory sync fails, preventing empty lock or reclaim directories from wedging later writers.
 - Stale-lock reclaim keeps Windows `dev`/`ino` identities as lossless `bigint` values through verification, avoiding false ownership changes when NTFS file IDs exceed JavaScript's safe integer range.
 - The directory-sync policy test can explicitly force strict non-Windows behavior, so Windows CI validates both the strict and portable `EPERM` branches.
+- ESM-based verification scripts convert absolute module paths with `pathToFileURL`, preventing Windows drive letters such as `D:` from being misread as unsupported URL schemes.
 
 ### Added
 

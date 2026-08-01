@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const cli = resolve(repo, 'dist/cli.js');
@@ -893,7 +893,7 @@ for (const mode of ['corrupt', 'unsupported']) {
 
 // Durability helper works on real parent directories, and public package exports compile.
 {
-  const module = await import(resolve(repo, 'dist/cli/pipeline/state-writer-lock.js'));
+  const module = await import(pathToFileURL(resolve(repo, 'dist/cli/pipeline/state-writer-lock.js')).href);
   const root = mkdtempSync(join(tmpdir(), 'kyro-fsync-contract-'));
   try {
     const file = join(root, 'state.json');
@@ -901,7 +901,7 @@ for (const mode of ['corrupt', 'unsupported']) {
     writeFileSync(file, '{}\n');
     module.fsyncParentDirectory(file);
   } finally { rmSync(root, { recursive: true, force: true }); }
-  const publicApi = await import(resolve(repo, 'dist/index.js'));
+  const publicApi = await import(pathToFileURL(resolve(repo, 'dist/index.js')).href);
   assert(publicApi.SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION === 1, 'checkpoint schema constant is not exported publicly');
   const consumerRoot = mkdtempSync(join(tmpdir(), 'kyro-type-consumer-'));
   try {
@@ -950,7 +950,7 @@ for (const mode of ['corrupt', 'unsupported']) {
 
 // Checkpoint recency is numeric, not lexical (sprint 1000 is newer than sprint 999).
 {
-  const module = await import(resolve(repo, 'dist/cli/commands/close-sprint.js'));
+  const module = await import(pathToFileURL(resolve(repo, 'dist/cli/commands/close-sprint.js')).href);
   const make = (sprintN, createdAt) => ({ identity: { sprintN }, createdAt, checkpointId: String(sprintN) });
   assert(module.compareCheckpointRecency(make(1000, '2026-01-01T00:00:00Z'), make(999, '2027-01-01T00:00:00Z')) > 0, 'checkpoint ordering regressed to lexical filename order');
 }
