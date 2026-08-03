@@ -81,16 +81,24 @@ That's it! The plugin works standalone. No extra setup needed.
 
 ---
 
-### Claude Code (npx alternative)
+### Install for any agent (Codex, OpenCode, CommandCode, etc.)
 
-If you prefer not to use the plugin, or you're working in a team repo, install via npm:
+Use this path to install Kyro for agents other than Claude Code plugin:
 
 ```bash
 cd /path/to/your-project
 npx kyro-ai@latest install --init-workspace --yes
 ```
 
-Then use Kyro commands from the terminal or via agent skills under `~/.agents/skills/kyro-*`.
+This installs:
+- Global runtime at `~/.agents/kyro/current/`
+- Command skills at `~/.agents/skills/kyro-*`
+- Project state at `./.agents/kyro/`
+
+Then invoke Kyro from your agent:
+- **Codex, Grok, CommandCode**: via `kyro-*` skills (auto-discovered)
+- **OpenCode**: via `/kyro/*` commands or `~/.config/opencode/skills/kyro-*`
+- **Terminal**: `kyro forge`, `kyro status`, etc.
 
 ---
 
