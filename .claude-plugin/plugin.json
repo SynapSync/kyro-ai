@@ -40,5 +40,5 @@
   "commands": [
     "./commands/"
   ],
-  "hooks": "./.claude-plugin/hooks/hooks.json"
+  "hooks": "./hooks/hooks.json"
 }
