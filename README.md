@@ -103,18 +103,38 @@ state ›  .agents/kyro/scopes/{scope}/sprint.json
 
 ---
 
-## Choose your host
+## Install for your host
 
-| Host | How to install | How to invoke |
-| ---- | -------------- | ------------- |
-| **Claude Code** | Plugin (recommended): `/plugin marketplace add SynapSync/kyro-ai` then `/plugin install kyro-ai@kyro-ai`. Optional: from the **project root**, `npx kyro-ai@latest install --init-workspace --yes` for shared runtime/state. | `/kyro:forge`, `/kyro:status`, … |
+### Claude Code (recommended)
+
+**Option A: Plugin (easiest)**
+
+1. In Claude Code, open the slash menu and type `/plugin install kyro-ai`
+2. Or search the plugin marketplace and install `SynapSync/kyro-ai`
+3. Once installed, use commands like `/kyro:forge`, `/kyro:status`, `/kyro:qa`
+
+**Option B: Plugin + Project state (teams)**
+
+If your team shares a repo with Kyro already set up, also run from your project root:
+
+```bash
+cd /path/to/your-project
+npx kyro-ai@latest install --init-workspace --yes
+```
+
+This writes shared `project.json` and your personal `local.json` to `.agents/kyro/`, so you're in sync with teammates.
+
+### Other hosts
+
+| Host | Installation | Invocation |
+| ---- | ------------ | ---------- |
 | **Codex** | From project root: `npx kyro-ai@latest install --agent codex --init-workspace --yes` | Skills `kyro-*` + managed block in root `AGENTS.md` |
 | **OpenCode** | From project root: `npx kyro-ai@latest install --agent opencode --init-workspace --yes` | Native `/kyro/*` commands or `~/.config/opencode/skills/kyro-*` |
 | **Other / Cursor** | From project root: `npx kyro-ai@latest install --init-workspace --yes` (standard skills). Cursor-specific adapter is not shipped yet. | `kyro-forge`, `kyro-status`, … under `~/.agents/skills/` |
 
 Host notes: [Agent adapters](docs/agent-adapters.md) · [Codex](docs/HOW-TO-USE-CODEX.md) · [OpenCode](docs/HOW-TO-USE-OPENCODE.md)
 
-### Claude plugin (local dev)
+### Local development (building from source)
 
 ```bash
 git clone https://github.com/SynapSync/kyro-ai.git
