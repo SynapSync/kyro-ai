@@ -16,131 +16,127 @@
 
 ---
 
-## Why Kyro
+## What You Get
 
-AI agents forget context, invent process, and edit planning files by hand. Across Claude, Codex, OpenCode, and others you re-explain the same workflow every session.
+Kyro is a **sprint harness** for AI coding agents. Install once, every agent uses the same source of truth:
 
-Kyro installs a **project harness** so any agent that opens the repo:
+- **Shared sprint cycle** — all agents follow init → plan → execute → review → close (gates enforced in code)
+- **One scope file** — `.agents/kyro/scopes/{scope}/sprint.json` is the single source of truth
+- **CLI-owned state** — schema and gates run every time; agents can't invent enums or hand-edit
+- **Team-safe by default** — commit `project.json` + scopes; each dev has personal `local.json`
+- **5 slash commands** — `/kyro:forge` (full cycle), `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context`
 
-- follows the **same** sprint cycle (init → plan → execute → review → close)
-- reads and writes **one** scope file: `.agents/kyro/scopes/{scope}/sprint.json`
-- mutates state through **CLI verbs** (schema + gates enforced in code, not prompt goodwill)
+**Why it matters:** AI agents forget context, invent process, and edit planning files by hand. Across Claude, Codex, OpenCode, and others you re-explain the same workflow every session. Kyro stops this.
 
 ---
 
 ## Quick start
 
-**Prerequisites:** Node.js ≥ 18, Git, and an agent that can load skills, slash commands, or root `AGENTS.md`.
+**Requirements:**
+- Node.js ≥ 18
+- Git
+- Claude Code, Codex, OpenCode, or similar agent (must support plugins or skills)
 
-### 1. Install from your project root
+### Step 1: Install plugin (Claude Code only)
 
-**Always `cd` into the repo you want Kyro to manage, then run install.**  
-Runtime and skills go under your home directory; project state (`.agents/kyro/`) is created in the **current working directory**. Running install from `~`, `/tmp`, or another folder still installs the global pieces but initializes Kyro state in the wrong place.
+In Claude Code, install the Kyro plugin:
 
-Always use **`kyro-ai@latest`** so install/sync pulls the current release (plain `npx kyro-ai` can reuse a stale cache).
-
-```bash
-cd /path/to/your-app
-
-# Default (standard skills under ~/.agents/skills/kyro-*)
-# --init-workspace writes layered project state here (project.json + local.json),
-# ensures .agents/kyro/.gitignore for local-only files, and rehydrates existing scopes/ after clone
-npx kyro-ai@latest install --scope workspace --init-workspace --yes
-
-# Optional host adapters (can combine; still run from the project root)
-npx kyro-ai@latest install --agent codex --scope workspace --init-workspace --yes
-npx kyro-ai@latest install --agent opencode --scope workspace --init-workspace --yes
+```
+/plugin install kyro-ai
 ```
 
-| Layer | Location | Depends on `cd`? |
-| ----- | -------- | ---------------- |
-| Runtime + CLI | `~/.agents/kyro/current/` | No |
-| Command skills | `~/.agents/skills/kyro-*` | No |
-| Project state | `./.agents/kyro/` (cwd) | **Yes** |
+Or use the marketplace:
+1. Open `/plugin marketplace`
+2. Search for `kyro-ai`
+3. Click install
 
-If the repo already has `.agents/kyro/scopes/` (team clone) without local state, the same command registers those scopes into shared `project.json` and writes your personal `local.json`. With several scopes, set yours afterward: `… scope set-active <scope> --yes`.
+### Step 2: Initialize project state (teams)
 
-### 2. Verify
-
-```bash
-# Preferred after a plain npx install (no global bin required):
-node ~/.agents/kyro/current/dist/cli.js doctor
-
-# Or, if you have a durable global install:
-#   npm i -g kyro-ai && kyro doctor
-npx kyro-ai@latest doctor
-```
-
-> **`npx` vs bare `kyro`:** `npx kyro-ai@latest install` does **not** permanently put `kyro` on your PATH. Install/sync persists a runnable invocation (often `node ~/.agents/kyro/current/dist/cli.js`) on the **global** runtime manifest and projected modes — not on project state files. Agents should use **that** form — not invent hand-edits when `kyro` is missing. Details: [CLI invocation](docs/cli.md#cli-invocation-persistence-kyroinvocation).
-
-### 3. Run a cycle
-
-In Claude-style hosts:
-
-```text
-/kyro:forge add JWT auth to the API
-```
-
-On hosts that discover skills:
-
-```text
-kyro-forge add JWT auth to the API
-```
-
-```text
-you ›  /kyro:forge add JWT auth to the API
-
-kyro ›  INIT      objective + success criteria
-        ─ gate ─  proceed / adjust / cancel?
-        PLAN      sprint tasks
-        ─ gate ─  proceed / adjust / cancel?
-        EXECUTE   evidence via CLI (not hand JSON)
-        REVIEW    checker verdict via CLI
-        CLOSE     lossless checkpoint + ledger
-
-state ›  .agents/kyro/scopes/{scope}/sprint.json
-```
-
----
-
-## Install for your host
-
-### Claude Code (recommended)
-
-**Option A: Plugin (easiest)**
-
-1. In Claude Code, open the slash menu and type `/plugin install kyro-ai`
-2. Or search the plugin marketplace and install `SynapSync/kyro-ai`
-3. Once installed, use commands like `/kyro:forge`, `/kyro:status`, `/kyro:qa`
-
-**Option B: Plugin + Project state (teams)**
-
-If your team shares a repo with Kyro already set up, also run from your project root:
+If you're working in a repo with teammates, initialize shared project state:
 
 ```bash
 cd /path/to/your-project
 npx kyro-ai@latest install --init-workspace --yes
 ```
 
-This writes shared `project.json` and your personal `local.json` to `.agents/kyro/`, so you're in sync with teammates.
+**Why:** This creates `.agents/kyro/project.json` (shared, committed) and `.agents/kyro/local.json` (personal, gitignored). If the repo already has scopes from teammates, this registers them and lets you pick your active scope.
 
-### Other hosts
+**Already set up?** Skip this step — the plugin works standalone.
 
-| Host | Installation | Invocation |
-| ---- | ------------ | ---------- |
-| **Codex** | From project root: `npx kyro-ai@latest install --agent codex --init-workspace --yes` | Skills `kyro-*` + managed block in root `AGENTS.md` |
-| **OpenCode** | From project root: `npx kyro-ai@latest install --agent opencode --init-workspace --yes` | Native `/kyro/*` commands or `~/.config/opencode/skills/kyro-*` |
-| **Other / Cursor** | From project root: `npx kyro-ai@latest install --init-workspace --yes` (standard skills). Cursor-specific adapter is not shipped yet. | `kyro-forge`, `kyro-status`, … under `~/.agents/skills/` |
+### Step 3: Verify setup
 
-Host notes: [Agent adapters](docs/agent-adapters.md) · [Codex](docs/HOW-TO-USE-CODEX.md) · [OpenCode](docs/HOW-TO-USE-OPENCODE.md)
+```bash
+npx kyro-ai@latest doctor
+```
 
-### Local development (building from source)
+If installed globally:
+
+```bash
+kyro doctor
+```
+
+### Step 4: Run your first sprint
+
+In Claude Code, type:
+
+```
+/kyro:forge implement OAuth2 authentication
+```
+
+You'll see:
+
+```text
+INIT      objective + success criteria
+─ gate ─  proceed / adjust / cancel?
+PLAN      sprint tasks
+─ gate ─  proceed / adjust / cancel?
+EXECUTE   evidence via CLI (not hand JSON)
+REVIEW    checker verdict via CLI
+CLOSE     lossless checkpoint + ledger
+
+state ›  .agents/kyro/scopes/oauth2-auth/sprint.json
+```
+
+---
+
+## Installation by host
+
+| Host | How to install | Invocation |
+| ---- | --------------- | ---------- |
+| **Claude Code** ⭐ | `/plugin install kyro-ai` | `/kyro:forge`, `/kyro:status`, `/kyro:qa` |
+| **Codex** | From project root: `npx kyro-ai@latest install --agent codex --init-workspace --yes` | Skills `kyro-*` (auto-loaded in root `AGENTS.md`) |
+| **OpenCode** | From project root: `npx kyro-ai@latest install --agent opencode --init-workspace --yes` | Native `/kyro/*` commands |
+| **Cursor / Others** | From project root: `npx kyro-ai@latest install --init-workspace --yes` | `kyro-forge`, `kyro-status` … under `~/.agents/skills/` |
+
+**Notes by host:** [Agent adapters](docs/agent-adapters.md) · [Codex guide](docs/HOW-TO-USE-CODEX.md) · [OpenCode guide](docs/HOW-TO-USE-OPENCODE.md)
+
+### For local development
+
+Clone and build from source:
 
 ```bash
 git clone https://github.com/SynapSync/kyro-ai.git
 cd kyro-ai && npm install && npm run build
 claude --plugin-dir /path/to/kyro-ai
 ```
+
+---
+
+## Typical flows
+
+**Use it when you want to...**
+
+| Scenario | Command |
+| -------- | ------- |
+| Start a new feature sprint | `/kyro:forge implement email notifications` |
+| Check progress on current work | `/kyro:status` |
+| Get a summary before switching contexts | `/kyro:task-context` (copy-paste into a fresh session) |
+| Audit code & architecture independently | `/kyro:qa` (runs outside the forge cycle) |
+| Mature a rough idea into a plan | `/kyro:idea design a rate-limiting strategy` |
+| Record evidence on a task | `kyro record-evidence <task> --evidence "…"` |
+| Mark a task complete after review | `kyro review <task> --verdict pass` |
+| Track technical debt | `kyro debt add --title "refactor auth" --tag database` |
+| Wrap up a sprint | `kyro close-sprint --outcome success` |
 
 ---
 
@@ -246,16 +242,58 @@ Details: [Teams multi-dev contract](docs/teams.md) · [CLI project state](docs/c
 
 ---
 
-## Troubleshooting
+## FAQ
 
-| Symptom | What to do |
-| ------- | ---------- |
-| `kyro: command not found` | Expected after install-only-via-npx. Use `node ~/.agents/kyro/current/dist/cli.js …`, or `npm i -g kyro-ai@latest`, then from the project root `npx kyro-ai@latest sync --yes`. |
-| Agent hand-writes `sprint.json` | Stop. Fix CLI discovery, load **kyro-ai** skills (`kyro-forge`), run `… doctor --artifacts`. Prefer `plan --from` / tool-owned verbs. |
-| No `.agents/kyro/` in the repo / wrong folder has Kyro state | Install was run outside the project. Remove stray `./.agents/kyro` if you created it by mistake, `cd` to the real project root, re-run `install --init-workspace --yes`. |
-| Status/doctor says install bootstrap / missing project state | From project root: `npx kyro-ai@latest install --init-workspace --yes` (creates `project.json` + `local.json`; does not invent scopes). |
-| Stale runtime after upgrade | From project root: `npx kyro-ai@latest sync --scope workspace --yes` |
-| Broken close / checkpoint | Do not null `activeSprint` by hand. Use `close-sprint` and [sprint-close checkpoints](docs/sprint-close-checkpoints.md). |
+**Do agents need to install separately, or does the plugin work for everyone?**
+
+The plugin is global (installed once per machine). If you're solo, you're done after `/plugin install kyro-ai`. If your team shares a repo, also run `npx kyro-ai@latest install --init-workspace --yes` from the project root once — it writes `.agents/kyro/project.json` (committed) and `local.json` per dev (gitignored).
+
+**How do I upgrade to the latest version?**
+
+From the project root:
+
+```bash
+npx kyro-ai@latest sync --scope workspace --yes
+```
+
+Or if installed globally:
+
+```bash
+npm i -g kyro-ai@latest
+kyro sync --scope workspace --yes
+```
+
+**Can agents hand-edit `sprint.json`?**
+
+No. Kyro enforces schema and gates through CLI verbs, not prompt discipline. Use `kyro plan --from <file>`, `kyro record-evidence`, `kyro review`, and `kyro close-sprint` instead of hand-edits.
+
+**My team has scopes already. How do I join?**
+
+```bash
+cd /path/to/your-project
+npx kyro-ai@latest install --init-workspace --yes
+```
+
+Kyro registers existing scopes into `project.json` and creates your personal `local.json`. Then set your active scope:
+
+```bash
+kyro scope set-active <scope> --yes
+```
+
+**What if `.kyro` ends up in the wrong directory?**
+
+Remove it and reinstall from the correct project root:
+
+```bash
+rm -rf ./.agents/kyro
+cd /path/to/actual/project
+npx kyro-ai@latest install --init-workspace --yes
+```
+
+**What's the difference between `/plugin install kyro-ai` and `npx kyro-ai@latest install`?**
+
+- `/plugin install kyro-ai` — installs the Claude Code plugin (global, one-time)
+- `npx kyro-ai@latest install` — initializes shared project state (`.agents/kyro/`). Only needed if your team shares the repo. Solo devs don't need to run this.
 
 ---
 
