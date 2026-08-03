@@ -37,7 +37,28 @@ Kyro is a **sprint harness** for AI coding agents. Install once, every agent use
 - Git
 - Claude Code, Codex, OpenCode, or similar agent (must support plugins or skills)
 
-### Claude Code (Plugin)
+### Install for any agent (Codex, OpenCode, CommandCode, etc.)
+
+Use this path to install Kyro for agents other than Claude Code plugin:
+
+```bash
+cd /path/to/your-project
+npx kyro-ai@latest install --init-workspace --yes
+```
+
+This installs:
+- Global runtime at `~/.agents/kyro/current/`
+- Command skills at `~/.agents/skills/kyro-*`
+- Project state at `./.agents/kyro/`
+
+Then invoke Kyro from your agent:
+- **Codex, Grok, CommandCode**: via `kyro-*` skills (auto-discovered)
+- **OpenCode**: via `/kyro/*` commands or `~/.config/opencode/skills/kyro-*`
+- **Terminal**: `kyro forge`, `kyro status`, etc.
+
+---
+
+### Install Claude Code (Plugin)
 
 **Step 1: Add the marketplace**
 
@@ -78,27 +99,6 @@ state ›  .agents/kyro/scopes/oauth2-auth/sprint.json
 ```
 
 That's it! The plugin works standalone. No extra setup needed.
-
----
-
-### Install for any agent (Codex, OpenCode, CommandCode, etc.)
-
-Use this path to install Kyro for agents other than Claude Code plugin:
-
-```bash
-cd /path/to/your-project
-npx kyro-ai@latest install --init-workspace --yes
-```
-
-This installs:
-- Global runtime at `~/.agents/kyro/current/`
-- Command skills at `~/.agents/skills/kyro-*`
-- Project state at `./.agents/kyro/`
-
-Then invoke Kyro from your agent:
-- **Codex, Grok, CommandCode**: via `kyro-*` skills (auto-discovered)
-- **OpenCode**: via `/kyro/*` commands or `~/.config/opencode/skills/kyro-*`
-- **Terminal**: `kyro forge`, `kyro status`, etc.
 
 ---
 
