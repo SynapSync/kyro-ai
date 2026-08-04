@@ -993,7 +993,9 @@ async function waitForRenewals(runState, root, count, message) {
 }
 
 // The same injected error without the Windows policy still fail-stops: POSIX behaviour is unchanged.
-{
+// POSIX-only: forcing the policy off on Windows also drops the EPERM tolerance that directory
+// fsync genuinely needs there, so the lock could not even be acquired.
+if (process.platform !== 'win32') {
   const root = makeSandbox();
   try {
     const ready = join(root, 'posix-ready');
