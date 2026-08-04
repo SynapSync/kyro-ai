@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.41.5] - 2026-08-04
+
+### Fixed
+
+- Claude Code plugin no longer fails to load with `Duplicate hooks file detected` for `hooks/hooks.json`. The standard plugin-root path is loaded automatically; `plugin.json` must not re-declare it. Bump past 4.41.4 so marketplace installs pick up the fix.
+
+## [4.41.4] - 2026-08-04
+
+### Fixed
+
+- Claude Code plugin hooks live at the plugin root (`hooks/hooks.json`) so the manifest path resolves correctly after marketplace install.
+- State-writer lock: retry transient Windows heartbeat I/O errors (`EPERM`/`EACCES`/`EBUSY`) from the published lease — including the first renewal — and clean orphaned heartbeat temps on release so install smoke no longer dies with silent SIGKILL or `ENOTEMPTY`.
+
 ## [4.41.2] - 2026-08-01
 
 ### Fixed
