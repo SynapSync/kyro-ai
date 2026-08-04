@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
-const hook = resolve(repo, '.claude-plugin/hooks/guard-bash-output.mjs');
+const hook = resolve(repo, 'hooks/guard-bash-output.mjs');
 
 function decide(payload) {
   const res = spawnSync(process.execPath, [hook], { input: JSON.stringify(payload), encoding: 'utf-8' });
