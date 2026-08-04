@@ -593,6 +593,8 @@ for (const mode of ['corrupt', 'unsupported']) {
 }
 
 // An empty partial lock remains reclaimable when Windows rejects directory fsync.
+// Use the CI-safe lease: a 500ms lease expires under Windows runner load during reclaim+repair
+// (Worker start + first renew), which is not what this case is testing.
 {
   const root = makeSandbox();
   try {
@@ -603,7 +605,7 @@ for (const mode of ['corrupt', 'unsupported']) {
     const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
       KYRO_TEST_LOCK_DIRSYNC_ERROR: 'EPERM',
       KYRO_TEST_LOCK_WIN32_POLICY: '1',
-      KYRO_TEST_LOCK_LEASE_MS: '500',
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
     });
     assert(result.status === 0, `Windows policy could not reclaim an empty partial lock: ${output(result)}`);
     assertNoLockDebris(root, 'Windows empty-lock reclaim');
@@ -953,6 +955,112 @@ for (const mode of ['corrupt', 'unsupported']) {
   const module = await import(pathToFileURL(resolve(repo, 'dist/cli/commands/close-sprint.js')).href);
   const make = (sprintN, createdAt) => ({ identity: { sprintN }, createdAt, checkpointId: String(sprintN) });
   assert(module.compareCheckpointRecency(make(1000, '2026-01-01T00:00:00Z'), make(999, '2027-01-01T00:00:00Z')) > 0, 'checkpoint ordering regressed to lexical filename order');
+}
+
+/** Wait until `count` distinct heartbeat renewals have been published under the held lock. */
+async function waitForRenewals(runState, root, count, message) {
+  const heartbeatPath = join(root, '.kyro-state-writer.lock', 'heartbeat.json');
+  const seen = new Set();
+  await waitForChild(runState, () => {
+    try { seen.add(JSON.parse(readFileSync(heartbeatPath, 'utf8')).renewedAt); }
+    catch { /* A renewal is mid-rename; the next poll observes it. */ }
+    return seen.size >= count;
+  }, message, LEASE_EVENT_BUDGET_MS);
+}
+
+// Windows returns EPERM/EACCES/EBUSY from rename-over-existing while another handle holds the
+// target. That is an I/O hiccup, not lease loss, so the owner must survive it — and the failed
+// renewal must not leave its heartbeat temporary behind, or release rmdir()s into ENOTEMPTY.
+{
+  const root = makeSandbox();
+  try {
+    const ready = join(root, 'transient-ready');
+    const gate = join(root, 'transient-gate');
+    const holder = runAsync(root, closeArgs, {
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
+      KYRO_TEST_LOCK_READY_FILE: ready,
+      KYRO_TEST_LOCK_RELEASE_GATE: gate,
+      KYRO_TEST_LOCK_WIN32_POLICY: '1',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_AFTER: '1',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_TIMES: '2',
+    });
+    await waitForChild(holder, () => existsSync(ready), 'transient-retry holder never acquired lock');
+    // Two published renewals bracket the injected failures, so the retry path definitely ran.
+    await waitForRenewals(holder, root, 2, 'holder never renewed past the injected transient errors');
+    writeFileSync(gate, 'release\n');
+    const result = await holder.completed;
+    assert(result.status === 0, `transient renewal error must be retried, not fail-stop: ${result.text}`);
+    assertNoLockDebris(root, 'transient renewal retry');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// First renewal must also retry: the main thread already published a lease, so margin is the
+// on-disk heartbeat — not an in-memory counter that used to start at 0 and always fail-stop.
+{
+  const root = makeSandbox();
+  try {
+    const ready = join(root, 'first-renew-ready');
+    const gate = join(root, 'first-renew-gate');
+    const holder = runAsync(root, closeArgs, {
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
+      KYRO_TEST_LOCK_READY_FILE: ready,
+      KYRO_TEST_LOCK_RELEASE_GATE: gate,
+      KYRO_TEST_LOCK_WIN32_POLICY: '1',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_AFTER: '0',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_TIMES: '2',
+    });
+    await waitForChild(holder, () => existsSync(ready), 'first-renewal transient holder never acquired lock');
+    await waitForRenewals(holder, root, 1, 'holder never completed a first renewal past injected EPERM');
+    writeFileSync(gate, 'release\n');
+    const result = await holder.completed;
+    assert(result.status === 0, `first-renewal transient error must be retried from published lease: ${result.text}`);
+    assertNoLockDebris(root, 'first-renewal transient retry');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// The same injected error without the Windows policy still fail-stops: POSIX behaviour is unchanged.
+// POSIX-only: forcing the policy off on Windows also drops the EPERM tolerance that directory
+// fsync genuinely needs there, so the lock could not even be acquired.
+if (process.platform !== 'win32') {
+  const root = makeSandbox();
+  try {
+    const ready = join(root, 'posix-ready');
+    const gate = join(root, 'posix-never-released');
+    const holder = runAsync(root, closeArgs, {
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
+      KYRO_TEST_LOCK_READY_FILE: ready,
+      KYRO_TEST_LOCK_RELEASE_GATE: gate,
+      KYRO_TEST_LOCK_WIN32_POLICY: '0',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_AFTER: '1',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_TIMES: '1000',
+    });
+    await waitForChild(holder, () => existsSync(ready), 'posix holder never acquired lock');
+    const result = await holder.completed;
+    assert(result.status !== 0, `POSIX must still fail-stop on a renewal error: ${result.text}`);
+    assert(!existsSync(paths(root).checkpoint), 'fail-stopped POSIX holder still published checkpoint side effects');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Retrying is bounded by the published lease: failures that outlive the margin still fail-stop
+// under the Windows policy, so a wedged writer can never outlive its own lease.
+{
+  const root = makeSandbox();
+  try {
+    const ready = join(root, 'exhaust-ready');
+    const gate = join(root, 'exhaust-never-released');
+    const holder = runAsync(root, closeArgs, {
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
+      KYRO_TEST_LOCK_READY_FILE: ready,
+      KYRO_TEST_LOCK_RELEASE_GATE: gate,
+      KYRO_TEST_LOCK_WIN32_POLICY: '1',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_AFTER: '1',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_TIMES: '1000',
+    });
+    await waitForChild(holder, () => existsSync(ready), 'lease-exhaustion holder never acquired lock');
+    const result = await holder.completed;
+    assert(result.status !== 0, `unbounded transient failures must exhaust the lease and fail-stop: ${result.text}`);
+    assert(!existsSync(paths(root).checkpoint), 'lease-exhausted holder still published checkpoint side effects');
+  } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
 console.log('check:lossless-checkpoints — all cases passed');
