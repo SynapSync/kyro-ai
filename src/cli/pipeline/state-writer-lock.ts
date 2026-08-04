@@ -13,6 +13,7 @@ import {
   rmdirSync,
   unlinkSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -41,6 +42,13 @@ const PORTABLE_DIRECTORY_SYNC_ERRORS = new Set([
   ...BASE_PORTABLE_DIRECTORY_SYNC_ERRORS,
   ...(USE_WINDOWS_DIRECTORY_SYNC_POLICY ? ['EPERM'] : []),
 ]);
+// Windows fails rename-over-existing and open with EPERM/EACCES/EBUSY while another handle
+// (Defender, the indexer, a sibling read) holds the target. That is an I/O hiccup, not lease
+// loss, so a renewal that hits one is retried while the published lease still has margin.
+// Ownership violations and non-errno failures are never retried; they still fail-stop at once.
+const TRANSIENT_RENEWAL_ERRORS = new Set(
+  USE_WINDOWS_DIRECTORY_SYNC_POLICY ? ['EPERM', 'EACCES', 'EBUSY'] : [],
+);
 
 interface LockOwner { pid: number; token: string; createdAt: number }
 interface LockHeartbeat { token: string; renewedAt: number; leaseUntil: number }
@@ -410,7 +418,10 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     const crypto = require('node:crypto');
     const pathApi = require('node:path');
     const state = new Int32Array(workerData.state);
-    const failStop = () => {
+    const failStop = (reason) => {
+      // SIGKILL discards whatever is still buffered in the owner's stdio pipe, so a buffered
+      // write would leave the owner dying with no diagnostic at all. fd 2 is written directly.
+      try { fs.writeSync(2, 'ERROR: state-writer lease fail-stop: ' + ((reason && reason.message) || reason || 'unknown') + '\\n'); } catch {}
       Atomics.store(state, 3, 1); Atomics.notify(state, 3);
       try { process.kill(workerData.ownerPid, 'SIGKILL'); } catch { process.abort(); }
     };
@@ -439,6 +450,7 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
       const heartbeat = JSON.parse(readNoFollow(workerData.path));
       if (heartbeat.token !== workerData.token || heartbeat.leaseUntil <= Date.now()) throw new Error('Lease heartbeat expired or changed');
     };
+    let lastLeaseUntil = 0;
     const renew = () => {
       verifyOwnership();
       const now = Date.now();
@@ -461,6 +473,7 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
       verifyOwnership();
       fs.renameSync(temporary, workerData.path);
       syncDir(pathApi.dirname(workerData.path));
+      lastLeaseUntil = now + workerData.leaseMs;
     };
     while (Atomics.load(state, 0) === 0) {
       if (workerData.pauseFile && Atomics.load(state, 1) >= 1) {
@@ -471,10 +484,17 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
         if (workerData.failAfter !== null && Atomics.load(state, 1) >= workerData.failAfter) throw new Error('Injected heartbeat renewal failure');
         renew(); Atomics.add(state, 1, 1); Atomics.notify(state, 1);
       }
-      catch {
-        // Record failure first, then fail-stop the owning process. The main thread may be blocked
-        // and must never resume protected work after another writer can reclaim the expired lease.
-        failStop();
+      catch (error) {
+        // A transient Windows I/O error is not lease loss: retry while the published lease still
+        // has more than one interval of margin. Everything else — ownership violation, expiry, or
+        // any non-errno failure — fail-stops at once, because the main thread may be blocked and
+        // must never resume protected work after another writer can reclaim the expired lease.
+        if (workerData.transientRenewalErrors.includes(error && error.code)
+          && lastLeaseUntil - Date.now() > workerData.intervalMs) {
+          Atomics.wait(state, 0, 0, Math.max(1, Math.floor(workerData.intervalMs / 4)));
+          continue;
+        }
+        failStop(error);
         break;
       }
       if (workerData.unexpectedAfter !== null && Atomics.load(state, 1) >= workerData.unexpectedAfter) throw new Error('Injected unexpected heartbeat worker termination');
@@ -510,9 +530,13 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     testTempToken: process.env.KYRO_TEST_LOCK_HEARTBEAT_TEMP_TOKEN ?? null,
     dirSyncErrorCode: process.env.KYRO_TEST_LOCK_DIRSYNC_ERROR ?? null,
     portableDirectorySyncErrors: [...PORTABLE_DIRECTORY_SYNC_ERRORS],
+    transientRenewalErrors: [...TRANSIENT_RENEWAL_ERRORS],
   } });
-  const fenceParent = (): void => {
+  const fenceParent = (reason?: unknown): void => {
     if (Atomics.load(state, 4) !== 0) return;
+    // Same reasoning as the worker's failStop: SIGKILL drops buffered stdio, so write fd 2 directly.
+    const detail = reason instanceof Error ? reason.message : reason ? String(reason) : 'heartbeat worker ended';
+    try { writeSync(2, `ERROR: state-writer lease fenced: ${detail}\n`); } catch {}
     Atomics.store(state, 3, 1);
     try { process.kill(process.pid, 'SIGKILL'); } catch { process.abort(); }
   };
