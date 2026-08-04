@@ -370,6 +370,9 @@ function releaseOwnedLock(lockPath: string, identity: LockIdentity, ownerRaw: st
   }
   unlinkSync(`${lockPath}/${HEARTBEAT_FILE}`);
   unlinkSync(`${lockPath}/${OWNER_FILE}`);
+  // Ownership was just verified above, so any heartbeat temporary here is ours: a renewal that
+  // hit a retryable error left it behind, and removeDirectoryDurably would fail with ENOTEMPTY.
+  removeHeartbeatTemporaries(lockPath);
   removeDirectoryDurably(lockPath);
 }
 
@@ -451,6 +454,7 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
       if (heartbeat.token !== workerData.token || heartbeat.leaseUntil <= Date.now()) throw new Error('Lease heartbeat expired or changed');
     };
     let lastLeaseUntil = 0;
+    let injectedTransient = 0;
     const renew = () => {
       verifyOwnership();
       const now = Date.now();
@@ -460,20 +464,35 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
       const temporary = workerData.path + '.tmp-' + tempToken;
       const flags = fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY | (fs.constants.O_NOFOLLOW || 0);
       const fd = fs.openSync(temporary, flags, 0o600);
-      let tempIdentity;
+      let published = false;
       try {
-        tempIdentity = fs.fstatSync(fd, { bigint: true });
-        if (!tempIdentity.isFile()) throw new Error('Heartbeat temporary is not a regular file');
-        fs.writeFileSync(fd, content, 'utf8'); fs.fsyncSync(fd);
-      } finally { fs.closeSync(fd); }
-      verifyOwnership();
-      const visibleTemp = fs.lstatSync(temporary, { bigint: true });
-      if (!visibleTemp.isFile() || visibleTemp.isSymbolicLink() || visibleTemp.dev !== tempIdentity.dev || visibleTemp.ino !== tempIdentity.ino) throw new Error('Heartbeat temporary ownership changed');
-      // Re-verify immediately before the atomic publish; never write into a successor lock.
-      verifyOwnership();
-      fs.renameSync(temporary, workerData.path);
-      syncDir(pathApi.dirname(workerData.path));
-      lastLeaseUntil = now + workerData.leaseMs;
+        let tempIdentity;
+        try {
+          tempIdentity = fs.fstatSync(fd, { bigint: true });
+          if (!tempIdentity.isFile()) throw new Error('Heartbeat temporary is not a regular file');
+          fs.writeFileSync(fd, content, 'utf8'); fs.fsyncSync(fd);
+        } finally { fs.closeSync(fd); }
+        verifyOwnership();
+        const visibleTemp = fs.lstatSync(temporary, { bigint: true });
+        if (!visibleTemp.isFile() || visibleTemp.isSymbolicLink() || visibleTemp.dev !== tempIdentity.dev || visibleTemp.ino !== tempIdentity.ino) throw new Error('Heartbeat temporary ownership changed');
+        // Re-verify immediately before the atomic publish; never write into a successor lock.
+        verifyOwnership();
+        if (workerData.transientAfter !== null && injectedTransient < workerData.transientTimes && Atomics.load(state, 1) >= workerData.transientAfter) {
+          injectedTransient += 1;
+          const injected = new Error('Injected transient heartbeat renewal failure');
+          injected.code = workerData.transientErrorCode;
+          throw injected;
+        }
+        fs.renameSync(temporary, workerData.path);
+        published = true;
+        syncDir(pathApi.dirname(workerData.path));
+        lastLeaseUntil = now + workerData.leaseMs;
+      } finally {
+        // A renewal that failed before publishing must not leave its temporary behind: release
+        // rmdir()s the lock directory and would fail with ENOTEMPTY once the owner survives a
+        // retryable error instead of being killed.
+        if (!published) { try { fs.unlinkSync(temporary); } catch {} }
+      }
     };
     while (Atomics.load(state, 0) === 0) {
       if (workerData.pauseFile && Atomics.load(state, 1) >= 1) {
@@ -508,6 +527,7 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     Atomics.store(state, 2, 1); Atomics.notify(state, 2);
   `;
   const failAfter = Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_FAIL_AFTER ?? '', 10);
+  const transientAfter = Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_AFTER ?? '', 10);
   const unexpectedAfter = Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_UNEXPECTED_AFTER ?? '', 10);
   const rawExitAfter = Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_RAW_EXIT_AFTER ?? '', 10);
   const worker = new Worker(source, { eval: true, workerData: {
@@ -531,6 +551,9 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     dirSyncErrorCode: process.env.KYRO_TEST_LOCK_DIRSYNC_ERROR ?? null,
     portableDirectorySyncErrors: [...PORTABLE_DIRECTORY_SYNC_ERRORS],
     transientRenewalErrors: [...TRANSIENT_RENEWAL_ERRORS],
+    transientAfter: Number.isFinite(transientAfter) && transientAfter >= 1 ? transientAfter : null,
+    transientErrorCode: process.env.KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_CODE ?? 'EPERM',
+    transientTimes: Math.max(1, Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_TIMES ?? '1', 10) || 1),
   } });
   const fenceParent = (reason?: unknown): void => {
     if (Atomics.load(state, 4) !== 0) return;
