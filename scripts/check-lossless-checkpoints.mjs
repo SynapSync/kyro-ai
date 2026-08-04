@@ -593,6 +593,8 @@ for (const mode of ['corrupt', 'unsupported']) {
 }
 
 // An empty partial lock remains reclaimable when Windows rejects directory fsync.
+// Use the CI-safe lease: a 500ms lease expires under Windows runner load during reclaim+repair
+// (Worker start + first renew), which is not what this case is testing.
 {
   const root = makeSandbox();
   try {
@@ -603,7 +605,7 @@ for (const mode of ['corrupt', 'unsupported']) {
     const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
       KYRO_TEST_LOCK_DIRSYNC_ERROR: 'EPERM',
       KYRO_TEST_LOCK_WIN32_POLICY: '1',
-      KYRO_TEST_LOCK_LEASE_MS: '500',
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
     });
     assert(result.status === 0, `Windows policy could not reclaim an empty partial lock: ${output(result)}`);
     assertNoLockDebris(root, 'Windows empty-lock reclaim');
@@ -989,6 +991,30 @@ async function waitForRenewals(runState, root, count, message) {
     const result = await holder.completed;
     assert(result.status === 0, `transient renewal error must be retried, not fail-stop: ${result.text}`);
     assertNoLockDebris(root, 'transient renewal retry');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// First renewal must also retry: the main thread already published a lease, so margin is the
+// on-disk heartbeat — not an in-memory counter that used to start at 0 and always fail-stop.
+{
+  const root = makeSandbox();
+  try {
+    const ready = join(root, 'first-renew-ready');
+    const gate = join(root, 'first-renew-gate');
+    const holder = runAsync(root, closeArgs, {
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
+      KYRO_TEST_LOCK_READY_FILE: ready,
+      KYRO_TEST_LOCK_RELEASE_GATE: gate,
+      KYRO_TEST_LOCK_WIN32_POLICY: '1',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_AFTER: '0',
+      KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_TIMES: '2',
+    });
+    await waitForChild(holder, () => existsSync(ready), 'first-renewal transient holder never acquired lock');
+    await waitForRenewals(holder, root, 1, 'holder never completed a first renewal past injected EPERM');
+    writeFileSync(gate, 'release\n');
+    const result = await holder.completed;
+    assert(result.status === 0, `first-renewal transient error must be retried from published lease: ${result.text}`);
+    assertNoLockDebris(root, 'first-renewal transient retry');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 

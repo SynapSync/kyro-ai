@@ -453,7 +453,17 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
       const heartbeat = JSON.parse(readNoFollow(workerData.path));
       if (heartbeat.token !== workerData.token || heartbeat.leaseUntil <= Date.now()) throw new Error('Lease heartbeat expired or changed');
     };
-    let lastLeaseUntil = 0;
+    // Seed from the heartbeat the main thread already published. lastLeaseUntil used to start at 0,
+    // so a transient EPERM on the *first* rename (the common Windows case under Defender load)
+    // always fail-stopped: 0 - now is never > intervalMs. The published lease is the authority.
+    const readPublishedLeaseUntil = () => {
+      try {
+        const heartbeat = JSON.parse(readNoFollow(workerData.path));
+        if (heartbeat.token === workerData.token && typeof heartbeat.leaseUntil === 'number') return heartbeat.leaseUntil;
+      } catch { /* Missing or mid-replace heartbeat: fall back to the last known publish. */ }
+      return null;
+    };
+    let lastLeaseUntil = readPublishedLeaseUntil() ?? 0;
     let injectedTransient = 0;
     const renew = () => {
       verifyOwnership();
@@ -508,8 +518,11 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
         // has more than one interval of margin. Everything else — ownership violation, expiry, or
         // any non-errno failure — fail-stops at once, because the main thread may be blocked and
         // must never resume protected work after another writer can reclaim the expired lease.
+        // Prefer the on-disk heartbeat (main's initial publish, or a prior successful renew) over
+        // an in-memory counter that was 0 before the first successful worker publish.
+        const publishedUntil = readPublishedLeaseUntil() ?? lastLeaseUntil;
         if (workerData.transientRenewalErrors.includes(error && error.code)
-          && lastLeaseUntil - Date.now() > workerData.intervalMs) {
+          && publishedUntil - Date.now() > workerData.intervalMs) {
           Atomics.wait(state, 0, 0, Math.max(1, Math.floor(workerData.intervalMs / 4)));
           continue;
         }
