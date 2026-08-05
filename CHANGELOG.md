@@ -17,14 +17,17 @@ All notable changes to this project are documented here. The format is based on
   correct repair. New closes now set `projectScopeAfter.status` via `deriveScopeStatus` (`planning`
   for intermediate and empty-roadmap edges; `completed` when every non-empty roadmap sprint is closed).
   Historical intermediate residual-`active` checkpoints stay immutable: validate and doctor accept
-  the narrow shape at read time (live `planning` counts as applied after) without rewriting archives
-  or bumping `schemaVersion`.
+  only the exact v1 copy-before shape at read time (active before, canonically identical active after;
+  live `planning` counts as applied after) without rewriting archives or bumping `schemaVersion`.
+  Self-consistent before/after transitions that v1 could not emit remain `CORRUPT` even when their
+  internal digests and ledger commitment are recomputed.
 
 ### Docs
 
 - Documented intermediate/final/empty-roadmap scope status and historical v1 residual compatibility
   in `docs/sprint-close-checkpoints.md`.
 - Implementation plan: `docs/plans/plan-10-intermediate-close-scope-status.md`.
+- Post-implementation semantic hardening: `docs/plans/plan-11-legacy-checkpoint-semantic-hardening.md`.
 
 ## [4.43.0] - 2026-08-05
 

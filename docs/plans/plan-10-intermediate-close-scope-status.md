@@ -2,7 +2,7 @@
 
 > **Versioned path:** `docs/plans/plan-10-intermediate-close-scope-status.md` (tracked by Git; safe to link from PRs).
 >
-> **Status:** Ready for implementation after Codex HOLD review (all blockers resolved in this revision).
+> **Status:** Implemented in `6f39720`; locally certified after the semantic hardening in [Plan 11](./plan-11-legacy-checkpoint-semantic-hardening.md).
 >
 > Execution target: Grok / Codex / Claude. Repo: `kyro-ai` @ `develop`.
 > Current version: **4.43.0** → target **4.43.1** (patch — bug fix + read-time compatibility; **no** `schemaVersion` bump).
@@ -226,8 +226,8 @@ export function isLegacyIntermediateActiveScopeAfter(
 1. `checkpoint.schemaVersion === 1` (current `SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION`).
 2. `checkpoint.intendedAfterClose.activeSprint === null`.
 3. Roadmap has **at least one** sprint with `state !== 'closed'` (true intermediate; empty roadmap is **not** this legacy residual — empty never stored residual `active` via the intermediate copy path in the same way as “remaining > 0 keep before”; intermediate path was `remaining > 0 → copy before`. Empty has remaining 0 → wrote `completed` historically. Do **not** treat empty+active as legacy intermediate).
-4. `checkpoint.projectScopeAfter.status === 'active'`.
-5. Same scope `id` (and `title`) on before/after entries as stored.
+4. `checkpoint.projectScopeBefore.status === 'active'`.
+5. `checkpoint.projectScopeAfter` is canonically identical to `projectScopeBefore` (historical v1 copied the complete entry).
 6. Re-deriving with the **new** rule yields an entry equal to stored `projectScopeAfter` **except** `status: 'planning'`.
 7. Checkpoint internal digests remain self-consistent under existing digest checks (fixture must be authentic).
 
@@ -269,9 +269,9 @@ Compatibility is **read-time only**. Never rewrite checkpoint bytes or ledger co
 
 Leave `compareAndSwapProjectScope*` fail-closed:
 
-- live === after → noop  
-- live === before → write after  
-- else → DIVERGED  
+- live === after → noop
+- live === before → write after
+- else → DIVERGED
 
 Repaired live `planning` vs historical after `active` → DIVERGED on resume (**desired**; no re-poison to `active`).
 
@@ -308,7 +308,7 @@ Forbidden: a commit that only adds failing tests and leaves `develop`/CI red.
 
 ### Phase A — Regressions (ship with Phase B in the same commit)
 
-**Primary:** `scripts/check-lossless-checkpoints.mjs`  
+**Primary:** `scripts/check-lossless-checkpoints.mjs`
 **Fixture dir (versioned):** `fixtures/checkpoints/legacy-v1-intermediate-active-scope/`
 
 | ID | Scenario | Assertions |
@@ -486,24 +486,24 @@ Implementation and local commits on a feature branch may proceed once this plan 
 
 ### 6.1 Behavioral
 
-- [ ] Intermediate close writes `projectScopeAfter.status === 'planning'`.
-- [ ] Final close (non-empty all-closed roadmap) writes `completed`.
-- [ ] Empty-roadmap close writes `planning` (A9).
-- [ ] `intendedAfterClose.status` formula unchanged from pre-patch.
-- [ ] New intermediate: doctor APPLIED without requiring repair; repair idempotent (A3).
-- [ ] Frozen historical intermediate v1 fixture + live `planning` → APPLIED legacy path; bytes unchanged (A4/A7).
-- [ ] Arbitrary live drift still DIVERGED (A5/A6).
-- [ ] Corrupt digests/identity still CORRUPT.
-- [ ] No schemaVersion bump; no checkpoint rewrite tooling.
+- [x] Intermediate close writes `projectScopeAfter.status === 'planning'`.
+- [x] Final close (non-empty all-closed roadmap) writes `completed`.
+- [x] Empty-roadmap close writes `planning` (A9).
+- [x] `intendedAfterClose.status` formula unchanged from pre-patch.
+- [x] New intermediate: doctor APPLIED without requiring repair; repair idempotent (A3).
+- [x] Frozen historical intermediate v1 fixture + live `planning` → APPLIED legacy path; bytes unchanged (A4/A7).
+- [x] Arbitrary live drift still DIVERGED (A5/A6).
+- [x] Corrupt digests/identity still CORRUPT.
+- [x] No schemaVersion bump; no checkpoint rewrite tooling.
 
 ### 6.2 Engineering / release
 
-- [ ] Behavior tests and fix land in the **same** non-red commit unit.
-- [ ] Phase E full release gate green (check → build → adapters → tokens → artifacts → pack dry-run) with OPENSSL/cache/shell env as needed.
-- [ ] Versions synced at 4.43.1.
-- [ ] CHANGELOG + checkpoint docs updated.
-- [ ] Consumer doctor green under **local candidate** 4.43.1 (not registry `@latest` pre-publish).
-- [ ] Plan path `docs/plans/...` is committed so PR can link it.
+- [x] Behavior tests and fix land in the **same** non-red commit unit.
+- [x] Phase E full release gate green (check → build → adapters → tokens → clean-export artifacts → pack dry-run) with OPENSSL/cache/shell env as needed.
+- [x] Versions synced at 4.43.1.
+- [x] CHANGELOG + checkpoint docs updated.
+- [x] Consumer doctor green under **local candidate** 4.43.1 (not registry `@latest` pre-publish).
+- [x] Plan path `docs/plans/...` is committed so PR can link it.
 
 ### 6.3 Explicitly out of pass criteria
 

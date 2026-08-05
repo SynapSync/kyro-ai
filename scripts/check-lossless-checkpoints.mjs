@@ -339,6 +339,29 @@ function installLegacyIntermediateFixture(root, { liveScopeStatus = 'planning' }
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
+// A self-consistent scope transition that v1 could not write must remain CORRUPT.
+{
+  const root = makeSandbox({ intermediate: true });
+  try {
+    const { checkpointPath } = installLegacyIntermediateFixture(root, { liveScopeStatus: 'planning' });
+    const checkpoint = readJson(checkpointPath);
+    checkpoint.projectScopeBefore.status = 'blocked';
+    checkpoint.digests.projectScopeBefore = digest(checkpoint.projectScopeBefore);
+    checkpoint.intendedAfterClose.ledger.at(-1).checkpointSha256 = checkpointCommitment(checkpoint);
+    checkpoint.digests.intendedAfterClose = digest(checkpoint.intendedAfterClose);
+    writeJson(checkpointPath, checkpoint);
+    // Keep the live after-image aligned so only the historical before/after authorization is tested.
+    writeJson(paths(root).sprint, checkpoint.intendedAfterClose);
+
+    const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+    const text = output(doctor);
+    assert(
+      doctor.status === 1 && text.includes('CORRUPT:') && text.includes('projectScopeAfter is not the authorized transition'),
+      `semantically unauthorized blocked→active checkpoint must be CORRUPT:\n${text}`,
+    );
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
 // Frozen historical fixture + live title drift → DIVERGED.
 {
   const root = makeSandbox({ intermediate: true });

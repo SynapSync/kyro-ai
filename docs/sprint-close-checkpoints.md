@@ -48,7 +48,8 @@ From the introduction of lossless checkpoints through 4.43.0, intermediate close
 - `schemaVersion === 1`
 - `intendedAfterClose.activeSprint === null`
 - at least one non-closed roadmap sprint
-- `projectScopeAfter.status === 'active'`
+- `projectScopeBefore.status === 'active'`
+- `projectScopeAfter` is canonically identical to `projectScopeBefore` (the complete v1 copy-before write shape)
 - re-deriving under current rules yields the same entry with `status: 'planning'` only
 
 Read-time behavior (no archive rewrite):
@@ -56,7 +57,8 @@ Read-time behavior (no archive rewrite):
 - `validateSprintCloseCheckpoint` accepts that residual as a historically authorized transition.
 - `kyro doctor --artifacts` treats live scope equal to `{ ...projectScopeAfter, status: 'planning' }` as the applied after-image and reports a legacy note (`active→planning`).
 - Immutable checkpoint bytes and ledger commitments are never rewritten for compatibility.
-- Arbitrary live drift (title, id, other statuses) remains `DIVERGED`.
+- Arbitrary live drift remains `DIVERGED`; a stored before/after relationship that v1 could not
+  write remains `CORRUPT`, even when its internal digests and ledger commitment are recomputed.
 
 ## Recovery states
 

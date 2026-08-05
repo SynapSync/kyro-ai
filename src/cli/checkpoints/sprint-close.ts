@@ -203,8 +203,9 @@ export function deriveSprintCloseTransition(
 /**
  * Historical intermediate checkpoint v1 residual shape (4.19.0–4.43.0): remaining sprints kept
  * `projectScopeAfter.status = 'active'` by copying the before entry. New writes emit `planning`.
- * Read-time validate/doctor accept this residual when the only material delta is that status field.
- * There is no writer-version field on the checkpoint — match the observable shape only.
+ * Read-time validate/doctor accept this residual only when the stored after entry is the exact
+ * copy of an active before entry that historical v1 writers emitted. There is no writer-version
+ * field on the checkpoint — match the complete observable write shape instead.
  */
 export function isLegacyIntermediateActiveScopeAfter(checkpoint: SprintCloseCheckpointV1): boolean {
   if (checkpoint.schemaVersion !== SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION) return false;
@@ -212,9 +213,10 @@ export function isLegacyIntermediateActiveScopeAfter(checkpoint: SprintCloseChec
   const roadmapSprints = checkpoint.intendedAfterClose.roadmap?.sprints ?? [];
   // True intermediate: at least one non-closed sprint remains. Empty roadmap is not this residual.
   if (!roadmapSprints.some((sprint) => sprint.state !== 'closed')) return false;
+  if (checkpoint.projectScopeBefore.status !== 'active') return false;
   if (checkpoint.projectScopeAfter.status !== 'active') return false;
-  if (checkpoint.projectScopeBefore.id !== checkpoint.projectScopeAfter.id) return false;
-  if (checkpoint.projectScopeBefore.title !== checkpoint.projectScopeAfter.title) return false;
+  // Historical v1 returned `{ ...projectScopeBefore }`; tolerate no other stored transition.
+  if (canonicalJson(checkpoint.projectScopeBefore) !== canonicalJson(checkpoint.projectScopeAfter)) return false;
   try {
     const derived = deriveSprintCloseTransition(
       checkpoint.beforeClose,
