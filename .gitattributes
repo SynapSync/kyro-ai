@@ -17,5 +17,8 @@
 # Generated — exclude from GitHub language stats
 dist/** linguist-generated
 
-# Frozen historical fixture preserves exact bytes, including its blank Notes field.
-fixtures/checkpoints/legacy-v1-intermediate-active-scope/narrative.md -whitespace
+# Digest-bound frozen checkpoint fixtures must checkout as LF on every OS.
+# Windows CRLF conversion breaks digests.legacySnapshot / digests.narrative and
+# makes doctor report snapshot=conflict, narrative=conflict (see CI Windows lock jobs).
+# More specific than the global *.json/*.md text rules above (last match wins per attr).
+fixtures/checkpoints/** text eol=lf

@@ -303,17 +303,26 @@ function closeSuccessfully(root) {
 
 const legacyFixtureDir = resolve(repo, 'fixtures/checkpoints/legacy-v1-intermediate-active-scope');
 
+/**
+ * Read a frozen fixture as exact LF bytes. Windows checkouts with autocrlf/text conversion
+ * may yield CRLF; digest-bound snapshot/narrative must match the historical SHA-256 (LF).
+ */
+function readFrozenFixtureBytes(path) {
+  const raw = readFileSync(path);
+  if (!raw.includes(0x0d)) return raw;
+  return Buffer.from(raw.toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n'), 'utf8');
+}
+
 /** Install frozen historical intermediate v1 residual-active checkpoint into a sandbox. */
 function installLegacyIntermediateFixture(root, { liveScopeStatus = 'planning' } = {}) {
   const archiveDir = join(root, '.agents/kyro/scopes/demo/archive');
   mkdirSync(archiveDir, { recursive: true });
-  const checkpointSrc = join(legacyFixtureDir, 'checkpoint.json');
-  const checkpointBytes = readFileSync(checkpointSrc);
+  const checkpointBytes = readFrozenFixtureBytes(join(legacyFixtureDir, 'checkpoint.json'));
   writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.checkpoint.json'), checkpointBytes);
-  writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.json'), readFileSync(join(legacyFixtureDir, 'legacy-snapshot.json')));
-  writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.md'), readFileSync(join(legacyFixtureDir, 'narrative.md')));
-  writeFileSync(paths(root).sprint, readFileSync(join(legacyFixtureDir, 'sprint-after.json')));
-  const project = readJson(join(legacyFixtureDir, 'project-after-close.json'));
+  writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.json'), readFrozenFixtureBytes(join(legacyFixtureDir, 'legacy-snapshot.json')));
+  writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.md'), readFrozenFixtureBytes(join(legacyFixtureDir, 'narrative.md')));
+  writeFileSync(paths(root).sprint, readFrozenFixtureBytes(join(legacyFixtureDir, 'sprint-after.json')));
+  const project = JSON.parse(readFrozenFixtureBytes(join(legacyFixtureDir, 'project-after-close.json')).toString('utf8'));
   const demo = project.scopes.find((scope) => scope.id === 'demo');
   assert(demo, 'legacy fixture project missing demo scope');
   demo.status = liveScopeStatus;
@@ -331,12 +340,57 @@ function installLegacyIntermediateFixture(root, { liveScopeStatus = 'planning' }
     const text = output(doctor);
     assert(doctor.status === 0 && text.includes('APPLIED:'), `legacy intermediate fixture must classify APPLIED:\n${text}`);
     assert(text.includes('legacy v1 intermediate scope status active→planning') || text.includes('active→planning'), `doctor must mention legacy normalization:\n${text}`);
+    assert(!text.includes('snapshot=conflict') && !text.includes('narrative=conflict'), `legacy APPLIED must not report artifact conflict:\n${text}`);
     const afterBytes = readFileSync(checkpointPath);
     assert(createHash('sha256').update(afterBytes).digest('hex') === beforeSha, 'doctor must not rewrite frozen checkpoint bytes');
     const repair = run(root, ['repair', '--kyro-scope', 'demo', '--confirm']);
     assert(repair.status === 0, `repair on legacy fixture failed:\n${output(repair)}`);
     assert(createHash('sha256').update(readFileSync(checkpointPath)).digest('hex') === beforeSha, 'repair must not rewrite frozen checkpoint bytes');
   } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Windows-style CRLF checkout of digest-bound fixtures must still install as LF and pass doctor.
+{
+  const crlfRoot = mkdtempSync(join(tmpdir(), 'kyro-legacy-crlf-'));
+  try {
+    const crlfFixture = join(crlfRoot, 'fixture');
+    mkdirSync(crlfFixture, { recursive: true });
+    for (const name of [
+      'checkpoint.json',
+      'legacy-snapshot.json',
+      'narrative.md',
+      'sprint-after.json',
+      'project-after-close.json',
+    ]) {
+      const lf = readFileSync(join(legacyFixtureDir, name), 'utf8');
+      writeFileSync(join(crlfFixture, name), lf.replace(/\n/g, '\r\n'));
+    }
+    const original = legacyFixtureDir;
+    // Temporarily point installer at the CRLF tree without mutating repo fixtures.
+    // (reassign via function-local override by shadowing path used in install)
+    const root = makeSandbox({ intermediate: true });
+    try {
+      const archiveDir = join(root, '.agents/kyro/scopes/demo/archive');
+      mkdirSync(archiveDir, { recursive: true });
+      const readCrlf = (name) => {
+        const raw = readFileSync(join(crlfFixture, name));
+        return Buffer.from(raw.toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n'), 'utf8');
+      };
+      const checkpointBytes = readCrlf('checkpoint.json');
+      writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.checkpoint.json'), checkpointBytes);
+      writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.json'), readCrlf('legacy-snapshot.json'));
+      writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.md'), readCrlf('narrative.md'));
+      writeFileSync(paths(root).sprint, readCrlf('sprint-after.json'));
+      const project = JSON.parse(readCrlf('project-after-close.json').toString('utf8'));
+      project.scopes.find((scope) => scope.id === 'demo').status = 'planning';
+      writeJson(paths(root).project, project);
+      const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+      const text = output(doctor);
+      assert(doctor.status === 0 && text.includes('APPLIED:'), `CRLF-normalized legacy fixture must APPLIED:\n${text}`);
+      assert(!text.includes('snapshot=conflict') && !text.includes('narrative=conflict'), `CRLF normalize must clear artifact conflicts:\n${text}`);
+      void original;
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { rmSync(crlfRoot, { recursive: true, force: true }); }
 }
 
 // A self-consistent scope transition that v1 could not write must remain CORRUPT.
