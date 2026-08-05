@@ -1,11 +1,11 @@
 # INIT Mode — Scope Analysis & sprint.json Bootstrap
 
-Use INIT when a scope has no `sprint.json`. Produces exactly two things: a new `sprint.json` and an updated `kyro.json`. Nothing else (besides write-only `findings/`).
+Use INIT when a scope has no `sprint.json`. Produces exactly one artifact you write: a new `sprint.json` (besides write-only `findings/`). Project state (`project.json`/`local.json`) is registered by `{{KYRO_CLI}} plan`, not by you. Nothing else.
 
 ## Inputs
 
 - User request and current repository path.
-- `.agents/kyro/kyro.json` if present (to know existing scopes).
+- `.agents/kyro/project.json` if present (to know existing scopes).
 - One work-type helper under `../helpers/analysis/` after work-type detection.
 - **Optional:** if the user references a matured-idea document, consume its plan-grade sections using the exact schema-safe mapping in Step 5. For legacy briefs, fall back to `Problem / Motivation`, `Who it's for`, and `What success looks like`. Never re-interview the user for facts or decisions already captured there.
 
@@ -56,33 +56,29 @@ Load `../templates/sprint.json`. Fill:
 
 **Plan-grade Seedbed mapping:** when a matured-idea document is referenced, load `../helpers/seedbed-init-mapping.md` and apply its exact schema-safe mapping. Account for every material item before writing. Do not load this helper on the normal one-line INIT path.
 
-**Mandatory: materialize `sprint.json` via the CLI, not by hand.** Write a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap` — **no `author` field**) and run `{{KYRO_CLI}} plan --from <file>`. This is tool-owned and validated: it materializes `sprint.json` (including optional `author` captured from git when available) and registers `kyro.json` for you — skip straight to Step 6's verification. The startup capability handshake (`{{KYRO_CLI}} capabilities --json`, orchestrator Step 3) already confirms `plan` is supported before INIT ever runs, so there is essentially never a legitimate reason to skip this.
+**Mandatory: materialize `sprint.json` via the CLI, not by hand.** Write a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap` — **no `author` field**) and run `{{KYRO_CLI}} plan --from <file>`. This is tool-owned and validated: it materializes `sprint.json` (including optional `author` captured from git when available) and registers the scope in `project.json`/`local.json` for you — skip straight to Step 6's verification. The startup capability handshake (`{{KYRO_CLI}} capabilities --json`, Step 0 of `../../SKILL.md`) already confirms `plan` is supported before INIT ever runs, so there is essentially never a legitimate reason to skip this.
 
 If `{{KYRO_CLI}} plan --from <file>` returns a validation error (e.g. `INVALID_INPUT`, `INVALID_SPRINT_SHAPE`), **fix the lean plan JSON and retry the CLI** — do not fall back to hand-writing. Hand-writing `sprint.json` directly is a **recovery-only fallback**, reserved for when the CLI genuinely cannot run (`UNKNOWN_COMMAND`, missing binary, crash) — never a routine choice. On that narrow fallback, hand-write the document without inventing `author`.
 
-Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`: read the current target when present, serialize the complete v4 document, write atomically, then re-read and parse it before continuing. Create `archive/` and `findings/` beside it. Do not update `kyro.json` until this verification succeeds.
+Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`: read the current target when present, serialize the complete v4 document, write atomically, then re-read and parse it before continuing. Create `archive/` and `findings/` beside it. Do not touch project state until this verification succeeds.
 
-## Step 6 — Update kyro.json
+## Step 6 — Verify project state (do not hand-write it)
 
-**If `.agents/kyro/kyro.json` exists:** add a scope **object** to `kyro.json.scopes[]` — exactly `{ "id": "{scope}", "title": "{title}", "status": "planning" }` (never a bare string — `{{KYRO_CLI}} doctor` fails it). Set `activeScope` if none is active. Use the Artifact Write Contract.
+`{{KYRO_CLI}} plan --from <file>` already registered the scope. It writes the layered project state
+for you: the scope object `{ "id": "{scope}", "title": "{title}", "status": "planning" }` goes into
+`.agents/kyro/project.json` under `scopes[]`, and `activeScope` goes into `.agents/kyro/local.json`
+when none is active. **Verify, do not re-create.**
 
-**If it does NOT exist:** create it with the COMPLETE v4 shape — every required field, not just `scopes`/`activeScope` (a partial file is flagged by `{{KYRO_CLI}} doctor`). Write exactly:
+Read `.agents/kyro/project.json` + `.agents/kyro/local.json` and confirm the scope is present and
+active. If either file is missing, project state was never bootstrapped — tell the human to run
+`npx kyro-ai install --scope workspace --init-workspace --yes` once (full npm package only, never
+via the projected runtime CLI), then retry. Do not hand-author these files to paper over it.
 
-```json
-{
-  "schemaVersion": 4,
-  "artifactRoot": ".agents/kyro/scopes",
-  "scopes": [{ "id": "{scope}", "title": "{title}", "status": "planning" }],
-  "activeScope": "{scope}",
-  "runtimePath": "~/.agents/kyro/current",
-  "installedAdapters": []
-}
-```
-
-After creating it, recommend the human run `npx kyro-ai install --scope workspace --yes` once (full npm package only — never via the projected runtime CLI). Day-to-day workflow still uses `{{KYRO_CLI}}`. The active runtime version is read from `~/.agents/kyro/current/manifest.json.packageVersion`, not copied into project state.
+The active runtime version is read from `~/.agents/kyro/current/manifest.json.packageVersion`, not
+copied into project state.
 
 **Optional — seed `principles[]`:** if the user states non-negotiable project rules, add them to
-`kyro.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
+`project.json.principles[]` as objects `{ id, rule, severity, rationale, check? }`. Use a built-in
 `check` (`tasks-have-acceptance-criteria`, `no-clarification-markers`, `success-criteria-present`)
 when it maps to the rule, so `{{KYRO_CLI}} analyze` enforces it deterministically.
 
@@ -92,6 +88,6 @@ Report: scope, work type, finding count, sprint count, sizing rationale, files c
 
 ## Rules
 
-- Write only `sprint.json` + `kyro.json` (plus write-only `findings/`). No other files.
+- Write only `sprint.json` (plus write-only `findings/`). Project state (`project.json`/`local.json`) is written by the CLI, not by you. No other files — no `README.md`, no getting-started guides, no scope-level Markdown of any kind.
 - Do not generate the first sprint — that is `plan-sprint.md`'s job.
 - Do not load sprint templates, debt tracker, execution modes, or unrelated analysis helpers during INIT.

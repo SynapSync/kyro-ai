@@ -9,7 +9,7 @@ Turn an idea into a decision-complete, plan-grade artifact that can seed `/kyro:
 
 ## Hard boundary
 
-This command is pre-scope and read-only toward Kyro state. Never read, resolve, create, or modify `.agents/kyro/kyro.json`, `.agents/kyro/scopes/`, any `sprint.json`, or the installed runtime. It may read user-provided references and explicitly relevant project evidence. It uses one confirmed document path under `.agents/kyro/{docType}/`: one initial write plus at most one corrective overwrite after failed verification.
+This command is pre-scope and read-only toward Kyro state. Never read, resolve, create, or modify `.agents/kyro/project.json`, `.agents/kyro/local.json`, `.agents/kyro/scopes/`, any `sprint.json`, or the installed runtime. It may read user-provided references and explicitly relevant project evidence. It uses one confirmed document path under `.agents/kyro/{docType}/`: one initial write plus at most one corrective overwrite after failed verification.
 
 ## Startup
 

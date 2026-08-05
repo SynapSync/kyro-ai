@@ -29,7 +29,7 @@ Preferred: `{{KYRO_CLI}} plan --from <file> --kyro-scope {scope}` (tool-owned, v
 
 ## Principles gate (before generating tasks)
 
-- Read `kyro.json.principles[]`. No task may violate a `non-negotiable` principle. For free-text
+- Read `project.json.principles[]`. No task may violate a `non-negotiable` principle. For free-text
   principles, confirm compliance explicitly; for principles with a `check`, `{{KYRO_CLI}} analyze` enforces
   them and will FAIL on violation. If a principle genuinely must bend, amend it explicitly — never
   ignore it silently.

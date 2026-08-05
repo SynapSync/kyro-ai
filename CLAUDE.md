@@ -44,7 +44,7 @@ kyro-ai/
 
 - **Rules file**: `.agents/kyro/scopes/rules.md` — persistent learned rules for this project
 - **Sprint output**: `{cwd}/.agents/kyro/scopes/{scope}/` — per-scope sprint documents (where `{scope}` is the work topic, e.g., `oauth-implementation`, `ui-redesign`)
-- **Matured-idea documents**: `.agents/kyro/{docType}/{date}-{slug}.md` — optional pre-scope briefs from `/kyro:idea` (`docType` is one of `plan`, `analysis`, `constitution`). Write-only, never routed. Kept explicitly separate from `kyro.json.principles[]`.
+- **Matured-idea documents**: `.agents/kyro/{docType}/{date}-{slug}.md` — optional pre-scope briefs from `/kyro:idea` (`docType` is one of `plan`, `analysis`, `constitution`). Write-only, never routed. Kept explicitly separate from `project.json.principles[]`.
 - **Checkpoint-per-phase**: Sprint file saved after each phase completes
 - **Debt never disappears**: Items are only closed when explicitly resolved
 - **Gates require approval**: Never proceed past a validation gate without user confirmation

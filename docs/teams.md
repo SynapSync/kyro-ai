@@ -12,7 +12,7 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 | `.agents/kyro/local.json` | **No** | Personal / machine | `activeScope`, `installedAdapters`, optional `runtimePath`, optional `execution.delegationEnabled` (L1 delegation opt-in) |
 | `.agents/kyro/scopes/**` | **Yes** | Team | Per-scope `sprint.json`, archives, findings |
 | `.agents/kyro/.gitignore` | **Yes** (recommended) | Team | Written/updated by install/sync so local-only files stay untracked |
-| Legacy `.agents/kyro/kyro.json` | **No** | Migration only | Pre-layered monolito; dual-read until install archives it |
+| Legacy monolito (see [Migration](#migration--dual-read)) | **No** | Migration only | Superseded by the two files above |
 
 **Never store CLI invocation on project files.** `kyroInvocation` lives only in `~/.agents/kyro/current/manifest.json` (global runtime).
 
@@ -66,7 +66,7 @@ What install does:
 3. **Rehydrates** on-disk scope folders into the shared registry.
 4. Sets `activeScope` automatically only when it is null and **exactly one** scope is known.
 
-You do **not** need to gitignore the entire `.agents/kyro/` directory or treat a single personal `kyro.json` as the only multi-dev strategy.
+You do **not** need to gitignore the entire `.agents/kyro/` directory.
 
 ## Read-only commands (no side effects)
 
@@ -78,9 +78,28 @@ Run: npx kyro-ai install --init-workspace --yes  (writes project.json + local.js
 
 ## Migration & dual-read
 
-- Existing workspaces with only legacy `kyro.json` still **read** via dual-read.
-- Install/sync **migrates** to layers and archives the monolito as `kyro.json.migrated`.
-- If both layers and a live `kyro.json` remain, **doctor WARNs** (does not hard-fail fleets mid-migration).
+> This section is the **only** place Kyro documents the pre-layered monolito by name. Everywhere
+> else — commands, skills, agent contracts, the rest of the docs — the project state is
+> `project.json` + `local.json`, full stop. If you are starting fresh, you can skip this section
+> entirely; it exists so workspaces created before layered state have a defined way out.
+
+Kyro's project state used to be a single `.agents/kyro/kyro.json`. It is superseded and **never
+written** — the only remaining behavior is getting you off it:
+
+- Workspaces that still have only the legacy monolito are **read** through dual-read, so nothing
+  breaks before you migrate.
+- Install/sync **migrates** it to layers and archives the original as `kyro.json.migrated`. That
+  archived file is inert; delete it whenever you like.
+- If both layers and a live monolito remain, **doctor WARNs** (it does not hard-fail fleets
+  mid-migration).
+
+To migrate now, from the project root:
+
+```bash
+npx kyro-ai@latest install --scope workspace --init-workspace --yes
+```
+
+Then confirm `project.json` + `local.json` hold what you expect and remove `kyro.json.migrated`.
 
 ## Optional team package floor
 

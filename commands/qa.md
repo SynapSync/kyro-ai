@@ -11,8 +11,8 @@ This command is **independent of the forge cycle** — use it anytime to validat
 
 ## Startup
 
-1. Read `.agents/kyro/kyro.json`.
-2. Resolve scope from `$ARGUMENTS`, `kyro.json.activeScope`, or prompt the user to select from `.agents/kyro/scopes/`.
+1. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`.
+2. Resolve scope from `$ARGUMENTS`, `local.json.activeScope`, or prompt the user to select from `.agents/kyro/scopes/`.
 3. Read the scope's `sprint.json`. Verify it exists and is valid.
 4. Validate sprint.json is present, parseable, and synchronized with code (per the qa-review skill's validation step at `SKILL.md:106`).
 5. Load `skills/qa-review/SKILL.md` to prepare the audit framework.
@@ -51,7 +51,7 @@ This verdict is the QA report's own conclusion. It does not replace the binary `
 
 ## Rules
 
-- `/kyro:qa` is read-only. It never writes to `sprint.json`, `kyro.json`, or any scope artifact — the review is a markdown report only, per `skills/qa-review/SKILL.md`'s output format.
+- `/kyro:qa` is read-only. It never writes to `sprint.json`, project state, or any scope artifact — the review is a markdown report only, per `skills/qa-review/SKILL.md`'s output format.
 - `/kyro:qa` never loads `agents/orchestrator.md` — it loads `skills/qa-review/SKILL.md` directly and stands outside the forge gate lifecycle.
 - QA is independent — can be run at any point, not just at phase gates.
 - The audit is strict but pragmatic — it protects architecture and maintainability.

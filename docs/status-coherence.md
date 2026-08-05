@@ -1,7 +1,7 @@
 # Status Coherence
 
 Kyro's `sprint.json` carries lifecycle status at several levels — `task.status`, `phase.status`,
-`activeSprint.status`, and the `kyro.json` scope-status cache. Only `task.status` is authoritative;
+`activeSprint.status`, and the project-state scope-status cache. Only `task.status` is authoritative;
 the rest are **derived** from it. This document describes how Kyro keeps them coherent so a phase can
 never silently read "pending" while all its tasks are "done".
 
@@ -35,10 +35,10 @@ So `activeSprint.status: planned` with `nextAction: execute_task` is **coherent*
   `activeSprint.status` on every verdict write, so status stops being an orphan field the instruction
   layer forgot to update.
 - **`kyro repair`** parses leniently, sets each `phase.status` and `activeSprint.status` to its derived
-  value, reconciles the `kyro.json` scope-status cache (including legacy values), then validates the
+  value, reconciles the project-state scope-status cache (including legacy values), then validates the
   result. Use it to migrate a scope whose status drifted.
 - **`kyro analyze`** reports drift as **advisory** findings (MEDIUM): a phase or active sprint whose
-  stored status contradicts its tasks, and a stale `kyro.json` scope-status cache. These never block a
+  stored status contradicts its tasks, and a stale project-state scope-status cache. These never block a
   user-invoked close — status bookkeeping should not wall a destructive gate.
 
 ## Review-debt surfacing

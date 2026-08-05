@@ -16,7 +16,7 @@ Built from `{{KYRO_CLI}} context-pack --kyro-scope {scope} --task <id> --json` â
 
 ## Prohibitions (non-negotiable)
 
-- Do **not** mutate `sprint.json`, `project.json`, `local.json`, or `kyro.json`
+- Do **not** mutate `sprint.json`, `project.json`, or `local.json`
 - Do **not** run `close-sprint`, `plan`, or hand-edit `evidence` / `verdict`
 - Do **not** replan the sprint or rewrite roadmap
 

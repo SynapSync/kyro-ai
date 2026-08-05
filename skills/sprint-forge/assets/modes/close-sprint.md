@@ -2,7 +2,7 @@
 
 Close a sprint by publishing a versioned lossless scope checkpoint, retaining the legacy verbatim ActiveSprint snapshot, recording a ledger entry, then clearing `activeSprint`.
 
-**The destructive step is NOT done by hand. It is owned by the CLI.** The command first publishes an immutable checkpoint containing complete `sprint.json` and affected `kyro.json` scope state before and after close. It then writes the compatible ActiveSprint snapshot and narrative and reconciles live state with compare-and-swap checks. Do **not** manually null `activeSprint` or hand-write the ledger entry.
+**The destructive step is NOT done by hand. It is owned by the CLI.** The command first publishes an immutable checkpoint containing complete `sprint.json` and affected project-state scope entries before and after close. It then writes the compatible ActiveSprint snapshot and narrative and reconciles live state with compare-and-swap checks. Do **not** manually null `activeSprint` or hand-write the ledger entry.
 
 Register conventions through `{{KYRO_CLI}} rule add`; debt uses its tool-owned CLI. Never hand-edit either collection.
 
@@ -33,7 +33,7 @@ Run:
   [--recommendation "..."]    # repeatable — recorded in the narrative + ledger
 ```
 
-The command publishes `sprint-NNN-slug.checkpoint.json` first, then the legacy `sprint-NNN-slug.json` ActiveSprint snapshot and narrative. It atomically reconciles `sprint.json` and only the affected `kyro.json` scope entry. A retry with the same frozen inputs resumes safely; corrupt, unsupported, conflicting, or divergent state stops without overwriting live work.
+The command publishes `sprint-NNN-slug.checkpoint.json` first, then the legacy `sprint-NNN-slug.json` ActiveSprint snapshot and narrative. It atomically reconciles `sprint.json` and only the affected project-state scope entry. A retry with the same frozen inputs resumes safely; corrupt, unsupported, conflicting, or divergent state stops without overwriting live work.
 
 Use `--dry-run` first if you want to review the plan. Do not replicate this by hand.
 

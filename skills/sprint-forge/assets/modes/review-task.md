@@ -29,7 +29,7 @@ Validate completed work and record the verdict through the Kyro checker tool.
 
 ## Principles gate
 
-- Non-negotiable `kyro.json.principles[]` violations are `fail`, not suggestions.
+- Non-negotiable `project.json.principles[]` violations are `fail`, not suggestions.
 - `{{KYRO_CLI}} review` vetoes pass on malformed evidence, incomplete checked criteria, principle gates, verdict-before-evidence, or self-review policy.
 
 ## Rules

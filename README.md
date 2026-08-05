@@ -240,7 +240,7 @@ Unknowns become `[NEEDS CLARIFICATION]` markers; `doctor` / `analyze` fail until
 .agents/kyro/
 ├── project.json              # SHARED — commit: principles, global conventions, team policy, scopes cache
 ├── local.json                # LOCAL — gitignored: activeScope, installedAdapters
-├── .gitignore                # written by install/sync (local.json, legacy kyro.json, locks)
+├── .gitignore                # written by install/sync (local.json, locks)
 └── scopes/{scope}/           # SHARED — commit sprint artifacts
     ├── sprint.json           # single source of truth for the scope
     ├── archive/              # write-only at close
@@ -252,7 +252,6 @@ Unknowns become `[NEEDS CLARIFICATION]` markers; `doctor` / `analyze` fail until
 | `project.json` | **Yes** | Team constitution (`principles`), global `conventions`, optional `team.minPackageVersion`, scopes registry cache |
 | `local.json` | **No** (gitignored) | Personal `activeScope`, machine `installedAdapters` |
 | `scopes/**` | **Yes** | Sprint work shared by the team |
-| Legacy `kyro.json` | **No** | Pre-layered monolito; dual-read until install migrates it to layers |
 
 CLI invocation is **global** (`~/.agents/kyro/current/manifest.json`), never stored on project files.
 
@@ -272,7 +271,7 @@ npx kyro-ai@latest sync --scope workspace --yes
 | ------- | -------- |
 | **Working directory** | Always install/sync from the **project root**. Global runtime is shared; `.agents/kyro/` is per-cwd. |
 | **Upgrade** | Always `npx kyro-ai@latest sync` (or re-`install`) from that root so you get the newest package and refresh the global runtime / projected modes. `kyroInvocation` lives in `~/.agents/kyro/current/manifest.json` (one refresh serves all projects). |
-| **Team commit matrix** | Commit `project.json` + `scopes/**`. Do **not** commit `local.json` (personal `activeScope`). Install writes `.agents/kyro/.gitignore` for local-only files — you no longer need to gitignore the entire `.agents/kyro/` tree or treat monolito `kyro.json` as the only multi-dev strategy. |
+| **Team commit matrix** | Commit `project.json` + `scopes/**`. Do **not** commit `local.json` (personal `activeScope`). Install writes `.agents/kyro/.gitignore` for local-only files — you no longer need to gitignore the entire `.agents/kyro/` tree. |
 | **Clone bootstrap** | From the clone root: `install --init-workspace --yes` writes layers if missing, **rehydrates** on-disk scopes into the shared registry, and leaves `activeScope` unset when multiple scopes exist. Then: `… scope set-active <scope> --yes`. |
 | **Read-only commands** | `status` / `doctor` / `context-pack` never create project state files; they surface an install bootstrap remedy when layers are missing. |
 | **Global bin (optional)** | `npm i -g kyro-ai@latest` for a durable `kyro` on PATH; still prefer `@latest` on every upgrade. |

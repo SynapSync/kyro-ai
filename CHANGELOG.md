@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.42.0] - 2026-08-05
+
+Closes the path that let an agent hand-author a whole Kyro scope. Observed in the field: a session
+invoked `kyro-ai:sprint-forge` directly (never through `/kyro:forge` → orchestrator), never ran the
+CLI once, and wrote a 14.7 KB `sprint.json` with no `schemaVersion` and no `handoff` — an artifact
+`context-pack` cannot route at all.
+
+### Added
+
+- `sprint-forge/SKILL.md` now carries the full startup handshake as a mandatory **Step 0**: resolve
+  `{{KYRO_CLI}}`, read project state, resolve scope, run `capabilities --json`, route via
+  `context-pack`, load one mode. The skill is invocable on its own, and on that path the
+  orchestrator — which previously held the only copy of these steps — is never loaded.
+- The `PreToolUse` guard now blocks creating a scope `sprint.json` whose shape is not routable
+  (missing `schemaVersion: 4`, `scope`, `handoff.nextAction`, or an `activeSprint` that is neither a
+  sprint object nor `null`). The gate is minimal by design: the hand-write fallback INIT.md
+  authorizes when the CLI cannot run, and recover.md's rebuild, both still pass.
+- `check:startup-contract` keeps the handshake in sync across `agents/orchestrator.md` and
+  `skills/sprint-forge/SKILL.md`; `check:sprint-guard` covers the guard's 20-case allow/block matrix.
+
+### Fixed
+
+- Plugin/marketplace installs never ran the `{{KYRO_CLI}}` substitution, so agents entering through
+  the skill read command tables full of literal `{{KYRO_CLI}}` tokens and concluded no CLI existed.
+  Step 0's resolution ladder (`kyro --version` → `~/.agents/kyro/current/dist/cli.js` → STOP) makes
+  the skill self-sufficient on that channel.
+- `INIT.md` Step 6 told agents to create `.agents/kyro/kyro.json` in the monolito shape — the exact
+  file install is forbidden to leave behind. It now verifies the layered `project.json` +
+  `local.json` that `{{KYRO_CLI}} plan --from` already writes, and never authors project state.
+  `principles[]` references corrected to `project.json` in `plan-sprint.md` and `review-task.md`.
+- The guard only matched on basename, so it policed any `sprint.json` anywhere on disk. It is now
+  scoped to `.agents/kyro/scopes/`.
+- `kyro plan --help` said it registers the scope in `kyro.json`; it writes `project.json`/`local.json`.
+
 ## [4.41.5] - 2026-08-04
 
 ### Fixed

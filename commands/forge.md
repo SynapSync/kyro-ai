@@ -9,15 +9,15 @@ Continue Kyro work without loading the whole workflow upfront.
 
 ## Startup
 
-1. Read `.agents/kyro/kyro.json` if it exists.
-2. Resolve the active scope from `$ARGUMENTS`, `kyro.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
+1. Read `.agents/kyro/project.json` + `.agents/kyro/local.json` if they exist.
+2. Resolve the active scope from `$ARGUMENTS`, `local.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
 3. Resolve routing with `kyro context-pack --kyro-scope <scope> --json` (lean pack). Do not open the full `sprint.json`, archive Markdown, findings, templates, or helpers to route. Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint` (see the Read Path Contract in `skills/sprint-forge/SKILL.md`).
 
 ## Route (on the pack's `nextAction`)
 
 | Condition | Load next |
 |-----------|-----------|
-| No `kyro.json` | Create or validate `.agents/kyro/kyro.json`, then continue routing. |
+| No project state | Validate `.agents/kyro/project.json` + `local.json`; if absent, tell the user to run install, then continue routing. |
 | No `sprint.json` for the scope | `skills/sprint-forge/assets/modes/INIT.md` |
 | `nextAction: "plan_sprint"` | `skills/sprint-forge/assets/modes/plan-sprint.md` |
 | `nextAction: "execute_task"` | `skills/sprint-forge/assets/modes/execute-task.md` |

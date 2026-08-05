@@ -98,7 +98,7 @@ ORCHESTRATOR
 
 ### Flow for `/kyro:forge`
 
-1. **Routing** - Orchestrator reads layered project state (`.agents/kyro/project.json` + `local.json`, or legacy `kyro.json` dual-read), then the scope's `sprint.json`, and routes on `handoff.nextAction`.
+1. **Routing** - Orchestrator reads layered project state (`.agents/kyro/project.json` + `local.json`), then the scope's `sprint.json`, and routes on `handoff.nextAction`.
 2. **Analysis** - Orchestrator explores the codebase and writes finding files under `findings/`.
 3. **Gate 1** - User approves analysis.
 4. **Planning** - Orchestrator materializes the objective, roadmap, and active sprint into `sprint.json` via `kyro plan --from` (tool-owned; init and sprint modes).
