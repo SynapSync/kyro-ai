@@ -24,6 +24,7 @@ import {
   KYRO_STATE_MIGRATED_PATH,
   readProjectState,
   sanitizeLocalForWrite,
+  collectUnnormalizableState,
   sanitizeSharedForWrite,
   splitMonolitoToLayers,
 } from './state';
@@ -92,6 +93,17 @@ function buildInstallPlanForMode(
 
   if (state) {
     const { shared, local } = splitMonolitoToLayers(state);
+    // Never let content vanish under a success message. Aliases from hand-authored state are mapped
+    // by the clone helpers; whatever still has no recoverable text is named here so the user can
+    // restore it, instead of finding a hollow `{ id }` entry later.
+    const unnormalizable = collectUnnormalizableState(shared);
+    if (unnormalizable.length > 0) {
+      console.warn(
+        `WARNING: ${unnormalizable.length} project.json entr${unnormalizable.length === 1 ? 'y has' : 'ies have'} no recoverable text and will be written incomplete:`,
+      );
+      for (const entry of unnormalizable) console.warn(`  - ${entry}`);
+      console.warn('  Restore the missing text in .agents/kyro/project.json, then re-run kyro doctor.');
+    }
     const workspaceOps: OperationPlan[] = [
       { action: 'mkdir', path: KYRO_PROJECT_ROOT },
       { action: 'mkdir', path: ARTIFACT_ROOT },

@@ -33,3 +33,20 @@ Execute the active sprint task, recording evidence through the Kyro CLI.
 - Do not write `task.verdict` as the maker — tool-owned by `{{KYRO_CLI}} review`.
 - Do not invent project patterns without justification.
 - If the plan is wrong, block the task, note the mismatch, set `handoff.nextAction: "plan_sprint"`.
+
+## Telling the user how to continue
+
+**There is no CLI verb that executes a task.** Execution is yours; the CLI only records the result
+(`record-evidence`) and the verdict (`review`).
+There is no `execute` verb and no `execute_task` verb — `execute_task` is a `handoff.nextAction`
+value, not a command. Agents have shipped both in closing summaries; each exits `UNKNOWN_COMMAND`
+and sends the user down a dead end.
+
+When you finish, hand back one of these and nothing else:
+
+- More work in this sprint → “Run `/kyro:forge` to continue with `<nextTaskId>`.”
+- Sprint finished → “Run `/kyro:forge` to close Sprint `<n>`.”
+- Want the state → “Run `/kyro:status`.”
+
+Never compose a `{{KYRO_CLI}}` line for the user unless you have run that exact verb yourself in this
+session and it succeeded.

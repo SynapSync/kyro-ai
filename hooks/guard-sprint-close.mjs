@@ -23,6 +23,44 @@ import { basename } from 'node:path';
 
 /** Scope artifacts live under this segment; anything else named sprint.json is not ours. */
 const SCOPE_SEGMENT = '.agents/kyro/scopes/';
+/** Layered project state lives directly under this segment. */
+const STATE_SEGMENT = '.agents/kyro/';
+
+/**
+ * Minimal shape gate for the layered project state, mirroring validateSharedProjectStateShape /
+ * validateLocalProjectStateShape in src/cli/artifacts/schema.ts. Kyro owns both files — install,
+ * sync and `plan` write them. An agent that hand-writes them produces state `kyro doctor` rejects,
+ * which is what happened in the field twice: the first time the whole scope was hand-authored, the
+ * second time the agent hand-patched project.json after misreading a CLI success message.
+ *
+ * Only the fields that make the file loadable are checked. Deeper validation belongs to `doctor`,
+ * which can report without blocking a write.
+ */
+function projectStateProblems(basename, doc) {
+  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {
+    return ['the document is not a JSON object'];
+  }
+  const problems = [];
+  if (doc.schemaVersion !== 4) {
+    problems.push(`\`schemaVersion\` must be the number 4 (got ${JSON.stringify(doc.schemaVersion)})`);
+  }
+  if (basename === 'project.json') {
+    if (typeof doc.artifactRoot !== 'string') problems.push('`artifactRoot` must be a string');
+    if (!Array.isArray(doc.scopes)) problems.push('`scopes` must be an array');
+    for (const localOnly of ['activeScope', 'installedAdapters', 'execution']) {
+      if (localOnly in doc) problems.push(`\`${localOnly}\` is a local.json field — it must not appear in project.json`);
+    }
+  } else {
+    if (!Array.isArray(doc.installedAdapters)) problems.push('`installedAdapters` must be an array');
+    for (const sharedOnly of ['principles', 'conventions', 'team']) {
+      if (sharedOnly in doc) problems.push(`\`${sharedOnly}\` is a project.json field — it must not appear in local.json`);
+    }
+  }
+  if ('kyroInvocation' in doc) {
+    problems.push('`kyroInvocation` lives in the global runtime manifest, never in project state');
+  }
+  return problems;
+}
 
 /**
  * Minimal routability gate for a newly created sprint.json. Returns an array of human-readable
@@ -65,6 +103,40 @@ function block(message) {
   process.exit(2);
 }
 
+/**
+ * Content the file will hold after the tool runs, or null when the payload is too malformed to
+ * reason about (fail open, as everywhere else in this hook). Edit against a missing file yields
+ * null — that write fails on its own.
+ */
+function resultingTextFor(path, input, tool) {
+  if (tool === 'Write') return typeof input.content === 'string' ? input.content : null;
+  if (!existsSync(path)) return null;
+  const original = readFileSync(path, 'utf-8');
+  const oldStr = input.old_string ?? '';
+  const newStr = input.new_string ?? '';
+  return input.replace_all ? original.split(oldStr).join(newStr) : original.replace(oldStr, newStr);
+}
+
+function blockProjectState(path, name, problems) {
+  block(
+    [
+      `BLOCKED by Kyro: ${name} is CLI-owned state — hand-writing it is not allowed.`,
+      '',
+      `Problems with ${path}:`,
+      ...problems.map((p) => `  - ${p}`),
+      '',
+      'install, sync and `kyro plan` own these files and keep both layers consistent. A hand-edit',
+      'produces state `kyro doctor` rejects, and the failure surfaces far from here — usually as an',
+      'unrelated command refusing to run.',
+      '',
+      'Fix it with the tool that owns it:',
+      '  npx kyro-ai install --scope workspace --init-workspace --yes',
+      '',
+      'To register a scope, use `kyro plan --from <lean-plan.json>` — it writes both layers for you.',
+    ].join('\n'),
+  );
+}
+
 let raw = '';
 try {
   raw = readFileSync(0, 'utf-8');
@@ -84,9 +156,31 @@ const toolInput = payload?.tool_input ?? {};
 if (toolName !== 'Write' && toolName !== 'Edit') allow();
 
 const filePath = toolInput.file_path;
-if (typeof filePath !== 'string' || basename(filePath) !== 'sprint.json') allow();
+if (typeof filePath !== 'string') allow();
+const fileName = basename(filePath);
+const normalizedPath = filePath.replace(/\\/g, '/');
+
+// --- Protection 3: hand-writing the layered project state ---
+// project.json / local.json are CLI-owned (install, sync, plan). Any Write/Edit reaching this hook
+// is a hand-edit; allow it only if the result still loads as valid state.
+if (fileName === 'project.json' || fileName === 'local.json') {
+  if (!normalizedPath.includes(STATE_SEGMENT)) allow(); // unrelated file with the same name.
+  const resultingStateText = resultingTextFor(filePath, toolInput, toolName);
+  if (resultingStateText === null) allow(); // malformed payload — fail open.
+  let stateDoc;
+  try {
+    stateDoc = JSON.parse(resultingStateText);
+  } catch {
+    blockProjectState(filePath, fileName, ['the result is not valid JSON']);
+  }
+  const stateProblems = projectStateProblems(fileName, stateDoc);
+  if (stateProblems.length > 0) blockProjectState(filePath, fileName, stateProblems);
+  allow();
+}
+
+if (fileName !== 'sprint.json') allow();
 // Only guard scope artifacts. An unrelated sprint.json elsewhere on disk is not ours to police.
-if (!filePath.replace(/\\/g, '/').includes(SCOPE_SEGMENT)) allow();
+if (!normalizedPath.includes(SCOPE_SEGMENT)) allow();
 
 // PreToolUse fires before the write, so the file on disk is still the pre-write state.
 if (!existsSync(filePath)) {

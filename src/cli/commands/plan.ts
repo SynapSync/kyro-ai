@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { asSprintFile, validateLocalProjectStateShape, validateSharedProjectStateShape, validateSprintFile } from '../artifacts/schema';
+import { LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveScopeAuthorFromGit } from '../core/actor';
 import { KyroCoreError } from '../core/errors';
 import { countClarificationMarkers } from '../core/analysis';
@@ -10,6 +11,7 @@ import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '
 import { emitToolCommandRun } from '../core/trace';
 import { readProjectState, updateProjectStateLayers } from '../state';
 import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, ScopeAuthor, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
+import type { ValidationIssue } from '../artifacts/schema';
 
 const KEBAB_CASE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SPEC_REQUIREMENT_PRIORITIES = ['must', 'should', 'could'] as const;
@@ -344,15 +346,60 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
   return { sprint: next, plan };
 }
 
+/**
+ * Register the scope in the layered project state, then prove the state on disk is valid.
+ *
+ * The early return below used to skip the write entirely when the scope was already registered —
+ * and with it, the normalization that `updateProjectStateLayers` performs. A workspace whose
+ * project.json had been hand-authored (no `schemaVersion`, `principle` instead of `rule`, ...) but
+ * already listed the scope therefore survived `plan` untouched, and the command still printed
+ * "Scope initialized". `kyro doctor` failed on that same state a second later. Agents read the
+ * success line, concluded Kyro had not written the files, and hand-patched them — which is exactly
+ * the failure this command exists to prevent.
+ *
+ * Now the shape is verified on every run, whether or not a scope was added, and a bad state fails
+ * the command instead of riding along under a success message.
+ */
 function registerScopeInProjectState(scope: string, title: string, state: KyroProjectState): void {
-  if (state.scopes.some((entry) => entry.id === scope)) return;
-  const scopes = [...state.scopes, { id: scope, title, status: 'planning' as const }];
-  // Registry cache on shared; auto-activeScope only when unset (local layer).
-  if (state.activeScope == null) {
-    updateProjectStateLayers({ scopes, activeScope: scope });
-  } else {
-    updateProjectStateLayers({ scopes });
+  if (!state.scopes.some((entry) => entry.id === scope)) {
+    const scopes = [...state.scopes, { id: scope, title, status: 'planning' as const }];
+    // Registry cache on shared; auto-activeScope only when unset (local layer).
+    if (state.activeScope == null) {
+      updateProjectStateLayers({ scopes, activeScope: scope });
+    } else {
+      updateProjectStateLayers({ scopes });
+    }
   }
+  assertProjectStateIsValid();
+}
+
+/**
+ * Fail closed when the project state on disk does not validate. Never report a successful plan on
+ * top of state that `doctor` rejects — a green message over a red workspace is what sends agents
+ * hand-editing.
+ */
+function assertProjectStateIsValid(): void {
+  const layers: { path: string; issues: ValidationIssue[] }[] = [];
+  const shared = readJsonSafely(PROJECT_STATE_PATH);
+  if (shared.exists && !shared.error) {
+    layers.push({ path: PROJECT_STATE_PATH, issues: validateSharedProjectStateShape(shared.value, PROJECT_STATE_PATH) });
+  }
+  const local = readJsonSafely(LOCAL_STATE_PATH);
+  if (local.exists && !local.error) {
+    layers.push({ path: LOCAL_STATE_PATH, issues: validateLocalProjectStateShape(local.value, LOCAL_STATE_PATH) });
+  }
+
+  const broken = layers.filter((layer) => layer.issues.length > 0);
+  if (broken.length === 0) return;
+
+  const detail = broken
+    .map((layer) => `${layer.path}: ${layer.issues.map((issue) => `${issue.field} ${issue.message}`).join('; ')}`)
+    .join(' | ');
+  throw new KyroCoreError(
+    'INVALID_PROJECT_STATE',
+    `sprint.json was written, but project state failed validation — ${detail}.`,
+    'Run: npx kyro-ai install --scope workspace --init-workspace --yes to rewrite the managed fields. Do NOT hand-edit project.json or local.json — Kyro owns their shape.',
+  );
 }
 
 /** Reconcile the shared scopes[] status cache with the derived scope status (mirrors kyro repair). */

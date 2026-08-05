@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Verifies the PreToolUse sprint.json guard (hooks/guard-sprint-close.mjs), both protections:
+// Verifies the PreToolUse guard (hooks/guard-sprint-close.mjs), all three protections:
 //
 // 1. Hand-close: Write/Edit that flips an existing scope's `activeSprint` non-null -> null.
 // 2. Hand-authored scope: creating a scope's sprint.json with a non-routable shape.
+// 3. Hand-written project state: Write/Edit leaving project.json or local.json invalid.
 //
 // The ALLOW matrix is the important half. `kyro plan`/`close-sprint` write via Node fs and never
 // reach this hook, but INIT.md authorizes a narrow hand-write fallback and recover.md rebuilds
@@ -90,6 +91,10 @@ const unrelatedDir = join(root, 'some-other-tool');
 mkdirSync(unrelatedDir, { recursive: true });
 const unrelatedPath = join(unrelatedDir, 'sprint.json');
 
+// Layered project state (CLI-owned).
+const projectStatePath = join(root, '.agents/kyro/project.json');
+const localStatePath = join(root, '.agents/kyro/local.json');
+
 function write(path, doc) {
   return {
     tool_name: 'Write',
@@ -145,6 +150,28 @@ const cases = [
   ['allow', 'archive snapshot is not named sprint.json',
     write(join(archiveDir, 'sprint-001-bootstrap.json'), HAND_AUTHORED_FIELD_ARTIFACT)],
 
+  // --- Protection 3: hand-writing the layered project state ---
+  // Reproduces the second field incident: after misreading a CLI success message, the agent
+  // hand-wrote project.json/local.json and Kyro Lens reported "schemaVersion undefined".
+  ['block', 'field incident: project.json with no schemaVersion',
+    write(projectStatePath, { name: 'OurGarden Platform', scopes: [{ id: 'phase-1-backend', name: 'Phase 1' }] })],
+  ['block', 'project.json missing artifactRoot',
+    write(projectStatePath, { schemaVersion: 4, scopes: [] })],
+  ['block', 'project.json carrying local-only activeScope',
+    write(projectStatePath, { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [], activeScope: 'demo' })],
+  ['block', 'project.json carrying kyroInvocation',
+    write(projectStatePath, { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [], kyroInvocation: 'kyro' })],
+  ['block', 'local.json with no schemaVersion',
+    write(localStatePath, { activeScope: 'demo', installedAdapters: [] })],
+  ['block', 'local.json with installedAdapters as strings is fine, but principles is shared-only',
+    write(localStatePath, { schemaVersion: 4, activeScope: null, installedAdapters: [], principles: [] })],
+  ['allow', 'valid shared project.json',
+    write(projectStatePath, { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [{ id: 'demo', title: 'Demo', status: 'planning' }] })],
+  ['allow', 'valid local.json',
+    write(localStatePath, { schemaVersion: 4, activeScope: 'demo', installedAdapters: [], runtimePath: '~/.agents/kyro/current' })],
+  ['allow', 'project.json outside .agents/kyro/', write(join(unrelatedDir, 'project.json'), { anything: true })],
+  ['allow', 'local.json outside .agents/kyro/', write(join(unrelatedDir, 'local.json'), { anything: true })],
+
   // --- Fail-open on anything we do not understand ---
   ['allow', 'non-Write/Edit tool', { tool_name: 'Read', tool_input: { file_path: newScopePath } }],
   ['allow', 'empty payload', {}],
@@ -173,5 +200,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-assert(cases.length >= 20, 'check:sprint-guard: expected at least 20 cases');
-console.log(`check:sprint-guard — ${cases.length} sprint.json guard cases passed (hand-close + hand-authored scope)`);
+assert(cases.length >= 30, 'check:sprint-guard: expected at least 30 cases');
+console.log(`check:sprint-guard — ${cases.length} guard cases passed (hand-close + hand-authored scope + hand-written project state)`);

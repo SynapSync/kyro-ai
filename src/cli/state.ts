@@ -515,27 +515,79 @@ function workspacePathExists(relativePath: string): boolean {
   return existsSync(resolveManagedPath(relativePath));
 }
 
+/**
+ * Field aliases seen on hand-authored project state.
+ *
+ * These clones used to pick only the canonical keys, so an entry written by an agent — `name`
+ * instead of `title`, `principle` instead of `rule`, `non_negotiable: true` instead of
+ * `severity` — collapsed to `{ id }` on the next install/sync. The rule text was silently
+ * destroyed, and `doctor` still failed afterwards because the required field was now missing.
+ * Mapping the aliases recovers the content and satisfies the validator in one step.
+ *
+ * Anything still unmappable is reported by {@link collectUnnormalizableState}, never dropped quietly.
+ */
+function readAlias(source: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim() !== '') return value;
+  }
+  return undefined;
+}
+
 function cloneScopeEntry(entry: KyroScopeEntry): KyroScopeEntry {
-  return { id: entry.id, title: entry.title, status: entry.status };
+  const source = entry as unknown as Record<string, unknown>;
+  return {
+    id: entry.id,
+    title: entry.title ?? readAlias(source, 'name', 'scopeName') ?? '',
+    status: entry.status,
+  };
 }
 
 function clonePrinciple(principle: Principle): Principle {
+  const source = principle as unknown as Record<string, unknown>;
+  const severity =
+    principle.severity
+    ?? (source.non_negotiable === true || source.nonNegotiable === true ? ('non-negotiable' as const) : undefined);
   return {
     id: principle.id,
-    rule: principle.rule,
-    severity: principle.severity,
-    rationale: principle.rationale,
+    rule: principle.rule ?? readAlias(source, 'principle', 'statement') ?? '',
+    severity: severity ?? 'advisory',
+    rationale: principle.rationale ?? readAlias(source, 'why', 'reason') ?? '',
     ...(principle.check !== undefined ? { check: principle.check } : {}),
   };
 }
 
 function cloneConvention(convention: Convention): Convention {
+  const source = convention as unknown as Record<string, unknown>;
+  const tags = Array.isArray(convention.tags)
+    ? [...convention.tags]
+    : typeof source.scope === 'string'
+      ? [source.scope]
+      : [];
   return {
     id: convention.id,
-    rule: convention.rule,
-    tags: [...convention.tags],
-    addedSprint: convention.addedSprint,
+    rule: convention.rule ?? readAlias(source, 'convention', 'statement') ?? '',
+    tags,
+    addedSprint: typeof convention.addedSprint === 'number' ? convention.addedSprint : 0,
   };
+}
+
+/**
+ * Names the entries whose required text could not be recovered from any known alias, so callers can
+ * warn instead of writing a hollow record. Empty means nothing was lost.
+ */
+export function collectUnnormalizableState(shared: KyroSharedProjectState): string[] {
+  const lost: string[] = [];
+  shared.scopes?.forEach((entry, index) => {
+    if (!cloneScopeEntry(entry).title) lost.push(`scopes[${index}] (id: ${entry.id ?? '?'}) has no title`);
+  });
+  shared.principles?.forEach((principle, index) => {
+    if (!clonePrinciple(principle).rule) lost.push(`principles[${index}] (id: ${principle.id ?? '?'}) has no rule text`);
+  });
+  shared.conventions?.forEach((convention, index) => {
+    if (!cloneConvention(convention).rule) lost.push(`conventions[${index}] (id: ${convention.id ?? '?'}) has no rule text`);
+  });
+  return lost;
 }
 
 function cloneTeamPolicy(team: TeamPolicy): TeamPolicy {

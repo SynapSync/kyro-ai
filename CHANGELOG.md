@@ -6,6 +6,42 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.43.0] - 2026-08-05
+
+Second field incident. 4.42.0 worked as intended — the agent ran the Step 0 handshake and
+materialized `sprint.json` through `plan --from` — but the same failure reappeared one file over:
+it hand-wrote `project.json` and `local.json`. It did so because Kyro told it to.
+
+### Fixed
+
+- **`plan --from` reported success over project state that `doctor` rejects.**
+  `registerScopeInProjectState` returned early when the scope was already in the registry, skipping
+  the write and with it the normalization. A workspace whose `project.json` had been hand-authored
+  but already listed the scope survived untouched, and the command still printed
+  "Scope initialized" — while `kyro doctor` failed on that same state. The agent read the success
+  line, concluded Kyro had not written the files, and hand-patched them. The shape is now verified
+  on every run and a bad state fails with `INVALID_PROJECT_STATE` instead of riding along under a
+  success message.
+- **`install --init-workspace` silently destroyed content.** The clone helpers picked only canonical
+  keys, so a hand-authored entry (`name` for `title`, `principle` for `rule`, `non_negotiable` for
+  `severity`) collapsed to `{ id }` — the rule text gone — and `doctor` still failed afterwards
+  because the required field was now missing. This was the remedy `doctor` itself printed. Known
+  aliases are now mapped, and anything with no recoverable text is named in a warning rather than
+  quietly dropped.
+- **`docs/getting-started.md`** referenced `kyro delegate`, a verb that does not exist. Found by the
+  new check on its first run.
+
+### Added
+
+- The `PreToolUse` guard now covers `project.json` and `local.json`, not just `sprint.json`. Both are
+  CLI-owned; a hand-write that leaves them invalid is blocked with the command that owns them.
+- `check:cli-verbs` fails the build when any asset references a CLI verb the dispatcher does not
+  accept, reading the real list from `src/cli/app.ts` so it cannot drift. Agents have twice closed a
+  session by telling the user to run a command Kyro never had (`execute`, then `execute_task`); both
+  exit `UNKNOWN_COMMAND`. Lines that name a verb in order to deny it are allowed.
+- `execute-task.md` states plainly that no verb executes a task, and gives the three handoff lines to
+  use instead — the gap agents were filling by inventing.
+
 ## [4.42.0] - 2026-08-05
 
 Closes the path that let an agent hand-author a whole Kyro scope. Observed in the field: a session
