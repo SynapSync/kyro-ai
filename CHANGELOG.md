@@ -31,6 +31,16 @@ it hand-wrote `project.json` and `local.json`. It did so because Kyro told it to
 - **`docs/getting-started.md`** referenced `kyro delegate`, a verb that does not exist. Found by the
   new check on its first run.
 
+- **Windows CI flake in `check:lossless-checkpoints`.** The raw-heartbeat-exit case waited on a file
+  the worker only writes on its 2nd renewal, under a 1000ms lease. The worker renews every
+  `lease/3`, so two renewals consumed 666ms and left ~334ms of absolute slack for Worker spin-up —
+  enough on Linux, not on a loaded Windows runner, where the owner fail-stopped with
+  "Lease heartbeat expired or changed" before the injected exit ran. The test read that as
+  "worker did not perform injected raw exit", so the same commit went green on one run and red on
+  the next. The lease for cases that must *observe* a heartbeat event is now 5000ms (~1667ms slack)
+  with the arithmetic documented; cases that merely assert the owner was fenced keep the short lease,
+  since they pass under either failure path.
+
 ### Added
 
 - The `PreToolUse` guard now covers `project.json` and `local.json`, not just `sprint.json`. Both are
