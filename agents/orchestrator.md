@@ -17,7 +17,7 @@ Kyro preserves quality by loading the smallest contract needed for the current l
    - Run `kyro --version`. If it exits 0, `{{KYRO_CLI}}` means bare `kyro` for the rest of this session.
    - Else, check whether `~/.agents/kyro/current/dist/cli.js` exists. If it does, `{{KYRO_CLI}}` means `node ~/.agents/kyro/current/dist/cli.js`.
    - Else, Kyro's runtime is not installed on this machine. STOP — tell the user to run `npx kyro-ai@latest install --scope workspace --init-workspace --yes` once, then retry. This is not a license to hand-edit `sprint.json` or improvise; same rule as a missing verb in Step 4.
-   Substitute the resolved value mentally everywhere `{{KYRO_CLI}}` appears in this or any other loaded skill asset for the rest of the session — never run the eight literal characters `{{KYRO_CLI}}`.
+   Substitute the resolved value mentally everywhere `{{KYRO_CLI}}` appears in this or any other loaded skill asset for the rest of the session — never run the literal 12 characters `{{KYRO_CLI}}`.
 2. Read `project.json` + `local.json` (`kyro.json` is dual-read).
 3. Resolve scope from user input, `local.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
 4. Capability handshake: run `{{KYRO_CLI}} capabilities --json`. Unknown command, or `record-evidence`/`review` missing — runtime too old: ABORT, report `{{KYRO_CLI}} --version`. Never work around it by hand.
