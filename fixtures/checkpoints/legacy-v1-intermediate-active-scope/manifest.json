@@ -1,0 +1,6 @@
+{
+  "description": "Frozen historical intermediate checkpoint v1 with residual projectScopeAfter.status=active (behavior from 4.19.0 through 4.43.0). Captured from pre-fix close path; digests are authentic for this payload.",
+  "capturedFrom": "4.43.0 intermediate close (active residual shape identical since 4.19.0)",
+  "projectScopeAfterStatus": "active",
+  "sha256CheckpointFile": "406a216c5fb2011d9efd036ffd8ae80d25c4415d7872e4f8959b6a1dfbc6189f"
+}

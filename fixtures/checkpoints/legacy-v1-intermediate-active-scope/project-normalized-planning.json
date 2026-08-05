@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 4,
+  "artifactRoot": ".agents/kyro/scopes",
+  "scopes": [
+    {
+      "id": "demo",
+      "title": "Demo",
+      "status": "planning"
+    }
+  ],
+  "activeScope": "demo",
+  "runtimePath": "~/.agents/kyro/current",
+  "installedAdapters": []
+}

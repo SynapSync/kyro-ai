@@ -16,3 +16,6 @@
 
 # Generated — exclude from GitHub language stats
 dist/** linguist-generated
+
+# Frozen historical fixture preserves exact bytes, including its blank Notes field.
+fixtures/checkpoints/legacy-v1-intermediate-active-scope/narrative.md -whitespace
