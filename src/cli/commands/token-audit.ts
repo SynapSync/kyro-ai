@@ -17,22 +17,30 @@ const TOKEN_BUDGET = {
   statusBriefTokens: 2000,
   initHappyPathTokens: 2000,
   orchestratorWords: 800,
-  sprintForgeSkillWords: 800,
+  // 4.42.0 raised this from 800: SKILL.md now carries the full Step 0 startup handshake, because
+  // the skill is invocable on its own and the orchestrator — which held the only copy — never
+  // loads on that path. Buying it back by trimming the contract was the wrong trade; a scope
+  // hand-authored without the handshake costs far more than the tokens it saves.
+  sprintForgeSkillWords: 1280,
   seedbedSkillWords: 700,
   seedbedModeWords: 900,
   seedbedHelperWords: 450,
-  runtimeStatusBriefTokens: 1500,
+  runtimeStatusBriefTokens: 1630,
   // Path budgets preserve the production agent contracts (orchestrator + SKILL + routed
   // mode/helpers) with roughly 10% headroom. They remain explicit ceilings so future growth is
   // reviewed instead of silently accumulating.
-  runtimeForgeExecuteTokens: 3650,
-  runtimeForgeReviewTokens: 4050,
-  runtimeForgePlanTokens: 4400,
-  runtimeForgeCloseTokens: 5100,
-  runtimeForgeInitTokens: 4450,
+  //
+  // Sized against a machine with the runtime INSTALLED (projected router ~180t), not against a
+  // bare checkout (stub router ~46t). CI measures the stub and therefore reads ~134 tokens lower
+  // per path — sizing to CI would leave `kyro doctor --tokens` failing for every real user.
+  runtimeForgeExecuteTokens: 4180,
+  runtimeForgeReviewTokens: 4570,
+  runtimeForgePlanTokens: 4940,
+  runtimeForgeCloseTokens: 5610,
+  runtimeForgeInitTokens: 5010,
   // Seedbed-backed INIT adds one lazy mapping helper to the normal INIT route. The ceiling keeps
   // roughly 10% headroom over the measured router + orchestrator + skill + mode + analysis + mapping path.
-  runtimeForgeInitSeedbedTokens: 4800,
+  runtimeForgeInitSeedbedTokens: 5370,
   runtimeTaskContextTokens: 2200,
   runtimeIdeaTokens: 5200,
 } as const;

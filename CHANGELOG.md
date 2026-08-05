@@ -26,6 +26,18 @@ CLI once, and wrote a 14.7 KB `sprint.json` with no `schemaVersion` and no `hand
 - `check:startup-contract` keeps the handshake in sync across `agents/orchestrator.md` and
   `skills/sprint-forge/SKILL.md`; `check:sprint-guard` covers the guard's 20-case allow/block matrix.
 
+### Changed
+
+- Token budgets raised to fit the Step 0 startup contract, which `SKILL.md` now carries on every
+  route: `sprintForgeSkillWords` 800 → 1280, and the six forge path ceilings plus
+  `runtimeStatusBriefTokens` re-sized with the 10% headroom the policy already declared. Trimming the
+  contract to fit the old ceiling was the wrong trade — a scope hand-authored without the handshake
+  costs far more than the tokens it saves.
+- Path budgets are now sized against a machine with the runtime **installed** (projected router
+  ~180t), not a bare checkout (stub router ~46t). CI measures the stub and reads ~134 tokens lower
+  per path, so the previous sizing would have left `kyro doctor --tokens` failing for every real user
+  while CI stayed green.
+
 ### Fixed
 
 - Plugin/marketplace installs never ran the `{{KYRO_CLI}}` substitution, so agents entering through
