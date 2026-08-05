@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "2bdbfa9b3a3a4c3b9e7dfa1f63236beaa13cffb8610a0e41c1dd975ab5fd1035",
+  "createdAt": "2026-08-05T22:08:33.977Z",
+  "identity": {
+    "scope": "demo",
+    "sprintN": 1,
+    "sprintSlug": "demo-sprint"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": "Continue safely.",
+    "summary": "Closed safely.",
+    "recommendations": [
+      "Use checkpoints."
+    ],
+    "learnings": [
+      "Keep complete history."
+    ]
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/demo/archive/sprint-001-demo-sprint.json",
+    "narrative": ".agents/kyro/scopes/demo/archive/sprint-001-demo-sprint.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "demo",
+    "title": "Demo",
+    "status": "active",
+    "objective": "Demo objective",
+    "successCriteria": [
+      "Demo works."
+    ],
+    "clarifications": [
+      {
+        "q": "Preserve debt?",
+        "a": "Yes.",
+        "sprint": 1,
+        "date": "2026-07-13"
+      }
+    ],
+    "conventions": [
+      {
+        "id": "C-1",
+        "rule": "Keep complete checkpoints.",
+        "tags": [
+          "archive"
+        ],
+        "addedSprint": 1
+      }
+    ],
+    "roadmap": {
+      "plannedSprintCount": 2,
+      "sizingRationale": "One sprint is enough.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "demo-sprint",
+          "title": "Demo Sprint",
+          "state": "active"
+        },
+        {
+          "n": 2,
+          "slug": "next",
+          "title": "Next",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [],
+    "previousSprint": null,
+    "activeSprint": {
+      "n": 1,
+      "slug": "demo-sprint",
+      "title": "Demo Sprint",
+      "objective": "Ship demo sprint.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Demo Phase",
+          "objective": "Complete demo work.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.1",
+              "title": "Implement demo",
+              "description": "Implement the demo task.",
+              "files_to_touch": [
+                "src/demo.ts"
+              ],
+              "context": "Use the existing demo pattern.",
+              "acceptance_criteria": [
+                "Validation passes."
+              ],
+              "depends_on": [],
+              "status": "done",
+              "evidence": {
+                "summary": "done",
+                "validation": "ok",
+                "files_changed": [
+                  "src/demo.ts"
+                ],
+                "notes": "",
+                "by": "maker",
+                "recordedAt": "2026-07-02T00:00:00.000Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Validation passes."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-07-02T00:01:00.000Z"
+              },
+              "scenario_refs": [
+                "SC-1"
+              ]
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [],
+      "definitionOfDone": [
+        "All tasks done."
+      ]
+    },
+    "debt": [
+      {
+        "id": "D-1",
+        "title": "Legacy history is limited",
+        "origin": 1,
+        "priority": "low",
+        "status": "deferred",
+        "targetSprint": null,
+        "note": "Do not fabricate."
+      }
+    ],
+    "handoff": {
+      "nextAction": "close_sprint",
+      "nextTaskId": "T1.1",
+      "blockers": [],
+      "note": "Resume demo.",
+      "lastUpdated": "2026-07-02"
+    },
+    "spec": {
+      "requirements": [
+        {
+          "id": "REQ-1",
+          "statement": "Preserve complete state.",
+          "priority": "must",
+          "rationale": "Recovery."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "SC-1",
+          "requirement": "REQ-1",
+          "given": "a scope",
+          "when": "it closes",
+          "then": "state is preserved"
+        }
+      ],
+      "nonGoals": [
+        "Backfill legacy history."
+      ],
+      "openQuestions": []
+    },
+    "adrs": [
+      {
+        "id": "ADR-0001",
+        "title": "Keep lossless close checkpoints",
+        "status": "accepted",
+        "date": "2026-07-15",
+        "context": "Sprint close must preserve complete scope state for recovery.",
+        "decision": "Store durable architectural decisions in sprint.json.adrs[] so checkpoint before/after images retain them.",
+        "consequences": [
+          "Close recovery keeps ADR history with the rest of the scope state."
+        ],
+        "alternatives": [
+          "Write separate markdown ADR files outside the checkpoint contract."
+        ],
+        "links": {
+          "docs": [
+            "docs/sprint-close-checkpoints.md"
+          ]
+        }
+      }
+    ],
+    "extensionState": {
+      "retained": true,
+      "nested": {
+        "value": 7
+      }
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "demo",
+    "title": "Demo",
+    "status": "active",
+    "objective": "Demo objective",
+    "successCriteria": [
+      "Demo works."
+    ],
+    "clarifications": [
+      {
+        "q": "Preserve debt?",
+        "a": "Yes.",
+        "sprint": 1,
+        "date": "2026-07-13"
+      }
+    ],
+    "conventions": [
+      {
+        "id": "C-1",
+        "rule": "Keep complete checkpoints.",
+        "tags": [
+          "archive"
+        ],
+        "addedSprint": 1
+      }
+    ],
+    "roadmap": {
+      "plannedSprintCount": 2,
+      "sizingRationale": "One sprint is enough.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "demo-sprint",
+          "title": "Demo Sprint",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "next",
+          "title": "Next",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "demo-sprint",
+        "outcome": "shipped",
+        "closedAt": "2026-08-05",
+        "archive": "archive/sprint-001-demo-sprint.md",
+        "snapshot": "archive/sprint-001-demo-sprint.json",
+        "checkpoint": "archive/sprint-001-demo-sprint.checkpoint.json",
+        "recommendations": [
+          "Use checkpoints."
+        ],
+        "checkpointSha256": "0de7bbec1657dbcf29faebb7a30366cb73deb3a7e486127e9b6cf19d640da628"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "demo-sprint",
+      "outcome": "shipped",
+      "summary": "Closed safely."
+    },
+    "activeSprint": null,
+    "debt": [
+      {
+        "id": "D-1",
+        "title": "Legacy history is limited",
+        "origin": 1,
+        "priority": "low",
+        "status": "deferred",
+        "targetSprint": null,
+        "note": "Do not fabricate."
+      }
+    ],
+    "handoff": {
+      "nextAction": "plan_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Continue safely.",
+      "lastUpdated": "2026-08-05"
+    },
+    "spec": {
+      "requirements": [
+        {
+          "id": "REQ-1",
+          "statement": "Preserve complete state.",
+          "priority": "must",
+          "rationale": "Recovery."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "SC-1",
+          "requirement": "REQ-1",
+          "given": "a scope",
+          "when": "it closes",
+          "then": "state is preserved"
+        }
+      ],
+      "nonGoals": [
+        "Backfill legacy history."
+      ],
+      "openQuestions": []
+    },
+    "adrs": [
+      {
+        "id": "ADR-0001",
+        "title": "Keep lossless close checkpoints",
+        "status": "accepted",
+        "date": "2026-07-15",
+        "context": "Sprint close must preserve complete scope state for recovery.",
+        "decision": "Store durable architectural decisions in sprint.json.adrs[] so checkpoint before/after images retain them.",
+        "consequences": [
+          "Close recovery keeps ADR history with the rest of the scope state."
+        ],
+        "alternatives": [
+          "Write separate markdown ADR files outside the checkpoint contract."
+        ],
+        "links": {
+          "docs": [
+            "docs/sprint-close-checkpoints.md"
+          ]
+        }
+      }
+    ],
+    "extensionState": {
+      "retained": true,
+      "nested": {
+        "value": 7
+      }
+    }
+  },
+  "projectScopeBefore": {
+    "id": "demo",
+    "title": "Demo",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "demo",
+    "title": "Demo",
+    "status": "active"
+  },
+  "digests": {
+    "beforeClose": "2c0da20a909f3232bea2ca283a70b434d0c50ff98a3afe5a3fd32b4d197539b4",
+    "intendedAfterClose": "a0c3536d1ca1e37650399ec2d99bf974fdcf6b131d91ae2d026e4ebe74f9aaae",
+    "projectScopeBefore": "cc0918da4195abe8473183ea749a6b5c194323480bf80521fd77fe54a0fe04d5",
+    "projectScopeAfter": "cc0918da4195abe8473183ea749a6b5c194323480bf80521fd77fe54a0fe04d5",
+    "legacySnapshot": "84e0af6905908a88a6824e2d0c5117352dc332c3de3b606e5947599f22de8a8c",
+    "narrative": "2e09db99ed30dee73036b4aabf341876d2fb30cb9f9a2fd5b0cee61f73bd9c9e"
+  }
+}
