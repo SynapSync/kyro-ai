@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.43.2] - 2026-08-05
+
+### Fixed
+
+- **The projected runtime TUI advertised install actions that it must reject.** Running the
+  canonical projected invocation without arguments displayed the full-package installer menu;
+  choosing any adapter called `install()` and then failed with `INVALID_INPUT`. The TUI now detects
+  its package-root mode: verified full packages retain adapter installation, while projected and
+  unknown roots show the full-package remedy and expose only Doctor and Exit. Explicit projected
+  `install` and `sync` commands remain fail-closed.
+
+### Tests
+
+- Added full-package, projected-runtime, and unknown-root TUI coverage to the packaged runtime
+  smoke, including Doctor routing and proof that restricted Exit does not acquire the writer lock.
+
+### Docs
+
+- Documented package-root-aware TUI behavior and added
+  `docs/plans/plan-12-package-root-aware-tui.md`.
+
 ## [4.43.1] - 2026-08-05
 
 ### Fixed
