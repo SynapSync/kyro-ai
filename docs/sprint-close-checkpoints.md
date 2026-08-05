@@ -6,7 +6,7 @@ Every new sprint close publishes an immutable, versioned checkpoint before chang
 
 | File | Contract |
 | --- | --- |
-| `sprint-NNN-slug.checkpoint.json` | Complete transaction record: full scope state before close and intended after close, affected `kyro.json` scope entry, frozen inputs, paths, and SHA-256 digests. |
+| `sprint-NNN-slug.checkpoint.json` | Complete transaction record: full scope state before close and intended after close, affected project-state scope entry, frozen inputs, paths, and SHA-256 digests. |
 | `sprint-NNN-slug.json` | Legacy verbatim `ActiveSprint` snapshot. It does not contain historical debt, spec, roadmap, handoff, or scope status. |
 | `sprint-NNN-slug.md` | Deterministic human-readable narrative. |
 

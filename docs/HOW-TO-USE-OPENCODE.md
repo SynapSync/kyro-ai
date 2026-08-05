@@ -15,7 +15,7 @@ This installs:
 - native OpenCode skills: `~/.config/opencode/skills/kyro-*`
 - native OpenCode commands: `~/.config/opencode/commands/kyro/*.md`
 - OpenCode agent overlay: `~/.config/opencode/opencode.json` key `agent.kyro-orchestrator`
-- project state: `.agents/kyro/project.json` + `local.json` (legacy `kyro.json` dual-read)
+- project state: `.agents/kyro/project.json` + `local.json`
 
 ## Usage
 

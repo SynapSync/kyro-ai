@@ -49,7 +49,7 @@ its own (`kyro-ai:sprint-forge`), and on that path the orchestrator is never loa
      not a license to hand-edit `sprint.json` or improvise; same rule as a missing verb in Step 4.
    Substitute the resolved value mentally everywhere `{{KYRO_CLI}}` appears in this or any other loaded
    skill asset for the rest of the session — never run the literal 12 characters `{{KYRO_CLI}}`.
-2. Read `.agents/kyro/project.json` + `.agents/kyro/local.json` (legacy `kyro.json` is dual-read).
+2. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`.
 3. Resolve the scope from user input, `local.json.activeScope`, or the only directory under
    `.agents/kyro/scopes/`.
 4. **Capability handshake:** run `{{KYRO_CLI}} capabilities --json`. Unknown command, or
@@ -83,7 +83,7 @@ The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/revie
 
 ## Artifact Write Contract (MANDATORY)
 
-Every mutation of `sprint.json` (or, on the legacy monolito path, `kyro.json`) MUST be a **safe write**:
+Every mutation of `sprint.json` or project state MUST be a **safe write**:
 
 > Read the whole file → `JSON.parse` → mutate the object → serialize → overwrite in one write → re-parse to confirm. If the re-parse fails, restore and report.
 

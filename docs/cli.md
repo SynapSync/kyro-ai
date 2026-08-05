@@ -102,7 +102,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 **Source of truth is global only:** `~/.agents/kyro/current/manifest.json.kyroInvocation`.
 
-Install/sync probe PATH once, write the result into the **runtime manifest**, and substitute it for `{{KYRO_CLI}}` in projected modes under `current/`. Project state files (`.agents/kyro/project.json`, `local.json`, or legacy `kyro.json`) do **not** store `kyroInvocation` (legacy copies are stripped on the next install/sync of that workspace). One machine-wide refresh is enough for all projects.
+Install/sync probe PATH once, write the result into the **runtime manifest**, and substitute it for `{{KYRO_CLI}}` in projected modes under `current/`. Project state files (`.agents/kyro/project.json`, `local.json`) do **not** store `kyroInvocation` (legacy copies are stripped on the next install/sync of that workspace). One machine-wide refresh is enough for all projects.
 
 | Situation | Persisted invocation (manifest) |
 | --------- | -------------------- |
@@ -146,7 +146,7 @@ The project keeps only state and artifacts (layered):
         └── findings/            # write-only INIT analysis evidence
 ```
 
-Legacy `.agents/kyro/kyro.json` (pre-layered monolito) remains dual-readable until install migrates it. Full commit matrix: [Teams](teams.md).
+Full commit matrix, including migration off the pre-layered monolito: [Teams](teams.md).
 
 ## Adapters
 
@@ -217,7 +217,7 @@ The uninstall output includes a summary with overlay, purged file, and empty-dir
 
 They do not create per-scope files. Each scope's `sprint.json` (the single source of truth for that scope) is created later by forge/INIT or `kyro plan`.
 
-**Effective state** is a deterministic merge of shared + local (plus dual-read of legacy monolito `kyro.json` when layers are absent). Readers use one façade (`readProjectState`); writers target the correct layer only.
+**Effective state** is a deterministic merge of shared + local (see [Teams](teams.md) for the pre-layered migration path). Readers use one façade (`readProjectState`); writers target the correct layer only.
 
 **Rehydrate from disk:** if `.agents/kyro/scopes/{id}/` directories already exist (common after clone when scopes + `project.json` are committed but `local.json` is not), install/sync **registers** those folders into the shared scopes registry. Title and status come from each scope's `sprint.json` when readable; existing registry entries are never overwritten. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
 
@@ -246,9 +246,9 @@ Shared file omits `activeScope` / `installedAdapters`. Local file omits `princip
 
 | Commit | Do not commit |
 | ------ | ------------- |
-| `project.json`, `scopes/**`, `.agents/kyro/.gitignore` | `local.json`, live legacy `kyro.json` |
+| `project.json`, `scopes/**`, `.agents/kyro/.gitignore` | `local.json` |
 
-You no longer need to gitignore the entire `.agents/kyro/` tree or treat monolito `kyro.json` as the only multi-dev strategy. See [Teams](teams.md).
+You no longer need to gitignore the entire `.agents/kyro/` tree. See [Teams](teams.md).
 
 After clone:
 

@@ -4,7 +4,7 @@ Report progress from the single source of truth. One read, no summaries.
 
 ## Inputs
 
-1. Read `.agents/kyro/kyro.json`.
+1. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`.
 2. Resolve scope. For `brief`, read the lean scope pack (`{{KYRO_CLI}} context-pack --kyro-scope {scope} --json`) — it carries `status`, `activeSprintSlug`, `nextAction`, `openDebtCount`, `reviewPending`. Open the full `.agents/kyro/scopes/{scope}/sprint.json` only for `full`/`debt`, which need `roadmap`/`ledger[]`/full `activeSprint`/`debt[]`/`adrs[]` (see the Read Path Contract in `../../SKILL.md`).
 
 ## Report variants

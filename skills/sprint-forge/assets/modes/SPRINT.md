@@ -16,7 +16,7 @@ Lightweight index for sprint work. Do not load the full sprint protocol upfront.
 
 ## Required read order
 
-1. `.agents/kyro/kyro.json`
+1. `.agents/kyro/project.json` + `.agents/kyro/local.json`
 2. The lean pack (`{{KYRO_CLI}} context-pack`; `--task` for execute/review) — never the full `sprint.json` to route. Full file only to write or in plan/close, per the Read Path Contract in `../../SKILL.md`.
 3. The routed mode file above
 4. Only the helpers/templates named by that routed mode

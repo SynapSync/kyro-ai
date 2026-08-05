@@ -5,7 +5,7 @@ Use INIT when a scope has no `sprint.json`. Produces exactly one artifact you wr
 ## Inputs
 
 - User request and current repository path.
-- `.agents/kyro/kyro.json` if present (to know existing scopes).
+- `.agents/kyro/project.json` if present (to know existing scopes).
 - One work-type helper under `../helpers/analysis/` after work-type detection.
 - **Optional:** if the user references a matured-idea document, consume its plan-grade sections using the exact schema-safe mapping in Step 5. For legacy briefs, fall back to `Problem / Motivation`, `Who it's for`, and `What success looks like`. Never re-interview the user for facts or decisions already captured there.
 
@@ -73,10 +73,6 @@ Read `.agents/kyro/project.json` + `.agents/kyro/local.json` and confirm the sco
 active. If either file is missing, project state was never bootstrapped — tell the human to run
 `npx kyro-ai install --scope workspace --init-workspace --yes` once (full npm package only, never
 via the projected runtime CLI), then retry. Do not hand-author these files to paper over it.
-
-> Legacy note: `.agents/kyro/kyro.json` is the pre-layered monolito. It is still **read** for
-> backwards compatibility, but never written — install/sync migrates it to `kyro.json.migrated`.
-> Never create a new `kyro.json`.
 
 The active runtime version is read from `~/.agents/kyro/current/manifest.json.packageVersion`, not
 copied into project state.

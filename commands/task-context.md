@@ -9,7 +9,7 @@ Generate a ready-to-paste prompt for a new agent context. This command is read-o
 
 ## Startup
 
-1. Read `.agents/kyro/kyro.json`.
+1. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`.
 2. Resolve the active scope unless the user supplied a scope.
 3. Run or reconstruct `kyro context-pack --kyro-scope <scope> --task --verbosity detailed --json`. If there is no active task, use scope mode.
 4. Check `git status --short --branch`.

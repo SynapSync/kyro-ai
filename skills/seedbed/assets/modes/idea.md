@@ -6,7 +6,7 @@ Produce an evidence-grounded, decision-complete artifact that another agent can 
 
 - The user's idea, conversation, and supplied reference paths.
 - Read-only project evidence explicitly relevant to the idea: source, tests, documentation, manifests, schemas, and version history.
-- Never read `.agents/kyro/kyro.json`, `.agents/kyro/scopes/`, `sprint.json`, installed runtime state, or secrets.
+- Never read `.agents/kyro/project.json`, `.agents/kyro/local.json`, `.agents/kyro/scopes/`, `sprint.json`, installed runtime state, or secrets.
 - Quote or record the source of decisive evidence. Label unsupported interpretations as hypotheses.
 
 ## 1. Detect the lane

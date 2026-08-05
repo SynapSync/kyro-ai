@@ -14,7 +14,7 @@ Use for `/kyro:idea` or when the user wants to deepen an idea before creating a 
 
 ## Hard Rules
 
-- Remain pre-scope: never read or mutate `kyro.json`, `scopes/`, `sprint.json`, or runtime state.
+- Remain pre-scope: never read or mutate `project.json`, `local.json`, `scopes/`, `sprint.json`, or runtime state.
 - Read only user-provided references and relevant read-only project evidence; distinguish evidence from inference.
 - Ask one question per turn, only when its answer materially changes the result. Never re-ask known facts.
 - Never hide contradictions, invent decisions, or present an unresolved material choice as settled.

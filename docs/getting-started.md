@@ -120,7 +120,7 @@ or, in Claude-style slash command environments:
 
 Kyro routes progressively:
 
-1. read layered project state (`.agents/kyro/project.json` + `local.json`, or legacy `kyro.json` dual-read)
+1. read layered project state (`.agents/kyro/project.json` + `local.json`)
 2. resolve or create scope
 3. read the scope's lean pack / `sprint.json` if present
 4. route on `sprint.json.handoff.nextAction` and load only the required mode: INIT, clarify, plan, execute, review, close, done, or recover
