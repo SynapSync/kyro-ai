@@ -10,6 +10,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- **Windows CI: frozen legacy checkpoint fixture reported `snapshot=conflict, narrative=conflict`.**
+  Global `*.json`/`*.md` text attributes checked out CRLF on Windows, breaking
+  `digests.legacySnapshot` / `digests.narrative`. Fixture path now forces `text eol=lf`, and the
+  lossless-check installer normalizes CRLF→LF before writing sandbox artifacts.
 - **Intermediate sprint close left `projectScopeAfter.status = active` while repair derived `planning`.**
   Since lossless checkpoint v1 (4.19.0), intermediate closes copied the before scope entry into the
   after image. `deriveScopeStatus` and `kyro repair` correctly yield `planning` when no sprint is
