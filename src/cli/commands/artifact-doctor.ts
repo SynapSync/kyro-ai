@@ -15,7 +15,13 @@ import {
 } from '../artifacts/schema';
 import type { CheckResult, KyroScopeEntry, SprintFile } from '../types';
 import { SPRINT_CLOSE_TRANSACTION_STATUS, type SprintCloseCheckpointV1, type SprintCloseTransactionStatus } from '../types';
-import { checkpointCommitment, sha256, validateSprintCloseCheckpoint } from '../checkpoints/sprint-close';
+import {
+  checkpointCommitment,
+  isLegacyIntermediateActiveScopeAfter,
+  legacyNormalizedProjectScopeAfter,
+  sha256,
+  validateSprintCloseCheckpoint,
+} from '../checkpoints/sprint-close';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import {
   formatBootstrapRemedy,
@@ -286,7 +292,17 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const projectDigest = projectEntry ? sha256(projectEntry) : null;
 
   const sprintPosition = digestPosition(sprintDigest, checkpoint.digests.beforeClose, checkpoint.digests.intendedAfterClose);
-  const scopePosition = digestPosition(projectDigest, checkpoint.digests.projectScopeBefore, checkpoint.digests.projectScopeAfter);
+  let scopePosition = digestPosition(projectDigest, checkpoint.digests.projectScopeBefore, checkpoint.digests.projectScopeAfter);
+  let legacyScopeNormalized = false;
+  // Historical intermediate v1 residual: checkpoint stores projectScopeAfter.status=active while
+  // the canonical live after-image (and repair) use planning. Treat exact normalized live match as after.
+  if (scopePosition === 'other' && projectEntry && isLegacyIntermediateActiveScopeAfter(checkpoint)) {
+    const normalized = legacyNormalizedProjectScopeAfter(checkpoint);
+    if (normalized && sha256(projectEntry) === sha256(normalized)) {
+      scopePosition = 'after';
+      legacyScopeNormalized = true;
+    }
+  }
   let status: SprintCloseTransactionStatus;
   if (snapshotState === 'conflict' || narrativeState === 'conflict' || sprintPosition === 'other' || scopePosition === 'other') {
     status = SPRINT_CLOSE_TRANSACTION_STATUS.DIVERGED;
@@ -297,7 +313,10 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   } else {
     status = SPRINT_CLOSE_TRANSACTION_STATUS.PARTIAL;
   }
-  return checkpointResult(scope, path, status, `sprint=${sprintPosition}, scope=${scopePosition}, snapshot=${snapshotState}, narrative=${narrativeState}`);
+  const scopeLabel = legacyScopeNormalized
+    ? 'after (legacy v1 intermediate scope status active→planning)'
+    : scopePosition;
+  return checkpointResult(scope, path, status, `sprint=${sprintPosition}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`);
 }
 
 function validateLedgerCheckpointReferences(

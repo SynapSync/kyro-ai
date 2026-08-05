@@ -29,6 +29,35 @@ The ledger commitment detects archive-only tampering even if someone rewrites em
 
 Package consumers can import `SprintCloseCheckpointV1`, `SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION`, `SPRINT_CLOSE_CHECKPOINT_KIND`, and `SPRINT_CLOSE_TRANSACTION_STATUS` from the supported `kyro-ai` entrypoint.
 
+## Project scope status on close
+
+`projectScopeAfter.status` is derived with the same rule as `repair` / `status` / `analyze` (`deriveScopeStatus` on the intended-after sprint with `activeSprint` cleared):
+
+| After-close roadmap | `projectScopeAfter.status` |
+| --- | --- |
+| Non-empty and every sprint `state === 'closed'` | `completed` |
+| Non-empty with at least one non-closed sprint (intermediate close) | `planning` |
+| Empty array (pathological / hand-edited; tool-owned `kyro plan` rejects empty roadmaps) | `planning` |
+
+Sprint-level `intendedAfterClose.status` is a separate field and is **not** rewritten by this rule.
+
+### Historical intermediate residual (checkpoint v1, 4.19.0–4.43.0)
+
+From the introduction of lossless checkpoints through 4.43.0, intermediate closes **copied** `projectScopeBefore` into `projectScopeAfter`, leaving residual `status: "active"` even though live repair correctly normalized the scope to `planning`. Checkpoints have no writer-version field; the residual is recognized by **shape**:
+
+- `schemaVersion === 1`
+- `intendedAfterClose.activeSprint === null`
+- at least one non-closed roadmap sprint
+- `projectScopeAfter.status === 'active'`
+- re-deriving under current rules yields the same entry with `status: 'planning'` only
+
+Read-time behavior (no archive rewrite):
+
+- `validateSprintCloseCheckpoint` accepts that residual as a historically authorized transition.
+- `kyro doctor --artifacts` treats live scope equal to `{ ...projectScopeAfter, status: 'planning' }` as the applied after-image and reports a legacy note (`active→planning`).
+- Immutable checkpoint bytes and ledger commitments are never rewritten for compatibility.
+- Arbitrary live drift (title, id, other statuses) remains `DIVERGED`.
+
 ## Recovery states
 
 `kyro doctor --artifacts` reports each checkpoint independently, even when live `sprint.json` is missing or invalid:

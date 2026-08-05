@@ -261,15 +261,120 @@ function closeSuccessfully(root) {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
-// Intermediate close retains active project scope status.
+// Intermediate close derives planning (SSOT) and doctor APPLIED without repair.
 {
   const root = makeSandbox({ intermediate: true });
   try {
     const checkpoint = closeSuccessfully(root);
-    assert(checkpoint.projectScopeBefore.status === 'active' && checkpoint.projectScopeAfter.status === 'active', 'intermediate close must not complete scope');
+    assert(checkpoint.projectScopeBefore.status === 'active', 'intermediate close must start from active scope');
+    assert(checkpoint.projectScopeAfter.status === 'planning', 'intermediate close must set projectScopeAfter=planning');
     assert(readJson(paths(root).sprint).handoff.nextAction === 'plan_sprint', 'intermediate close must route to plan_sprint');
+    assert(readJson(paths(root).project).scopes.find((scope) => scope.id === 'demo').status === 'planning', 'live scope after intermediate close must be planning');
     const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
     assert(doctor.status === 0 && output(doctor).includes('APPLIED:'), `intermediate checkpoint must classify APPLIED:\n${output(doctor)}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Intermediate close → repair → doctor remains APPLIED (idempotent repair).
+{
+  const root = makeSandbox({ intermediate: true });
+  try {
+    closeSuccessfully(root);
+    const repair = run(root, ['repair', '--kyro-scope', 'demo', '--confirm']);
+    assert(repair.status === 0, `repair after intermediate close failed:\n${output(repair)}`);
+    assert(readJson(paths(root).project).scopes.find((scope) => scope.id === 'demo').status === 'planning', 'repair must keep planning');
+    const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+    assert(doctor.status === 0 && output(doctor).includes('APPLIED:'), `doctor after repair must stay APPLIED:\n${output(doctor)}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Empty roadmap at close follows deriveScopeStatus → planning (pathological / hand-edited).
+{
+  const root = makeSandbox();
+  try {
+    const sprint = readJson(paths(root).sprint);
+    sprint.roadmap = { plannedSprintCount: 0, sprints: [] };
+    writeJson(paths(root).sprint, sprint);
+    const checkpoint = closeSuccessfully(root);
+    assert(checkpoint.projectScopeAfter.status === 'planning', 'empty roadmap must yield projectScopeAfter=planning under SSOT');
+    assert(readJson(paths(root).sprint).handoff.nextAction === 'done', 'empty roadmap remaining=0 must route handoff to done');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+const legacyFixtureDir = resolve(repo, 'fixtures/checkpoints/legacy-v1-intermediate-active-scope');
+
+/** Install frozen historical intermediate v1 residual-active checkpoint into a sandbox. */
+function installLegacyIntermediateFixture(root, { liveScopeStatus = 'planning' } = {}) {
+  const archiveDir = join(root, '.agents/kyro/scopes/demo/archive');
+  mkdirSync(archiveDir, { recursive: true });
+  const checkpointSrc = join(legacyFixtureDir, 'checkpoint.json');
+  const checkpointBytes = readFileSync(checkpointSrc);
+  writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.checkpoint.json'), checkpointBytes);
+  writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.json'), readFileSync(join(legacyFixtureDir, 'legacy-snapshot.json')));
+  writeFileSync(join(archiveDir, 'sprint-001-demo-sprint.md'), readFileSync(join(legacyFixtureDir, 'narrative.md')));
+  writeFileSync(paths(root).sprint, readFileSync(join(legacyFixtureDir, 'sprint-after.json')));
+  const project = readJson(join(legacyFixtureDir, 'project-after-close.json'));
+  const demo = project.scopes.find((scope) => scope.id === 'demo');
+  assert(demo, 'legacy fixture project missing demo scope');
+  demo.status = liveScopeStatus;
+  writeJson(paths(root).project, project);
+  return { checkpointBytes, checkpointPath: join(archiveDir, 'sprint-001-demo-sprint.checkpoint.json') };
+}
+
+// Frozen historical intermediate v1 residual active + live planning → APPLIED (legacy path).
+{
+  const root = makeSandbox({ intermediate: true });
+  try {
+    const { checkpointBytes, checkpointPath } = installLegacyIntermediateFixture(root, { liveScopeStatus: 'planning' });
+    const beforeSha = createHash('sha256').update(checkpointBytes).digest('hex');
+    const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+    const text = output(doctor);
+    assert(doctor.status === 0 && text.includes('APPLIED:'), `legacy intermediate fixture must classify APPLIED:\n${text}`);
+    assert(text.includes('legacy v1 intermediate scope status active→planning') || text.includes('active→planning'), `doctor must mention legacy normalization:\n${text}`);
+    const afterBytes = readFileSync(checkpointPath);
+    assert(createHash('sha256').update(afterBytes).digest('hex') === beforeSha, 'doctor must not rewrite frozen checkpoint bytes');
+    const repair = run(root, ['repair', '--kyro-scope', 'demo', '--confirm']);
+    assert(repair.status === 0, `repair on legacy fixture failed:\n${output(repair)}`);
+    assert(createHash('sha256').update(readFileSync(checkpointPath)).digest('hex') === beforeSha, 'repair must not rewrite frozen checkpoint bytes');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Frozen historical fixture + live title drift → DIVERGED.
+{
+  const root = makeSandbox({ intermediate: true });
+  try {
+    installLegacyIntermediateFixture(root, { liveScopeStatus: 'planning' });
+    const project = readJson(paths(root).project);
+    project.scopes = project.scopes.map((scope) => scope.id === 'demo' ? { ...scope, title: 'Tampered' } : scope);
+    writeJson(paths(root).project, project);
+    const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+    assert(doctor.status === 1 && output(doctor).includes('DIVERGED:'), `title drift must DIVERGE:\n${output(doctor)}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Frozen historical fixture + live blocked → DIVERGED.
+{
+  const root = makeSandbox({ intermediate: true });
+  try {
+    installLegacyIntermediateFixture(root, { liveScopeStatus: 'blocked' });
+    const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+    assert(doctor.status === 1 && output(doctor).includes('DIVERGED:'), `blocked live scope must DIVERGE:\n${output(doctor)}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// CAS/resume does not re-poison repaired planning with legacy residual active after.
+{
+  const root = makeSandbox({ intermediate: true });
+  try {
+    installLegacyIntermediateFixture(root, { liveScopeStatus: 'planning' });
+    // Retry close with same frozen inputs: live planning matches neither before(active) nor after(active) digests → fail closed.
+    const retry = run(root, closeArgs);
+    assert(retry.status === 1, `resume must not silently succeed against repaired planning:\n${output(retry)}`);
+    assert(
+      output(retry).includes('STATE_DIVERGED') || output(retry).includes('diverged') || output(retry).includes('DIVERGED') || output(retry).includes('matches neither'),
+      `resume must fail-closed:\n${output(retry)}`,
+    );
+    assert(readJson(paths(root).project).scopes.find((scope) => scope.id === 'demo').status === 'planning', 'resume must not re-poison live scope to active');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 

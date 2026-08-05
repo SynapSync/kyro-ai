@@ -17,6 +17,7 @@ import { projectStatePath, sprintJsonPath } from '../artifacts/paths';
 import { asProjectState, validateProjectStateShape, validateSprintFile } from '../artifacts/schema';
 import { PROJECT_STATE_PATH, KYRO_STATE_PATH } from '../constants';
 import { KyroCoreError, describeWriteFailure } from '../core/errors';
+import { deriveScopeStatus } from '../core/status';
 import {
   hasLayeredProjectStateOnDisk,
   hasMonolitoProjectStateOnDisk,
@@ -171,6 +172,7 @@ export function deriveSprintCloseTransition(
   const remaining = roadmapSprints.filter((sprint) => sprint.state !== 'closed').length;
   const intendedAfterClose: SprintFile = {
     ...beforeClose,
+    // Sprint-level status formula is intentionally unchanged (out of scope for intermediate scope fix).
     status: remaining === 0 ? 'completed' : beforeClose.status,
     ledger: [...beforeClose.ledger, ledgerEntry],
     previousSprint: {
@@ -189,10 +191,53 @@ export function deriveSprintCloseTransition(
       lastUpdated: closedAt,
     },
   };
-  return {
-    intendedAfterClose,
-    projectScopeAfter: remaining === 0 ? { ...projectScopeBefore, status: 'completed' } : { ...projectScopeBefore },
+  // Scope entry status uses the same SSOT as repair/status/analyze. Intermediate closes become
+  // planning; non-empty all-closed roadmaps become completed; empty roadmaps yield planning.
+  const projectScopeAfter: KyroScopeEntry = {
+    ...projectScopeBefore,
+    status: deriveScopeStatus(intendedAfterClose, false),
   };
+  return { intendedAfterClose, projectScopeAfter };
+}
+
+/**
+ * Historical intermediate checkpoint v1 residual shape (4.19.0–4.43.0): remaining sprints kept
+ * `projectScopeAfter.status = 'active'` by copying the before entry. New writes emit `planning`.
+ * Read-time validate/doctor accept this residual when the only material delta is that status field.
+ * There is no writer-version field on the checkpoint — match the observable shape only.
+ */
+export function isLegacyIntermediateActiveScopeAfter(checkpoint: SprintCloseCheckpointV1): boolean {
+  if (checkpoint.schemaVersion !== SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION) return false;
+  if (checkpoint.intendedAfterClose.activeSprint !== null) return false;
+  const roadmapSprints = checkpoint.intendedAfterClose.roadmap?.sprints ?? [];
+  // True intermediate: at least one non-closed sprint remains. Empty roadmap is not this residual.
+  if (!roadmapSprints.some((sprint) => sprint.state !== 'closed')) return false;
+  if (checkpoint.projectScopeAfter.status !== 'active') return false;
+  if (checkpoint.projectScopeBefore.id !== checkpoint.projectScopeAfter.id) return false;
+  if (checkpoint.projectScopeBefore.title !== checkpoint.projectScopeAfter.title) return false;
+  try {
+    const derived = deriveSprintCloseTransition(
+      checkpoint.beforeClose,
+      checkpoint.projectScopeBefore,
+      checkpoint.close,
+      checkpoint.createdAt,
+      checkpoint.paths.legacySnapshot,
+      checkpoint.paths.narrative,
+      // Path is only used for ledger relative paths in derivation; identity paths already validated.
+      `.agents/kyro/scopes/${checkpoint.identity.scope}/archive/sprint-${String(checkpoint.identity.sprintN).padStart(3, '0')}-${checkpoint.identity.sprintSlug}.checkpoint.json`,
+    );
+    if (derived.projectScopeAfter.status !== 'planning') return false;
+    const normalizedLegacy: KyroScopeEntry = { ...checkpoint.projectScopeAfter, status: 'planning' };
+    return canonicalJson(derived.projectScopeAfter) === canonicalJson(normalizedLegacy);
+  } catch {
+    return false;
+  }
+}
+
+/** Normalized live after-image for historical intermediate residual `active` → canonical `planning`. */
+export function legacyNormalizedProjectScopeAfter(checkpoint: SprintCloseCheckpointV1): KyroScopeEntry | null {
+  if (!isLegacyIntermediateActiveScopeAfter(checkpoint)) return null;
+  return { ...checkpoint.projectScopeAfter, status: 'planning' };
 }
 
 export function readSprintCloseCheckpoint(path: string): SprintCloseCheckpointV1 | null {
@@ -292,8 +337,14 @@ export function validateSprintCloseCheckpoint(value: unknown, path: string): str
       const derived = deriveSprintCloseTransition(typed.beforeClose, typed.projectScopeBefore, typed.close, typed.createdAt, typed.paths.legacySnapshot, typed.paths.narrative, path);
       const derivedLast = derived.intendedAfterClose.ledger[derived.intendedAfterClose.ledger.length - 1];
       if (derivedLast) derivedLast.checkpointSha256 = checkpointCommitment({ ...typed, intendedAfterClose: derived.intendedAfterClose });
-      if (canonicalJson(derived.intendedAfterClose) !== canonicalJson(typed.intendedAfterClose)) issues.push(`${path}:intendedAfterClose is not the authorized transition derived from beforeClose and frozen inputs`);
-      if (canonicalJson(derived.projectScopeAfter) !== canonicalJson(typed.projectScopeAfter)) issues.push(`${path}:projectScopeAfter is not the authorized transition`);
+      if (canonicalJson(derived.intendedAfterClose) !== canonicalJson(typed.intendedAfterClose)) {
+        issues.push(`${path}:intendedAfterClose is not the authorized transition derived from beforeClose and frozen inputs`);
+      }
+      const scopeAfterMismatch = canonicalJson(derived.projectScopeAfter) !== canonicalJson(typed.projectScopeAfter);
+      // Accept historical intermediate v1 residual active without rewriting the immutable checkpoint.
+      if (scopeAfterMismatch && !isLegacyIntermediateActiveScopeAfter(typed)) {
+        issues.push(`${path}:projectScopeAfter is not the authorized transition`);
+      }
     } catch (error) {
       issues.push(`${path}:semantic transition invalid (${error instanceof Error ? error.message : String(error)})`);
     }

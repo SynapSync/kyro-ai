@@ -1,0 +1,57 @@
+{
+  "n": 1,
+  "slug": "demo-sprint",
+  "title": "Demo Sprint",
+  "objective": "Ship demo sprint.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Demo Phase",
+      "objective": "Complete demo work.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "title": "Implement demo",
+          "description": "Implement the demo task.",
+          "files_to_touch": [
+            "src/demo.ts"
+          ],
+          "context": "Use the existing demo pattern.",
+          "acceptance_criteria": [
+            "Validation passes."
+          ],
+          "depends_on": [],
+          "status": "done",
+          "evidence": {
+            "summary": "done",
+            "validation": "ok",
+            "files_changed": [
+              "src/demo.ts"
+            ],
+            "notes": "",
+            "by": "maker",
+            "recordedAt": "2026-07-02T00:00:00.000Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Validation passes."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-07-02T00:01:00.000Z"
+          },
+          "scenario_refs": [
+            "SC-1"
+          ]
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "All tasks done."
+  ]
+}

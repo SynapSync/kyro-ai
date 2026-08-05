@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.43.1] - 2026-08-05
+
+### Fixed
+
+- **Intermediate sprint close left `projectScopeAfter.status = active` while repair derived `planning`.**
+  Since lossless checkpoint v1 (4.19.0), intermediate closes copied the before scope entry into the
+  after image. `deriveScopeStatus` and `kyro repair` correctly yield `planning` when no sprint is
+  active and roadmap work remains, so `doctor --artifacts` reported `DIVERGED: scope=other` after a
+  correct repair. New closes now set `projectScopeAfter.status` via `deriveScopeStatus` (`planning`
+  for intermediate and empty-roadmap edges; `completed` when every non-empty roadmap sprint is closed).
+  Historical intermediate residual-`active` checkpoints stay immutable: validate and doctor accept
+  the narrow shape at read time (live `planning` counts as applied after) without rewriting archives
+  or bumping `schemaVersion`.
+
+### Docs
+
+- Documented intermediate/final/empty-roadmap scope status and historical v1 residual compatibility
+  in `docs/sprint-close-checkpoints.md`.
+- Implementation plan: `docs/plans/plan-10-intermediate-close-scope-status.md`.
+
 ## [4.43.0] - 2026-08-05
 
 Second field incident. 4.42.0 worked as intended — the agent ran the Step 0 handshake and
