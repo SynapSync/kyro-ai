@@ -16,6 +16,21 @@ const PROCESS_STARTUP_BUDGET_MS = 15_000;
 const LEASE_EVENT_BUDGET_MS = 20_000;
 /** Short but CI-safe test lease: worker interval is lease/3 and must survive one delayed tick. */
 const CI_SAFE_TEST_LEASE_MS = '1000';
+/**
+ * Lease for cases that must OBSERVE a specific heartbeat event before the lease may expire.
+ *
+ * The worker renews every `lease/3`, so waiting on the Nth heartbeat burns `N/3` of the lease
+ * before the awaited event can even happen. At CI_SAFE_TEST_LEASE_MS with N=2 that leaves ~334ms
+ * of absolute slack for Worker spin-up plus two renewals — enough on Linux, not on a loaded Windows
+ * runner, where the owner's liveness check fail-stopped ("Lease heartbeat expired or changed")
+ * before the injected exit ever ran and the test read it as "worker did not perform injected raw
+ * exit". Same commit, green on one run and red on the next.
+ *
+ * 5000ms keeps the same 2-renewal semantics with ~1667ms of slack (interval 1666ms, two beats at
+ * ~3333ms). Only for tests that wait on a heartbeat-produced file; cases that merely assert the
+ * owner was fenced pass under either failure path and should stay on the short lease.
+ */
+const OBSERVED_HEARTBEAT_LEASE_MS = '5000';
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function readJson(path) { return JSON.parse(readFileSync(path, 'utf8')); }
@@ -795,7 +810,9 @@ for (const mode of ['corrupt', 'unsupported']) {
     const mainGate = join(root, 'raw-exit-main-gate');
     const rawExitReady = join(root, 'raw-worker-exited');
     const holder = runAsync(root, closeArgs, {
-      KYRO_TEST_LOCK_LEASE_MS: '1000',
+      // Waits on rawExitReady, which the worker only writes on its 2nd renewal — see
+      // OBSERVED_HEARTBEAT_LEASE_MS for why the short lease races this on Windows CI.
+      KYRO_TEST_LOCK_LEASE_MS: OBSERVED_HEARTBEAT_LEASE_MS,
       KYRO_TEST_LOCK_READY_FILE: ready,
       KYRO_TEST_LOCK_RELEASE_GATE: mainGate,
       KYRO_TEST_LOCK_HEARTBEAT_RAW_EXIT_AFTER: '2',
