@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { AGENT_SKILLS_ROOT, COMMAND_NAMES, PACKAGE_ROOT } from '../constants';
+import { buildCommandSkill } from '../adapters/command-skills';
 import { resolveManagedPath } from '../fs';
 import type { CheckResult } from '../types';
 
@@ -355,12 +356,22 @@ function heaviestAnalysisHelperPath(): string | null {
   return helper?.path ?? null;
 }
 
+/**
+ * Weight the projected command router that sits at the head of every runtime path.
+ *
+ * When the runtime is installed, weigh the real file. When it is not — a bare checkout, which is
+ * how CI runs — fall back to `buildCommandSkill()`, the exact generator install uses, so both
+ * environments measure the same thing.
+ *
+ * This used to fall back to a hand-written 34-word literal while the real projection is ~134 words.
+ * CI therefore read ~134 tokens lower per path than any machine with Kyro installed, and 4.42.0
+ * shipped ceilings that passed CI while `kyro doctor --tokens` failed for real users. Deriving the
+ * fallback from the generator makes that drift impossible.
+ */
 function weightProjectedCommandSkill(command: CommandName): WeightedFile {
   const managedPath = `${AGENT_SKILLS_ROOT}/kyro-${command}/SKILL.md`;
   if (existsSync(resolveManagedPath(managedPath))) return weightManagedFile(managedPath);
-  const title = command === 'task-context' ? 'Kyro Task Context' : `Kyro ${command}`;
-  const text = `---\nname: kyro-${command}\ndescription: Kyro command stub\n---\n# ${title}\nRead the Kyro command router, then load only the files requested by that router. Do not ask the user to restate the workflow.`;
-  return buildWeightedFile(`projected:${command}`, text);
+  return buildWeightedFile(`projected:${command}`, buildCommandSkill(command));
 }
 
 function isString(value: string | null): value is string {

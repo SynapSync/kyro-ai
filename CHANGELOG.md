@@ -26,6 +26,22 @@ CLI once, and wrote a 14.7 KB `sprint.json` with no `schemaVersion` and no `hand
 - `check:startup-contract` keeps the handshake in sync across `agents/orchestrator.md` and
   `skills/sprint-forge/SKILL.md`; `check:sprint-guard` covers the guard's 20-case allow/block matrix.
 
+### Added
+
+- `check:token-budgets` runs the token-audit assertions inside `npm run check`. Previously the only
+  budget gate was `check:tokens` (`doctor --tokens`), which also runs environment-dependent doctor
+  checks — installed runtime version, CLI capabilities, project state — so it could not be wired into
+  the local suite without going red for unrelated reasons. Budget regressions therefore surfaced only
+  in CI, which is exactly how 4.42.0 shipped a `SKILL.md` 363 words over its ceiling.
+
+### Fixed
+
+- The token auditor measured a different runtime path depending on the machine. With no runtime
+  installed it fell back to a hand-written 34-word stub for the projected command router, while the
+  real projection is ~134 words — so CI read ~134 tokens lower per path than any machine with Kyro
+  installed. The fallback now comes from `buildCommandSkill()`, the same generator install uses; CI
+  and a real machine agree to within a token.
+
 ### Changed
 
 - Token budgets raised to fit the Step 0 startup contract, which `SKILL.md` now carries on every
