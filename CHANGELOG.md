@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [Unreleased]
+
+### Fixed
+
+- **Windows CI flake: TUI adapter install lost the state-writer lease mid-apply.**
+  Full standard-adapter install performs hundreds of durable writes under one lease. Default 5s
+  was fine on unloaded Linux but intermittent on Windows matrix runners (Node 20/22) when heartbeat
+  renewals lagged under fsync load. The TUI install regression now uses a 60s test lease; reclaim
+  tests keep short leases.
+
 ## [4.43.3] - 2026-08-05
 
 ### Fixed
