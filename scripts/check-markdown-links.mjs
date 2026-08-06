@@ -84,7 +84,7 @@ function checkFile(filePath) {
 const patterns = [
   'README.md',
   'docs',
-  'skills',
+  'internal/skills',
   'agents',
   'commands',
 ];

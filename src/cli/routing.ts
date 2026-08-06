@@ -34,7 +34,8 @@ export function resolveRoute(nextAction: NextAction, packMode: ContextPackMode =
 }
 
 export function routeModePath(mode: string): string {
-  return join(PACKAGE_ROOT, 'skills/sprint-forge/assets/modes', mode);
+  const skillsRoot = existsSync(join(PACKAGE_ROOT, 'internal/skills')) ? 'internal/skills' : 'skills';
+  return join(PACKAGE_ROOT, skillsRoot, 'sprint-forge/assets/modes', mode);
 }
 
 export function validateRoutingTableModes(): string[] {

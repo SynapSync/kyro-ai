@@ -24,11 +24,12 @@ kyro-ai/
 │   ├── idea.md       # /kyro:idea — idea maturation pre-scope (optional)
 │   ├── qa.md         # /kyro:qa — certification and quality audit (independent)
 │   └── task-context.md # /kyro:task-context — fresh-context continuation prompt
-├── skills/           # 4 skills
+├── internal/skills/  # 4 workflow engines; not Claude slash commands
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │   ├── seedbed/           # Idea maturation pre-scope — matures a rough idea into a structured brief (loaded only via /kyro:idea)
 │   ├── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 │   └── kyro-sprint-executor/ # Strict standalone sprint executor for external hosts — projected to agent skill roots on install/sync
+├── providers/claude/commands/ # 5 public Claude wrappers over canonical command routers
 ├── .claude-plugin/   # Claude Code adapter packaging
 │   ├── plugin.json   # Plugin manifest (version must match package.json)
 │   ├── marketplace.json # Marketplace listing metadata

@@ -84,10 +84,10 @@ export function runTokenAuditChecks(): CheckResult[] {
   const checks: CheckResult[] = [];
   checks.push(...checkCommandRouters());
   checks.push(checkRuntimeAssetBudget('agents/orchestrator.md', TOKEN_BUDGET.orchestratorWords, 'orchestrator agent'));
-  checks.push(checkRuntimeAssetBudget('skills/sprint-forge/SKILL.md', TOKEN_BUDGET.sprintForgeSkillWords, 'sprint-forge skill'));
-  checks.push(checkRuntimeAssetBudget('skills/seedbed/SKILL.md', TOKEN_BUDGET.seedbedSkillWords, 'seedbed skill'));
+  checks.push(checkRuntimeAssetBudget('internal/skills/sprint-forge/SKILL.md', TOKEN_BUDGET.sprintForgeSkillWords, 'sprint-forge skill'));
+  checks.push(checkRuntimeAssetBudget('internal/skills/seedbed/SKILL.md', TOKEN_BUDGET.seedbedSkillWords, 'seedbed skill'));
   checks.push(...checkModeFiles());
-  checks.push(checkRuntimeAssetBudget('skills/seedbed/assets/modes/idea.md', TOKEN_BUDGET.seedbedModeWords, 'seedbed mode'));
+  checks.push(checkRuntimeAssetBudget('internal/skills/seedbed/assets/modes/idea.md', TOKEN_BUDGET.seedbedModeWords, 'seedbed mode'));
   checks.push(...checkSeedbedHelperBudgets());
   checks.push(checkInitModeBudget());
   checks.push(...checkAnalysisHelperBudgets());
@@ -115,7 +115,7 @@ function checkCommandRouters(): CheckResult[] {
 }
 
 function checkModeFiles(): CheckResult[] {
-  return listPackageFiles('skills/sprint-forge/assets/modes', '.md').map((file) => {
+  return listPackageFiles('internal/skills/sprint-forge/assets/modes', '.md').map((file) => {
     const weighted = weightPackageFile(file);
     const budget = file.endsWith('/INIT.md') ? TOKEN_BUDGET.initModeWords : TOKEN_BUDGET.modeFileWords;
     if (weighted.words > budget) {
@@ -126,7 +126,7 @@ function checkModeFiles(): CheckResult[] {
 }
 
 function checkInitModeBudget(): CheckResult {
-  const file = 'skills/sprint-forge/assets/modes/INIT.md';
+  const file = 'internal/skills/sprint-forge/assets/modes/INIT.md';
   const weighted = weightPackageFile(file);
   if (weighted.words > TOKEN_BUDGET.initModeWords) {
     return warn('token budget: INIT mode', `${file} has ${weighted.words} words`, 'Keep INIT as a router; move work-type guidance into analysis helpers.');
@@ -135,7 +135,7 @@ function checkInitModeBudget(): CheckResult {
 }
 
 function checkAnalysisHelperBudgets(): CheckResult[] {
-  return listPackageFiles('skills/sprint-forge/assets/helpers/analysis', '.md').map((file) => {
+  return listPackageFiles('internal/skills/sprint-forge/assets/helpers/analysis', '.md').map((file) => {
     const weighted = weightPackageFile(file);
     if (weighted.words > TOKEN_BUDGET.analysisHelperWords) {
       return warn('token budget: analysis helper', `${file} has ${weighted.words} words`, 'Keep each work-type helper focused on routing, findings, and sizing signals.');
@@ -145,7 +145,7 @@ function checkAnalysisHelperBudgets(): CheckResult[] {
 }
 
 function checkSeedbedHelperBudgets(): CheckResult[] {
-  return listPackageFiles('skills/seedbed/assets/helpers', '.md').map((file) =>
+  return listPackageFiles('internal/skills/seedbed/assets/helpers', '.md').map((file) =>
     checkRuntimeAssetBudget(file, TOKEN_BUDGET.seedbedHelperWords, 'seedbed helper'),
   );
 }
@@ -189,7 +189,7 @@ function checkAgentsBlockBudget(): CheckResult {
 }
 
 function checkStartupBudget(): CheckResult {
-  const files = ['commands/forge.md', 'skills/sprint-forge/assets/modes/SPRINT.md'];
+  const files = ['commands/forge.md', 'internal/skills/sprint-forge/assets/modes/SPRINT.md'];
   const total = sumEstimatedTokens(files.map(weightPackageFile));
   if (total > TOKEN_BUDGET.startupTokens) {
     return warn('token budget: startup path', `${total}/${TOKEN_BUDGET.startupTokens} estimated tokens`, 'Reduce forge router or sprint router startup instructions.');
@@ -210,9 +210,9 @@ function checkInitHappyPathBudget(): CheckResult {
   // INIT loads only the INIT mode + one routed analysis helper.
   const baseFiles = [
     'commands/forge.md',
-    'skills/sprint-forge/assets/modes/INIT.md',
+    'internal/skills/sprint-forge/assets/modes/INIT.md',
   ].map(weightPackageFile);
-  const heaviestHelper = listPackageFiles('skills/sprint-forge/assets/helpers/analysis', '.md').map(weightPackageFile).sort((a, b) => b.estimatedTokens - a.estimatedTokens)[0];
+  const heaviestHelper = listPackageFiles('internal/skills/sprint-forge/assets/helpers/analysis', '.md').map(weightPackageFile).sort((a, b) => b.estimatedTokens - a.estimatedTokens)[0];
   const files = heaviestHelper ? [...baseFiles, heaviestHelper] : baseFiles;
   const total = sumEstimatedTokens(files);
   if (total > TOKEN_BUDGET.initHappyPathTokens) {
@@ -255,7 +255,7 @@ function checkForbiddenRuntimeLoading(): CheckResult[] {
     checks.push(pass('runtime loading: orchestrator sprint route', 'SPRINT route is mode-only'));
   }
 
-  const kyroRuntimeFiles = listPackageFiles('skills/sprint-forge', '.md');
+  const kyroRuntimeFiles = listPackageFiles('internal/skills/sprint-forge', '.md');
   if (kyroRuntimeFiles.some((file) => /ad3c-cycle\.md$/i.test(file))) {
     checks.push(fail('runtime loading: AD3C workflow', 'sprint-forge still packages ad3c-cycle.md', 'Remove AD3C from Kyro runtime while preserving standalone skills.'));
   } else {
@@ -265,19 +265,19 @@ function checkForbiddenRuntimeLoading(): CheckResult[] {
 }
 
 function runtimePathDefinitions(): RuntimePathDefinition[] {
-  const commonForge = ['commands/forge.md', 'agents/orchestrator.md', 'skills/sprint-forge/SKILL.md'];
+  const commonForge = ['commands/forge.md', 'agents/orchestrator.md', 'internal/skills/sprint-forge/SKILL.md'];
   const commonSprintForbidden = [
-    'skills/sprint-forge/assets/helpers/sprint-generator.md',
-    'skills/sprint-forge/assets/helpers/debt-tracker.md',
-    'skills/sprint-forge/assets/helpers/learner.md',
+    'internal/skills/sprint-forge/assets/helpers/sprint-generator.md',
+    'internal/skills/sprint-forge/assets/helpers/debt-tracker.md',
+    'internal/skills/sprint-forge/assets/helpers/learner.md',
   ];
   return [
     {
       name: 'runtime path: kyro-forge:init',
       budget: TOKEN_BUDGET.runtimeForgeInitTokens,
       projectedSkill: 'forge',
-      files: [...commonForge, 'skills/sprint-forge/assets/modes/INIT.md', heaviestAnalysisHelperPath()].filter(isString),
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md'],
+      files: [...commonForge, 'internal/skills/sprint-forge/assets/modes/INIT.md', heaviestAnalysisHelperPath()].filter(isString),
+      forbiddenFiles: ['internal/skills/sprint-forge/assets/helpers/sprint-generator.md', 'internal/skills/sprint-forge/assets/helpers/debt-tracker.md'],
     },
     {
       name: 'runtime path: kyro-forge:init-seedbed',
@@ -285,46 +285,46 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       projectedSkill: 'forge',
       files: [
         ...commonForge,
-        'skills/sprint-forge/assets/modes/INIT.md',
+        'internal/skills/sprint-forge/assets/modes/INIT.md',
         heaviestAnalysisHelperPath(),
-        'skills/sprint-forge/assets/helpers/seedbed-init-mapping.md',
+        'internal/skills/sprint-forge/assets/helpers/seedbed-init-mapping.md',
       ].filter(isString),
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md'],
+      forbiddenFiles: ['internal/skills/sprint-forge/assets/helpers/sprint-generator.md', 'internal/skills/sprint-forge/assets/helpers/debt-tracker.md'],
     },
     {
       name: 'runtime path: kyro-forge:plan',
       budget: TOKEN_BUDGET.runtimeForgePlanTokens,
       projectedSkill: 'forge',
-      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/plan-sprint.md', 'skills/sprint-forge/assets/helpers/sprint-generator.md'],
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/learner.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
+      files: [...commonForge, 'internal/skills/sprint-forge/assets/modes/SPRINT.md', 'internal/skills/sprint-forge/assets/modes/plan-sprint.md', 'internal/skills/sprint-forge/assets/helpers/sprint-generator.md'],
+      forbiddenFiles: ['internal/skills/sprint-forge/assets/helpers/learner.md', 'internal/skills/sprint-forge/assets/helpers/reviewer.md'],
     },
     {
       name: 'runtime path: kyro-forge:execute',
       budget: TOKEN_BUDGET.runtimeForgeExecuteTokens,
       projectedSkill: 'forge',
-      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/execute-task.md'],
+      files: [...commonForge, 'internal/skills/sprint-forge/assets/modes/SPRINT.md', 'internal/skills/sprint-forge/assets/modes/execute-task.md'],
       forbiddenFiles: commonSprintForbidden,
     },
     {
       name: 'runtime path: kyro-forge:review',
       budget: TOKEN_BUDGET.runtimeForgeReviewTokens,
       projectedSkill: 'forge',
-      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/review-task.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/learner.md'],
+      files: [...commonForge, 'internal/skills/sprint-forge/assets/modes/SPRINT.md', 'internal/skills/sprint-forge/assets/modes/review-task.md', 'internal/skills/sprint-forge/assets/helpers/reviewer.md'],
+      forbiddenFiles: ['internal/skills/sprint-forge/assets/helpers/sprint-generator.md', 'internal/skills/sprint-forge/assets/helpers/learner.md'],
     },
     {
       name: 'runtime path: kyro-forge:close',
       budget: TOKEN_BUDGET.runtimeForgeCloseTokens,
       projectedSkill: 'forge',
-      files: [...commonForge, 'skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/modes/close-sprint.md', 'skills/sprint-forge/assets/helpers/debt-tracker.md', 'skills/sprint-forge/assets/helpers/learner.md'],
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md'],
+      files: [...commonForge, 'internal/skills/sprint-forge/assets/modes/SPRINT.md', 'internal/skills/sprint-forge/assets/modes/close-sprint.md', 'internal/skills/sprint-forge/assets/helpers/debt-tracker.md', 'internal/skills/sprint-forge/assets/helpers/learner.md'],
+      forbiddenFiles: ['internal/skills/sprint-forge/assets/helpers/sprint-generator.md'],
     },
     {
       name: 'runtime path: kyro-status:brief',
       budget: TOKEN_BUDGET.runtimeStatusBriefTokens,
       projectedSkill: 'status',
       files: ['commands/status.md', 'agents/orchestrator.md'],
-      forbiddenFiles: ['skills/sprint-forge/assets/modes/SPRINT.md', 'skills/sprint-forge/assets/helpers/sprint-generator.md'],
+      forbiddenFiles: ['internal/skills/sprint-forge/assets/modes/SPRINT.md', 'internal/skills/sprint-forge/assets/helpers/sprint-generator.md'],
     },
     {
       name: 'runtime path: kyro-idea',
@@ -332,27 +332,27 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       projectedSkill: 'idea',
       files: [
         'commands/idea.md',
-        'skills/seedbed/SKILL.md',
-        'skills/seedbed/assets/modes/idea.md',
-        'skills/seedbed/assets/helpers/classification-and-synthesis.md',
-        'skills/seedbed/assets/helpers/material-questions.md',
-        'skills/seedbed/assets/helpers/quality-rubric.md',
-        'skills/seedbed/assets/templates/matured-idea.md',
+        'internal/skills/seedbed/SKILL.md',
+        'internal/skills/seedbed/assets/modes/idea.md',
+        'internal/skills/seedbed/assets/helpers/classification-and-synthesis.md',
+        'internal/skills/seedbed/assets/helpers/material-questions.md',
+        'internal/skills/seedbed/assets/helpers/quality-rubric.md',
+        'internal/skills/seedbed/assets/templates/matured-idea.md',
       ],
-      forbiddenFiles: ['agents/orchestrator.md', 'skills/sprint-forge/assets/modes/SPRINT.md'],
+      forbiddenFiles: ['agents/orchestrator.md', 'internal/skills/sprint-forge/assets/modes/SPRINT.md'],
     },
     {
       name: 'runtime path: kyro-task-context',
       budget: TOKEN_BUDGET.runtimeTaskContextTokens,
       projectedSkill: 'task-context',
       files: ['commands/task-context.md', 'agents/orchestrator.md'],
-      forbiddenFiles: ['skills/sprint-forge/assets/helpers/sprint-generator.md', 'skills/sprint-forge/assets/helpers/reviewer.md'],
+      forbiddenFiles: ['internal/skills/sprint-forge/assets/helpers/sprint-generator.md', 'internal/skills/sprint-forge/assets/helpers/reviewer.md'],
     },
   ];
 }
 
 function heaviestAnalysisHelperPath(): string | null {
-  const helper = listPackageFiles('skills/sprint-forge/assets/helpers/analysis', '.md').map(weightPackageFile).sort((a, b) => b.estimatedTokens - a.estimatedTokens)[0];
+  const helper = listPackageFiles('internal/skills/sprint-forge/assets/helpers/analysis', '.md').map(weightPackageFile).sort((a, b) => b.estimatedTokens - a.estimatedTokens)[0];
   return helper?.path ?? null;
 }
 
@@ -379,7 +379,7 @@ function isString(value: string | null): value is string {
 }
 
 function checkSizingDecisionFixture(): CheckResult {
-  const file = 'skills/sprint-forge/assets/fixtures/subcommands-and-reports.sizingDecision.json';
+  const file = 'internal/skills/sprint-forge/assets/fixtures/subcommands-and-reports.sizingDecision.json';
   const absolutePath = resolve(PACKAGE_ROOT, file);
   if (!existsSync(absolutePath)) {
     return fail('sizingDecision fixture', `${file} missing`, 'Add the subcommands-and-reports regression fixture.');
@@ -449,8 +449,8 @@ function reportHeaviestFiles(): CheckResult {
   const files = [
     ...listPackageFiles('commands', '.md'),
     ...listPackageFiles('agents', '.md'),
-    ...listPackageFiles('skills/sprint-forge', '.md'),
-    ...listPackageFiles('skills/seedbed', '.md'),
+    ...listPackageFiles('internal/skills/sprint-forge', '.md'),
+    ...listPackageFiles('internal/skills/seedbed', '.md'),
   ].map(weightPackageFile).sort((a, b) => b.words - a.words).slice(0, 8);
   return pass('token audit: heaviest files', formatWeightedList(files));
 }

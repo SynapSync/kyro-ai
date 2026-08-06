@@ -25,6 +25,21 @@ kyro uninstall          # Remove managed workspace assets, preserving scope arti
 
 `npx kyro-ai@latest` resolves to the same CLI entrypoint. Prefer **`@latest`** for install/sync so clients do not reuse a stale npx cache; pin an explicit version only when you need reproducibility.
 
+### Interactive TUI by package root
+
+The no-argument TUI is package-root-aware:
+
+| CLI root | Available actions |
+| --- | --- |
+| Full npm package (`npx kyro-ai`, global package binary) | Install standard, OpenCode, or Codex adapter; Doctor; Exit |
+| Projected runtime (`node ~/.agents/kyro/current/dist/cli.js`) | Doctor; Exit; full-package installation remedy |
+| Unrecognized or corrupt root | Doctor; Exit; full-package recovery remedy |
+
+The projected runtime is the canonical entrypoint for normal workflow commands, but it intentionally
+cannot install or synchronize package assets. Run install/sync from `npx kyro-ai@latest` or a verified
+global package instead. The restricted TUI never presents unavailable package actions and does not
+acquire the writer lock merely to reject them.
+
 ## Maintenance Scripts
 
 Kyro provides npm scripts for validating generated artifacts and adapter behavior. These are used both locally and in CI.

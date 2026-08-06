@@ -62,7 +62,7 @@ export function getFullSkillPathForRoot(skill: ProjectedFullSkillName, skillsRoo
  * runtimeVersion in the frontmatter so checkSkillRuntimeSkew covers it like the command stubs.
  */
 export function buildFullSkill(skill: ProjectedFullSkillName): string {
-  const source = readPackageText(`skills/${skill}/SKILL.md`);
+  const source = readPackageText(`internal/skills/${skill}/SKILL.md`);
   const cli = resolveKyroInvocation().raw;
   const substituted = source.replaceAll('{{KYRO_CLI}}', cli);
   const packageVersion = readPackageVersion();

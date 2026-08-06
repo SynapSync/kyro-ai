@@ -11,7 +11,7 @@
     {
       "name": "kyro-ai",
       "source": "./",
-      "description": "Claude Code adapter for Kyro: one orchestrator agent, 5 slash commands (including evidence-grounded idea maturation and independent QA certification), 4 skills, markdown artifacts, formal debt tracking, runtime context-pack CLI with cliRecipes, tool-owned scenario/ADR/evidence/review/close verbs, deterministic evals, MCP typed tools, portable guardrails, maker/checker gates, and ledger-aware spec traceability.",
+      "description": "Claude Code adapter for Kyro: 5 public slash commands with internal workflow engines hidden from the command menu, markdown artifacts, formal debt tracking, runtime context-pack CLI with cliRecipes, tool-owned scenario/ADR/evidence/review/close verbs, deterministic evals, MCP typed tools, portable guardrails, maker/checker gates, and ledger-aware spec traceability.",
       "author": {
         "name": "SynapSync"
       },

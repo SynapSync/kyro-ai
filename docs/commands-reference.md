@@ -36,7 +36,7 @@ Repository `check:seedbed` is a deterministic structural contract test: it valid
 
 ### Routing and safety
 
-`/kyro:idea` bypasses the orchestrator and loads `skills/seedbed/assets/modes/idea.md` directly. It must not read or modify layered project state (`.agents/kyro/project.json`, `local.json`), `.agents/kyro/scopes/`, any `sprint.json`, secrets, or installed runtime state. User-provided documents and authorized read-only source, tests, schemas, manifests, docs, and history are valid grounding sources.
+`/kyro:idea` bypasses the orchestrator and loads `internal/skills/seedbed/assets/modes/idea.md` directly. It must not read or modify layered project state (`.agents/kyro/project.json`, `local.json`), `.agents/kyro/scopes/`, any `sprint.json`, secrets, or installed runtime state. User-provided documents and authorized read-only source, tests, schemas, manifests, docs, and history are valid grounding sources.
 
 ### After maturing
 

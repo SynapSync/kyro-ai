@@ -84,7 +84,11 @@ Kyro preserves existing `opencode.json` content and owns only `agent.kyro-orches
 
 ## Claude
 
-Claude plugin support remains first-class through `.claude-plugin/`. The CLI adapter path complements the plugin; it does not retire it.
+Claude plugin support remains first-class through `.claude-plugin/`. Its public surface is exactly
+`/kyro-ai:forge`, `/kyro-ai:status`, `/kyro-ai:task-context`, `/kyro-ai:idea`, and `/kyro-ai:qa`.
+Provider wrappers delegate to the canonical command routers; `sprint-forge`, `seedbed`, `qa-review`,
+and `kyro-sprint-executor` remain internal assets and must not appear in Claude's command menu. The
+CLI adapter path complements the plugin; it does not retire it.
 
 ## Cursor
 
