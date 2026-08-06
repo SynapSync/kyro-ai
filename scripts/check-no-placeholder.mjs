@@ -107,7 +107,7 @@ withWorkspace('kyro-no-placeholder-', (cwd) => {
 
 // --- 2. Source-side assertion: placeholder present, no bare literal invocation ---
 
-const sourceRoots = [join(repo, 'skills'), join(repo, 'agents')];
+const sourceRoots = [join(repo, 'internal', 'skills'), join(repo, 'agents')];
 let placeholderFilesFound = 0;
 
 for (const root of sourceRoots) {

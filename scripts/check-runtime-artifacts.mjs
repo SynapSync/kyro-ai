@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 // Fail the build if it references any non-model artifact filename as something to read or write.
 
 const repo = resolve(new URL('..', import.meta.url).pathname);
-const ROOTS = ['agents', 'commands', 'skills'];
+const ROOTS = ['agents', 'commands', 'internal/skills'];
 const SKIP_DIRS = new Set(['node_modules']);
 const SKIP_FILES = new Set(['manifest.json']);
 

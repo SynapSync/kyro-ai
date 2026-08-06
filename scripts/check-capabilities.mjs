@@ -50,7 +50,7 @@ function walk(dir) {
 {
   const payload = JSON.parse(run(['capabilities', '--json']).stdout);
   const referenced = new Set();
-  for (const dir of ['skills', 'agents', 'commands']) {
+  for (const dir of ['internal/skills', 'agents', 'commands']) {
     for (const file of walk(resolve(repo, dir))) {
       if (!file.endsWith('.md')) continue;
       const body = readFileSync(file, 'utf-8');

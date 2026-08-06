@@ -194,8 +194,8 @@ v2.0: User command -> orchestrator
 |-----------|----------|
 | Commands | `commands/` |
 | Orchestrator | `agents/orchestrator.md` |
-| Sprint workflow skill | `skills/sprint-forge/` |
-| QA review skill | `skills/qa-review/` |
-| Templates | `skills/sprint-forge/assets/templates/` |
+| Sprint workflow skill | `internal/skills/sprint-forge/` |
+| QA review skill | `internal/skills/qa-review/` |
+| Templates | `internal/skills/sprint-forge/assets/templates/` |
 | Scope rules | `{scope}/sprint.json.conventions[]`, written by `kyro rule add` |
 | Global rules | `.agents/kyro/project.json.conventions[]`, written by `kyro rule add --global` |

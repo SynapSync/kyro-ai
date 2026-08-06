@@ -140,7 +140,7 @@ function buildInstallPlanForMode(
   const substitutions = { [KYRO_CLI_PLACEHOLDER]: kyroInvocation };
   addCopyDirectoryPlan(plan, 'agents', `${runtimeRoot}/core/agents`, substitutions);
   addCopyDirectoryPlan(plan, 'commands', `${runtimeRoot}/commands`);
-  addCopyDirectoryPlan(plan, 'skills', `${runtimeRoot}/skills`, substitutions);
+  addCopyDirectoryPlan(plan, 'internal/skills', `${runtimeRoot}/skills`, substitutions);
   addCopyFilePlan(plan, 'config.json', `${runtimeRoot}/core/config.json`);
   addCopyFilePlan(plan, 'WORKFLOW.yaml', `${runtimeRoot}/core/WORKFLOW.yaml`);
 
@@ -261,7 +261,7 @@ function buildManagedFiles(agents: Agent[], runtimeRoot: string): string[] {
 
   files.push(...listRelativeFiles('agents').map((file) => `${runtimeRoot}/core/agents/${file}`));
   files.push(...listRelativeFiles('commands').map((file) => `${runtimeRoot}/commands/${file}`));
-  files.push(...listRelativeFiles('skills').map((file) => `${runtimeRoot}/skills/${file}`));
+  files.push(...listRelativeFiles('internal/skills').map((file) => `${runtimeRoot}/skills/${file}`));
   files.push(...listRelativeFiles('dist').map((file) => `${runtimeRoot}/dist/${file}`));
   files.push(`${runtimeRoot}/package.json`, `${runtimeRoot}/config.json`);
 

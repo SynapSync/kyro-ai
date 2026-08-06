@@ -185,8 +185,8 @@ function output(result) {
 
 // 7) Agent-facing instructions own the ambiguity: ask about global, then call the CLI; no hand-edit.
 {
-  const learner = readFileSync(resolve(repo, 'skills/sprint-forge/assets/helpers/learner.md'), 'utf-8');
-  const executor = readFileSync(resolve(repo, 'skills/kyro-sprint-executor/SKILL.md'), 'utf-8');
+  const learner = readFileSync(resolve(repo, 'internal/skills/sprint-forge/assets/helpers/learner.md'), 'utf-8');
+  const executor = readFileSync(resolve(repo, 'internal/skills/kyro-sprint-executor/SKILL.md'), 'utf-8');
   for (const [name, body] of [['learner', learner], ['executor', executor]]) {
     assert(body.includes('{{KYRO_CLI}} rule add'), `${name} must direct agents to the rule command`);
     assert(/ask.+global/i.test(body), `${name} must tell agents to ask about global persistence`);

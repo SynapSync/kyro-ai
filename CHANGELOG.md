@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.43.3] - 2026-08-05
+
+### Fixed
+
+- **Claude exposed Kyro's internal workflow engines as user slash commands.** Claude Code always
+  auto-discovers a plugin-root `skills/` directory, and the manifest's `skills` field adds paths
+  instead of acting as a whitelist. The plugin therefore registered nine skills: the five public
+  commands plus `sprint-forge`, `seedbed`, `qa-review`, and `kyro-sprint-executor`. Packaged engines
+  now live under `internal/skills/`; Claude registers five provider wrappers that delegate to the
+  canonical routers, while runtime installation still projects the engines to the stable
+  `~/.agents/kyro/current/skills/` path for Standard, Codex, and OpenCode.
+
+### Tests
+
+- Added `check:claude-plugin-surface` to enforce exactly five Claude commands, no plugin-root
+  `skills/`, no registered internal agents, wrapper parity with canonical routers, and presence of
+  every internal engine source.
+- Certified the local marketplace with Claude Code's validator and isolated plugin inventory:
+  five skills (`forge`, `idea`, `qa`, `status`, `task-context`), zero agents, and no internal names.
+
 ## [4.43.2] - 2026-08-05
 
 ### Fixed
