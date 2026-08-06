@@ -288,6 +288,33 @@ function closeSuccessfully(root) {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
+// Post-close rule add evolves live sprint but must not DIVERGE a ledger-anchored close.
+{
+  const root = makeSandbox({ intermediate: true });
+  try {
+    closeSuccessfully(root);
+    const rule = run(root, [
+      'rule', 'add',
+      '--rule', 'When adding emergent tasks, attach scenario_refs for traceability.',
+      '--tag', 'process',
+      '--kyro-scope', 'demo',
+    ]);
+    assert(rule.status === 0, `rule add after close failed:\n${output(rule)}`);
+    const sprint = readJson(paths(root).sprint);
+    assert(Array.isArray(sprint.conventions) && sprint.conventions.length >= 1, 'rule must remain on live sprint');
+    const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+    const text = output(doctor);
+    assert(doctor.status === 0 && text.includes('APPLIED:'), `post-close rule must stay APPLIED:\n${text}`);
+    assert(text.includes('post-close evolution'), `doctor should label post-close evolution:\n${text}`);
+    // repair must not wipe the new convention
+    const repair = run(root, ['repair', '--kyro-scope', 'demo', '--confirm']);
+    assert(repair.status === 0, `repair after rule add failed:\n${output(repair)}`);
+    assert(readJson(paths(root).sprint).conventions.length >= 1, 'repair must not wipe post-close conventions');
+    const doctor2 = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+    assert(doctor2.status === 0 && output(doctor2).includes('APPLIED:'), `doctor after repair+rule must stay APPLIED:\n${output(doctor2)}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
 // Empty roadmap at close follows deriveScopeStatus → planning (pathological / hand-edited).
 {
   const root = makeSandbox();

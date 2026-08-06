@@ -6,15 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [Unreleased]
+## [4.43.4] - 2026-08-06
 
 ### Fixed
 
-- **Windows CI flake: TUI adapter install lost the state-writer lease mid-apply.**
-  Full standard-adapter install performs hundreds of durable writes under one lease. Default 5s
-  was fine on unloaded Linux but intermittent on Windows matrix runners (Node 20/22) when heartbeat
-  renewals lagged under fsync load. The TUI install regression now uses a 60s test lease; reclaim
-  tests keep short leases.
+- **Doctor false DIVERGED after legitimate post-close mutations (e.g. `kyro rule add`).**
+  Live `sprint.json` may evolve after a successful close while the ledger still anchors the
+  checkpoint. Doctor now reports APPLIED with `sprint=after (post-close evolution)` instead of
+  treating that as a failed close. `repair` still only normalizes derived status — it does not
+  restore checkpoint after-images (and must not wipe intentional post-close rules/debt/ADRs).
+- **`plan --from` init left `plan_sprint` when `spec.openQuestions` was non-empty.**
+  Init mode now routes `handoff.nextAction` to `clarify` when open questions remain (in addition to
+  `[NEEDS CLARIFICATION]` markers), matching the documented clarify drain for open questions.
 
 ## [4.43.3] - 2026-08-05
 

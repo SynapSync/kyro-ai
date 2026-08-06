@@ -260,6 +260,34 @@ function initScope(root, scope = 'demo-scope') {
   }
 }
 
+// 2b) Non-empty spec.openQuestions alone (no markers) routes init to "clarify".
+{
+  const root = sandbox();
+  try {
+    const leanPath = writeLeanPlan(root, validLeanPlan({
+      scope: 'open-q-scope',
+      spec: {
+        requirements: [
+          { id: 'R1', statement: 'Users can complete the happy path.', priority: 'must', rationale: 'Core value.' },
+        ],
+        nonGoals: ['Out of scope for v1.'],
+        openQuestions: ['Which allergen taxonomy is canonical for phase one?'],
+      },
+    }));
+    const result = run(['plan', '--from', leanPath], root);
+    assert(result.status === 0, `kyro plan with openQuestions should succeed: ${result.stdout}${result.stderr}`);
+    const sprint = readSprint(root, 'open-q-scope');
+    assert(sprint.handoff.nextAction === 'clarify', `openQuestions should route to clarify, got ${sprint.handoff.nextAction}`);
+    assert(
+      String(sprint.handoff.note || '').toLowerCase().includes('open question'),
+      `handoff note should mention open questions: ${sprint.handoff.note}`,
+    );
+    assert(Array.isArray(sprint.spec?.openQuestions) && sprint.spec.openQuestions.length === 1, 'openQuestions must be preserved');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 // 3) Already initialized: mode is auto-detected from scope state, not file shape. Once a scope has a
 //    sprint.json ready to plan (nextAction: plan_sprint, activeSprint: null), re-running plan routes
 //    to SPRINT MODE regardless of the file passed — so replaying the same init-shaped lean file now

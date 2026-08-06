@@ -19,8 +19,9 @@ import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun } from '../core/trace';
 
 /**
- * Repair: validate and normalize a scope's sprint.json (stable formatting + trailing newline).
- * The sprint.json is the single source of truth; there is nothing else to regenerate.
+ * Repair: validate and normalize a scope's sprint.json (derived status fields + stable formatting).
+ * Does NOT restore checkpoint after-images or reverse tool-owned post-close mutations (rules, debt, ADRs).
+ * The sprint.json is the single source of truth for live scope state.
  */
 export async function repair(options: CliOptions): Promise<void> {
   const scope = resolveScope(options.kyroScope);

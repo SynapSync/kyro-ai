@@ -68,10 +68,22 @@ Read-time behavior (no archive rewrite):
 | --- | --- |
 | `PREPARED` | Checkpoint exists; live state still matches the before image. |
 | `PARTIAL` | Some artifacts or live mutations were applied; retry the same frozen close inputs. |
-| `APPLIED` | Artifacts and live state match the intended after image. |
-| `DIVERGED` | Live or artifact content matches neither protected state; reconcile manually. |
+| `APPLIED` | Artifacts and live state match the intended after image, **or** the close remains ledger-anchored after legitimate post-close evolution (see below). |
+| `DIVERGED` | Live or artifact content matches neither protected state and is not ledger-anchored evolution; inspect manually. |
 | `CORRUPT` | Checkpoint structure, identity, or digest is invalid. |
 | `UNSUPPORTED_VERSION` | The installed Kyro runtime cannot interpret the checkpoint. |
+
+### Post-close evolution vs failed close
+
+Tool-owned writers may mutate live `sprint.json` after a successful close (for example `kyro rule add`, debt, ADRs). That changes the live digest relative to `intendedAfterClose` without invalidating the close. When:
+
+- snapshot and narrative digests still match,
+- the project-scope entry still matches the after image (or the legacy intermediate `active→planning` normalization), and
+- live `ledger[]` still anchors this checkpoint (path + `checkpointSha256`, closed roadmap row, no rewound active sprint),
+
+doctor reports **APPLIED** with `sprint=after (post-close evolution)`.
+
+`kyro repair` only normalizes derived **status** fields and pretty-prints JSON. It does **not** restore checkpoint after-images and must not be used to wipe intentional post-close mutations.
 
 Retries are compare-and-swap operations under the same renewable, token-owned state-writer lease used by other Kyro mutators. The heartbeat runs independently of the main thread; renewal failure fail-stops the owning process before another writer may reclaim the lease. Missing `sprint.json` or the affected project scope entry can be restored to the intended-after image; unrelated current project fields are preserved. Invalid or divergent content and conflicting archive files are never overwritten. Managed scope, archive, lock, and reclaim paths must stay inside the workspace and cannot traverse symlinks.
 
