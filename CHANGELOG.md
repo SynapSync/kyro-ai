@@ -18,6 +18,9 @@ All notable changes to this project are documented here. The format is based on
 - **`plan --from` init left `plan_sprint` when `spec.openQuestions` was non-empty.**
   Init mode now routes `handoff.nextAction` to `clarify` when open questions remain (in addition to
   `[NEEDS CLARIFICATION]` markers), matching the documented clarify drain for open questions.
+- **Windows CI: concurrent close holder tests lost a 1s lease under matrix load.**
+  `CI_SAFE_TEST_LEASE_MS` raised to 5s for concurrent close/repair holder cases (reclaim still uses
+  explicit sub-second leases).
 
 ## [4.43.3] - 2026-08-05
 
