@@ -65,7 +65,7 @@ function lineContaining(text, index) {
   return text.slice(start, end === -1 ? undefined : end);
 }
 
-const roots = ['skills', 'agents', 'commands', 'docs'].map((dir) => join(repo, dir));
+const roots = ['internal/skills', 'agents', 'commands', 'docs'].map((dir) => join(repo, dir));
 const failures = [];
 
 for (const root of roots) {

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The startup handshake must be self-contained in BOTH entry points.
 //
-// `skills/sprint-forge/SKILL.md` is invocable on its own (`kyro-ai:sprint-forge`), and on that path
+// The packaged sprint-forge source must retain the startup contract even though Claude only
+// exposes the public command wrappers. Standard/Codex/OpenCode runtime projections still load it.
 // `agents/orchestrator.md` is never loaded. It used to carry no startup steps at all — only a
 // parenthetical "(Startup handshake)" pointing at the orchestrator — so an agent entering through
 // the skill saw unsubstituted {{KYRO_CLI}} tokens, no capability handshake, and no routing call.
@@ -17,7 +18,7 @@ const repo = resolve(fileURLToPath(import.meta.url), '../..');
 
 const ENTRY_POINTS = [
   ['agents/orchestrator.md', 'orchestrator agent'],
-  ['skills/sprint-forge/SKILL.md', 'sprint-forge skill (direct-invocation path)'],
+  ['internal/skills/sprint-forge/SKILL.md', 'sprint-forge skill (direct-invocation path)'],
 ];
 
 // Each element is [label, pattern]. Patterns are deliberately loose on prose and strict on the

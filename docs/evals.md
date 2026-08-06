@@ -86,7 +86,7 @@ The repository ships a seed suite under `fixtures/evals/` covering:
 
 ## L0 delegated execution manual eval checklist
 
-These are **protocol checks** for agents following the delegation path in execute/review modes. They are not automated `kyro eval` replay cases. Protocol summary: [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in). Mode routers: `execute-task.md` / `review-task.md`; full protocol: `skills/sprint-forge/assets/helpers/delegated-execution.md` plus `delegates/implementer.md` / `delegates/checker.md`.
+These are **protocol checks** for agents following the delegation path in execute/review modes. They are not automated `kyro eval` replay cases. Protocol summary: [Architecture — Delegated execution](architecture.md#delegated-execution-protocol-opt-in). Mode routers: `execute-task.md` / `review-task.md`; full protocol: `internal/skills/sprint-forge/assets/helpers/delegated-execution.md` plus `delegates/implementer.md` / `delegates/checker.md`.
 
 | # | Check | Pass when |
 |---|-------|-----------|

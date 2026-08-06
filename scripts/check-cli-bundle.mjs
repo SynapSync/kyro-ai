@@ -50,6 +50,20 @@ function main() {
   const runEnv = { ...inheritedEnv, HOME: home, PATH: `${dirname(process.execPath)}:${noKyroBin}` };
 
   try {
+    // 0. The full package TUI may advertise package installation operations.
+    const packageTuiLockReady = join(workspace, '.full-package-tui-lock-ready');
+    const packageTui = spawnSync(process.execPath, [cli], {
+      cwd: workspace,
+      env: { ...installEnv, KYRO_TEST_LOCK_READY_FILE: packageTuiLockReady },
+      encoding: 'utf-8',
+      input: '5\n',
+    });
+    assert(packageTui.status === 0, `check-cli-bundle: full-package TUI should exit 0: ${packageTui.stderr || packageTui.stdout}`);
+    assert(packageTui.stdout.includes('Install standard .agents adapter'), 'check-cli-bundle: full-package TUI must advertise standard adapter install');
+    assert(packageTui.stdout.includes('Install OpenCode adapter'), 'check-cli-bundle: full-package TUI must advertise OpenCode install');
+    assert(packageTui.stdout.includes('Install Codex adapter'), 'check-cli-bundle: full-package TUI must advertise Codex install');
+    assert(!existsSync(packageTuiLockReady), 'check-cli-bundle: full-package TUI Exit must not acquire the state-writer lock');
+
     // 1. Install from the built package with a PATH stripped of `kyro`.
     const install = spawnSync(process.execPath, [cli, 'install', '--scope', 'workspace', '--init-workspace', '--yes'], {
       cwd: workspace,
@@ -82,7 +96,21 @@ function main() {
     const [command, ...invArgs] = manifest.kyroInvocation.trim().split(/\s+/).map((segment) => expandHome(segment, home));
     assert(existsSync(invArgs[0]), `check-cli-bundle: resolved cli path does not exist: ${invArgs[0]}`);
 
-    // 5a. Doctor from projected runtime must not FAIL on npm-package packaging layout.
+    // 5a. The projected runtime TUI exposes operational actions only, never dead package actions.
+    assertRestrictedTui(command, invArgs, workspace, runEnv, 'projected runtime CLI');
+    const tuiDoctor = spawnSync(command, invArgs, {
+      cwd: workspace,
+      env: runEnv,
+      encoding: 'utf-8',
+      input: '1\n',
+    });
+    assert(tuiDoctor.status === 0, `check-cli-bundle: projected TUI Doctor should exit 0: ${tuiDoctor.stderr || tuiDoctor.stdout}`);
+    assert(
+      tuiDoctor.stdout.includes('projected runtime (package packaging checks skipped)'),
+      `check-cli-bundle: projected TUI Doctor must run the mode-aware diagnostic, got:\n${tuiDoctor.stdout}`,
+    );
+
+    // 5b. Doctor from projected runtime must not FAIL on npm-package packaging layout.
     const doctor = spawnSync(command, [...invArgs, 'doctor', '--artifacts', '--kyro-scope', 'demo'], {
       cwd: workspace,
       env: runEnv,
@@ -96,11 +124,11 @@ function main() {
     assert(!doctor.stdout.includes('missing agents/orchestrator.md'), 'check-cli-bundle: doctor must not FAIL on missing root agents/orchestrator.md');
     assert(!doctor.stdout.includes('.claude-plugin/plugin.json missing'), 'check-cli-bundle: doctor must not FAIL on missing .claude-plugin');
 
-    // 5b. Install/sync from projected runtime must fail with exact INVALID_INPUT + npx remedy (no ENOENT).
+    // 5c. Install/sync from projected runtime must fail with exact INVALID_INPUT + npx remedy (no ENOENT).
     assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
     assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
 
-    // 5c. Token audit from projected runtime fails clearly (package-only), not with packaging ENOENT noise.
+    // 5d. Token audit from projected runtime fails clearly (package-only), not with packaging ENOENT noise.
     const doctorTokens = spawnSync(command, [...invArgs, 'doctor', '--tokens'], {
       cwd: workspace,
       env: runEnv,
@@ -188,12 +216,35 @@ function main() {
 
     // 12. Losing every projected identity marker becomes unknown, never full-package.
     unlinkSync(join(runtimeRoot, 'KYRO.md'));
+    assertRestrictedTui(command, invArgs, workspace, runEnv, 'unrecognized or corrupt');
     assertUnknownRootBlocked(command, invArgs, workspace, runEnv, 'marker-less corrupt runtime');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 
-  console.log('check:cli-bundle — runtime CLI workflows pass; package operations fail closed for projected, corrupt, conflicting, and unknown roots');
+  console.log('check:cli-bundle — package-root-aware TUI and runtime workflows pass; package operations fail closed for projected, corrupt, conflicting, and unknown roots');
+}
+
+/** Projected/unknown TUI roots expose Doctor + Exit and the full-package remedy only. */
+function assertRestrictedTui(command, invArgs, workspace, runEnv, expectedRootLabel) {
+  const lockReady = join(workspace, '.restricted-tui-lock-ready');
+  if (existsSync(lockReady)) unlinkSync(lockReady);
+  const result = spawnSync(command, invArgs, {
+    cwd: workspace,
+    env: { ...runEnv, KYRO_TEST_LOCK_READY_FILE: lockReady },
+    encoding: 'utf-8',
+    input: '2\n',
+  });
+  assert(result.status === 0, `check-cli-bundle: restricted TUI should exit 0: ${result.stderr || result.stdout}`);
+  const out = `${result.stdout || ''}${result.stderr || ''}`;
+  assert(out.includes('Package management is unavailable'), `check-cli-bundle: restricted TUI must explain package operation limits, got:\n${out}`);
+  assert(out.includes(expectedRootLabel), `check-cli-bundle: restricted TUI must name ${expectedRootLabel}, got:\n${out}`);
+  assert(out.includes('npx kyro-ai'), `check-cli-bundle: restricted TUI must show the full-package remedy, got:\n${out}`);
+  assert(out.includes('1) Run doctor') && out.includes('2) Exit'), `check-cli-bundle: restricted TUI must offer Doctor and Exit, got:\n${out}`);
+  assert(!out.includes('Install standard .agents adapter'), `check-cli-bundle: restricted TUI must not advertise standard install, got:\n${out}`);
+  assert(!out.includes('Install OpenCode adapter'), `check-cli-bundle: restricted TUI must not advertise OpenCode install, got:\n${out}`);
+  assert(!out.includes('Install Codex adapter'), `check-cli-bundle: restricted TUI must not advertise Codex install, got:\n${out}`);
+  assert(!existsSync(lockReady), 'check-cli-bundle: restricted TUI Exit must not acquire the state-writer lock');
 }
 
 /** Install/sync from any non-full-package root: exact INVALID_INPUT, npx remedy, no ENOENT. */

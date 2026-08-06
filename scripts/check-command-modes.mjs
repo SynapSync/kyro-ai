@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Static guard: every mode/helper/template file a command router references must exist.
-// Command files (commands/*.md) point agents at specific sprint-forge assets by repo-root
-// relative path (e.g. `skills/sprint-forge/assets/modes/idea.md`). A rename or typo that
-// leaves a command pointing at a missing asset is a silent routing break the link checker
-// misses (these paths live in code spans, not markdown links). This asserts they resolve.
+// Command files (commands/*.md) use the stable projected-runtime path `skills/...`.
+// The full package stores those assets under `internal/skills/...` so Claude does not auto-register
+// them as slash commands. A rename or typo is still a silent routing break; map the runtime path
+// back to its package source before checking existence.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +24,8 @@ for (const entry of readdirSync(commandsDir, { withFileTypes: true })) {
   const refs = new Set(text.match(assetRe) ?? []);
   for (const ref of refs) {
     referenceCount++;
-    if (!existsSync(resolve(repo, ref))) {
+    const packageSource = ref.replace(/^skills\//, 'internal/skills/');
+    if (!existsSync(resolve(repo, packageSource))) {
       failures.push(`commands/${entry.name} -> ${ref} (file not found)`);
     }
   }

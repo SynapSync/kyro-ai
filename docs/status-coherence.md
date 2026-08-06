@@ -92,7 +92,7 @@ Kyro exposes status through both agent routers and a read-only CLI path:
 
 - `kyro status [brief|full|debt]` reads `.agents/kyro/scopes/<scope>/sprint.json` directly and never emits trace events. The default is brief; `--json` returns stable machine fields for scope, derived status, active sprint, next action/task, blockers, open debt, and pending review count.
 - `/kyro:status` (`commands/status.md`) remains the agent-facing router for read-only brief/full reports.
-- `skills/sprint-forge/assets/modes/STATUS.md` remains the full agent report shape.
+- `internal/skills/sprint-forge/assets/modes/STATUS.md` remains the full agent report shape.
 - `context-pack` fields `reviewPending` and `nextTaskReview` remain available for agent routing; unlike `kyro status`, `context-pack` also records route-selection trace events.
 - `analyze` findings report status drift and checker debt.
 

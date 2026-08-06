@@ -156,7 +156,7 @@ Se revisaron DOS proyectos Kyro reales:
 
 ## Falla #1 — El sizing está sesgado a fragmentar (RIESGO TEÓRICO — no observado en datos reales)
 
-**Dónde:** `skills/sprint-forge/assets/helpers/analysis/feature.md:26` y `skills/sprint-forge/assets/modes/INIT.md:39` (Step 4 — Size the roadmap).
+**Dónde:** `internal/skills/sprint-forge/assets/helpers/analysis/feature.md:26` y `internal/skills/sprint-forge/assets/modes/INIT.md:39` (Step 4 — Size the roadmap).
 
 Los "sizing signals" reales:
 
@@ -181,7 +181,7 @@ Los "sizing signals" reales:
 
 ## Falla #2 — El review por-tarea multiplica el costo dentro de cada sprint
 
-**Dónde:** `skills/sprint-forge/assets/modes/execute-task.md` + `review-task.md`.
+**Dónde:** `internal/skills/sprint-forge/assets/modes/execute-task.md` + `review-task.md`.
 
 El loop real es `execute_task → review_task → CLI review → siguiente tarea`, **por cada tarea**. Cada `review_task`:
 - re-lee `sprint.json`,
@@ -197,7 +197,7 @@ Para un caso simple con muchas tareas chicas repartidas en 4 sprints, son **dece
 
 ## Falla #3 — Nada fuerza contexto fresco entre sprints (el pico de costo)
 
-**Dónde:** `skills/sprint-forge/assets/modes/close-sprint.md` + comando `task-context`.
+**Dónde:** `internal/skills/sprint-forge/assets/modes/close-sprint.md` + comando `task-context`.
 
 `close-sprint` publica un checkpoint lossless **justo para permitir retomar en sesión fresca y barata** — el diseño lo soporta. Pero **nada en el flujo empuja al usuario a resetear el contexto** al cerrar un sprint. El usuario, naturalmente, sigue en la misma sesión → el sprint 4 arrastra el contexto de los 3 anteriores → peor caso de tokens, como default de facto.
 

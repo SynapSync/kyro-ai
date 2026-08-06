@@ -13,8 +13,8 @@ Kyro can be used with any LLM API by loading its markdown instructions into your
 
 ```pseudo
 orchestrator = read("agents/orchestrator.md")
-kyro_core = read("skills/sprint-forge/SKILL.md")
-qa_review = read("skills/qa-review/SKILL.md")
+kyro_core = read("internal/skills/sprint-forge/SKILL.md")
+qa_review = read("internal/skills/qa-review/SKILL.md")
 
 system_prompt = join([
   orchestrator,
@@ -41,7 +41,7 @@ write_artifacts(response)
 ## Provider-Neutral Review Example
 
 ```pseudo
-qa_review = read("skills/qa-review/SKILL.md")
+qa_review = read("internal/skills/qa-review/SKILL.md")
 
 response = llm.generate({
   model: STRONG_REVIEW_MODEL,
@@ -66,7 +66,7 @@ response = llm.generate({
 
 ```pseudo
 orchestrator = read("agents/orchestrator.md")
-kyro_core = read("skills/sprint-forge/SKILL.md")
+kyro_core = read("internal/skills/sprint-forge/SKILL.md")
 
 response = llm.generate({
   model: STRONG_PLANNING_MODEL,
