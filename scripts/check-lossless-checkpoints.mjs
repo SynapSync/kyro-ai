@@ -1042,7 +1042,12 @@ for (const mode of ['corrupt', 'unsupported']) {
 {
   const root = makeSandbox();
   try {
-    const tui = runAsync(root, ['tui']);
+    // Full standard-adapter install is hundreds of durable writes under one lease. Default 5s is
+    // fine on unloaded Linux, but Windows CI runners under matrix load can delay Worker heartbeats
+    // long enough for assertStateWriterLeaseHealthy to fail mid-apply ("lease lost") — seen as
+    // intermittent Node 20/22 failures while Node 18 passes. Keep reclaim tests on short leases;
+    // only widen this long install path.
+    const tui = runAsync(root, ['tui'], { KYRO_TEST_LOCK_LEASE_MS: '60000' });
     await waitForChild(tui, () => tui.text().includes('Select an option:'), 'TUI did not reach its prompt');
     const changed = run(root, ['scope', 'set-active', 'unrelated', '--confirm']);
     assert(changed.status === 0, `concurrent scope mutation failed: ${output(changed)}`);
