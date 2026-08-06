@@ -7,6 +7,7 @@ import { listScopeFolders } from '../artifacts/scopes';
 import { countClarificationMarkers } from '../core/analysis';
 import {
   asProjectState,
+  asSprintFile,
   validateLocalProjectStateShape,
   validateProjectStateShape,
   validateSharedProjectStateShape,
@@ -291,9 +292,10 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const projectEntry = project?.scopes.find((entry) => entry.id === scope);
   const projectDigest = projectEntry ? sha256(projectEntry) : null;
 
-  const sprintPosition = digestPosition(sprintDigest, checkpoint.digests.beforeClose, checkpoint.digests.intendedAfterClose);
+  let sprintPosition = digestPosition(sprintDigest, checkpoint.digests.beforeClose, checkpoint.digests.intendedAfterClose);
   let scopePosition = digestPosition(projectDigest, checkpoint.digests.projectScopeBefore, checkpoint.digests.projectScopeAfter);
   let legacyScopeNormalized = false;
+  let postCloseEvolution = false;
   // Historical intermediate v1 residual: checkpoint stores projectScopeAfter.status=active while
   // the canonical live after-image (and repair) use planning. Treat exact normalized live match as after.
   if (scopePosition === 'other' && projectEntry && isLegacyIntermediateActiveScopeAfter(checkpoint)) {
@@ -302,6 +304,22 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
       scopePosition = 'after';
       legacyScopeNormalized = true;
     }
+  }
+  // Tool-owned post-close mutations (rule add, debt, ADR, …) change live sprint.json while the
+  // close remains anchored in ledger[].checkpointSha256. That is evolution, not a failed close —
+  // repair only normalizes status and must not wipe those mutations. Treat as APPLIED when
+  // artifacts are intact, scope is after, and the live ledger still anchors this checkpoint.
+  if (
+    sprintPosition === 'other'
+    && snapshotState === 'ok'
+    && narrativeState === 'ok'
+    && isAfterPosition(scopePosition)
+    && sprintRead.exists
+    && !sprintRead.error
+    && liveAnchorsAppliedCheckpoint(sprintRead.value, checkpoint)
+  ) {
+    sprintPosition = 'after';
+    postCloseEvolution = true;
   }
   let status: SprintCloseTransactionStatus;
   if (snapshotState === 'conflict' || narrativeState === 'conflict' || sprintPosition === 'other' || scopePosition === 'other') {
@@ -316,7 +334,33 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const scopeLabel = legacyScopeNormalized
     ? 'after (legacy v1 intermediate scope status active→planning)'
     : scopePosition;
-  return checkpointResult(scope, path, status, `sprint=${sprintPosition}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`);
+  const sprintLabel = postCloseEvolution
+    ? 'after (post-close evolution)'
+    : sprintPosition;
+  return checkpointResult(scope, path, status, `sprint=${sprintLabel}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`);
+}
+
+/**
+ * True when live sprint.json still records this close in its ledger (path + optional SHA) and the
+ * closed sprint remains closed. Distinguishes legitimate post-close evolution from unanchored drift.
+ */
+function liveAnchorsAppliedCheckpoint(liveValue: unknown, checkpoint: SprintCloseCheckpointV1): boolean {
+  const sprint = asSprintFile(liveValue);
+  if (!sprint) return false;
+  const { sprintN: n, sprintSlug: slug } = checkpoint.identity;
+  const entry = sprint.ledger.find((item) => item.n === n && item.slug === slug);
+  if (!entry?.checkpoint) return false;
+  const expectedRel = `archive/sprint-${String(n).padStart(3, '0')}-${slug}.checkpoint.json`;
+  if (entry.checkpoint !== expectedRel) return false;
+  if (typeof entry.checkpointSha256 === 'string' && entry.checkpointSha256 !== checkpointCommitment(checkpoint)) {
+    return false;
+  }
+  const road = sprint.roadmap.sprints.find((item) => item.n === n);
+  if (road && road.state !== 'closed') return false;
+  // Close left activeSprint null; a later active sprint supersedes live compare elsewhere.
+  // An active sprint at or before this n would mean the close was rewound, not evolved.
+  if (sprint.activeSprint && sprint.activeSprint.n <= n) return false;
+  return true;
 }
 
 function validateLedgerCheckpointReferences(
@@ -364,7 +408,13 @@ function checkpointResult(scope: string, path: string, status: SprintCloseTransa
     return warn(name, message, 'Retry kyro close-sprint with the checkpoint\'s frozen close inputs to resume safely.');
   }
   if (status === SPRINT_CLOSE_TRANSACTION_STATUS.UNSUPPORTED_VERSION) return fail(name, message, 'Upgrade Kyro before inspecting or resuming this checkpoint.');
-  return fail(name, message, status === SPRINT_CLOSE_TRANSACTION_STATUS.DIVERGED ? 'Do not overwrite live state. Reconcile it explicitly against the checkpoint before/after images.' : 'Restore the immutable checkpoint from versioned storage; do not overwrite it.');
+  return fail(
+    name,
+    message,
+    status === SPRINT_CLOSE_TRANSACTION_STATUS.DIVERGED
+      ? 'Do not overwrite the immutable checkpoint. kyro repair only normalizes derived status fields — it does not restore checkpoint after-images. Inspect live sprint.json against the checkpoint before/after digests; reverse unintended edits or accept tool-owned post-close evolution (rules/debt/ADRs) only when the ledger still anchors this close.'
+      : 'Restore the immutable checkpoint from versioned storage; do not overwrite it.',
+  );
 }
 
 function inspectArtifact(path: string, expectedDigest: string): 'missing' | 'ok' | 'conflict' {

@@ -240,10 +240,15 @@ export function buildPlanInitPlan(scope: string, input: LeanPlanInput): { sprint
   const draftSprint = attachAuthorIfValid(baseSprint, author);
 
   const markers = countClarificationMarkers(draftSprint);
-  const nextAction: NextAction = markers > 0 ? 'clarify' : 'plan_sprint';
+  const openQuestionCount = draftSprint.spec?.openQuestions?.length ?? 0;
+  // Markers are hard clarity gaps; non-empty openQuestions are also init-time clarify work
+  // (docs: clarify drains openQuestions before the spec is treated as stable for planning).
+  const nextAction: NextAction = markers > 0 || openQuestionCount > 0 ? 'clarify' : 'plan_sprint';
   const note = markers > 0
     ? `Scope initialized with ${markers} unresolved [NEEDS CLARIFICATION] marker(s); resolve them before planning.`
-    : 'Scope initialized (spec + roadmap); ready to plan Sprint 1.';
+    : openQuestionCount > 0
+      ? `Scope initialized with ${openQuestionCount} open question(s); resolve them via clarify before planning Sprint 1.`
+      : 'Scope initialized (spec + roadmap); ready to plan Sprint 1.';
 
   const sprint: SprintFile = {
     ...draftSprint,
