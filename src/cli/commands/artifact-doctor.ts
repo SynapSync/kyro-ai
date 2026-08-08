@@ -17,6 +17,9 @@ import type { CheckResult, KyroScopeEntry, SprintFile } from '../types';
 import { SPRINT_CLOSE_TRANSACTION_STATUS, type SprintCloseCheckpointV1, type SprintCloseTransactionStatus } from '../types';
 import {
   checkpointCommitment,
+  checkpointIntegrityIssues,
+  checkpointSchemaIssues,
+  isHistoricalCheckpoint,
   isLegacyIntermediateActiveScopeAfter,
   legacyNormalizedProjectScopeAfter,
   sha256,
@@ -299,10 +302,20 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   if (raw?.schemaVersion !== 1) {
     return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.UNSUPPORTED_VERSION, `schemaVersion=${String(raw?.schemaVersion ?? '(missing)')}`);
   }
-  const issues = validateSprintCloseCheckpoint(read.value, path);
-  if (issues.length > 0) return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CORRUPT, issues.join('; '));
+  // Separate integrity from schema: a checkpoint with valid commitment but stale schema
+  // is historical evidence, not corruption (T2.2, S6).
+  const integrityIssues = checkpointIntegrityIssues(read.value, path);
+  if (integrityIssues.length > 0) return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CORRUPT, integrityIssues.join('; '));
   const checkpoint = read.value as SprintCloseCheckpointV1;
   if (checkpoint.identity.scope !== scope) return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CORRUPT, `identity scope ${checkpoint.identity.scope} does not match directory ${scope}`);
+
+  // If schema failed but integrity is sound, this is a historical checkpoint with stale fields.
+  // Name the stale fields (T2.2, AC1) but never skip a verification on the strength of it: schema
+  // staleness says nothing about whether the immutable artifacts still hash to their commitments,
+  // so tampering with the narrative or the legacy snapshot must still fail closed (T2.2, AC2).
+  const schemaIssues = checkpointSchemaIssues(read.value, path);
+  const historicalNote = schemaIssues.length > 0 ? `historical: ${schemaIssues.join('; ')}` : null;
+  const withHistoricalNote = (detail: string): string => (historicalNote ? `${historicalNote}; ${detail}` : detail);
 
   const snapshotState = inspectArtifact(checkpoint.paths.legacySnapshot, checkpoint.digests.legacySnapshot);
   const narrativeState = inspectArtifact(checkpoint.paths.narrative, checkpoint.digests.narrative);
@@ -312,7 +325,7 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
       : snapshotState === 'conflict' || narrativeState === 'conflict'
         ? SPRINT_CLOSE_TRANSACTION_STATUS.DIVERGED
         : SPRINT_CLOSE_TRANSACTION_STATUS.PARTIAL;
-    return checkpointResult(scope, path, status, `historical integrity: snapshot=${snapshotState}, narrative=${narrativeState}`);
+    return checkpointResult(scope, path, status, withHistoricalNote(`historical integrity: snapshot=${snapshotState}, narrative=${narrativeState}`));
   }
   const sprintRead = readJsonSafely(sprintJsonPath(scope));
   const sprintDigest = sprintRead.exists && !sprintRead.error ? sha256(sprintRead.value) : null;
@@ -374,7 +387,7 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
     ? 'after (legacy v1 intermediate scope status active→planning)'
     : scopePosition;
   const sprintLabel = remediationLabel ?? sprintPosition;
-  return checkpointResult(scope, path, status, `sprint=${sprintLabel}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`);
+  return checkpointResult(scope, path, status, withHistoricalNote(`sprint=${sprintLabel}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`));
 }
 
 function validateLedgerCheckpointReferences(
@@ -399,10 +412,10 @@ function validateLedgerCheckpointReferences(
       results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `referenced checkpoint is unreadable: ${read.error}`, 'Restore the immutable checkpoint; do not rewrite the ledger to hide the failure.'));
       continue;
     }
-    const issues = validateSprintCloseCheckpoint(read.value, path);
+    const integrityIssues = checkpointIntegrityIssues(read.value, path);
     const checkpoint = read.value as Partial<SprintCloseCheckpointV1>;
-    if (issues.length > 0 || checkpoint.identity?.sprintN !== entry.n || checkpoint.identity?.sprintSlug !== entry.slug) {
-      results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `referenced checkpoint is invalid or mismatched: ${issues.join('; ') || 'identity mismatch'}`, 'Restore the checkpoint that matches this ledger entry.'));
+    if (integrityIssues.length > 0 || checkpoint.identity?.sprintN !== entry.n || checkpoint.identity?.sprintSlug !== entry.slug) {
+      results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `referenced checkpoint is invalid or mismatched: ${integrityIssues.join('; ') || 'identity mismatch'}`, 'Restore the checkpoint that matches this ledger entry.'));
     } else if (!entry.checkpointSha256) {
       results.push(warn(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `${entry.checkpoint} has no external ledger commitment`, 'This pre-anchor checkpoint remains readable, but archive-only tampering cannot be detected. Future closes record checkpointSha256.'));
     } else if (entry.checkpointSha256 !== checkpointCommitment(checkpoint as SprintCloseCheckpointV1)) {

@@ -272,7 +272,12 @@ export function readSprintCloseCheckpoint(path: string): SprintCloseCheckpointV1
   return read.value as SprintCloseCheckpointV1;
 }
 
-export function validateSprintCloseCheckpoint(value: unknown, path: string): string[] {
+/**
+ * Integrity issues only (structural, commitment, digests, paths, transitions).
+ * A checkpoint with a valid commitment and no integrity issues is historical evidence,
+ * even if its schema is stale.
+ */
+export function checkpointIntegrityIssues(value: unknown, path: string): string[] {
   const issues: string[] = [];
   const checkpoint = asRecord(value);
   if (!checkpoint) return [`${path}:<root> must be an object`];
@@ -295,14 +300,31 @@ export function validateSprintCloseCheckpoint(value: unknown, path: string): str
   if (!paths || typeof paths.legacySnapshot !== 'string' || typeof paths.narrative !== 'string') {
     issues.push(`${path}:paths must contain legacySnapshot and narrative`);
   }
-  issues.push(...validateSprintFile(checkpoint.beforeClose, `${path}:beforeClose`).map(formatValidationIssue));
-  issues.push(...validateSprintFile(checkpoint.intendedAfterClose, `${path}:intendedAfterClose`).map(formatValidationIssue));
-  validateScopeEntry(checkpoint.projectScopeBefore, `${path}:projectScopeBefore`, issues);
-  validateScopeEntry(checkpoint.projectScopeAfter, `${path}:projectScopeAfter`, issues);
+  // Schema validation is NOT checked for integrity — a legacy checkpoint with stale schema
+  // remains valid evidence if its commitment matches the ledger anchor.
+  const digestCheckScope = (scope: unknown, scopePath: string): string[] => {
+    const result: string[] = [];
+    validateScopeEntry(scope, scopePath, result);
+    return result;
+  };
+  issues.push(...digestCheckScope(checkpoint.projectScopeBefore, `${path}:projectScopeBefore`));
+  issues.push(...digestCheckScope(checkpoint.projectScopeAfter, `${path}:projectScopeAfter`));
   const digests = asRecord(checkpoint.digests);
   const digestKeys = ['beforeClose', 'intendedAfterClose', 'projectScopeBefore', 'projectScopeAfter', 'legacySnapshot', 'narrative'] as const;
   if (!digests) issues.push(`${path}:digests must be an object`);
   else for (const key of digestKeys) if (typeof digests[key] !== 'string' || !/^[a-f0-9]{64}$/.test(digests[key] as string)) issues.push(`${path}:digests.${key} must be a SHA-256 hex digest`);
+
+  // Digest verification (integrity): beforeClose and intendedAfterClose objects are compared by hash,
+  // not parsed against schema, so digests can be verified even if the embedded schema is stale.
+  if (digests) {
+    if (digests.beforeClose !== sha256(checkpoint.beforeClose)) issues.push(`${path}:digests.beforeClose mismatch`);
+    if (digests.intendedAfterClose !== sha256(checkpoint.intendedAfterClose)) issues.push(`${path}:digests.intendedAfterClose mismatch`);
+    if (digests.projectScopeBefore !== sha256(checkpoint.projectScopeBefore)) issues.push(`${path}:digests.projectScopeBefore mismatch`);
+    if (digests.projectScopeAfter !== sha256(checkpoint.projectScopeAfter)) issues.push(`${path}:digests.projectScopeAfter mismatch`);
+    const before = asRecord(checkpoint.beforeClose);
+    const active = before?.activeSprint;
+    if (active && digests.legacySnapshot !== sha256(`${JSON.stringify(active, null, 2)}\n`)) issues.push(`${path}:digests.legacySnapshot does not match beforeClose.activeSprint`);
+  }
 
   if (identity) {
     if (typeof identity.scope === 'string') assertSafePathSegmentForValidation(identity.scope, `${path}:identity.scope`, issues);
@@ -324,15 +346,7 @@ export function validateSprintCloseCheckpoint(value: unknown, path: string): str
     const scopeAfter = asRecord(checkpoint.projectScopeAfter);
     if (scopeBefore?.id !== identity.scope || scopeAfter?.id !== identity.scope) issues.push(`${path}:project scope entries do not match identity`);
   }
-  if (digests) {
-    if (digests.beforeClose !== sha256(checkpoint.beforeClose)) issues.push(`${path}:digests.beforeClose mismatch`);
-    if (digests.intendedAfterClose !== sha256(checkpoint.intendedAfterClose)) issues.push(`${path}:digests.intendedAfterClose mismatch`);
-    if (digests.projectScopeBefore !== sha256(checkpoint.projectScopeBefore)) issues.push(`${path}:digests.projectScopeBefore mismatch`);
-    if (digests.projectScopeAfter !== sha256(checkpoint.projectScopeAfter)) issues.push(`${path}:digests.projectScopeAfter mismatch`);
-    const before = asRecord(checkpoint.beforeClose);
-    const active = before?.activeSprint;
-    if (active && digests.legacySnapshot !== sha256(`${JSON.stringify(active, null, 2)}\n`)) issues.push(`${path}:digests.legacySnapshot does not match beforeClose.activeSprint`);
-  }
+
   const after = asRecord(checkpoint.intendedAfterClose);
   const ledger = Array.isArray(after?.ledger) ? after.ledger : [];
   const lastLedger = asRecord(ledger[ledger.length - 1]);
@@ -345,6 +359,7 @@ export function validateSprintCloseCheckpoint(value: unknown, path: string): str
   if (lastLedger && (typeof lastLedger.checkpointSha256 !== 'string' || lastLedger.checkpointSha256 !== checkpointCommitment(value as SprintCloseCheckpointV1))) {
     issues.push(`${path}:intendedAfterClose ledger checkpointSha256 does not match checkpoint commitment`);
   }
+
   if (issues.length === 0) {
     const typed = value as SprintCloseCheckpointV1;
     try {
@@ -364,6 +379,42 @@ export function validateSprintCloseCheckpoint(value: unknown, path: string): str
     }
   }
   return issues;
+}
+
+/**
+ * Schema issues only (embedded beforeClose and intendedAfterClose images fail current validator).
+ * Returns the specific stale fields that fail the current schema.
+ */
+export function checkpointSchemaIssues(value: unknown, path: string): string[] {
+  const checkpoint = asRecord(value);
+  if (!checkpoint) return [];
+  const issues: string[] = [];
+  issues.push(...validateSprintFile(checkpoint.beforeClose, `${path}:beforeClose`).map(formatValidationIssue));
+  issues.push(...validateSprintFile(checkpoint.intendedAfterClose, `${path}:intendedAfterClose`).map(formatValidationIssue));
+  return issues;
+}
+
+/**
+ * Full validation (integrity + schema). Used by readSprintCloseCheckpoint (close-sprint writer)
+ * to ensure new checkpoints meet all requirements. Historical checkpoints use checkpointIntegrityIssues
+ * to separate evidence validity (commitment) from schema currency.
+ */
+export function validateSprintCloseCheckpoint(value: unknown, path: string): string[] {
+  const integrityIssues = checkpointIntegrityIssues(value, path);
+  if (integrityIssues.length > 0) return integrityIssues;
+  return checkpointSchemaIssues(value, path);
+}
+
+/**
+ * A checkpoint is historical evidence if its commitment is valid (passes integrity checks)
+ * even if the embedded schema is stale. Doctor reports it as historical with the specific
+ * stale field named.
+ */
+export function isHistoricalCheckpoint(checkpoint: SprintCloseCheckpointV1, path: string): boolean {
+  const integrityIssues = checkpointIntegrityIssues(checkpoint, path);
+  if (integrityIssues.length > 0) return false;
+  const schemaIssues = checkpointSchemaIssues(checkpoint, path);
+  return schemaIssues.length > 0;
 }
 
 export function applySprintCloseTransaction(transaction: SprintCloseTransaction): SprintCloseApplyResult {

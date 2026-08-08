@@ -32,6 +32,7 @@ export const ADR_LINK_KEY_VALUES = Object.values(ADR_LINK_KEYS);
 const ADR_ID_PATTERN = /^ADR-\d{4}$/;
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
 const REMEDIATION_ANCHOR_KEYS = ['id', 'path', 'commitment'];
+const CERTIFICATION_ID_PATTERN = /^C-\d{3,}$/;
 
 export interface ValidationIssue {
   path: string;
@@ -377,6 +378,13 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
   // corrected state claim a provenance nobody can check.
   if ('remediations' in value) {
     validateRemediationAnchors(value.remediations, path, 'remediations', issues);
+  }
+
+  // certifications[] is the append-only anchor to independent validation of a corrected state. The
+  // id and the path must derive from each other, or an anchor could name C-001 while pointing at
+  // the bytes of another record (the E3 lesson).
+  if ('certifications' in value) {
+    validateCertificationAnchors(value.certifications, path, 'certifications', issues);
   }
 
   if (!isRecord(value.handoff)) {
@@ -782,6 +790,44 @@ function validateRemediationAnchors(value: unknown, path: string, prefix: string
       if (seen.has(entry.id)) issues.push({ path, field: `${field}.id`, message: `duplicates remediation id ${entry.id}` });
       seen.add(entry.id);
     }
+  });
+}
+
+/**
+ * A certification anchor is only well-formed when its id is a certification id, its commitment is a
+ * real digest, and its path is EXACTLY the path derived from that id. Accepting a free-form path
+ * would let the anchor point anywhere while still passing every other check.
+ */
+function validateCertificationAnchors(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!Array.isArray(value)) {
+    issues.push({ path, field: prefix, message: 'must be an array when present' });
+    return;
+  }
+  const seen = new Set<string>();
+  value.forEach((entry, index) => {
+    const field = `${prefix}[${index}]`;
+    if (!isRecord(entry)) {
+      issues.push({ path, field, message: 'must be an object { id, path, commitment }' });
+      return;
+    }
+    for (const key of Object.keys(entry)) {
+      if (!REMEDIATION_ANCHOR_KEYS.includes(key)) {
+        issues.push({ path, field: `${field}.${key}`, message: 'is not part of the certification anchor contract' });
+      }
+    }
+    if (typeof entry.commitment !== 'string' || !SHA256_HEX_PATTERN.test(entry.commitment)) {
+      issues.push({ path, field: `${field}.commitment`, message: 'must be a sha-256 hex digest' });
+    }
+    if (typeof entry.id !== 'string' || !CERTIFICATION_ID_PATTERN.test(entry.id)) {
+      issues.push({ path, field: `${field}.id`, message: 'must be a certification id of the form C-NNN' });
+      return;
+    }
+    const derived = `archive/certifications/certification-${entry.id.slice('C-'.length)}.json`;
+    if (entry.path !== derived) {
+      issues.push({ path, field: `${field}.path`, message: `must be ${derived}, the path derived from ${entry.id}` });
+    }
+    if (seen.has(entry.id)) issues.push({ path, field: `${field}.id`, message: `duplicates certification id ${entry.id}` });
+    seen.add(entry.id);
   });
 }
 

@@ -8,6 +8,8 @@ import { applySprintCloseTransaction } from '../checkpoints/sprint-close';
 import { buildRepairPlan } from '../commands/repair';
 import { planRemediation } from '../remediation/plan';
 import { applyRemediationTransaction } from '../remediation/transaction';
+import { planCertification } from '../remediation/certification-plan';
+import { applyCertificationTransaction } from '../remediation/certification-transaction';
 import { readPackageVersion } from '../help';
 import { buildReviewPlan, checkerErrorCode, parseFinding, parseVerdict, parseWaiver, type ReviewArgs } from '../commands/review';
 import { readJsonSafely } from '../artifacts/json';
@@ -49,7 +51,7 @@ export function callTool(name: string, rawArgs: unknown): ToolResult {
 }
 
 function isConfirmedMutator(name: string, args: Record<string, unknown>): boolean {
-  return args.confirm === true && ['close_sprint', 'repair_scope', 'review_task', 'remediate_scope'].includes(name);
+  return args.confirm === true && ['close_sprint', 'repair_scope', 'review_task', 'remediate_scope', 'recertify_scope'].includes(name);
 }
 
 function dispatchTool(name: string, args: Record<string, unknown>): unknown {
@@ -70,6 +72,8 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       return repairScopeTool(args);
     case 'remediate_scope':
       return remediateScopeTool(args);
+    case 'recertify_scope':
+      return recertifyScopeTool(args);
     case 'review_task':
       return reviewTaskTool(args);
     case 'trace_tail':
@@ -157,6 +161,28 @@ function remediateScopeTool(args: Record<string, unknown>): unknown {
   emitToolCommandRun(scope, 'mcp', 'remediate_scope', { manifest: options.manifestPath });
   const applied = applyRemediationTransaction(options);
   return { phase: 'applied', scope, remediationId: applied.remediationId, recordPath: applied.recordPath, sprintPath: applied.sprintPath, commitment: applied.commitment, resumed: applied.resumed, changes: applied.plan.changes };
+}
+
+/**
+ * Certification over MCP. Same planner, same locked transaction, same refusals as the CLI — the
+ * surfaces must never diverge on what counts as certifiable evidence.
+ */
+function recertifyScopeTool(args: Record<string, unknown>): unknown {
+  const scope = resolveScope(optionalString(args.scope) ?? null);
+  const options = {
+    scope,
+    manifestPath: requiredString(args.manifest, 'manifest'),
+    now: new Date().toISOString(),
+    kyroVersion: readPackageVersion(),
+  };
+  if (args.confirm !== true) {
+    const plan = planCertification(options);
+    return { phase: 'preview', scope, certificationId: plan.certificationId, recordPath: plan.recordPath, commitment: plan.commitment, certifiedChainHeadCommitment: plan.record.certifiedChainHeadCommitment, certifiedStateDigest: plan.record.certifiedStateDigest, evidence: plan.record.evidence, verdict: plan.record.verdict, transactionStatus: plan.transactionStatus };
+  }
+  emitGateApproved(scope, 'recertify_scope');
+  emitToolCommandRun(scope, 'mcp', 'recertify_scope', { manifest: options.manifestPath });
+  const applied = applyCertificationTransaction(options);
+  return { phase: 'applied', scope, certificationId: applied.certificationId, recordPath: applied.recordPath, sprintPath: applied.sprintPath, commitment: applied.commitment, resumed: applied.resumed };
 }
 
 function reviewTaskTool(args: Record<string, unknown>): unknown {
@@ -276,6 +302,10 @@ function summarize(name: string, data: unknown): string {
       return rec.phase === 'applied' ? `close_sprint: applied, snapshot=${rec.snapshotPath ?? '?'}.` : `close_sprint: plan ready (${planLen(rec.plan)} ops). Re-call with confirm:true.`;
     case 'repair_scope':
       return rec.phase === 'applied' ? `repair_scope: applied to ${rec.scope}.` : `repair_scope: plan ready (${planLen(rec.plan)} ops). Re-call with confirm:true.`;
+    case 'recertify_scope':
+      return rec.phase === 'applied'
+        ? `recertify_scope: ${rec.certificationId} applied${rec.resumed ? ' (resumed)' : ''}, record=${rec.recordPath ?? '?'}.`
+        : `recertify_scope: ${rec.certificationId} planned for chain head ${rec.certifiedChainHeadCommitment ?? '?'}. Re-call with confirm:true.`;
     case 'remediate_scope':
       return rec.phase === 'applied'
         ? `remediate_scope: ${rec.remediationId} applied${rec.resumed ? ' (resumed)' : ''}, record=${rec.recordPath ?? '?'}.`

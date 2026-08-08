@@ -3,11 +3,12 @@ import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile, type ValidationIssue } from '../artifacts/schema';
-import { checkpointCommitmentOfRecord, sha256, validateSprintCloseCheckpoint } from '../checkpoints/sprint-close';
+import { checkpointCommitmentOfRecord, checkpointIntegrityIssues, sha256 } from '../checkpoints/sprint-close';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import type { CheckResult, RemediationAnchor, ScopeVerification, SprintCloseCheckpointV1, SprintFile } from '../types';
 import { canonicalRemediationState, observedValueDigest } from './canonical-state';
+import { resolveCertificationForChainHead } from './certification-plan';
 import {
   REMEDIATION_MANIFEST_KIND,
   SCOPE_REMEDIATION_KIND,
@@ -286,6 +287,24 @@ export function inspectRemediationTransaction(
   return { status: REMEDIATION_TRANSACTION_STATUS.APPLIED, detail: `record and live anchor agree on ${commitment}` };
 }
 
+/**
+ * Whether a LATER sprint has started since the newest close checkpoint.
+ *
+ * Everything that compares live state against a frozen image — the checkpoint after-image, or a
+ * remediation record's result digest — is only meaningful until that happens. Once sprint N+1 is
+ * under way, its ordinary edits move live state off those images by design, and reading that as
+ * tampering turns normal in-sprint work into a DIVERGED failure. Doctor's checkpoint lens already
+ * drew this line; this helper exists so the remediation and verification lenses draw the same one.
+ */
+export function isSupersededByActiveSprint(scope: string, state?: Record<string, unknown> | null): boolean {
+  const live = state ?? readLiveStateOrNull(scope);
+  const checkpoint = latestValidCloseCheckpoint(scope);
+  if (live === null || checkpoint === null) return false;
+  const activeSprint = asRecord(live.activeSprint);
+  const activeN = typeof activeSprint?.n === 'number' ? activeSprint.n : null;
+  return activeN !== null && activeN > checkpoint.identity.sprintN;
+}
+
 /** Doctor lens over a scope's remediation chain. Read-only; never repairs. */
 export function inspectRemediationChain(scope: string): CheckResult[] {
   const state = readLiveStateOrNull(scope);
@@ -301,12 +320,18 @@ export function inspectRemediationChain(scope: string): CheckResult[] {
   }
   if (anchors.length === 0) return [];
 
+  // Record integrity, commitments and continuity are always checked. Only the head-vs-live digest
+  // comparison is suppressed while a later sprint is active, because that sprint legitimately owns
+  // the drift.
+  const superseded = isSupersededByActiveSprint(scope, state);
+
   const results: CheckResult[] = [];
   let expectedHead: string | null = null;
   let expectedBase: string | null = null;
   for (const anchor of anchors) {
     const name = `${scope}/remediation/${anchor.id}`;
-    const transaction = inspectRemediationTransaction(scope, anchor.id, anchor.commitment, null, anchor === anchors[anchors.length - 1]);
+    const isHead = anchor === anchors[anchors.length - 1];
+    const transaction = inspectRemediationTransaction(scope, anchor.id, anchor.commitment, null, isHead && !superseded);
     const record = readRemediationRecord(scope, anchor.id);
     const brokenLink = chainContinuityIssue(record, expectedHead, expectedBase);
     if (brokenLink) {
@@ -472,8 +497,13 @@ export function listValidCloseCheckpoints(scope: string): ValidCloseCheckpoint[]
     if (!file.endsWith('.checkpoint.json')) continue;
     const path = `${archiveDir(scope)}/${file}`;
     const read = readJsonSafely(path);
-    if (!read.exists || read.error || validateSprintCloseCheckpoint(read.value, path).length > 0) continue;
+    if (!read.exists || read.error) continue;
     const checkpoint = read.value as SprintCloseCheckpointV1;
+    // A checkpoint is valid if its integrity is sound (commitment matches ledger anchor, structure intact).
+    // Historical checkpoints with stale schema are still valid evidence; their schema issues are named
+    // separately in doctor output (S6, AC3).
+    const integrityIssues = checkpointIntegrityIssues(read.value, path);
+    if (integrityIssues.length > 0) continue;
     if (checkpoint.identity.scope !== scope) continue;
     entries.push({ path, checkpoint });
   }
@@ -487,15 +517,15 @@ export function latestValidCloseCheckpoint(scope: string): SprintCloseCheckpoint
 }
 
 /**
- * T2.3/T2.4 seam — whether a valid certification exists for the current chain head.
+ * Whether a valid certification exists for the CURRENT chain head.
  *
- * The certification contract (T2.3) and its writer (T2.4) are not shipped yet, so no certification
- * record can exist. recertified is derived but deliberately unreachable rather than simulated: when
- * the writer lands, this reader resolves the C-NNN records and validates their chain-head binding
- * and evidence digests against the current head (ADR-0001).
+ * Delegates to the certification reader, which requires the C-NNN record behind the anchor to be
+ * readable, contract-valid, commitment-matching, bound to this head and to the live business
+ * digest, with a passing verdict and non-empty evidence. An anchor on its own certifies nothing
+ * (ADR-0001).
  */
-function resolveCertificationForHead(scope: string, chainHeadId: string): { kind: 'none' } | { kind: 'valid'; through: string } {
-  return { kind: 'none' };
+function resolveCertificationForHead(scope: string): { kind: 'none' } | { kind: 'valid'; through: string } {
+  return resolveCertificationForChainHead(scope);
 }
 
 /**
@@ -526,6 +556,10 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
     return { state: 'diverged', detail: 'remediations[] is present but is not a well-formed anchor array' };
   }
 
+  // Must be known before the chain walk: the head's result digest is compared against live state
+  // inside it, and that comparison is exactly what a later active sprint invalidates.
+  const supersededByActiveSprint = isSupersededByActiveSprint(scope, live);
+
   // Chain health first: walk every anchor exactly as doctor does — per-record transaction status
   // AND both continuity links. A broken chain beats any reassuring position; diverged > unsupported.
   let unsupportedDetail: string | null = null;
@@ -534,7 +568,7 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
   for (let index = 0; index < anchors.length; index += 1) {
     const anchor = anchors[index];
     const isHead = index === anchors.length - 1;
-    const transaction = inspectRemediationTransaction(scope, anchor.id, anchor.commitment, null, isHead);
+    const transaction = inspectRemediationTransaction(scope, anchor.id, anchor.commitment, null, isHead && !supersededByActiveSprint);
     if (transaction.status === REMEDIATION_TRANSACTION_STATUS.CORRUPT
       || transaction.status === REMEDIATION_TRANSACTION_STATUS.DIVERGED) {
       return { state: 'diverged', detail: transaction.detail };
@@ -554,6 +588,22 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
     return { state: 'unsupported', detail: unsupportedDetail };
   }
 
+  // Position only means something while the checkpoint's after-image is still the expected live
+  // state. Once a LATER sprint is under way, every edit it makes moves live state off that image
+  // legitimately, and reading that as tampering would report normal in-sprint work as diverged.
+  // Doctor's checkpoint lens already draws this line (supersededByActiveSprint); the verification
+  // lens must draw the same one, or the two contradict each other on the same scope.
+  if (supersededByActiveSprint) {
+    // The chain was still walked above, so a corrupt or forged record has already been reported.
+    // What cannot be judged here is drift, so nothing is claimed about it.
+    if (anchors.length === 0) return null;
+    const headId = anchors[anchors.length - 1].id;
+    return {
+      state: 'remediated',
+      detail: `valid remediation chain through ${headId}; live drift is not evaluated while a later sprint is active`,
+    };
+  }
+
   const liveBusiness = businessStateDigest(live);
   const afterBusiness = businessStateDigest(checkpoint.intendedAfterClose);
   const atAfterImage = liveBusiness !== null && afterBusiness !== null && liveBusiness === afterBusiness;
@@ -564,7 +614,7 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
   if (anchors.length > 0) {
     const headId = anchors[anchors.length - 1].id;
     if (atAfterImage) {
-      const certification = resolveCertificationForHead(scope, headId);
+      const certification = resolveCertificationForHead(scope);
       if (certification.kind === 'valid') {
         return { state: 'recertified', detail: `valid certification for chain head ${headId}` };
       }
@@ -573,7 +623,7 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
     // Real drift: the chain must replay from the after-image to explain it.
     const rebase = resolveRemediationRebase(scope, checkpoint.intendedAfterClose);
     if (rebase.kind === 'remediated') {
-      const certification = resolveCertificationForHead(scope, rebase.through);
+      const certification = resolveCertificationForHead(scope);
       if (certification.kind === 'valid') {
         return { state: 'recertified', detail: `valid certification for chain head ${rebase.through}` };
       }
