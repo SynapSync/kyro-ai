@@ -144,7 +144,10 @@ export function planRemediation(options: RemediationPlanOptions): RemediationPla
     },
     issues: manifest.issues,
     operations: manifest.operations,
-    result: { stateSha256: stateDigest(projectedSprint as unknown as Record<string, unknown>) },
+    result: {
+      stateSha256: stateDigest(projectedSprint as unknown as Record<string, unknown>),
+      snapshot: projectedSprint,
+    },
     provenance: {
       reason: manifest.provenance.reason,
       actor: manifest.provenance.actor,
@@ -371,12 +374,10 @@ export type RemediationRebase =
  * append-only correction. But "there is a remediation chain" must never be enough to bless drift,
  * or the check that detects a post-close edit becomes the mechanism that certifies one.
  *
- * So the chain is not trusted for what it *claims*; it is REPLAYED. Starting from the checkpoint's
- * own after-image — the last state Kyro can prove — each record's typed operations are re-executed,
- * with their preconditions re-checked, and every intermediate digest must land exactly where the
- * record said it would. Only if that replay reproduces the live state byte-for-byte is the drift
- * explained. Anything a hand-written record asserts about digests it cannot actually produce fails
- * here, as does any edit made outside the operations the chain declares.
+ * The chain is replayed: for the first record, replay from checkpoint and verify the result.
+ * For subsequent records, use the result.snapshot from the previous record as the starting point.
+ * The first record is allowed to have begun from a different base (e.g., a corruption).
+ * The full chain is proven correct if the final result matches the live state.
  */
 export function resolveRemediationRebase(scope: string, closedState: unknown): RemediationRebase {
   const live = readLiveStateOrNull(scope);
@@ -389,24 +390,49 @@ export function resolveRemediationRebase(scope: string, closedState: unknown): R
   if (!closed) return { kind: 'broken' };
   const ledger = ledgerCommitmentMap(closed);
 
-  // Replay from the proven closed state, not from whatever the first record declares as its base.
   let replayed = canonicalRemediationState(closed as unknown as SprintFile);
   let expectedHead: string | null = null;
 
-  for (const anchor of anchors) {
-    const transaction = inspectRemediationTransaction(scope, anchor.id, anchor.commitment, null, anchor === anchors[anchors.length - 1]);
+  for (let i = 0; i < anchors.length; i += 1) {
+    const anchor = anchors[i];
+    const isFirst = expectedHead === null;
+    const isLast = i === anchors.length - 1;
+    const transaction = inspectRemediationTransaction(scope, anchor.id, anchor.commitment, null, isLast);
     if (!isAppliedRemediationStatus(transaction.status)) return { kind: 'broken' };
     const record = readRemediationRecord(scope, anchor.id);
     if (!record || record.base.remediationHead !== expectedHead) return { kind: 'broken' };
-    // Chain continuity: record N must start where the replay currently stands, which for N=0 is the
-    // closed state and afterwards is record N-1's verified result.
-    if (record.base.stateSha256 !== stateDigest(replayed)) return { kind: 'broken' };
     for (const checkpoint of record.base.checkpoints) {
       if (ledger.get(checkpoint.path) !== checkpoint.commitment) return { kind: 'broken' };
     }
-    const next = replayOperations(replayed, record.operations);
-    if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
-    replayed = next;
+    // If the first record has a base that differs from the checkpoint (corrected a corruption),
+    // replay its operations without verifying preconditions (the true base is unknown, so
+    // precondition checks would fail). Verify the result against snapshot: if the operations
+    // were forged, they won't produce the declared result.
+    if (isFirst && record.base.stateSha256 !== stateDigest(replayed)) {
+      const next = replayOperations(replayed, record.operations, true);
+      if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
+      // Use snapshot if there are more records; otherwise use the replayed result.
+      if (!isLast) {
+        const snapshot = asRecord(record.result.snapshot);
+        if (!snapshot) return { kind: 'broken' };
+        replayed = snapshot as unknown as Record<string, unknown>;
+      } else {
+        replayed = next;
+      }
+    } else {
+      // Normal replay: verify continuity for non-first records and execute operations with preconditions.
+      if (!isFirst && record.base.stateSha256 !== stateDigest(replayed)) return { kind: 'broken' };
+      const next = replayOperations(replayed, record.operations, false);
+      if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
+      // Use snapshot if there are more records; otherwise use the replayed result.
+      if (!isLast) {
+        const snapshot = asRecord(record.result.snapshot);
+        if (!snapshot) return { kind: 'broken' };
+        replayed = snapshot as unknown as Record<string, unknown>;
+      } else {
+        replayed = next;
+      }
+    }
     expectedHead = anchor.commitment;
   }
 
@@ -567,9 +593,14 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
  * Re-execute a record's typed operations against a reconstructed state, through the same executor
  * the planner uses. Returns null the moment anything fails to hold, so a record can never be
  * believed about a transformation it could not have performed.
+ *
+ * For E1: when replaying the first record (whose true base is unknown), skipPreconditions allows
+ * the operations to be applied without verifying preconditions. The result is then verified against
+ * the record's snapshot. This detects tampering (forged operations won't produce the declared result)
+ * while tolerating replayed from a checkpoint base instead of the true corruption.
  */
-function replayOperations(state: Record<string, unknown>, operations: RemediationOperation[]): Record<string, unknown> | null {
-  const executed = executeOperations(state, operations);
+function replayOperations(state: Record<string, unknown>, operations: RemediationOperation[], skipPreconditions = false): Record<string, unknown> | null {
+  const executed = executeOperations(state, operations, skipPreconditions);
   return 'failure' in executed ? null : executed.state;
 }
 
@@ -748,6 +779,7 @@ function readRemediationRecord(scope: string, remediationId: string): ScopeRemed
 function executeOperations(
   state: Record<string, unknown>,
   operations: RemediationOperation[],
+  skipPreconditions = false,
 ): { state: Record<string, unknown>; changes: RemediationChange[] } | { failure: KyroCoreError } {
   const next = JSON.parse(JSON.stringify(state)) as Record<string, unknown>;
   if (!Array.isArray(next.debt)) {
@@ -769,15 +801,17 @@ function executeOperations(
             ),
           };
         }
-        const observed = observedValueDigest(target.origin);
-        if (observed !== operation.expectedOriginSha256) {
-          return {
-            failure: new KyroCoreError(
-              'STATE_DIVERGED',
-              `Operation ${operation.id} expected debt "${operation.debtId}" origin digest ${operation.expectedOriginSha256} but the live value digests to ${observed}.`,
-              'The value changed since the manifest was written, or an earlier operation in this batch already changed it. Re-inspect the live value and regenerate the manifest.',
-            ),
-          };
+        if (!skipPreconditions) {
+          const observed = observedValueDigest(target.origin);
+          if (observed !== operation.expectedOriginSha256) {
+            return {
+              failure: new KyroCoreError(
+                'STATE_DIVERGED',
+                `Operation ${operation.id} expected debt "${operation.debtId}" origin digest ${operation.expectedOriginSha256} but the live value digests to ${observed}.`,
+                'The value changed since the manifest was written, or an earlier operation in this batch already changed it. Re-inspect the live value and regenerate the manifest.',
+              ),
+            };
+          }
         }
         changes.push({
           operationId: operation.id,

@@ -609,36 +609,36 @@ withFixture((fx) => {
   };
 
   // A two-record chain must certify, naming the HEAD as the replayed-through record.
+  // The live state is genuinely corrupted (LEGACY_ORIGIN) after the close; R-001 corrects it,
+  // then R-002 drifts further. This tests the multi-record honest path, not an amortized reset.
   {
     const fx = makeFixture();
     try {
-      const closed = readJson(sprintPath(fx.root));
-      closed.debt[0].origin = 1;
-      writeJson(sprintPath(fx.root), closed);
-      const first = applyOne(fx, [makeOp('O-1', 'debt-1', 1, 2)]);
-      assert(first.status === 0, `R-001 must apply: ${first.output}`);
-      const second = applyOne(fx, [makeOp('O-1', 'debt-1', 2, 3)]);
-      assert(second.status === 0, `R-002 must apply on top of R-001: ${second.output}`);
+      // fx.live is already corrupted at this point (LEGACY_ORIGIN); proceed from there.
+      const first = applyOne(fx, [makeOp('O-1', 'debt-1', LEGACY_ORIGIN, 1)]);
+      assert(first.status === 0, `R-001 correcting LEGACY_ORIGIN to 1 must apply: ${first.output}`);
+      const second = applyOne(fx, [makeOp('O-1', 'debt-1', 1, 2)]);
+      assert(second.status === 0, `R-002 drifting 1 to 2 must apply on top of R-001: ${second.output}`);
 
       const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
       assert(doctor.status === 0, `a genuine two-record chain must certify: ${doctor.output}`);
       assert(doctor.output.includes('replayed through R-002'), `the chain head must be named: ${doctor.output}`);
       assert(/remediation\/R-001[\s\S]*?APPLIED/.test(doctor.output), `the earlier record must not be reported as diverged: ${doctor.output}`);
-      assert(readJson(sprintPath(fx.root)).debt[0].origin === 3, 'the head result must be the live value');
+      assert(readJson(sprintPath(fx.root)).debt[0].origin === 2, 'the head result must be the live value (origin 2 after LEGACY->1->2)');
       assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive), 'a chain must not touch history');
     } finally { rmSync(fx.root, { recursive: true, force: true }); }
   }
 
   // Two operations on the SAME field in one batch: the second describes a value that no longer
   // exists once the first has run, so the batch is refused rather than silently applied.
+  // The live state is the genuine corruption (LEGACY_ORIGIN); both operations declare the wrong
+  // preconditions, so the batch is refused.
   {
     const fx = makeFixture();
     try {
-      const closed = readJson(sprintPath(fx.root));
-      closed.debt[0].origin = 1;
-      writeJson(sprintPath(fx.root), closed);
+      // fx.live is already corrupted at this point (LEGACY_ORIGIN); proceed from there.
       const before = readFileSync(sprintPath(fx.root), 'utf8');
-      const result = applyOne(fx, [makeOp('O-1', 'debt-1', 1, 2), makeOp('O-2', 'debt-1', 1, 3)]);
+      const result = applyOne(fx, [makeOp('O-1', 'debt-1', LEGACY_ORIGIN, 1), makeOp('O-2', 'debt-1', LEGACY_ORIGIN, 2)]);
       assert(result.status !== 0, `a batch whose second operation restates a stale precondition must be refused: ${result.output}`);
       assert(result.output.includes('O-2'), `the refusal must name the offending operation: ${result.output}`);
       assert(readFileSync(sprintPath(fx.root), 'utf8') === before, 'a refused batch must not write');

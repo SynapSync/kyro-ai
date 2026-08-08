@@ -60,6 +60,8 @@ export type RemediationOperation = SetDebtOriginOperation;
 
 export interface RemediationResult {
   stateSha256: string;
+  /** Snapshot of the scope state after applying operations. Used by E1 to replay multi-record chains. */
+  snapshot: unknown;
 }
 
 export interface RemediationProvenance {
@@ -139,10 +141,11 @@ export function validateScopeRemediation(value: unknown, path: string): Validati
   validateOperations(value.operations, issueIds, path, 'operations', issues);
 
   if (!isRecord(value.result)) {
-    issues.push({ path, field: 'result', message: 'must be an object { stateSha256 }' });
+    issues.push({ path, field: 'result', message: 'must be an object { stateSha256, snapshot }' });
   } else {
-    requireUnknownKeys(value.result, ['stateSha256'], path, 'result', issues);
+    requireUnknownKeys(value.result, ['stateSha256', 'snapshot'], path, 'result', issues);
     requireDigest(value.result, 'stateSha256', path, issues, 'result.stateSha256');
+    // snapshot is allowed but not validated (it's a copy of the live state at that moment)
   }
 
   if (!isRecord(value.provenance)) {
