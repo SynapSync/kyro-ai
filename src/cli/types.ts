@@ -275,6 +275,35 @@ export const SPRINT_CLOSE_TRANSACTION_STATUS = {
 } as const;
 export type SprintCloseTransactionStatus = (typeof SPRINT_CLOSE_TRANSACTION_STATUS)[keyof typeof SPRINT_CLOSE_TRANSACTION_STATUS];
 
+/**
+ * Named verification vocabulary for a closed scope (T2.1, ADR-0002).
+ *
+ * A reader must be able to tell an audited correction from tampering without parsing prose, so
+ * doctor and status both derive exactly one of these states from the checkpoint position plus the
+ * replayed remediation chain. The WORST applicable state always wins:
+ *
+ *   diverged > unsupported > remediated > recertified > historical
+ *
+ * - `historical`: live business state equals the checkpoint after-image — nothing has drifted.
+ * - `remediated`: live drift is explained by a valid, replayed remediation chain.
+ * - `recertified`: remediated AND a valid certification exists for the current chain head.
+ * - `diverged`: drift that no chain can reproduce, or an unreadable/contract-invalid record
+ *   behind a well-formed anchor, or any digest/commitment/ordering mismatch.
+ * - `unsupported`: a remediation or certification record declares an unknown schemaVersion.
+ */
+export type ScopeVerificationState =
+  | 'historical'
+  | 'remediated'
+  | 'recertified'
+  | 'diverged'
+  | 'unsupported';
+
+/** One named scope verification state plus the specific reason it applies (ADR-0002). */
+export interface ScopeVerification {
+  state: ScopeVerificationState;
+  detail: string;
+}
+
 export interface TaskEvidence {
   summary: string;
   // A single validation line, or a list of them. Real runs record multiple validation commands, so
@@ -379,6 +408,20 @@ export interface Debt {
   note: string;
 }
 
+/**
+ * Live anchor to an immutable remediation record under `archive/remediations/`. It stores only the
+ * commitment — never a duplicate state image — so the corrected live state stays the single
+ * canonical copy while the correction remains independently verifiable.
+ */
+export interface RemediationAnchor {
+  /** Remediation id, e.g. R-001. */
+  id: string;
+  /** Scope-relative path to the immutable record. */
+  path: string;
+  /** SHA-256 commitment to the remediation record payload. */
+  commitment: string;
+}
+
 export interface Handoff {
   nextAction: NextAction;
   nextTaskId: string | null;
@@ -429,6 +472,11 @@ export interface SprintFile {
   previousSprint: unknown | null;
   activeSprint: ActiveSprint | null;
   debt: Debt[];
+  /**
+   * Append-only anchors to remediation records that corrected this scope's live state after close.
+   * Absent on scopes that were never remediated. Excluded from the canonical state digest.
+   */
+  remediations?: RemediationAnchor[];
   handoff: Handoff;
 }
 

@@ -91,7 +91,19 @@ export function sha256(value: unknown): string {
  * while still protecting the complete before/after images, identity, close inputs and paths.
  */
 export function checkpointCommitment(checkpoint: SprintCloseCheckpointV1): string {
-  const payload = JSON.parse(JSON.stringify(checkpoint)) as Record<string, unknown>;
+  return checkpointCommitmentOfRecord(checkpoint);
+}
+
+/**
+ * Commitment for a checkpoint that has been parsed but not schema-validated.
+ *
+ * A checkpoint is historical evidence: it is proven by its recorded commitment, not by the schema
+ * Kyro happens to enforce today. A scope closed before a contract was tightened embeds a state that
+ * the current strict validator rejects — remediation exists precisely for that case, so it must be
+ * able to verify the checkpoint is untampered without first demanding it pass the new rules.
+ */
+export function checkpointCommitmentOfRecord(value: unknown): string {
+  const payload = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
   delete payload.digests;
   const after = asRecord(payload.intendedAfterClose);
   const ledger = Array.isArray(after?.ledger) ? after.ledger : [];
@@ -485,7 +497,11 @@ function verifyArtifact(path: string, digest: string, label: string): void {
   if (sha256(content) !== digest) throw new KyroCoreError('CHECKPOINT_CONFLICT', `${label} content conflicts with checkpoint at ${path}.`, 'Do not overwrite audit artifacts. Inspect and resolve the conflict manually.');
 }
 
-function publishExclusive(path: string, content: string, label: string): void {
+/**
+ * Create a file that must not already exist, durably. Exported so other immutable-artifact writers
+ * (remediation records) inherit the same fsync + link + parent-fsync discipline rather than copying it.
+ */
+export function publishExclusive(path: string, content: string, label: string): void {
   const target = assertSafeManagedPath(path);
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
   let failure: unknown = null;
@@ -506,7 +522,8 @@ function publishExclusive(path: string, content: string, label: string): void {
   if (failure) throw describeWriteFailure(failure) ?? failure;
 }
 
-function atomicReplace(path: string, content: string): void {
+/** Durable rename-based replacement of a managed file. Exported for the same reason as publishExclusive. */
+export function atomicReplace(path: string, content: string): void {
   const target = assertSafeManagedPath(path);
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
   let failure: unknown = null;

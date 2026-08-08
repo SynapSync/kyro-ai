@@ -6,6 +6,9 @@ import { buildContextPack } from '../commands/context-pack';
 import { buildClosePlan, type CloseSprintArgs } from '../commands/close-sprint';
 import { applySprintCloseTransaction } from '../checkpoints/sprint-close';
 import { buildRepairPlan } from '../commands/repair';
+import { planRemediation } from '../remediation/plan';
+import { applyRemediationTransaction } from '../remediation/transaction';
+import { readPackageVersion } from '../help';
 import { buildReviewPlan, checkerErrorCode, parseFinding, parseVerdict, parseWaiver, type ReviewArgs } from '../commands/review';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
@@ -46,7 +49,7 @@ export function callTool(name: string, rawArgs: unknown): ToolResult {
 }
 
 function isConfirmedMutator(name: string, args: Record<string, unknown>): boolean {
-  return args.confirm === true && ['close_sprint', 'repair_scope', 'review_task'].includes(name);
+  return args.confirm === true && ['close_sprint', 'repair_scope', 'review_task', 'remediate_scope'].includes(name);
 }
 
 function dispatchTool(name: string, args: Record<string, unknown>): unknown {
@@ -65,6 +68,8 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       return closeSprintTool(args);
     case 'repair_scope':
       return repairScopeTool(args);
+    case 'remediate_scope':
+      return remediateScopeTool(args);
     case 'review_task':
       return reviewTaskTool(args);
     case 'trace_tail':
@@ -130,6 +135,28 @@ function repairScopeTool(args: Record<string, unknown>): unknown {
   applyPlan(plan);
   assertValidSprint(scope);
   return { phase: 'applied', scope, plan };
+}
+
+/**
+ * Preview is a pure plan; apply reuses the same locked transaction the CLI uses, so both surfaces
+ * enforce identical digests, preconditions and post-write verification.
+ */
+function remediateScopeTool(args: Record<string, unknown>): unknown {
+  const scope = resolveScope(optionalString(args.scope) ?? null);
+  const options = {
+    scope,
+    manifestPath: requiredString(args.manifest, 'manifest'),
+    now: new Date().toISOString(),
+    kyroVersion: readPackageVersion(),
+  };
+  if (args.confirm !== true) {
+    const plan = planRemediation(options);
+    return { phase: 'preview', scope, remediationId: plan.remediationId, recordPath: plan.recordPath, commitment: plan.commitment, base: plan.record.base, issues: plan.record.issues, operations: plan.record.operations, result: plan.record.result, changes: plan.changes, transactionStatus: plan.transactionStatus };
+  }
+  emitGateApproved(scope, 'remediate_scope');
+  emitToolCommandRun(scope, 'mcp', 'remediate_scope', { manifest: options.manifestPath });
+  const applied = applyRemediationTransaction(options);
+  return { phase: 'applied', scope, remediationId: applied.remediationId, recordPath: applied.recordPath, sprintPath: applied.sprintPath, commitment: applied.commitment, resumed: applied.resumed, changes: applied.plan.changes };
 }
 
 function reviewTaskTool(args: Record<string, unknown>): unknown {
@@ -249,6 +276,10 @@ function summarize(name: string, data: unknown): string {
       return rec.phase === 'applied' ? `close_sprint: applied, snapshot=${rec.snapshotPath ?? '?'}.` : `close_sprint: plan ready (${planLen(rec.plan)} ops). Re-call with confirm:true.`;
     case 'repair_scope':
       return rec.phase === 'applied' ? `repair_scope: applied to ${rec.scope}.` : `repair_scope: plan ready (${planLen(rec.plan)} ops). Re-call with confirm:true.`;
+    case 'remediate_scope':
+      return rec.phase === 'applied'
+        ? `remediate_scope: ${rec.remediationId} applied${rec.resumed ? ' (resumed)' : ''}, record=${rec.recordPath ?? '?'}.`
+        : `remediate_scope: ${rec.remediationId} planned (${asArray(rec.changes).length} typed change(s)). Re-call with confirm:true.`;
     case 'review_task':
       return rec.phase === 'applied' ? `review_task: ${rec.verdict}, next=${rec.nextAction ?? '—'}.` : `review_task: plan ready (${rec.verdict}). Re-call with confirm:true.`;
     case 'trace_tail':

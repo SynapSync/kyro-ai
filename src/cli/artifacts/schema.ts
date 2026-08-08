@@ -30,6 +30,8 @@ export const SPEC_REQUIREMENT_PRIORITY_VALUES = ['must', 'should', 'could'] as c
 export const ADR_STATUS_VALUES = Object.values(ADR_STATUS);
 export const ADR_LINK_KEY_VALUES = Object.values(ADR_LINK_KEYS);
 const ADR_ID_PATTERN = /^ADR-\d{4}$/;
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+const REMEDIATION_ANCHOR_KEYS = ['id', 'path', 'commitment'];
 
 export interface ValidationIssue {
   path: string;
@@ -368,6 +370,13 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
     issues.push({ path, field: 'debt', message: 'must be an array' });
   } else {
     value.debt.forEach((d, i) => validateDebtItem(d, path, `debt[${i}]`, issues));
+  }
+
+  // remediations[] is the append-only anchor to post-close corrections. Absent on scopes that were
+  // never remediated; when present it must be well-formed, since an unverifiable anchor would let a
+  // corrected state claim a provenance nobody can check.
+  if ('remediations' in value) {
+    validateRemediationAnchors(value.remediations, path, 'remediations', issues);
   }
 
   if (!isRecord(value.handoff)) {
@@ -740,7 +749,40 @@ function validateDebtItem(value: unknown, path: string, prefix: string, issues: 
   }
   requireString(value, 'id', path, issues, `${prefix}.id`);
   requireString(value, 'title', path, issues, `${prefix}.title`);
+  requireNumber(value, 'origin', path, issues, `${prefix}.origin`);
+  requireLiteralSet(value, 'priority', DEBT_PRIORITY_VALUES, path, issues, `${prefix}.priority`);
   requireLiteralSet(value, 'status', DEBT_STATUS_VALUES, path, issues, `${prefix}.status`);
+  requireNullableNumber(value, 'targetSprint', path, issues, `${prefix}.targetSprint`);
+  requireString(value, 'note', path, issues, `${prefix}.note`);
+}
+
+function validateRemediationAnchors(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!Array.isArray(value)) {
+    issues.push({ path, field: prefix, message: 'must be an array when present' });
+    return;
+  }
+  const seen = new Set<string>();
+  value.forEach((entry, index) => {
+    const field = `${prefix}[${index}]`;
+    if (!isRecord(entry)) {
+      issues.push({ path, field, message: 'must be an object { id, path, commitment }' });
+      return;
+    }
+    for (const key of Object.keys(entry)) {
+      if (!REMEDIATION_ANCHOR_KEYS.includes(key)) {
+        issues.push({ path, field: `${field}.${key}`, message: 'is not part of the remediation anchor contract' });
+      }
+    }
+    requireNonEmptyString(entry, 'id', path, issues, `${field}.id`);
+    requireNonEmptyString(entry, 'path', path, issues, `${field}.path`);
+    if (typeof entry.commitment !== 'string' || !SHA256_HEX_PATTERN.test(entry.commitment)) {
+      issues.push({ path, field: `${field}.commitment`, message: 'must be a sha-256 hex digest' });
+    }
+    if (typeof entry.id === 'string') {
+      if (seen.has(entry.id)) issues.push({ path, field: `${field}.id`, message: `duplicates remediation id ${entry.id}` });
+      seen.add(entry.id);
+    }
+  });
 }
 
 export function validateScopeState(value: unknown, path: string): ValidationIssue[] {
@@ -937,6 +979,12 @@ function requireIsoString(record: Record<string, unknown>, key: string, path: st
 
 function requireNullableString(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[]): void {
   if (record[key] !== null && typeof record[key] !== 'string') issues.push({ path, field: key, message: 'must be a string or null' });
+}
+
+function requireNullableNumber(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field = key): void {
+  if (record[key] !== null && (typeof record[key] !== 'number' || Number.isNaN(record[key]))) {
+    issues.push({ path, field, message: 'must be a number or null' });
+  }
 }
 
 function requireNumber(record: Record<string, unknown>, key: string, path: string, issues: ValidationIssue[], field = key): void {

@@ -1262,4 +1262,52 @@ if (process.platform !== 'win32') {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
+// An append-only remediation corrects live state only. The immutable close artifacts and the
+// external ledger commitment that proves them must survive it byte-for-byte — otherwise the
+// remediation protocol would be able to launder a rewrite of history through a "correction".
+{
+  const root = makeSandbox();
+  try {
+    const closed = run(root);
+    assert(closed.status === 0, `close must succeed before remediation: ${output(closed)}`);
+    const p = paths(root);
+    const frozen = { checkpoint: readFileSync(p.checkpoint, 'utf8'), snapshot: readFileSync(p.snapshot, 'utf8'), narrative: readFileSync(p.narrative, 'utf8') };
+    const closedSprint = readJson(p.sprint);
+    const ledgerEntry = closedSprint.ledger.at(-1);
+    const anchor = ledgerEntry.checkpointSha256;
+    assert(typeof anchor === 'string', 'closed sprint must carry an external checkpoint commitment');
+
+    // Reproduce the historical defect on the live copy only: prose written into a numeric field.
+    const corrupted = readJson(p.sprint);
+    corrupted.debt = [{ id: 'debt-1', title: 'Legacy origin.', origin: 'food-analysis FR-FA-013 revision', priority: 'low', status: 'deferred', targetSprint: null, note: 'legacy' }];
+    writeJson(p.sprint, corrupted);
+    const observed = digest(corrupted.debt[0].origin);
+    const businessState = { ...corrupted };
+    delete businessState.remediations;
+    writeJson(join(root, 'manifest.json'), {
+      schemaVersion: 1,
+      kind: 'scope-remediation-manifest',
+      scope: 'demo',
+      base: { stateSha256: digest(businessState), remediationHead: null },
+      issues: [{ id: 'I-1', code: 'debt.origin.not-number', path: 'debt[0].origin', observedValueSha256: observed }],
+      operations: [{ id: 'O-1', kind: 'debt.origin.set', resolves: ['I-1'], debtId: 'debt-1', expectedOriginSha256: observed, origin: 1, reason: 'Raised in sprint 1.' }],
+      provenance: { reason: 'Live origin persisted as prose after close.', actor: 'lossless-suite' },
+    });
+
+    const remediated = run(root, ['remediate', 'apply', '--kyro-scope', 'demo', '--manifest', 'manifest.json', '--yes']);
+    assert(remediated.status === 0, `remediation must succeed: ${output(remediated)}`);
+
+    assert(readFileSync(p.checkpoint, 'utf8') === frozen.checkpoint, 'remediation rewrote the immutable checkpoint');
+    assert(readFileSync(p.snapshot, 'utf8') === frozen.snapshot, 'remediation rewrote the legacy snapshot');
+    assert(readFileSync(p.narrative, 'utf8') === frozen.narrative, 'remediation rewrote the archive narrative');
+
+    const live = readJson(p.sprint);
+    assert(live.debt[0].origin === 1, 'remediation must correct the live debt origin');
+    assert(live.ledger.at(-1).checkpointSha256 === anchor, 'remediation must not touch the external ledger commitment');
+    assert(checkpointCommitment(readJson(p.checkpoint)) === anchor, 'checkpoint must still verify against its unchanged ledger anchor');
+    assert(JSON.stringify(live.ledger) === JSON.stringify(closedSprint.ledger), 'remediation must not touch historical ledger fields');
+    assertNoLockDebris(root, 'remediate apply');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
 console.log('check:lossless-checkpoints — all cases passed');

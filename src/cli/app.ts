@@ -4,6 +4,7 @@ import { detect } from './commands/detect';
 import { install, sync } from './commands/install';
 import { runTui } from './commands/tui';
 import { repair } from './commands/repair';
+import { runRemediateCommand } from './commands/remediate';
 import { contextPack } from './commands/context-pack';
 import { runStatusCommand } from './commands/status';
 import { runScopeCommand } from './commands/scope';
@@ -79,6 +80,11 @@ export async function runCli(): Promise<void> {
 
   if (command === 'plan') {
     runPlanCommand(args);
+    return;
+  }
+
+  if (command === 'remediate') {
+    runRemediateCommand(args);
     return;
   }
 
@@ -173,7 +179,7 @@ function isMutatingInvocation(command: string, args: string[]): boolean {
   if (args.includes('--dry-run')) return false;
   // close-sprint owns its lock after interactive confirmation so prompts never block writers.
   // install owns a post-prompt lock and rebuilds its plan from fresh state.
-  if (['sync', 'uninstall', 'repair', 'review', 'record-evidence', 'plan', 'debt', 'add-emergent', 'scenario', 'adr', 'rule'].includes(command)) return true;
+  if (['sync', 'uninstall', 'repair', 'remediate', 'review', 'record-evidence', 'plan', 'debt', 'add-emergent', 'scenario', 'adr', 'rule'].includes(command)) return true;
   if (command === 'scope' && args[0] === 'set-active') return true;
   return command === 'trace' && args.includes('--clear');
 }

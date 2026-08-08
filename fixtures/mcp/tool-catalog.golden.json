@@ -177,6 +177,36 @@
       }
     },
     {
+      "name": "remediate_scope",
+      "title": "Remediate a closed Kyro scope",
+      "description": "Preview or apply a typed, append-only correction to a CLOSED scope whose live state no longer satisfies the contract. Use when doctor reports schema drift in a scope that was already closed, so its history must not be rewritten. Checkpoints, snapshots, narratives and ledger commitments are verified and never rewritten. Only registry operations are accepted (generic JSON Patch is rejected). Without confirm:true it returns the plan and writes nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Kyro scope id. Omit to use activeScope or the only existing scope."
+          },
+          "manifest": {
+            "type": "string",
+            "description": "Path to a scope-remediation-manifest v1 document."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required for mutation. Omit or false to return the dry-run plan without writing."
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true
+      }
+    },
+    {
       "name": "review_task",
       "title": "Review a Kyro task (maker/checker)",
       "description": "Run the deterministic maker/checker on a task and write its verdict. Use when a task is done and needs verification. Without confirm:true it returns the plan and writes nothing; a pass that fails the deterministic checks is refused.",

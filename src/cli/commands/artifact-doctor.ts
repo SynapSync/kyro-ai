@@ -22,6 +22,7 @@ import {
   sha256,
   validateSprintCloseCheckpoint,
 } from '../checkpoints/sprint-close';
+import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase } from '../remediation/plan';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import {
   formatBootstrapRemedy,
@@ -150,18 +151,24 @@ function checkScope(scope: string): CheckResult[] {
   const sprintRead = readJsonSafely(sprintJsonPath(scope));
   if (!sprintRead.exists) {
     checks.push(fail(`${scope}/sprint.json`, 'missing', `Run /kyro:forge (INIT) to create it.`));
+    checks.push(...scopeVerificationChecks(scope));
     checks.push(...inspectSprintCloseCheckpoints(scope));
+    checks.push(...inspectRemediationChain(scope));
     return checks;
   }
   if (sprintRead.error) {
     checks.push(fail(`${scope}/sprint.json`, sprintRead.error, 'Fix invalid JSON or run kyro repair --kyro-scope <scope>.'));
+    checks.push(...scopeVerificationChecks(scope));
     checks.push(...inspectSprintCloseCheckpoints(scope));
+    checks.push(...inspectRemediationChain(scope));
     return checks;
   }
   const issues = validateSprintFile(sprintRead.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
     checks.push(fail(`${scope}/sprint.json`, formatIssues(issues), 'Fix the shape drift (see field paths). Conventions/scopes/debt/ADRs must be structured objects, not loose strings.'));
+    checks.push(...scopeVerificationChecks(scope));
     checks.push(...inspectSprintCloseCheckpoints(scope));
+    checks.push(...inspectRemediationChain(scope));
     return checks;
   }
   checks.push(pass(`${scope}/sprint.json`, 'Schema shapes are valid.'));
@@ -227,7 +234,30 @@ function checkScope(scope: string): CheckResult[] {
     }
   }
   checks.push(...inspectSprintCloseCheckpoints(scope));
+  // Chain state is reported even when the live file fails validation — a scope awaiting remediation
+  // is exactly the case where the reader must still say whether a correction was applied.
+  checks.push(...inspectRemediationChain(scope));
+  checks.push(...scopeVerificationChecks(scope));
   return checks;
+}
+
+/**
+ * Named scope verification state (T2.1, ADR-0002). Derived from the checkpoint position plus the
+ * replayed remediation chain — the SAME single derivation `kyro status` uses, so a reader can tell
+ * an audited correction from tampering without parsing prose.
+ */
+function scopeVerificationChecks(scope: string): CheckResult[] {
+  const verification = deriveScopeVerificationState(scope);
+  if (verification === null) return [];
+  const name = `${scope}/verification`;
+  const message = `${verification.state}: ${verification.detail}`;
+  if (verification.state === 'historical' || verification.state === 'remediated' || verification.state === 'recertified') {
+    return [pass(name, message)];
+  }
+  if (verification.state === 'unsupported') {
+    return [fail(name, message, 'Upgrade Kyro before reading or extending this remediation or certification chain.')];
+  }
+  return [fail(name, message, 'Do not overwrite live state. Reconcile the scope explicitly against the checkpoint after-image and the remediation chain.')];
 }
 
 export function inspectSprintCloseCheckpoints(scope: string): CheckResult[] {
@@ -291,7 +321,34 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const projectEntry = project?.scopes.find((entry) => entry.id === scope);
   const projectDigest = projectEntry ? sha256(projectEntry) : null;
 
-  const sprintPosition = digestPosition(sprintDigest, checkpoint.digests.beforeClose, checkpoint.digests.intendedAfterClose);
+  let sprintPosition = digestPosition(sprintDigest, checkpoint.digests.beforeClose, checkpoint.digests.intendedAfterClose);
+  // An append-only remediation is expected to move live state off the checkpoint's after-image, so
+  // two narrow allowances keep an audited correction from reading as tampering. Neither may ever be
+  // reachable by drift that Kyro did not itself produce.
+  let remediationLabel: string | null = null;
+  if (sprintPosition === 'other') {
+    // 1. Anchor-only difference: the business state (remediations[] excluded) still matches an image
+    //    of the checkpoint. Trusts nothing about the chain — the states are simply identical.
+    const businessDigest = businessStateDigest(sprintRead.value);
+    const businessPosition = digestPosition(
+      businessDigest,
+      businessStateDigest(checkpoint.beforeClose) ?? '',
+      businessStateDigest(checkpoint.intendedAfterClose) ?? '',
+    );
+    if (isAfterPosition(businessPosition)) {
+      sprintPosition = 'after';
+      remediationLabel = 'after (remediation anchor excluded)';
+    } else {
+      // 2. Replay: re-execute the chain from the checkpoint's after-image and require it to
+      //    reproduce the live state exactly. A record cannot be believed about a transformation it
+      //    could not perform, and drift outside the declared operations never replays.
+      const rebase = resolveRemediationRebase(scope, checkpoint.intendedAfterClose);
+      if (rebase.kind === 'remediated') {
+        sprintPosition = 'after';
+        remediationLabel = `after (replayed through ${rebase.through})`;
+      }
+    }
+  }
   let scopePosition = digestPosition(projectDigest, checkpoint.digests.projectScopeBefore, checkpoint.digests.projectScopeAfter);
   let legacyScopeNormalized = false;
   // Historical intermediate v1 residual: checkpoint stores projectScopeAfter.status=active while
@@ -316,7 +373,8 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const scopeLabel = legacyScopeNormalized
     ? 'after (legacy v1 intermediate scope status active→planning)'
     : scopePosition;
-  return checkpointResult(scope, path, status, `sprint=${sprintPosition}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`);
+  const sprintLabel = remediationLabel ?? sprintPosition;
+  return checkpointResult(scope, path, status, `sprint=${sprintLabel}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`);
 }
 
 function validateLedgerCheckpointReferences(
