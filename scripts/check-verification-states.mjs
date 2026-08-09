@@ -244,6 +244,33 @@ withFixture({ corrupt: true }, (fx) => {
   assert(doctor.status !== 0, 'forged record: doctor must exit non-zero');
 });
 
+// 4b. A coherent anchor chain still diverges when a non-final snapshot is not a valid sprint
+// state. The forged field is excluded from the business digest, so this isolates snapshot
+// structural validation rather than relying on a later digest mismatch.
+withFixture({ corrupt: true }, (fx) => {
+  const first = remediate(fx.root, readJson(sprintPath(fx.root)), 1);
+  assert(first.status === 0, `intermediate snapshot: R-001 setup failed: ${first.output}`);
+  const second = remediate(fx.root, readJson(sprintPath(fx.root)), 2);
+  assert(second.status === 0, `intermediate snapshot: R-002 setup failed: ${second.output}`);
+
+  const firstFile = join(archiveDir(fx.root), 'remediations/remediation-001.json');
+  const firstRecord = readJson(firstFile);
+  firstRecord.result.snapshot.certifications = 'not-an-anchor-array';
+  writeJson(firstFile, firstRecord);
+
+  const live = readJson(sprintPath(fx.root));
+  live.remediations[0].commitment = digest(firstRecord);
+  const secondFile = join(archiveDir(fx.root), 'remediations/remediation-002.json');
+  const secondRecord = readJson(secondFile);
+  secondRecord.base.remediationHead = live.remediations[0].commitment;
+  writeJson(secondFile, secondRecord);
+  live.remediations[1].commitment = digest(secondRecord);
+  writeJson(sprintPath(fx.root), live);
+
+  const doctor = assertBothReport(fx.root, 'diverged', 'intermediate snapshot');
+  assert(doctor.status !== 0, 'intermediate snapshot: doctor must exit non-zero');
+});
+
 // 5. unsupported — a record declaring a schemaVersion this runtime cannot evaluate must be named,
 //    never silently treated as absent (which would read as diverged, or worse as historical).
 withFixture({ corrupt: true }, (fx) => {

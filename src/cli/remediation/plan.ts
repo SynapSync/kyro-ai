@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
-import { validateSprintFile, type ValidationIssue } from '../artifacts/schema';
+import { asSprintFile, validateSprintFile, type ValidationIssue } from '../artifacts/schema';
 import { checkpointCommitmentOfRecord, checkpointIntegrityIssues, sha256 } from '../checkpoints/sprint-close';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
@@ -438,9 +438,9 @@ export function resolveRemediationRebase(scope: string, closedState: unknown): R
       if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
       // Use snapshot if there are more records; otherwise use the replayed result.
       if (!isLast) {
-        const snapshot = asRecord(record.result.snapshot);
+        const snapshot = validatedReplaySnapshot(record.result.snapshot, record.result.stateSha256);
         if (!snapshot) return { kind: 'broken' };
-        replayed = snapshot as unknown as Record<string, unknown>;
+        replayed = snapshot;
       } else {
         replayed = next;
       }
@@ -451,9 +451,9 @@ export function resolveRemediationRebase(scope: string, closedState: unknown): R
       if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
       // Use snapshot if there are more records; otherwise use the replayed result.
       if (!isLast) {
-        const snapshot = asRecord(record.result.snapshot);
+        const snapshot = validatedReplaySnapshot(record.result.snapshot, record.result.stateSha256);
         if (!snapshot) return { kind: 'broken' };
-        replayed = snapshot as unknown as Record<string, unknown>;
+        replayed = snapshot;
       } else {
         replayed = next;
       }
@@ -652,6 +652,18 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
 function replayOperations(state: Record<string, unknown>, operations: RemediationOperation[], skipPreconditions = false): Record<string, unknown> | null {
   const executed = executeOperations(state, operations, skipPreconditions);
   return 'failure' in executed ? null : executed.state;
+}
+
+/**
+ * A non-head record's snapshot is a replay input, not opaque historical metadata. It must be a
+ * current SprintFile-shaped state and reproduce the result digest the immutable record declares.
+ * Without both checks an attacker can alter excluded anchor fields in the snapshot, carry that
+ * payload through later operations, and still satisfy the final business-state digest.
+ */
+function validatedReplaySnapshot(value: unknown, expectedDigest: string): Record<string, unknown> | null {
+  const snapshot = asSprintFile(value);
+  if (!snapshot || stateDigest(snapshot as unknown as Record<string, unknown>) !== expectedDigest) return null;
+  return snapshot as unknown as Record<string, unknown>;
 }
 
 function ledgerCommitmentMap(state: Record<string, unknown>): Map<string, string> {

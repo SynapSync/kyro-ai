@@ -145,7 +145,8 @@ export function validateScopeRemediation(value: unknown, path: string): Validati
   } else {
     requireUnknownKeys(value.result, ['stateSha256', 'snapshot'], path, 'result', issues);
     requireDigest(value.result, 'stateSha256', path, issues, 'result.stateSha256');
-    // snapshot is allowed but not validated (it's a copy of the live state at that moment)
+    // The record contract preserves the snapshot as opaque archival data. Replay validates every
+    // non-final snapshot as a SprintFile and rechecks it against result.stateSha256 before reuse.
   }
 
   if (!isRecord(value.provenance)) {

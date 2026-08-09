@@ -629,6 +629,37 @@ withFixture((fx) => {
     } finally { rmSync(fx.root, { recursive: true, force: true }); }
   }
 
+  // An intermediate snapshot is replay input, so it cannot carry a malformed excluded field just
+  // because that field is absent from the business digest. Re-anchor both records to isolate the
+  // replay check: commitment, ordering, and result digests otherwise remain coherent.
+  {
+    const fx = makeFixture();
+    try {
+      const first = applyOne(fx, [makeOp('O-1', 'debt-1', LEGACY_ORIGIN, 1)]);
+      assert(first.status === 0, `snapshot tampering: R-001 must apply: ${first.output}`);
+      const second = applyOne(fx, [makeOp('O-1', 'debt-1', 1, 2)]);
+      assert(second.status === 0, `snapshot tampering: R-002 must apply: ${second.output}`);
+
+      const firstRecord = readJson(recordPath(fx.root, '001'));
+      firstRecord.result.snapshot.certifications = 'not-an-anchor-array';
+      writeJson(recordPath(fx.root, '001'), firstRecord);
+
+      const live = readJson(sprintPath(fx.root));
+      live.remediations[0].commitment = digest(firstRecord);
+      const secondRecord = readJson(recordPath(fx.root, '002'));
+      secondRecord.base.remediationHead = live.remediations[0].commitment;
+      writeJson(recordPath(fx.root, '002'), secondRecord);
+      live.remediations[1].commitment = digest(secondRecord);
+      writeJson(sprintPath(fx.root), live);
+
+      const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+      assert(doctor.status === 1, `an invalid intermediate snapshot must fail doctor: ${doctor.output}`);
+      assert(doctor.output.includes('DIVERGED'), `snapshot tampering must be reported as divergence: ${doctor.output}`);
+      const status = run(fx.root, ['status', '--kyro-scope', SCOPE]);
+      assert(status.status === 0 && status.output.includes('Verification: diverged'), `snapshot tampering must make status diverged: ${status.output}`);
+    } finally { rmSync(fx.root, { recursive: true, force: true }); }
+  }
+
   // Two operations on the SAME field in one batch: the second describes a value that no longer
   // exists once the first has run, so the batch is refused rather than silently applied.
   // The live state is the genuine corruption (LEGACY_ORIGIN); both operations declare the wrong
