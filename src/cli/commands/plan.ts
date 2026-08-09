@@ -363,12 +363,9 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
 function registerScopeInProjectState(scope: string, title: string, state: KyroProjectState): void {
   if (!state.scopes.some((entry) => entry.id === scope)) {
     const scopes = [...state.scopes, { id: scope, title, status: 'planning' as const }];
-    // Registry cache on shared; auto-activeScope only when unset (local layer).
-    if (state.activeScope == null) {
-      updateProjectStateLayers({ scopes, activeScope: scope });
-    } else {
-      updateProjectStateLayers({ scopes });
-    }
+    // Initializing a new scope is an explicit selection. Keep the registry shared and the
+    // selection local; sprint-mode planning never calls this helper.
+    updateProjectStateLayers({ scopes, activeScope: scope });
   }
   assertProjectStateIsValid();
 }
@@ -734,7 +731,7 @@ function printPlanHelp(): void {
 Two modes, auto-detected from the resolved scope's state (not from the --from file shape):
   - init mode: no sprint.json yet for the scope. Materializes the scope's initial sprint.json
     (spec + roadmap, activeSprint: null). Also registers the scope in the layered project state:
-    project.json (scopes[]) and local.json (activeScope if unset). When git user.name and/or a valid user.email is set, writes optional
+    project.json (scopes[]) and local.json (activeScope set to the initialized scope). When git user.name and/or a valid user.email is set, writes optional
     sprint.json.author { name?, email?, source: "git", capturedAt } with usable fields only
     (malformed email dropped). Omits author when nothing usable remains. Never blocks init —
     author is best-effort only. Not accepted from the lean file (machine identity at write time).

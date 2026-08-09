@@ -230,13 +230,39 @@ function initScope(root, scope = 'demo-scope') {
 
     const kyroJson = readKyroJson(root);
     assert(kyroJson.scopes.some((entry) => entry.id === 'demo-scope'), 'kyro.json should register the new scope');
-    assert(kyroJson.activeScope === 'demo-scope', 'kyro.json activeScope should be set when previously null');
+    assert(kyroJson.activeScope === 'demo-scope', 'kyro.json activeScope should be set to the initialized scope');
 
     const doctorResult = run(['doctor', '--artifacts', '--kyro-scope', 'demo-scope'], root);
     assert(doctorResult.status === 0, `doctor --artifacts should be clean: ${doctorResult.stdout}${doctorResult.stderr}`);
 
     const analyzeResult = run(['analyze', '--kyro-scope', 'demo-scope'], root);
     assert(analyzeResult.status === 0, `analyze should be clean (no CRITICAL/HIGH): ${analyzeResult.stdout}${analyzeResult.stderr}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 1b) Initializing a second scope explicitly selects it locally, without adding the local-only
+//     activeScope key to the shared project registry. This prevents commands without
+//     --kyro-scope from silently continuing to target the previous scope.
+{
+  const root = sandbox();
+  try {
+    initScope(root, 'previous-scope');
+    const secondScope = 'newly-initialized-scope';
+    const leanPath = writeLeanPlan(root, validLeanPlan({ scope: secondScope }), 'second-lean.json');
+    const result = run(['plan', '--from', leanPath, '--kyro-scope', secondScope], root);
+    assert(result.status === 0, `second scope init should succeed: ${result.stdout}${result.stderr}`);
+
+    const effective = readKyroJson(root);
+    assert(effective.activeScope === secondScope, 'newly initialized scope must become the active scope');
+    assert(effective.scopes.some((entry) => entry.id === 'previous-scope'), 'previous scope must remain registered');
+    assert(effective.scopes.some((entry) => entry.id === secondScope), 'new scope must be registered');
+
+    const shared = JSON.parse(readFileSync(projectJsonPath(root), 'utf-8'));
+    const local = JSON.parse(readFileSync(localJsonPath(root), 'utf-8'));
+    assert(!Object.hasOwn(shared, 'activeScope'), 'shared project.json must not store activeScope');
+    assert(local.activeScope === secondScope, 'local.json must select the newly initialized scope');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
