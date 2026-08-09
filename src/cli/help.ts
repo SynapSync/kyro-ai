@@ -22,6 +22,8 @@ Usage:
   kyro adr <subcommand>        Tool-owned ADR append (full v4 record)
   kyro rule <subcommand>       Tool-owned scope/global convention append
   kyro repair [options]        Validate and normalize a scope's sprint.json
+  kyro remediate <subcommand>  Typed, append-only correction of a CLOSED scope: preview, apply
+  kyro recertify <subcommand>  Certify a remediated scope against re-verified evidence: preview, apply
   kyro status [mode]           Read-only scope progress, review debt, and debt report
   kyro close-sprint [options]  Checkpoint + close the active sprint (lossless, tool-owned)
   kyro context-pack [options]  Emit a context package for a scope from sprint.json
@@ -59,6 +61,8 @@ Examples:
   kyro detect --json
   kyro doctor --tokens --artifacts
   kyro repair --kyro-scope auth-refactor --dry-run
+  kyro remediate preview --kyro-scope auth-refactor --manifest remediation.json
+  kyro recertify preview --kyro-scope auth-refactor --manifest certification.json
   kyro status --kyro-scope auth-refactor --json
   kyro status debt --kyro-scope auth-refactor
   kyro record-evidence T1.1 --kyro-scope auth-refactor --summary "..." --validation "npm test" --file src/x.ts
@@ -86,6 +90,10 @@ export function printCommandHelp(command: string): void {
     console.log('Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--trace] [--kyro-scope <scope>]');
   } else if (command === 'repair') {
     console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes|--confirm]');
+  } else if (command === 'remediate') {
+    console.log('Usage: kyro remediate preview|apply --manifest <path> [--kyro-scope <scope>] [--json] (apply requires --yes)');
+  } else if (command === 'recertify') {
+    console.log('Usage: kyro recertify preview|apply --manifest <path> [--kyro-scope <scope>] [--json] (apply requires --yes)');
   } else if (command === 'status') {
     console.log('Usage: kyro status [brief|full|debt] [--kyro-scope <scope>] [--json]');
   } else if (command === 'analyze') {

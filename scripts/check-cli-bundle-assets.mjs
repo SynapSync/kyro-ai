@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -89,6 +90,21 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
   }
   const managedDistCli = `~/.agents/kyro/current/dist/cli.js`;
   assert(manifest.managedFiles.includes(managedDistCli), `check-cli-bundle-assets: manifest.managedFiles missing ${managedDistCli}`);
+
+  // T3.6: verify the isolated projected runtime, rather than this checkout or the user's global
+  // install, drives the complete remediated/recertified/diverged/unsupported vocabulary harness.
+  const verification = spawnSync(process.execPath, [join(repo, 'scripts/check-verification-states.mjs')], {
+    cwd: repo,
+    encoding: 'utf-8',
+    env: {
+      ...process.env,
+      HOME: home,
+      KYRO_CLI_UNDER_TEST: join(runtimeDir, 'dist/cli.js'),
+    },
+  });
+  const verificationOutput = `${verification.stdout ?? ''}${verification.stderr ?? ''}`;
+  assert(verification.status === 0, `check-cli-bundle-assets: projected runtime verification failed:\n${verificationOutput}`);
+  assert(verificationOutput.includes('162 assertions passed'), `check-cli-bundle-assets: projected runtime did not report verification coverage:\n${verificationOutput}`);
 
   // kyroInvocation SoT is the global runtime manifest only (not project kyro.json).
   // Shape: bare `kyro` (durable PATH) or `node {current}/dist/cli.js` fallback.

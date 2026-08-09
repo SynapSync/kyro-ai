@@ -6,9 +6,10 @@ import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { unregisteredScopeFolders } from '../core/scopes';
 import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
 import { KyroCoreError } from '../core/errors';
+import { deriveScopeVerificationState } from '../remediation/plan';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
 import { ADR_STATUS } from '../types';
-import type { ActiveSprint, AdrRecord, AdrStatus, Debt, ScopeAuthor, SprintFile, Task, TaskStatus } from '../types';
+import type { ActiveSprint, AdrRecord, AdrStatus, Debt, ScopeAuthor, ScopeVerification, SprintFile, Task, TaskStatus } from '../types';
 
 const STATUS_MODE = {
   BRIEF: 'brief',
@@ -79,6 +80,8 @@ interface BriefStatusReport {
   pendingReviewCount: number;
   /** Present when project layers/monolito are missing or disk scopes are unregistered (D7a). */
   bootstrapRemedy: string | null;
+  /** Named scope verification state (T2.1/ADR-0002), or null when no close checkpoint exists to derive from. */
+  verification: ScopeVerification | null;
 }
 
 interface DebtStatusReport {
@@ -232,6 +235,7 @@ function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusR
     openDebtCount: countOpenDebt(sprint.debt),
     pendingReviewCount: reviewDebt.length,
     bootstrapRemedy: resolveBootstrapRemedy(),
+    verification: deriveScopeVerificationState(scope),
   };
 }
 
@@ -365,6 +369,7 @@ function printBriefStatus(report: BriefStatusReport): void {
   }
   console.log(`Open debt: ${report.openDebtCount}`);
   console.log(`Pending review: ${report.pendingReviewCount}`);
+  if (report.verification) console.log(`Verification: ${report.verification.state} — ${report.verification.detail}`);
   if (report.blockers.length > 0) console.log(`Blockers: ${report.blockers.join(' | ')}`);
   if (report.bootstrapRemedy) console.log(`Bootstrap: ${report.bootstrapRemedy}`);
 }

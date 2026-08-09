@@ -3,7 +3,7 @@
 // tool (no hand-edit), never deletes a debt item, never reuses an id, and refuses invalid transitions
 // (restart a resolved item, escalate downward, defer without a concrete reason) without writing.
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -203,6 +203,34 @@ function run(args, root) {
     assert(JSON.stringify(untouchedAfter) === JSON.stringify(untouchedBefore), 'debt-1 must be unchanged when debt-2 is mutated');
     const changed = afterDebt.find((d) => d.id === 'debt-2');
     assert(changed.status === 'resolved', 'debt-2 should be resolved');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// N) `kyro debt` is not a backdoor repair path. A scope carrying a legacy non-numeric origin is
+//    refused with the field path and left byte-identical, so correcting it must go through the
+//    audited `kyro remediate` transaction instead of a silent in-place rewrite.
+{
+  const root = sandbox();
+  try {
+    run(['debt', 'add', '--title', 'Legacy item', '--priority', 'low', '--kyro-scope', 'demo'], root);
+    const corrupted = readSprint(root);
+    corrupted.debt[0].origin = 'food-analysis FR-FA-013 revision';
+    writeFileSync(sprintPath(root), `${JSON.stringify(corrupted, null, 2)}\n`);
+    const before = readFileSync(sprintPath(root), 'utf-8');
+
+    for (const args of [
+      ['debt', 'add', '--title', 'Another', '--priority', 'low', '--kyro-scope', 'demo'],
+      ['debt', 'resolve', 'debt-1', '--note', 'Done.', '--kyro-scope', 'demo'],
+      ['debt', 'escalate', 'debt-1', '--priority', 'high', '--kyro-scope', 'demo'],
+    ]) {
+      const result = run(args, root);
+      const output = `${result.stdout}${result.stderr}`;
+      assert(result.status !== 0, `debt ${args[1]} must refuse a scope with a non-numeric origin: ${output}`);
+      assert(output.includes('debt[0].origin must be a number'), `debt ${args[1]} must name the offending field: ${output}`);
+      assert(readFileSync(sprintPath(root), 'utf-8') === before, `debt ${args[1]} must not write while refusing`);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -289,7 +289,8 @@ function closeSuccessfully(root) {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
-// Post-close rule add evolves live sprint but must not DIVERGE a ledger-anchored close.
+// A post-close rule add is a live-state mutation without an append-only witness, so the historical
+// checkpoint must remain DIVERGED even though repair preserves the rule on the live scope.
 {
   const root = makeSandbox({ intermediate: true });
   try {
@@ -305,14 +306,13 @@ function closeSuccessfully(root) {
     assert(Array.isArray(sprint.conventions) && sprint.conventions.length >= 1, 'rule must remain on live sprint');
     const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
     const text = output(doctor);
-    assert(doctor.status === 0 && text.includes('APPLIED:'), `post-close rule must stay APPLIED:\n${text}`);
-    assert(text.includes('post-close evolution'), `doctor should label post-close evolution:\n${text}`);
+    assert(doctor.status === 1 && text.includes('DIVERGED'), `post-close rule must remain detectable as drift:\n${text}`);
     // repair must not wipe the new convention
     const repair = run(root, ['repair', '--kyro-scope', 'demo', '--confirm']);
     assert(repair.status === 0, `repair after rule add failed:\n${output(repair)}`);
     assert(readJson(paths(root).sprint).conventions.length >= 1, 'repair must not wipe post-close conventions');
     const doctor2 = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
-    assert(doctor2.status === 0 && output(doctor2).includes('APPLIED:'), `doctor after repair+rule must stay APPLIED:\n${output(doctor2)}`);
+    assert(doctor2.status === 1 && output(doctor2).includes('DIVERGED'), `repair must not launder the post-close rule:\n${output(doctor2)}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -1292,6 +1292,54 @@ if (process.platform !== 'win32') {
     const result = await holder.completed;
     assert(result.status !== 0, `unbounded transient failures must exhaust the lease and fail-stop: ${result.text}`);
     assert(!existsSync(paths(root).checkpoint), 'lease-exhausted holder still published checkpoint side effects');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// An append-only remediation corrects live state only. The immutable close artifacts and the
+// external ledger commitment that proves them must survive it byte-for-byte — otherwise the
+// remediation protocol would be able to launder a rewrite of history through a "correction".
+{
+  const root = makeSandbox();
+  try {
+    const closed = run(root);
+    assert(closed.status === 0, `close must succeed before remediation: ${output(closed)}`);
+    const p = paths(root);
+    const frozen = { checkpoint: readFileSync(p.checkpoint, 'utf8'), snapshot: readFileSync(p.snapshot, 'utf8'), narrative: readFileSync(p.narrative, 'utf8') };
+    const closedSprint = readJson(p.sprint);
+    const ledgerEntry = closedSprint.ledger.at(-1);
+    const anchor = ledgerEntry.checkpointSha256;
+    assert(typeof anchor === 'string', 'closed sprint must carry an external checkpoint commitment');
+
+    // Reproduce the historical defect on the live copy only: prose written into a numeric field.
+    const corrupted = readJson(p.sprint);
+    corrupted.debt = [{ id: 'debt-1', title: 'Legacy origin.', origin: 'food-analysis FR-FA-013 revision', priority: 'low', status: 'deferred', targetSprint: null, note: 'legacy' }];
+    writeJson(p.sprint, corrupted);
+    const observed = digest(corrupted.debt[0].origin);
+    const businessState = { ...corrupted };
+    delete businessState.remediations;
+    writeJson(join(root, 'manifest.json'), {
+      schemaVersion: 1,
+      kind: 'scope-remediation-manifest',
+      scope: 'demo',
+      base: { stateSha256: digest(businessState), remediationHead: null },
+      issues: [{ id: 'I-1', code: 'debt.origin.not-number', path: 'debt[0].origin', observedValueSha256: observed }],
+      operations: [{ id: 'O-1', kind: 'debt.origin.set', resolves: ['I-1'], debtId: 'debt-1', expectedOriginSha256: observed, origin: 1, reason: 'Raised in sprint 1.' }],
+      provenance: { reason: 'Live origin persisted as prose after close.', actor: 'lossless-suite' },
+    });
+
+    const remediated = run(root, ['remediate', 'apply', '--kyro-scope', 'demo', '--manifest', 'manifest.json', '--yes']);
+    assert(remediated.status === 0, `remediation must succeed: ${output(remediated)}`);
+
+    assert(readFileSync(p.checkpoint, 'utf8') === frozen.checkpoint, 'remediation rewrote the immutable checkpoint');
+    assert(readFileSync(p.snapshot, 'utf8') === frozen.snapshot, 'remediation rewrote the legacy snapshot');
+    assert(readFileSync(p.narrative, 'utf8') === frozen.narrative, 'remediation rewrote the archive narrative');
+
+    const live = readJson(p.sprint);
+    assert(live.debt[0].origin === 1, 'remediation must correct the live debt origin');
+    assert(live.ledger.at(-1).checkpointSha256 === anchor, 'remediation must not touch the external ledger commitment');
+    assert(checkpointCommitment(readJson(p.checkpoint)) === anchor, 'checkpoint must still verify against its unchanged ledger anchor');
+    assert(JSON.stringify(live.ledger) === JSON.stringify(closedSprint.ledger), 'remediation must not touch historical ledger fields');
+    assertNoLockDebris(root, 'remediate apply');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
