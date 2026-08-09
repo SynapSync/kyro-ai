@@ -84,6 +84,11 @@ function fileTree(dir) {
 
 function sprintPath(root) { return join(root, `.agents/kyro/scopes/${SCOPE}/sprint.json`); }
 function archiveDir(root) { return join(root, `.agents/kyro/scopes/${SCOPE}/archive`); }
+function historicalArchive(root) {
+  return Object.fromEntries(
+    Object.entries(fileTree(archiveDir(root))).filter(([path]) => !path.startsWith('remediations/')),
+  );
+}
 function checkpointPath(root) {
   const dir = archiveDir(root);
   const name = readdirSync(dir).find((f) => f.endsWith('.checkpoint.json'));
@@ -667,6 +672,31 @@ withFixture({ corrupt: true, plannedSprints: 2 }, (fx) => {
     `active sprint + chain: a forged record went unreported while a sprint was active (state=${tampered.state})`,
   );
   assert(tampered.status !== 0, 'active sprint + chain: doctor must exit non-zero on a forged record');
+});
+
+// 16. A record version the runtime does not understand is not a malformed v1 record to be
+// coerced: both readers report unsupported, fail closed, and leave the close evidence untouched.
+withFixture({ corrupt: true }, (fx) => {
+  const applied = remediate(fx.root, readJson(sprintPath(fx.root)));
+  assert(applied.status === 0, `unsupported remediation version: setup failed: ${applied.output}`);
+  const historyBefore = historicalArchive(fx.root);
+  const ledgerBefore = JSON.stringify(readJson(sprintPath(fx.root)).ledger);
+
+  const recordFile = join(archiveDir(fx.root), 'remediations/remediation-001.json');
+  const record = readJson(recordFile);
+  record.schemaVersion = 2;
+  writeJson(recordFile, record);
+  const live = readJson(sprintPath(fx.root));
+  live.remediations[0].commitment = digest(record);
+  writeJson(sprintPath(fx.root), live);
+
+  const doctor = assertBothReport(fx.root, 'unsupported', 'unsupported remediation version');
+  assert(doctor.status !== 0, 'unsupported remediation version: doctor must fail closed');
+  assert(doctor.output.includes('schemaVersion=2'), `unsupported remediation version: doctor must name the version\n${doctor.output}`);
+  const status = run(fx.root, ['status', '--kyro-scope', SCOPE]);
+  assert(status.output.includes('schemaVersion=2'), `unsupported remediation version: status must name the version\n${status.output}`);
+  assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(historyBefore), 'unsupported remediation version: checkpoint, snapshot, and narrative bytes changed');
+  assert(JSON.stringify(readJson(sprintPath(fx.root)).ledger) === ledgerBefore, 'unsupported remediation version: ledger changed');
 });
 
 console.log(`check:verification-states — ${passed} assertions passed`);

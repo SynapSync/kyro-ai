@@ -619,12 +619,19 @@ withFixture((fx) => {
       assert(first.status === 0, `R-001 correcting LEGACY_ORIGIN to 1 must apply: ${first.output}`);
       const second = applyOne(fx, [makeOp('O-1', 'debt-1', 1, 2)]);
       assert(second.status === 0, `R-002 drifting 1 to 2 must apply on top of R-001: ${second.output}`);
+      const v1Records = [
+        readFileSync(recordPath(fx.root, '001'), 'utf8'),
+        readFileSync(recordPath(fx.root, '002'), 'utf8'),
+      ];
 
       const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
       assert(doctor.status === 0, `a genuine two-record chain must certify: ${doctor.output}`);
       assert(doctor.output.includes('replayed through R-002'), `the chain head must be named: ${doctor.output}`);
       assert(/remediation\/R-001[\s\S]*?APPLIED/.test(doctor.output), `the earlier record must not be reported as diverged: ${doctor.output}`);
       assert(readJson(sprintPath(fx.root)).debt[0].origin === 2, 'the head result must be the live value (origin 2 after LEGACY->1->2)');
+      assert(readJson(recordPath(fx.root, '001')).schemaVersion === 1, 'the first historic record must keep its v1 protocol version');
+      assert(readFileSync(recordPath(fx.root, '001'), 'utf8') === v1Records[0], 'doctor must not rewrite the first v1 record while replaying it');
+      assert(readFileSync(recordPath(fx.root, '002'), 'utf8') === v1Records[1], 'doctor must not rewrite the head v1 record while replaying it');
       assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive), 'a chain must not touch history');
     } finally { rmSync(fx.root, { recursive: true, force: true }); }
   }

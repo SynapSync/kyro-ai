@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, validateSprintFile, type ValidationIssue } from '../artifacts/schema';
+import { validateSprintFile, type ValidationIssue } from '../artifacts/schema';
 import { checkpointCommitmentOfRecord, checkpointIntegrityIssues, sha256 } from '../checkpoints/sprint-close';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
@@ -20,6 +20,7 @@ import {
   type ScopeRemediationV1,
   type SetDebtOriginOperation,
 } from './protocol';
+import { REPLAY_WITNESS_VALIDATION_STATUS, validateReplayWitness } from './replay-witness';
 
 /**
  * Pure remediation planner.
@@ -400,7 +401,8 @@ export type RemediationRebase =
  * or the check that detects a post-close edit becomes the mechanism that certifies one.
  *
  * The chain is replayed: for the first record, replay from checkpoint and verify the result.
- * For subsequent records, use the result.snapshot from the previous record as the starting point.
+ * For subsequent records, use the prior record's explicitly versioned replay witness as the
+ * starting point.
  * The first record is allowed to have begun from a different base (e.g., a corruption).
  * The full chain is proven correct if the final result matches the live state.
  */
@@ -438,7 +440,7 @@ export function resolveRemediationRebase(scope: string, closedState: unknown): R
       if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
       // Use snapshot if there are more records; otherwise use the replayed result.
       if (!isLast) {
-        const snapshot = validatedReplaySnapshot(record.result.snapshot, record.result.stateSha256);
+        const snapshot = validatedReplaySnapshot(record);
         if (!snapshot) return { kind: 'broken' };
         replayed = snapshot;
       } else {
@@ -451,7 +453,7 @@ export function resolveRemediationRebase(scope: string, closedState: unknown): R
       if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
       // Use snapshot if there are more records; otherwise use the replayed result.
       if (!isLast) {
-        const snapshot = validatedReplaySnapshot(record.result.snapshot, record.result.stateSha256);
+        const snapshot = validatedReplaySnapshot(record);
         if (!snapshot) return { kind: 'broken' };
         replayed = snapshot;
       } else {
@@ -656,14 +658,18 @@ function replayOperations(state: Record<string, unknown>, operations: Remediatio
 
 /**
  * A non-head record's snapshot is a replay input, not opaque historical metadata. It must be a
- * current SprintFile-shaped state and reproduce the result digest the immutable record declares.
+ * record-version-shaped state and reproduce the result digest the immutable record declares.
  * Without both checks an attacker can alter excluded anchor fields in the snapshot, carry that
  * payload through later operations, and still satisfy the final business-state digest.
  */
-function validatedReplaySnapshot(value: unknown, expectedDigest: string): Record<string, unknown> | null {
-  const snapshot = asSprintFile(value);
-  if (!snapshot || stateDigest(snapshot as unknown as Record<string, unknown>) !== expectedDigest) return null;
-  return snapshot as unknown as Record<string, unknown>;
+function validatedReplaySnapshot(record: ScopeRemediationV1): Record<string, unknown> | null {
+  const witness = validateReplayWitness({
+    recordSchemaVersion: record.schemaVersion,
+    snapshot: record.result.snapshot,
+    expectedStateSha256: record.result.stateSha256,
+  });
+  if (witness.status !== REPLAY_WITNESS_VALIDATION_STATUS.VALID) return null;
+  return witness.witness.snapshot as unknown as Record<string, unknown>;
 }
 
 function ledgerCommitmentMap(state: Record<string, unknown>): Map<string, string> {
