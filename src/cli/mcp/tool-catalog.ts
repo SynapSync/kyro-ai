@@ -73,6 +73,20 @@ export const MCP_TOOLS = [
     annotations: { destructiveHint: true, idempotentHint: true },
   },
   {
+    name: 'remediate_scope',
+    title: 'Remediate a closed Kyro scope',
+    description: 'Preview or apply a typed, append-only correction to a CLOSED scope whose live state no longer satisfies the contract. Use when doctor reports schema drift in a scope that was already closed, so its history must not be rewritten. Checkpoints, snapshots, narratives and ledger commitments are verified and never rewritten. Only registry operations are accepted (generic JSON Patch is rejected). Without confirm:true it returns the plan and writes nothing.',
+    inputSchema: { type: 'object', properties: { scope, manifest: { type: 'string', description: 'Path to a scope-remediation-manifest v1 document.' }, confirm }, required: ['manifest'], additionalProperties: false },
+    annotations: { destructiveHint: true, idempotentHint: true },
+  },
+  {
+    name: 'recertify_scope',
+    title: 'Certify a remediated Kyro scope',
+    description: 'Preview or apply a certification recording that a remediated scope\'s corrected state was independently validated against named, re-verifiable evidence. Use after remediate, once the corrections have been checked. Every evidence digest is re-derived from the workspace; certification is refused when the chain does not replay to live state, when the chain head has moved, when evidence is empty, or when the verdict is not a pass. A certificate covers one chain head, so remediating again drops it. Without confirm:true it returns the plan and writes nothing.',
+    inputSchema: { type: 'object', properties: { scope, manifest: { type: 'string', description: 'Path to a scope-certification-manifest v1 document.' }, confirm }, required: ['manifest'], additionalProperties: false },
+    annotations: { destructiveHint: true, idempotentHint: true },
+  },
+  {
     name: 'review_task',
     title: 'Review a Kyro task (maker/checker)',
     description: 'Run the deterministic maker/checker on a task and write its verdict. Use when a task is done and needs verification. Without confirm:true it returns the plan and writes nothing; a pass that fails the deterministic checks is refused.',

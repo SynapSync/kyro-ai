@@ -19,6 +19,16 @@ const validKyroJson = {
   installedAdapters: [],
 };
 
+const validDebt = {
+  id: 'D-1',
+  title: 'Document a known limitation.',
+  origin: 1,
+  priority: 'low',
+  status: 'deferred',
+  targetSprint: null,
+  note: 'Tracked without fabricating a migration.',
+};
+
 const validSprintJson = {
   schemaVersion: 4,
   scope: 'demo',
@@ -79,7 +89,7 @@ const validSprintJson = {
     emergentTasks: [],
     definitionOfDone: ['done'],
   },
-  debt: [],
+  debt: [validDebt],
   handoff: { nextAction: 'execute_task', nextTaskId: 'T1.1', blockers: [], note: '', lastUpdated: '2026-06-29' },
 };
 
@@ -119,6 +129,22 @@ function assertCase(name, kyroJson, sprintJson, expectedStatus, expectedText, ar
 
 // 1. Valid v4 artifacts pass.
 assertCase('valid', validKyroJson, validSprintJson, 0, 'Schema shapes are valid.');
+
+// 1b. Debt fields mirror the runtime Debt contract so Lens never receives a shape doctor accepted.
+for (const [name, patch, expectedText] of [
+  ['debt-origin-string', { origin: 'food-analysis FR-FA-013 revision' }, 'debt[0].origin must be a number'],
+  ['debt-priority-invalid', { priority: 'urgent' }, 'debt[0].priority must be one of'],
+  ['debt-target-sprint-string', { targetSprint: '2' }, 'debt[0].targetSprint must be a number or null'],
+  ['debt-note-not-string', { note: 42 }, 'debt[0].note must be a string'],
+]) {
+  assertCase(
+    name,
+    validKyroJson,
+    { ...validSprintJson, debt: [{ ...validDebt, ...patch }] },
+    1,
+    expectedText,
+  );
+}
 
 // Legacy v4 files may still contain runtimeVersion as an ignored extra field.
 assertCase(
