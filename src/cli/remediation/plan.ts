@@ -11,13 +11,18 @@ import { canonicalRemediationState, observedValueDigest } from './canonical-stat
 import { resolveCertificationForChainHead } from './certification-plan';
 import {
   REMEDIATION_MANIFEST_KIND,
+  COMPACT_REPLAY_WITNESS_KIND,
+  COMPACT_REPLAY_WITNESS_SCHEMA_VERSION,
+  CURRENT_SCOPE_REMEDIATION_SCHEMA_VERSION,
   SCOPE_REMEDIATION_KIND,
-  SCOPE_REMEDIATION_SCHEMA_VERSION,
+  isScopeRemediationSchemaVersion,
   validateRemediationManifest,
   validateScopeRemediation,
   type RemediationManifestV1,
   type RemediationOperation,
+  type ScopeRemediation,
   type ScopeRemediationV1,
+  type ScopeRemediationV2,
   type SetDebtOriginOperation,
 } from './protocol';
 import { REPLAY_WITNESS_VALIDATION_STATUS, validateReplayWitness } from './replay-witness';
@@ -68,7 +73,7 @@ export interface RemediationPlan {
   /** Workspace-relative path the immutable record would occupy. Reported, never written here. */
   recordPath: string;
   sprintPath: string;
-  record: ScopeRemediationV1;
+  record: ScopeRemediationV2;
   /** SHA-256 commitment that the live anchor would carry. */
   commitment: string;
   anchor: RemediationAnchor;
@@ -133,8 +138,8 @@ export function planRemediation(options: RemediationPlanOptions): RemediationPla
   // If anything else about the plan differs, the commitments still diverge and the retry is refused.
   const prepared = readRemediationRecord(options.scope, remediationId);
 
-  const record: ScopeRemediationV1 = {
-    schemaVersion: SCOPE_REMEDIATION_SCHEMA_VERSION,
+  const record: ScopeRemediationV2 = {
+    schemaVersion: CURRENT_SCOPE_REMEDIATION_SCHEMA_VERSION,
     kind: SCOPE_REMEDIATION_KIND,
     id: remediationId,
     scope: options.scope,
@@ -148,7 +153,10 @@ export function planRemediation(options: RemediationPlanOptions): RemediationPla
     operations: manifest.operations,
     result: {
       stateSha256: stateDigest(projectedSprint as unknown as Record<string, unknown>),
-      snapshot: projectedSprint,
+      witness: {
+        schemaVersion: COMPACT_REPLAY_WITNESS_SCHEMA_VERSION,
+        kind: COMPACT_REPLAY_WITNESS_KIND,
+      },
     },
     provenance: {
       reason: manifest.provenance.reason,
@@ -237,7 +245,7 @@ export function inspectRemediationTransaction(
     return { status: REMEDIATION_TRANSACTION_STATUS.CORRUPT, detail: `record is unreadable: ${read.error}` };
   }
   const declaredVersion = (read.value as { schemaVersion?: unknown } | null)?.schemaVersion;
-  if (declaredVersion !== SCOPE_REMEDIATION_SCHEMA_VERSION) {
+  if (!isScopeRemediationSchemaVersion(declaredVersion)) {
     return {
       status: REMEDIATION_TRANSACTION_STATUS.UNSUPPORTED_VERSION,
       detail: `record declares schemaVersion=${String(declaredVersion ?? '(missing)')}`,
@@ -247,7 +255,7 @@ export function inspectRemediationTransaction(
   if (issues.length > 0) {
     return { status: REMEDIATION_TRANSACTION_STATUS.CORRUPT, detail: formatIssues(issues) };
   }
-  const record = read.value as ScopeRemediationV1;
+  const record = read.value as ScopeRemediation;
   // A record is evidence about one scope and one remediation. Leaving those self-declared fields
   // unverified would let a record misreport its own provenance while still passing every digest.
   if (record.scope !== scope) {
@@ -362,7 +370,7 @@ export function inspectRemediationChain(scope: string): CheckResult[] {
  * Shared by doctor's per-record inspection and the scope verification derivation so the two surfaces
  * cannot disagree about a forked, reordered, or gapped chain (T2.1 finding 3).
  */
-export function chainContinuityIssue(record: ScopeRemediationV1 | null, expectedHead: string | null, expectedBase: string | null): string | null {
+export function chainContinuityIssue(record: ScopeRemediation | null, expectedHead: string | null, expectedBase: string | null): string | null {
   if (!record) return null;
   if (record.base.remediationHead !== expectedHead) {
     return `record head ${record.base.remediationHead ?? '(none)'} does not continue the chain (expected ${expectedHead ?? '(none)'})`;
@@ -401,8 +409,8 @@ export type RemediationRebase =
  * or the check that detects a post-close edit becomes the mechanism that certifies one.
  *
  * The chain is replayed: for the first record, replay from checkpoint and verify the result.
- * For subsequent records, use the prior record's explicitly versioned replay witness as the
- * starting point.
+ * Compact v2 records advance that state directly through their typed operations; historic v1
+ * records retain their versioned snapshot witness only when a later link needs that exact image.
  * The first record is allowed to have begun from a different base (e.g., a corruption).
  * The full chain is proven correct if the final result matches the live state.
  */
@@ -438,27 +446,17 @@ export function resolveRemediationRebase(scope: string, closedState: unknown): R
     if (isFirst && record.base.stateSha256 !== stateDigest(replayed)) {
       const next = replayOperations(replayed, record.operations, true);
       if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
-      // Use snapshot if there are more records; otherwise use the replayed result.
-      if (!isLast) {
-        const snapshot = validatedReplaySnapshot(record);
-        if (!snapshot) return { kind: 'broken' };
-        replayed = snapshot;
-      } else {
-        replayed = next;
-      }
+      const advanced = advanceReplayState(record, next, isLast);
+      if (!advanced) return { kind: 'broken' };
+      replayed = advanced;
     } else {
       // Normal replay: verify continuity for non-first records and execute operations with preconditions.
       if (!isFirst && record.base.stateSha256 !== stateDigest(replayed)) return { kind: 'broken' };
       const next = replayOperations(replayed, record.operations, false);
       if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
-      // Use snapshot if there are more records; otherwise use the replayed result.
-      if (!isLast) {
-        const snapshot = validatedReplaySnapshot(record);
-        if (!snapshot) return { kind: 'broken' };
-        replayed = snapshot;
-      } else {
-        replayed = next;
-      }
+      const advanced = advanceReplayState(record, next, isLast);
+      if (!advanced) return { kind: 'broken' };
+      replayed = advanced;
     }
     expectedHead = anchor.commitment;
   }
@@ -610,28 +608,23 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
   const afterBusiness = businessStateDigest(checkpoint.intendedAfterClose);
   const atAfterImage = liveBusiness !== null && afterBusiness !== null && liveBusiness === afterBusiness;
 
-  // A present, healthy chain is a recorded correction (S5). Even when it net-restored the
-  // after-image — the motivating case — the scope was corrected, so it is remediated, never
-  // historical. The head transaction already proved the head result matches live above.
+  // A present chain must be replayed even when it net-restored the after-image. The head digest
+  // only binds the claimed result to live state; without replaying operations, a re-anchored record
+  // could alter its operation payload while retaining that digest and be reported as remediated.
   if (anchors.length > 0) {
-    const headId = anchors[anchors.length - 1].id;
-    if (atAfterImage) {
-      const certification = resolveCertificationForHead(scope);
-      if (certification.kind === 'valid') {
-        return { state: 'recertified', detail: `valid certification for chain head ${headId}` };
-      }
-      return { state: 'remediated', detail: 'live business state matches the checkpoint after-image after a valid remediation chain' };
-    }
-    // Real drift: the chain must replay from the after-image to explain it.
     const rebase = resolveRemediationRebase(scope, checkpoint.intendedAfterClose);
     if (rebase.kind === 'remediated') {
       const certification = resolveCertificationForHead(scope);
       if (certification.kind === 'valid') {
         return { state: 'recertified', detail: `valid certification for chain head ${rebase.through}` };
       }
-      return { state: 'remediated', detail: `drift explained by the replayed chain through ${rebase.through}` };
+      return atAfterImage
+        ? { state: 'remediated', detail: `live business state matches the checkpoint after-image after replay through ${rebase.through}` }
+        : { state: 'remediated', detail: `drift explained by the replayed chain through ${rebase.through}` };
     }
-    return { state: 'diverged', detail: 'live drift is not explained by any replayed remediation chain' };
+    return { state: 'diverged', detail: atAfterImage
+      ? 'live business state matches the checkpoint after-image but the remediation chain does not replay'
+      : 'live drift is not explained by any replayed remediation chain' };
   }
 
   // No chain at all: historical only when the live state is exactly the checkpoint after-image.
@@ -647,9 +640,8 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
  * believed about a transformation it could not have performed.
  *
  * For E1: when replaying the first record (whose true base is unknown), skipPreconditions allows
- * the operations to be applied without verifying preconditions. The result is then verified against
- * the record's snapshot. This detects tampering (forged operations won't produce the declared result)
- * while tolerating replayed from a checkpoint base instead of the true corruption.
+ * the operations to be applied without verifying preconditions. The resulting state is always
+ * checked against the record's digest; v1 additionally verifies its snapshot witness when needed.
  */
 function replayOperations(state: Record<string, unknown>, operations: RemediationOperation[], skipPreconditions = false): Record<string, unknown> | null {
   const executed = executeOperations(state, operations, skipPreconditions);
@@ -657,12 +649,12 @@ function replayOperations(state: Record<string, unknown>, operations: Remediatio
 }
 
 /**
- * A non-head record's snapshot is a replay input, not opaque historical metadata. It must be a
- * record-version-shaped state and reproduce the result digest the immutable record declares.
- * Without both checks an attacker can alter excluded anchor fields in the snapshot, carry that
- * payload through later operations, and still satisfy the final business-state digest.
+ * Advance one verified record. v2 intentionally stores no state image: its closed witness says the
+ * already-typed operations are the replay proof, so `next` is the only admissible successor. v1
+ * retains a versioned snapshot witness for compatibility with immutable historical records.
  */
-function validatedReplaySnapshot(record: ScopeRemediationV1): Record<string, unknown> | null {
+function advanceReplayState(record: ScopeRemediation, next: Record<string, unknown>, isLast: boolean): Record<string, unknown> | null {
+  if (isLast || record.schemaVersion === 2) return next;
   const witness = validateReplayWitness({
     recordSchemaVersion: record.schemaVersion,
     snapshot: record.result.snapshot,
@@ -823,12 +815,12 @@ function readAnchorsSafely(scope: string, state: Record<string, unknown>): Remed
   return anchors;
 }
 
-function readRemediationRecord(scope: string, remediationId: string): ScopeRemediationV1 | null {
+function readRemediationRecord(scope: string, remediationId: string): ScopeRemediation | null {
   const path = remediationRecordPath(scope, remediationId);
   const read = readJsonSafely(path);
   if (!read.exists || read.error) return null;
   if (validateScopeRemediation(read.value, path).length > 0) return null;
-  const record = read.value as ScopeRemediationV1;
+  const record = read.value as ScopeRemediation;
   return record.scope === scope && record.id === remediationId ? record : null;
 }
 

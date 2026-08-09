@@ -4,7 +4,7 @@ import { validateSprintFile, type ValidationIssue } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath, withStateWriterLock } from '../pipeline/state-writer-lock';
 import { canonicalRemediationState } from './canonical-state';
-import { validateScopeRemediation, type ScopeRemediationV1 } from './protocol';
+import { validateScopeRemediation, type ScopeRemediation } from './protocol';
 import {
   REMEDIATION_TRANSACTION_STATUS,
   planRemediation,
@@ -79,7 +79,7 @@ function verifyPublishedRecord(plan: RemediationPlan): void {
   }
   const issues = validateScopeRemediation(read.value, plan.recordPath);
   if (issues.length > 0) throw diverged(plan.recordPath, `published record is invalid — ${formatIssues(issues)}`);
-  const published = read.value as ScopeRemediationV1;
+  const published = read.value as ScopeRemediation;
   if (sha256(published) !== plan.commitment) {
     throw diverged(plan.recordPath, 'published record does not match the planned commitment');
   }

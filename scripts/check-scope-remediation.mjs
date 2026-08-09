@@ -87,6 +87,19 @@ function recordPath(root, id = '001') {
   return join(root, `.agents/kyro/scopes/${SCOPE}/archive/remediations/remediation-${id}.json`);
 }
 
+/** Construct immutable v1 evidence only inside a temp fixture; production records are never rewritten. */
+function rewriteFixtureRecordAsV1(root, id, snapshot) {
+  const record = readJson(recordPath(root, id));
+  record.schemaVersion = 1;
+  record.result = { stateSha256: record.result.stateSha256, snapshot };
+  writeJson(recordPath(root, id), record);
+  const live = readJson(sprintPath(root));
+  const anchor = live.remediations.find((entry) => entry.id === `R-${id}`);
+  anchor.commitment = digest(record);
+  writeJson(sprintPath(root), live);
+  return record;
+}
+
 /**
  * A genuinely closed scope whose live debt origin was then written as prose.
  *
@@ -205,12 +218,13 @@ withFixture((fx) => {
   // The immutable record.
   assert(existsSync(recordPath(fx.root)), 'apply must publish the immutable remediation record');
   const record = readJson(recordPath(fx.root));
-  assert(record.schemaVersion === 1 && record.kind === 'scope-remediation' && record.id === 'R-001', 'record must be a v1 scope-remediation');
+  assert(record.schemaVersion === 2 && record.kind === 'scope-remediation' && record.id === 'R-001', 'record must be a compact v2 scope-remediation');
   assert(record.base.stateSha256 === stateDigest(fx.live), 'record must bind the pre-remediation base digest');
   assert(record.base.remediationHead === null, 'first remediation must have a null chain head');
   assert(record.operations.length === 1 && record.operations[0].kind === 'debt.origin.set', 'record must carry the typed operation');
   assert(record.issues.length === 1 && record.issues[0].code === 'debt.origin.not-number', 'record must carry the issue it resolves');
   assert(typeof record.provenance.kyroVersion === 'string' && record.provenance.actor === 'regression-harness', 'record must carry provenance');
+  assert(record.result.witness?.kind === 'operations-replay' && !('snapshot' in record.result), 'v2 record must carry only the typed compact witness');
 
   // The corrected live state and its anchor.
   const live = readJson(sprintPath(fx.root));
@@ -608,7 +622,7 @@ withFixture((fx) => {
     return fx;
   };
 
-  // A two-record chain must certify, naming the HEAD as the replayed-through record.
+  // A four-record compact chain must certify, naming the HEAD as the replayed-through record.
   // The live state is genuinely corrupted (LEGACY_ORIGIN) after the close; R-001 corrects it,
   // then R-002 drifts further. This tests the multi-record honest path, not an amortized reset.
   {
@@ -619,35 +633,47 @@ withFixture((fx) => {
       assert(first.status === 0, `R-001 correcting LEGACY_ORIGIN to 1 must apply: ${first.output}`);
       const second = applyOne(fx, [makeOp('O-1', 'debt-1', 1, 2)]);
       assert(second.status === 0, `R-002 drifting 1 to 2 must apply on top of R-001: ${second.output}`);
-      const v1Records = [
+      const third = applyOne(fx, [makeOp('O-1', 'debt-1', 2, 3)]);
+      assert(third.status === 0, `R-003 drifting 2 to 3 must apply on top of R-002: ${third.output}`);
+      const fourth = applyOne(fx, [makeOp('O-1', 'debt-1', 3, 4)]);
+      assert(fourth.status === 0, `R-004 drifting 3 to 4 must apply on top of R-003: ${fourth.output}`);
+      const v2Records = [
         readFileSync(recordPath(fx.root, '001'), 'utf8'),
         readFileSync(recordPath(fx.root, '002'), 'utf8'),
+        readFileSync(recordPath(fx.root, '003'), 'utf8'),
+        readFileSync(recordPath(fx.root, '004'), 'utf8'),
       ];
 
       const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
-      assert(doctor.status === 0, `a genuine two-record chain must certify: ${doctor.output}`);
-      assert(doctor.output.includes('replayed through R-002'), `the chain head must be named: ${doctor.output}`);
+      assert(doctor.status === 0, `a genuine four-record chain must certify: ${doctor.output}`);
+      assert(doctor.output.includes('replayed through R-004'), `the chain head must be named: ${doctor.output}`);
       assert(/remediation\/R-001[\s\S]*?APPLIED/.test(doctor.output), `the earlier record must not be reported as diverged: ${doctor.output}`);
-      assert(readJson(sprintPath(fx.root)).debt[0].origin === 2, 'the head result must be the live value (origin 2 after LEGACY->1->2)');
-      assert(readJson(recordPath(fx.root, '001')).schemaVersion === 1, 'the first historic record must keep its v1 protocol version');
-      assert(readFileSync(recordPath(fx.root, '001'), 'utf8') === v1Records[0], 'doctor must not rewrite the first v1 record while replaying it');
-      assert(readFileSync(recordPath(fx.root, '002'), 'utf8') === v1Records[1], 'doctor must not rewrite the head v1 record while replaying it');
+      assert(readJson(sprintPath(fx.root)).debt[0].origin === 4, 'the head result must be the live value (origin 4 after four compact links)');
+      const compactSizes = v2Records.map((record) => Buffer.byteLength(record, 'utf8'));
+      assert(v2Records.every((record) => {
+        const parsed = JSON.parse(record);
+        return parsed.schemaVersion === 2 && parsed.result.witness.kind === 'operations-replay' && !('snapshot' in parsed.result);
+      }), 'every compact record must contain only typed operations-replay evidence, never a SprintFile snapshot');
+      assert(Math.max(...compactSizes) - Math.min(...compactSizes) <= 64, `compact record size must stay bounded per link, got ${compactSizes.join(', ')}`);
+      assert(readFileSync(recordPath(fx.root, '001'), 'utf8') === v2Records[0], 'doctor must not rewrite the first v2 record while replaying it');
+      assert(readFileSync(recordPath(fx.root, '004'), 'utf8') === v2Records[3], 'doctor must not rewrite the v2 chain head while replaying it');
       assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive), 'a chain must not touch history');
     } finally { rmSync(fx.root, { recursive: true, force: true }); }
   }
 
-  // An intermediate snapshot is replay input, so it cannot carry a malformed excluded field just
+  // An intermediate v1 snapshot is replay input, so it cannot carry a malformed excluded field just
   // because that field is absent from the business digest. Re-anchor both records to isolate the
   // replay check: commitment, ordering, and result digests otherwise remain coherent.
   {
-    const fx = makeFixture();
+      const fx = makeFixture();
     try {
       const first = applyOne(fx, [makeOp('O-1', 'debt-1', LEGACY_ORIGIN, 1)]);
       assert(first.status === 0, `snapshot tampering: R-001 must apply: ${first.output}`);
+      const firstV1Snapshot = readJson(sprintPath(fx.root));
       const second = applyOne(fx, [makeOp('O-1', 'debt-1', 1, 2)]);
       assert(second.status === 0, `snapshot tampering: R-002 must apply: ${second.output}`);
 
-      const firstRecord = readJson(recordPath(fx.root, '001'));
+      const firstRecord = rewriteFixtureRecordAsV1(fx.root, '001', firstV1Snapshot);
       firstRecord.result.snapshot.certifications = 'not-an-anchor-array';
       writeJson(recordPath(fx.root, '001'), firstRecord);
 
@@ -664,6 +690,29 @@ withFixture((fx) => {
       assert(doctor.output.includes('DIVERGED'), `snapshot tampering must be reported as divergence: ${doctor.output}`);
       const status = run(fx.root, ['status', '--kyro-scope', SCOPE]);
       assert(status.status === 0 && status.output.includes('Verification: diverged'), `snapshot tampering must make status diverged: ${status.output}`);
+    } finally { rmSync(fx.root, { recursive: true, force: true }); }
+  }
+
+  // Historic v1 evidence followed by a newly emitted v2 record must replay by each record's own
+  // immutable schema. The v1 bytes are captured before doctor reads them.
+  {
+    const fx = makeFixture();
+    try {
+      const first = applyOne(fx, [makeOp('O-1', 'debt-1', LEGACY_ORIGIN, 1)]);
+      assert(first.status === 0, `mixed chain: R-001 must apply: ${first.output}`);
+      const firstV1Snapshot = readJson(sprintPath(fx.root));
+      rewriteFixtureRecordAsV1(fx.root, '001', firstV1Snapshot);
+      const historicV1Bytes = readFileSync(recordPath(fx.root, '001'), 'utf8');
+      const second = applyOne(fx, [makeOp('O-1', 'debt-1', 1, 2)]);
+      assert(second.status === 0, `mixed chain: R-002 must apply: ${second.output}`);
+      assert(readJson(recordPath(fx.root, '002')).schemaVersion === 2, 'mixed chain: the new head must be compact v2');
+
+      const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+      assert(doctor.status === 0 && doctor.output.includes('replayed through R-002'), `mixed v1→v2 chain must certify: ${doctor.output}`);
+      const status = run(fx.root, ['status', '--kyro-scope', SCOPE]);
+      assert(status.status === 0 && status.output.includes('Verification: remediated'), `mixed v1→v2 chain must be remediated: ${status.output}`);
+      assert(readFileSync(recordPath(fx.root, '001'), 'utf8') === historicV1Bytes, 'doctor and status must not rewrite historic v1 evidence');
+      assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive), 'mixed chain must not touch checkpoint, snapshot, or narrative bytes');
     } finally { rmSync(fx.root, { recursive: true, force: true }); }
   }
 

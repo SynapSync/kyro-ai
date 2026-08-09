@@ -11,7 +11,16 @@ import type { ValidationIssue } from '../artifacts/schema';
  */
 
 export const SCOPE_REMEDIATION_KIND = 'scope-remediation' as const;
+/** Immutable record version emitted before compact witnesses existed. */
 export const SCOPE_REMEDIATION_SCHEMA_VERSION = 1 as const;
+/** Current immutable record version: operations plus a compact replay witness, never a SprintFile. */
+export const SCOPE_REMEDIATION_V2_SCHEMA_VERSION = 2 as const;
+export const CURRENT_SCOPE_REMEDIATION_SCHEMA_VERSION = SCOPE_REMEDIATION_V2_SCHEMA_VERSION;
+export const SCOPE_REMEDIATION_SCHEMA_VERSIONS = {
+  V1: SCOPE_REMEDIATION_SCHEMA_VERSION,
+  V2: SCOPE_REMEDIATION_V2_SCHEMA_VERSION,
+} as const;
+export type ScopeRemediationSchemaVersion = (typeof SCOPE_REMEDIATION_SCHEMA_VERSIONS)[keyof typeof SCOPE_REMEDIATION_SCHEMA_VERSIONS];
 
 /** Closed v1 operation registry. An unknown kind fails before any plan is produced. */
 export const REMEDIATION_OPERATION_KINDS = ['debt.origin.set'] as const;
@@ -64,6 +73,20 @@ export interface RemediationResult {
   snapshot: unknown;
 }
 
+export const COMPACT_REPLAY_WITNESS_KIND = 'operations-replay' as const;
+export const COMPACT_REPLAY_WITNESS_SCHEMA_VERSION = 1 as const;
+
+/** v2 needs no state image: the typed operations and bound digests are the replay evidence. */
+export interface CompactReplayWitnessV1 {
+  schemaVersion: typeof COMPACT_REPLAY_WITNESS_SCHEMA_VERSION;
+  kind: typeof COMPACT_REPLAY_WITNESS_KIND;
+}
+
+export interface CompactRemediationResult {
+  stateSha256: string;
+  witness: CompactReplayWitnessV1;
+}
+
 export interface RemediationProvenance {
   reason: string;
   actor: string;
@@ -83,6 +106,22 @@ export interface ScopeRemediationV1 {
   result: RemediationResult;
   provenance: RemediationProvenance;
 }
+
+/** Immutable compact record emitted by current Kyro. Historic v1 records are never rewritten. */
+export interface ScopeRemediationV2 {
+  schemaVersion: typeof SCOPE_REMEDIATION_V2_SCHEMA_VERSION;
+  kind: typeof SCOPE_REMEDIATION_KIND;
+  id: string;
+  scope: string;
+  createdAt: string;
+  base: RemediationBase;
+  issues: RemediationIssue[];
+  operations: RemediationOperation[];
+  result: CompactRemediationResult;
+  provenance: RemediationProvenance;
+}
+
+export type ScopeRemediation = ScopeRemediationV1 | ScopeRemediationV2;
 
 const REMEDIATION_KEYS = [
   'schemaVersion',
@@ -121,12 +160,22 @@ export function isRemediationOperationKind(value: unknown): value is Remediation
  * field-specific path (e.g. `operations[0].origin`) so a rejection is actionable without guessing.
  */
 export function validateScopeRemediation(value: unknown, path: string): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
   if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
+  if (value.schemaVersion === SCOPE_REMEDIATION_SCHEMA_VERSION) return validateScopeRemediationV1(value, path);
+  if (value.schemaVersion === SCOPE_REMEDIATION_V2_SCHEMA_VERSION) return validateScopeRemediationV2(value, path);
+  return [{
+    path,
+    field: 'schemaVersion',
+    message: `must be one of ${Object.values(SCOPE_REMEDIATION_SCHEMA_VERSIONS).join(', ')}`,
+  }];
+}
 
-  if (value.schemaVersion !== SCOPE_REMEDIATION_SCHEMA_VERSION) {
-    issues.push({ path, field: 'schemaVersion', message: `must be ${SCOPE_REMEDIATION_SCHEMA_VERSION}` });
-  }
+export function isScopeRemediationSchemaVersion(value: unknown): value is ScopeRemediationSchemaVersion {
+  return Object.values(SCOPE_REMEDIATION_SCHEMA_VERSIONS).includes(value as ScopeRemediationSchemaVersion);
+}
+
+function validateScopeRemediationV1(value: Record<string, unknown>, path: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
   if (value.kind !== SCOPE_REMEDIATION_KIND) {
     issues.push({ path, field: 'kind', message: `must be "${SCOPE_REMEDIATION_KIND}"` });
   }
@@ -161,8 +210,34 @@ export function validateScopeRemediation(value: unknown, path: string): Validati
   return issues;
 }
 
-export function asScopeRemediation(value: unknown): ScopeRemediationV1 | null {
-  return validateScopeRemediation(value, '<memory>').length === 0 ? (value as ScopeRemediationV1) : null;
+function validateScopeRemediationV2(value: Record<string, unknown>, path: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (value.kind !== SCOPE_REMEDIATION_KIND) {
+    issues.push({ path, field: 'kind', message: `must be "${SCOPE_REMEDIATION_KIND}"` });
+  }
+  requireUnknownKeys(value, REMEDIATION_KEYS, path, '<root>', issues);
+  requirePattern(value, 'id', REMEDIATION_ID_PATTERN, 'must match R-NNN', path, issues, 'id');
+  requireNonEmptyString(value, 'scope', path, issues, 'scope');
+  requireNonEmptyString(value, 'createdAt', path, issues, 'createdAt');
+  validateBase(value.base, path, 'base', issues);
+
+  const issueIds = validateIssues(value.issues, path, 'issues', issues);
+  validateOperations(value.operations, issueIds, path, 'operations', issues);
+
+  if (!isRecord(value.result)) {
+    issues.push({ path, field: 'result', message: 'must be an object { stateSha256, witness }' });
+  } else {
+    requireUnknownKeys(value.result, ['stateSha256', 'witness'], path, 'result', issues);
+    requireDigest(value.result, 'stateSha256', path, issues, 'result.stateSha256');
+    validateCompactReplayWitness(value.result.witness, path, issues);
+  }
+
+  validateProvenance(value.provenance, path, issues);
+  return issues;
+}
+
+export function asScopeRemediation(value: unknown): ScopeRemediation | null {
+  return validateScopeRemediation(value, '<memory>').length === 0 ? (value as ScopeRemediation) : null;
 }
 
 export const REMEDIATION_MANIFEST_KIND = 'scope-remediation-manifest' as const;
@@ -366,6 +441,31 @@ function validateSetDebtOriginOperation(
     issues.push({ path, field: `${prefix}.origin`, message: 'must be a sprint number >= 1' });
   }
   requireNonEmptyString(value, 'reason', path, issues, `${prefix}.reason`);
+}
+
+function validateCompactReplayWitness(value: unknown, path: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: 'result.witness', message: 'must be an object { schemaVersion, kind }' });
+    return;
+  }
+  requireUnknownKeys(value, ['schemaVersion', 'kind'], path, 'result.witness', issues);
+  if (value.schemaVersion !== COMPACT_REPLAY_WITNESS_SCHEMA_VERSION) {
+    issues.push({ path, field: 'result.witness.schemaVersion', message: `must be ${COMPACT_REPLAY_WITNESS_SCHEMA_VERSION}` });
+  }
+  if (value.kind !== COMPACT_REPLAY_WITNESS_KIND) {
+    issues.push({ path, field: 'result.witness.kind', message: `must be "${COMPACT_REPLAY_WITNESS_KIND}"` });
+  }
+}
+
+function validateProvenance(value: unknown, path: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: 'provenance', message: 'must be an object { reason, actor, kyroVersion }' });
+    return;
+  }
+  requireUnknownKeys(value, ['reason', 'actor', 'kyroVersion'], path, 'provenance', issues);
+  requireNonEmptyString(value, 'reason', path, issues, 'provenance.reason');
+  requireNonEmptyString(value, 'actor', path, issues, 'provenance.actor');
+  requireNonEmptyString(value, 'kyroVersion', path, issues, 'provenance.kyroVersion');
 }
 
 function requireUnknownKeys(

@@ -259,18 +259,17 @@ withFixture({ corrupt: true }, (fx) => {
   assert(doctor.status !== 0, 'forged record: doctor must exit non-zero');
 });
 
-// 4b. A coherent anchor chain still diverges when a non-final snapshot is not a valid sprint
-// state. The forged field is excluded from the business digest, so this isolates snapshot
-// structural validation rather than relying on a later digest mismatch.
+// 4b. A coherent anchor chain still diverges when a non-final compact witness is malformed.
+// The re-anchored record isolates witness validation from commitment and continuity failures.
 withFixture({ corrupt: true }, (fx) => {
   const first = remediate(fx.root, readJson(sprintPath(fx.root)), 1);
-  assert(first.status === 0, `intermediate snapshot: R-001 setup failed: ${first.output}`);
+  assert(first.status === 0, `intermediate witness: R-001 setup failed: ${first.output}`);
   const second = remediate(fx.root, readJson(sprintPath(fx.root)), 2);
-  assert(second.status === 0, `intermediate snapshot: R-002 setup failed: ${second.output}`);
+  assert(second.status === 0, `intermediate witness: R-002 setup failed: ${second.output}`);
 
   const firstFile = join(archiveDir(fx.root), 'remediations/remediation-001.json');
   const firstRecord = readJson(firstFile);
-  firstRecord.result.snapshot.certifications = 'not-an-anchor-array';
+  firstRecord.result.witness.kind = 'opaque-state';
   writeJson(firstFile, firstRecord);
 
   const live = readJson(sprintPath(fx.root));
@@ -282,9 +281,30 @@ withFixture({ corrupt: true }, (fx) => {
   live.remediations[1].commitment = digest(secondRecord);
   writeJson(sprintPath(fx.root), live);
 
-  const doctor = assertBothReport(fx.root, 'diverged', 'intermediate snapshot');
-  assert(doctor.status !== 0, 'intermediate snapshot: doctor must exit non-zero');
+  const doctor = assertBothReport(fx.root, 'diverged', 'intermediate compact witness');
+  assert(doctor.status !== 0, 'intermediate compact witness: doctor must exit non-zero');
 });
+
+// 4c. Re-anchoring a forged compact record removes the easy commitment failure, so replay itself
+// must still reject altered operations and result digests rather than blessing the chain.
+for (const [label, mutate] of [
+  ['operation', (record) => { record.operations[0].origin = 2; }],
+  ['result digest', (record) => { record.result.stateSha256 = 'a'.repeat(64); }],
+]) {
+  withFixture({ corrupt: true }, (fx) => {
+    const applied = remediate(fx.root, readJson(sprintPath(fx.root)));
+    assert(applied.status === 0, `forged compact ${label}: setup failed: ${applied.output}`);
+    const recordFile = join(archiveDir(fx.root), 'remediations/remediation-001.json');
+    const record = readJson(recordFile);
+    mutate(record);
+    writeJson(recordFile, record);
+    const live = readJson(sprintPath(fx.root));
+    live.remediations[0].commitment = digest(record);
+    writeJson(sprintPath(fx.root), live);
+    const doctor = assertBothReport(fx.root, 'diverged', `forged compact ${label}`);
+    assert(doctor.status !== 0, `forged compact ${label}: doctor must exit non-zero`);
+  });
+}
 
 // 5. unsupported — a record declaring a schemaVersion this runtime cannot evaluate must be named,
 //    never silently treated as absent (which would read as diverged, or worse as historical).
@@ -684,7 +704,7 @@ withFixture({ corrupt: true }, (fx) => {
 
   const recordFile = join(archiveDir(fx.root), 'remediations/remediation-001.json');
   const record = readJson(recordFile);
-  record.schemaVersion = 2;
+  record.schemaVersion = 99;
   writeJson(recordFile, record);
   const live = readJson(sprintPath(fx.root));
   live.remediations[0].commitment = digest(record);
@@ -692,9 +712,9 @@ withFixture({ corrupt: true }, (fx) => {
 
   const doctor = assertBothReport(fx.root, 'unsupported', 'unsupported remediation version');
   assert(doctor.status !== 0, 'unsupported remediation version: doctor must fail closed');
-  assert(doctor.output.includes('schemaVersion=2'), `unsupported remediation version: doctor must name the version\n${doctor.output}`);
+  assert(doctor.output.includes('schemaVersion=99'), `unsupported remediation version: doctor must name the version\n${doctor.output}`);
   const status = run(fx.root, ['status', '--kyro-scope', SCOPE]);
-  assert(status.output.includes('schemaVersion=2'), `unsupported remediation version: status must name the version\n${status.output}`);
+  assert(status.output.includes('schemaVersion=99'), `unsupported remediation version: status must name the version\n${status.output}`);
   assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(historyBefore), 'unsupported remediation version: checkpoint, snapshot, and narrative bytes changed');
   assert(JSON.stringify(readJson(sprintPath(fx.root)).ledger) === ledgerBefore, 'unsupported remediation version: ledger changed');
 });
