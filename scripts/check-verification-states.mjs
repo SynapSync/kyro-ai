@@ -18,7 +18,9 @@ import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
-const cli = resolve(repo, 'dist/cli.js');
+const cli = process.env.KYRO_CLI_UNDER_TEST
+  ? resolve(process.env.KYRO_CLI_UNDER_TEST)
+  : resolve(repo, 'dist/cli.js');
 const closeFixture = resolve(repo, 'fixtures/evals/close-sprint-happy/state');
 const SCOPE = 'demo';
 const LEGACY_ORIGIN = 'food-analysis FR-FA-013 revision';
@@ -56,6 +58,14 @@ function run(root, args) {
     env: { ...process.env, HOME: join(root, '.home') },
   });
   return { status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}` };
+}
+
+/** Optional T3.5 bridge: preserve the real, already-verified recertified workspace for Lens. */
+function exportLensFixture(root) {
+  const output = process.env.KYRO_LENS_REAL_FIXTURE;
+  if (!output) return;
+  rmSync(output, { recursive: true, force: true });
+  cpSync(root, output, { recursive: true });
 }
 
 /** Recursive snapshot of a directory's bytes, used to prove history was not disturbed. */
@@ -446,6 +456,7 @@ withFixture({ corrupt: true }, (fx) => {
   for (const [name, content] of Object.entries(historyBefore)) {
     assert(historyAfter[name] === content, `recertified: history file ${name} was modified`);
   }
+  exportLensFixture(fx.root);
 });
 
 // 10. A certificate covers ONE chain head: remediating again must drop it.
