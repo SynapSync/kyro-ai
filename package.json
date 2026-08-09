@@ -21,6 +21,7 @@
     "check:sprint-doctor-v4": "node scripts/check-sprint-doctor-v4.mjs",
     "check:scope-remediation": "node scripts/check-scope-remediation.mjs",
     "check:lossless-checkpoints": "node scripts/check-lossless-checkpoints.mjs",
+    "check:lens-remediation-fixture": "node scripts/check-lens-remediation-fixture.mjs",
     "check:verification-states": "node scripts/check-verification-states.mjs",
     "check:windows-file-identity": "node scripts/check-windows-file-identity.mjs",
     "check:windows-install-smoke": "node scripts/check-windows-install-smoke.mjs",
