@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.43.5] - 2026-08-09
+
+### Added
+
+- **Append-only scope remediation and recertification.** `kyro remediate preview|apply` applies
+  explicitly typed, preconditioned corrections without rewriting immutable checkpoints; `kyro
+  recertify` records a chain-bound certification after verification. Replay witnesses are versioned
+  and compact, so verification remains fail-closed without unbounded SprintFile snapshots.
+
+### Fixed
+
+- **Newly initialized scopes now become the local active scope.** `kyro plan --from` registers the
+  scope in shared state and selects it in `local.json`, preventing subsequent commands without
+  `--kyro-scope` from silently targeting the prior scope.
+- **Doctor no longer blesses unaudited post-close drift.** A ledger anchor alone does not prove a
+  live mutation was tool-owned; only a replay-verified append-only remediation can move a closed
+  scope off its checkpoint after-image without `DIVERGED`.
+
 ## [4.43.4] - 2026-08-06
 
 ### Fixed
