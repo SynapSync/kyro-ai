@@ -8,6 +8,7 @@ import { applySprintCloseTransaction } from '../checkpoints/sprint-close';
 import { buildRepairPlan } from '../commands/repair';
 import { planRemediation } from '../remediation/plan';
 import { applyRemediationTransaction } from '../remediation/transaction';
+import { prepareDebtCanonicalization, previewDebtCanonicalization } from '../remediation/canonicalize-surface';
 import { planCertification } from '../remediation/certification-plan';
 import { applyCertificationTransaction } from '../remediation/certification-transaction';
 import { readPackageVersion } from '../help';
@@ -72,6 +73,13 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
       return repairScopeTool(args);
     case 'remediate_scope':
       return remediateScopeTool(args);
+    case 'remediate_canonicalize_prepare':
+      return canonicalizePrepareTool(args);
+    case 'remediate_canonicalize_preview':
+      return previewDebtCanonicalization({
+        scope: resolveScope(optionalString(args.scope) ?? null),
+        manifestPath: requiredString(args.manifest, 'manifest'),
+      });
     case 'recertify_scope':
       return recertifyScopeTool(args);
     case 'review_task':
@@ -145,6 +153,28 @@ function repairScopeTool(args: Record<string, unknown>): unknown {
  * Preview is a pure plan; apply reuses the same locked transaction the CLI uses, so both surfaces
  * enforce identical digests, preconditions and post-write verification.
  */
+/**
+ * Read-only preparation. Decisions are opt-in per field: an omitted argument means "undecided",
+ * never "adopt the suggestion". `target_sprint_null` exists because an explicit null is a decision
+ * and must be distinguishable from silence.
+ */
+function canonicalizePrepareTool(args: Record<string, unknown>): unknown {
+  const decisions: Record<string, unknown> = {};
+  if (args.origin !== undefined) decisions.origin = args.origin;
+  if (args.priority !== undefined) decisions.priority = args.priority;
+  if (args.target_sprint_null === true) decisions.targetSprint = null;
+  else if (args.target_sprint !== undefined) decisions.targetSprint = args.target_sprint;
+  if (args.note !== undefined) decisions.note = args.note;
+
+  return prepareDebtCanonicalization({
+    scope: resolveScope(optionalString(args.scope) ?? null),
+    debtId: requiredString(args.debt_id, 'debt_id'),
+    decisions,
+    reason: optionalString(args.reason) ?? undefined,
+    actor: optionalString(args.actor) ?? undefined,
+  });
+}
+
 function remediateScopeTool(args: Record<string, unknown>): unknown {
   const scope = resolveScope(optionalString(args.scope) ?? null);
   const options = {
@@ -312,6 +342,16 @@ function summarize(name: string, data: unknown): string {
         : `remediate_scope: ${rec.remediationId} planned (${asArray(rec.changes).length} typed change(s)). Re-call with confirm:true.`;
     case 'review_task':
       return rec.phase === 'applied' ? `review_task: ${rec.verdict}, next=${rec.nextAction ?? '—'}.` : `review_task: plan ready (${rec.verdict}). Re-call with confirm:true.`;
+    case 'remediate_canonicalize_prepare': {
+      const unresolved = asArray(rec.unresolved);
+      return rec.status === 'READY'
+        ? `remediate_canonicalize_prepare: ${rec.debtId} is READY — complete manifest returned (nothing written). This runtime cannot apply it.`
+        : `remediate_canonicalize_prepare: ${rec.debtId} is ${rec.status}${unresolved.length > 0 ? ` — ${unresolved.length} decision(s) needed: ${unresolved.map((u) => u.field).join(', ')}` : ''}.`;
+    }
+    case 'remediate_canonicalize_preview':
+      return rec.accepted
+        ? `remediate_canonicalize_preview: ${asArray(rec.operations).length} canonicalization(s) complete and still true (read-only).`
+        : `remediate_canonicalize_preview: rejected — ${asArray(rec.issues).length} problem(s).`;
     case 'trace_tail':
       return `trace_tail: ${asArray(rec.events).length} event(s)${typeof rec.skipped === 'number' && rec.skipped > 0 ? `, ${rec.skipped} skipped` : ''}.`;
     default:

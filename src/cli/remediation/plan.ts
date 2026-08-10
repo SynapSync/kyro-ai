@@ -883,9 +883,21 @@ function executeOperations(
         target.origin = operation.origin;
         break;
       }
+      case 'debt.canonicalize': {
+        // The operation is defined and planable, but nothing applies it yet: atomic application,
+        // resume, replay and recertification are a separate, later contract. Failing closed here is
+        // the point — a half-implemented writer is exactly how a hybrid record would be persisted.
+        return {
+          failure: new KyroCoreError(
+            'UNSUPPORTED_OPERATION',
+            `Operation ${operation.id} is a debt.canonicalize, which this runtime can prepare and preview but not apply.`,
+            'Use the read-only preparation and preview surfaces to produce and review the manifest. Application lands with the canonicalization transaction.',
+          ),
+        };
+      }
       default: {
-        const exhaustive: never = operation.kind;
-        return { failure: new KyroCoreError('INVALID_INPUT', `Unsupported remediation operation ${String(exhaustive)}.`, 'Only registry operations can be planned.') };
+        const exhaustive: never = operation;
+        return { failure: new KyroCoreError('INVALID_INPUT', `Unsupported remediation operation ${JSON.stringify(exhaustive)}.`, 'Only registry operations can be planned.') };
       }
     }
   }

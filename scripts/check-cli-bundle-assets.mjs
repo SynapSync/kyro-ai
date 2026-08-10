@@ -104,7 +104,83 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
   });
   const verificationOutput = `${verification.stdout ?? ''}${verification.stderr ?? ''}`;
   assert(verification.status === 0, `check-cli-bundle-assets: projected runtime verification failed:\n${verificationOutput}`);
-  assert(verificationOutput.includes('162 assertions passed'), `check-cli-bundle-assets: projected runtime did not report verification coverage:\n${verificationOutput}`);
+  assert(verificationOutput.includes('185 assertions passed'), `check-cli-bundle-assets: projected runtime did not report verification coverage:\n${verificationOutput}`);
+
+  // The debt contract must hold in the *installed* runtime, not only in this checkout: the original
+  // incident survived a green source build. The projected runtime classifies the same faithful corpus
+  // and must reach the same outcomes (original-incident-gate, shared-debt-vectors).
+  const contract = spawnSync(process.execPath, [join(repo, 'scripts/check-debt-contract.mjs')], {
+    cwd: repo,
+    encoding: 'utf-8',
+    env: { ...process.env, HOME: home, KYRO_DIST_UNDER_TEST: join(runtimeDir, 'dist') },
+  });
+  const contractOutput = `${contract.stdout ?? ''}${contract.stderr ?? ''}`;
+  assert(contract.status === 0, `check-cli-bundle-assets: projected runtime debt contract failed:\n${contractOutput}`);
+  assert(
+    contractOutput.includes('239 assertions passed over 14 corpus cases'),
+    `check-cli-bundle-assets: projected runtime did not classify the full corpus:\n${contractOutput}`,
+  );
+
+  // Preparation must also hold in the installed runtime, and must hold as READ-ONLY there: a
+  // projected build that silently wrote a manifest or mutated a scope would pass every source test.
+  {
+    const scopeDir = join(cwd, '.agents', 'kyro', 'scopes', 'canonicalize-probe');
+    mkdirSync(scopeDir, { recursive: true });
+    const sprint = {
+      schemaVersion: 4,
+      scope: 'canonicalize-probe',
+      title: 'Canonicalize probe',
+      status: 'completed',
+      objective: 'Probe read-only preparation in the projected runtime.',
+      successCriteria: [],
+      spec: { requirements: [], nonGoals: [], openQuestions: [] },
+      clarifications: [],
+      conventions: [],
+      adrs: [],
+      roadmap: [],
+      ledger: [],
+      previousSprint: null,
+      activeSprint: null,
+      debt: [{
+        id: 'D1',
+        title: 'AnalyzeMeal retry path is unreachable in production',
+        status: 'resolved',
+        detail: 'Historical prose.',
+        origin: 'food-analysis FR-FA-013 revision',
+        resolution: 'Decide explicitly.',
+        addedSprint: 1,
+        note: 'RESOLVED AS A DECISION.',
+      }],
+      handoff: { nextAction: 'done', nextTaskId: null, note: 'Probe.' },
+    };
+    writeFileSync(join(scopeDir, 'sprint.json'), `${JSON.stringify(sprint, null, 2)}\n`, 'utf-8');
+    const scopeBefore = readFileSync(join(scopeDir, 'sprint.json'), 'utf-8');
+
+    const prepare = (args) => {
+      const result = spawnSync(process.execPath, [join(runtimeDir, 'dist/cli.js'), 'remediate', 'canonicalize-prepare',
+        '--debt', 'D1', '--kyro-scope', 'canonicalize-probe', '--json', ...args], {
+        cwd,
+        encoding: 'utf-8',
+        env: { ...process.env, HOME: home },
+      });
+      const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+      assert(result.status === 0, `check-cli-bundle-assets: projected runtime preparation failed:\n${output}`);
+      return JSON.parse(result.stdout);
+    };
+
+    const undecided = prepare([]);
+    assert(undecided.status === 'INPUT_REQUIRED', `check-cli-bundle-assets: projected runtime must ask for decisions, got ${undecided.status}`);
+    assert(undecided.manifest === null, 'check-cli-bundle-assets: projected runtime produced a manifest without decisions');
+
+    const ready = prepare(['--origin', '1', '--priority', 'high', '--target-sprint', 'null']);
+    assert(ready.status === 'READY', `check-cli-bundle-assets: projected runtime must reach READY, got ${ready.status}`);
+    assert(ready.manifest.schemaVersion === 3 && ready.manifest.operations[0].kind === 'debt.canonicalize',
+      'check-cli-bundle-assets: projected runtime must emit a protocol v3 canonicalization');
+    assert(readFileSync(join(scopeDir, 'sprint.json'), 'utf-8') === scopeBefore,
+      'check-cli-bundle-assets: projected runtime preparation must not modify the scope');
+    assert(!existsSync(join(cwd, 'manifest.json')), 'check-cli-bundle-assets: projected runtime preparation must not write a manifest');
+    rmSync(join(cwd, '.agents', 'kyro', 'scopes', 'canonicalize-probe'), { recursive: true, force: true });
+  }
 
   // kyroInvocation SoT is the global runtime manifest only (not project kyro.json).
   // Shape: bare `kyro` (durable PATH) or `node {current}/dist/cli.js` fallback.

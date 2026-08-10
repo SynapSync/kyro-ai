@@ -207,6 +207,90 @@
       }
     },
     {
+      "name": "remediate_canonicalize_prepare",
+      "title": "Prepare a debt canonicalization (read-only)",
+      "description": "Read one legacy debt record and report what canonicalization would need: its classification, the values already observed, the values still undecided, and the evidence behind each suggestion. Use when a debt cannot be repaired by origin alone because a canonical field is absent or invalid, or legacy-only keys such as detail/resolution/addedSprint must be retired. A suggested value is evidence, never authorization: only values you pass explicitly become canonical. With every value settled it returns a complete manifest for review. Read-only: it writes nothing, not even the manifest. This runtime cannot apply the result.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Kyro scope id. Omit to use activeScope or the only existing scope."
+          },
+          "debt_id": {
+            "type": "string",
+            "description": "Id of the debt record to canonicalize."
+          },
+          "origin": {
+            "type": "number",
+            "description": "Explicit sprint number the debt originated in. Omit to leave undecided."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "description": "Explicit priority. Omit to leave undecided; no observation implies it."
+          },
+          "target_sprint": {
+            "type": "number",
+            "description": "Explicit target sprint. Omit to leave undecided; pass target_sprint_null:true for an explicit null."
+          },
+          "target_sprint_null": {
+            "type": "boolean",
+            "description": "Set true to decide targetSprint is explicitly null."
+          },
+          "note": {
+            "type": "string",
+            "description": "Explicit canonical note. Omit to leave undecided."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this record is being canonicalized."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Operator id recorded in the manifest provenance."
+          }
+        },
+        "required": [
+          "debt_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "remediate_canonicalize_preview",
+      "title": "Preview a debt canonicalization manifest (read-only)",
+      "description": "Re-check a canonicalization manifest against the state on disk: schema, protocol revision, scope binding, the whole-debt collection digest, preserved identity and lifecycle, and the legacy keys it retires. Use before handing a manifest on, or after the scope may have changed. The exact after-image is shown only when the manifest is complete and still true. Read-only: it writes nothing and this runtime cannot apply the result.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Kyro scope id. Omit to use activeScope or the only existing scope."
+          },
+          "manifest": {
+            "type": "string",
+            "description": "Path to a scope-remediation-manifest v3 document carrying debt.canonicalize operations."
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
       "name": "recertify_scope",
       "title": "Certify a remediated Kyro scope",
       "description": "Preview or apply a certification recording that a remediated scope's corrected state was independently validated against named, re-verifiable evidence. Use after remediate, once the corrections have been checked. Every evidence digest is re-derived from the workspace; certification is refused when the chain does not replay to live state, when the chain head has moved, when evidence is empty, or when the verdict is not a pass. A certificate covers one chain head, so remediating again drops it. Without confirm:true it returns the plan and writes nothing.",

@@ -378,6 +378,73 @@ withFixture({ corrupt: false }, (fx) => {
   assert(tampered.status !== 0, 'stale-schema checkpoint: doctor must exit non-zero after tampering');
 });
 
+// 6b. The same guarantee, held against the *faithful* original-incident shapes rather than a
+//     single retyped field: the Sprint 1 checkpoint variant (no note) and the Sprint 2 variant
+//     (with note), both carrying the legacy detail/resolution/addedSprint keys. Schema notes must
+//     survive, artifact integrity must still be evaluated, and tampering must still fail closed.
+//     Sentinel: if the corpus ever loses these shapes, this case stops testing the real incident.
+{
+  const corpus = readJson(resolve(repo, 'fixtures/debt-contract/golden.json'));
+  const historical = corpus.cases.filter((entry) => entry.target === 'history');
+  assert(historical.length === 2, `faithful historical fixture: expected the two checkpoint variants, got ${historical.length}`);
+
+  for (const entry of historical) {
+    assert(typeof entry.raw.origin === 'string', `${entry.id}: the faithful fixture must keep a string origin`);
+    assert('detail' in entry.raw && 'resolution' in entry.raw && 'addedSprint' in entry.raw, `${entry.id}: legacy keys were cleaned away`);
+
+    withFixture({ corrupt: false }, (fx) => {
+      const cpPath = checkpointPath(fx.root);
+      assert(cpPath !== null, `${entry.id}: no checkpoint was written`);
+
+      // Freeze the faithful legacy debt into BOTH images so the authorized transition still derives,
+      // then re-anchor honestly: only the schema is stale, every commitment stays sound.
+      const cp = readJson(cpPath);
+      cp.beforeClose.debt[0] = JSON.parse(JSON.stringify(entry.raw));
+      cp.intendedAfterClose.debt[0] = JSON.parse(JSON.stringify(entry.raw));
+      const commitmentPayload = JSON.parse(JSON.stringify(cp));
+      delete commitmentPayload.digests;
+      delete commitmentPayload.intendedAfterClose.ledger.at(-1).checkpointSha256;
+      const commitment = digest(commitmentPayload);
+      cp.intendedAfterClose.ledger.at(-1).checkpointSha256 = commitment;
+      cp.digests.beforeClose = digest(cp.beforeClose);
+      cp.digests.intendedAfterClose = digest(cp.intendedAfterClose);
+      cp.digests.legacySnapshot = digest(`${JSON.stringify(cp.beforeClose.activeSprint, null, 2)}\n`);
+      writeJson(cpPath, cp);
+
+      const snapshot = join(archiveDir(fx.root), readdirSync(archiveDir(fx.root)).find((f) => f.endsWith('.json') && !f.endsWith('.checkpoint.json')));
+      writeFileSync(snapshot, `${JSON.stringify(cp.beforeClose.activeSprint, null, 2)}\n`);
+
+      const live = readJson(sprintPath(fx.root));
+      live.debt[0] = JSON.parse(JSON.stringify(entry.raw));
+      live.ledger.at(-1).checkpointSha256 = commitment;
+      writeJson(sprintPath(fx.root), live);
+
+      const intact = doctorState(fx.root);
+      assert(intact.output.includes('historical:'), `${entry.id}: fixture did not produce a historical checkpoint:\n${intact.output}`);
+      assert(intact.output.includes('narrative=ok'), `${entry.id}: artifact integrity was not evaluated:\n${intact.output}`);
+      // The live copy of the same shape must be diagnosed truthfully, never called canonical.
+      assert(
+        intact.output.includes('remediation-required debt: debt[0].origin'),
+        `${entry.id}: the live legacy shape was not reported as remediation-required:\n${intact.output}`,
+      );
+      assert(
+        !/debt-contract:.*(are canonical|legacy-compatible)/.test(intact.output),
+        `${entry.id}: a present invalid origin must never be reported as canonical or merely legacy-compatible:\n${intact.output}`,
+      );
+
+      const narrative = narrativePath(fx.root);
+      assert(narrative !== null, `${entry.id}: no narrative artifact was written`);
+      writeFileSync(narrative, `${readFileSync(narrative, 'utf8')}\nTAMPERED\n`);
+      const tampered = doctorState(fx.root);
+      assert(
+        tampered.output.includes('narrative=conflict'),
+        `${entry.id}: a stale schema bought an exemption from artifact digest checks:\n${tampered.output}`,
+      );
+      assert(tampered.status !== 0, `${entry.id}: doctor must exit non-zero after tampering`);
+    });
+  }
+}
+
 // 7. Appending a certification anchor must not move the business digest. Without the exclusion,
 //    certifying a healthy scope reports it as diverged — certification would look like tampering.
 withFixture({ corrupt: true }, (fx) => {

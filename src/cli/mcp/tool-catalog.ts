@@ -8,6 +8,7 @@ export interface JsonSchemaObject {
 export type JsonSchemaProperty =
   | { type: 'string'; description?: string; enum?: string[] }
   | { type: 'boolean'; description?: string }
+  | { type: 'number'; description?: string }
   | { type: 'array'; description?: string; items: { type: 'string' } };
 
 export interface McpToolDefinition {
@@ -78,6 +79,20 @@ export const MCP_TOOLS = [
     description: 'Preview or apply a typed, append-only correction to a CLOSED scope whose live state no longer satisfies the contract. Use when doctor reports schema drift in a scope that was already closed, so its history must not be rewritten. Checkpoints, snapshots, narratives and ledger commitments are verified and never rewritten. Only registry operations are accepted (generic JSON Patch is rejected). Without confirm:true it returns the plan and writes nothing.',
     inputSchema: { type: 'object', properties: { scope, manifest: { type: 'string', description: 'Path to a scope-remediation-manifest v1 document.' }, confirm }, required: ['manifest'], additionalProperties: false },
     annotations: { destructiveHint: true, idempotentHint: true },
+  },
+  {
+    name: 'remediate_canonicalize_prepare',
+    title: 'Prepare a debt canonicalization (read-only)',
+    description: 'Read one legacy debt record and report what canonicalization would need: its classification, the values already observed, the values still undecided, and the evidence behind each suggestion. Use when a debt cannot be repaired by origin alone because a canonical field is absent or invalid, or legacy-only keys such as detail/resolution/addedSprint must be retired. A suggested value is evidence, never authorization: only values you pass explicitly become canonical. With every value settled it returns a complete manifest for review. Read-only: it writes nothing, not even the manifest. This runtime cannot apply the result.',
+    inputSchema: { type: 'object', properties: { scope, debt_id: { type: 'string', description: 'Id of the debt record to canonicalize.' }, origin: { type: 'number', description: 'Explicit sprint number the debt originated in. Omit to leave undecided.' }, priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'], description: 'Explicit priority. Omit to leave undecided; no observation implies it.' }, target_sprint: { type: 'number', description: 'Explicit target sprint. Omit to leave undecided; pass target_sprint_null:true for an explicit null.' }, target_sprint_null: { type: 'boolean', description: 'Set true to decide targetSprint is explicitly null.' }, note: { type: 'string', description: 'Explicit canonical note. Omit to leave undecided.' }, reason: { type: 'string', description: 'Why this record is being canonicalized.' }, actor: { type: 'string', description: 'Operator id recorded in the manifest provenance.' } }, required: ['debt_id'], additionalProperties: false },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'remediate_canonicalize_preview',
+    title: 'Preview a debt canonicalization manifest (read-only)',
+    description: 'Re-check a canonicalization manifest against the state on disk: schema, protocol revision, scope binding, the whole-debt collection digest, preserved identity and lifecycle, and the legacy keys it retires. Use before handing a manifest on, or after the scope may have changed. The exact after-image is shown only when the manifest is complete and still true. Read-only: it writes nothing and this runtime cannot apply the result.',
+    inputSchema: { type: 'object', properties: { scope, manifest: { type: 'string', description: 'Path to a scope-remediation-manifest v3 document carrying debt.canonicalize operations.' } }, required: ['manifest'], additionalProperties: false },
+    annotations: { readOnlyHint: true },
   },
   {
     name: 'recertify_scope',

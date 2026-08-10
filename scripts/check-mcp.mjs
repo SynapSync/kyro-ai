@@ -9,7 +9,7 @@ import { scanLines } from './lib/scan.mjs';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const cli = resolve(repo, 'dist/cli.js');
-const expectedTools = ['context_pack','doctor_artifacts','analyze_scope','close_sprint','scope_list','scope_inspect','repair_scope','remediate_scope','recertify_scope','review_task','trace_tail'];
+const expectedTools = ['context_pack','doctor_artifacts','analyze_scope','close_sprint','scope_list','scope_inspect','repair_scope','remediate_scope','remediate_canonicalize_prepare','remediate_canonicalize_preview','recertify_scope','review_task','trace_tail'];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -73,7 +73,7 @@ function combinedOutput(result) {
 
 async function main() {
   const golden = JSON.parse(readFileSync(resolve(repo, 'fixtures/mcp/tool-catalog.golden.json'), 'utf-8'));
-  assert(golden.tools.length === 11, 'golden catalog must contain exactly 11 tools');
+  assert(golden.tools.length === 13, 'golden catalog must contain exactly 13 tools');
   assert(golden.tools.map((t) => t.name).sort().join(',') === [...expectedTools].sort().join(','), 'golden catalog tool names drifted');
 
   // ACI ergonomics gates (Plan 07).
@@ -158,7 +158,7 @@ async function main() {
       notify('notifications/initialized');
 
       const list = await send('tools/list');
-      assert(list.result?.tools?.length === 11, 'tools/list should return 11 tools');
+      assert(list.result?.tools?.length === 13, 'tools/list should return 13 tools');
       assert(list.result.tools.find((tool) => tool.name === 'close_sprint')?.annotations?.idempotentHint === true, 'close_sprint must advertise idempotent retries');
       assert(JSON.stringify(list.result.tools) === JSON.stringify(golden.tools), 'tool catalog differs from golden');
 

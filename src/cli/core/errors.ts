@@ -25,6 +25,8 @@ export type KyroErrorCode =
   | 'SPRINT_ALREADY_ACTIVE'
   | 'NOT_READY_TO_PLAN'
   | 'WRITE_NOT_PERMITTED'
+  /** A defined, parseable operation this runtime can prepare or preview but deliberately not apply. */
+  | 'UNSUPPORTED_OPERATION'
   | 'INTERNAL';
 
 export class KyroCoreError extends Error {
