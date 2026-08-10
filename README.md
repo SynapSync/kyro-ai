@@ -211,6 +211,31 @@ Thin routers over scope state — they load only what the current step needs.
 
 Replace `…` with your persisted invocation (`kyro`, or `node ~/.agents/kyro/current/dist/cli.js`). Full flags: [CLI](docs/cli.md).
 
+### Repairing a legacy debt record in a closed scope
+
+A closed scope's checkpoints, snapshots, narratives and ledger commitments are immutable and are
+never rewritten. A wrong *live* record is corrected by an append-only, explicitly typed remediation
+that leaves an immutable record of itself.
+
+**Kyro 4.43.5 is origin-only.** Its single operation, `debt.origin.set`, repairs `origin` and
+nothing else, so it cannot repair a record-level legacy shape: a debt that carries a string `origin`
+*and* legacy-only keys like `detail`/`resolution`/`addedSprint` *and* missing canonical fields.
+**4.44.0** adds `debt.canonicalize` (remediation protocol v3), which repairs the whole record at
+once, emits exactly the seven canonical keys `id, title, origin, priority, status, targetSprint,
+note`, and names the legacy keys it retires.
+
+Nothing is migrated for you. Installing a newer Kyro never rewrites an existing scope, and Doctor
+never repairs one on your behalf. The supported path is
+`doctor → canonicalize-prepare → explicit values → canonicalize-preview → apply --yes → doctor →
+recertify`, where preparation and preview write nothing and Kyro refuses to guess `priority` or
+`targetSprint` for you — a suggestion is never an authorization.
+
+[Kyro Lens](https://github.com/synapsync/kyro-lens) verifies the result **read-only**: it recomputes
+the commitments and the replay itself rather than trusting Kyro's label, and never repairs anything.
+
+Full workflow, expected failure boundaries and the certification evidence table:
+[CLI](docs/cli.md) and [Release checklist](docs/release-checklist.md).
+
 ### How routing works
 
 ```text

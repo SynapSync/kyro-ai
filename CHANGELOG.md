@@ -6,6 +6,35 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.44.0] - 2026-08-10
+
+### Added
+
+- **`debt.canonicalize` (remediation protocol v3).** A typed append-only operation that repairs a
+  whole legacy debt record — broken or absent canonical fields *and* legacy-only keys such as
+  `detail`, `resolution` and `addedSprint` — producing exactly the seven canonical keys as an
+  explicit after-image and naming the keys it retires. It binds the whole observed debt with a
+  SHA-256 precondition and resolves the record's field issues atomically, without becoming a generic
+  patch. Older readers treat a v3 record as `unsupported` rather than partially understanding it.
+- **`kyro remediate canonicalize-prepare` and `canonicalize-preview`.** Both are read-only.
+  Preparation reports what is observed, what is still undecided, and the evidence behind each
+  suggestion; it returns `INPUT_REQUIRED` and produces no manifest while any canonical value is
+  unsettled. A suggested value is never an authorization — only values passed explicitly become
+  canonical values.
+- **`check:original-incident-release`.** A release gate that runs the faithful legacy fixture
+  through the built source *and* through the packed tarball installed into a fresh temporary prefix,
+  inventories every checkpoint, snapshot, narrative and ledger commitment by SHA-256 before and
+  after, and can additionally probe a real local scope read-only while remediating only a temporary
+  copy. It reports the globally installed runtime as a compatibility observation and never writes to
+  it.
+
+### Changed
+
+- **Kyro 4.43.5 is documented as origin-only.** It repairs `origin` and nothing else, and cannot
+  remediate a record-level legacy shape. There is no automatic migration: installing this version
+  never rewrites an existing scope, and Doctor never repairs one on your behalf. See
+  [docs/cli.md](docs/cli.md) for the supported operator workflow.
+
 ## [4.43.5] - 2026-08-09
 
 ### Added

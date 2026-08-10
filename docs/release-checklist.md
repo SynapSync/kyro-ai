@@ -90,3 +90,47 @@ This means a local `npm publish` also rebuilds, proves freshness, and validates 
 - Do not edit `dist/` files by hand. Always change `src/` and regenerate with `npm run build`.
 - If `check:dist` fails, run `npm run build` and inspect the diff in `dist/` before committing.
 - Adapter fixture failures usually mean a projection in `src/cli/adapters/` or a command in `src/cli/commands/` changed without updating the corresponding fixture expectations.
+
+## Evidence boundaries
+
+Six different things get called "it works". They are not interchangeable, and a release claim must
+say which one it has. This project has already shipped a gate that passed against a synthetic
+fixture while the real scope remained unrepairable, so these boundaries are enforced rather than
+merely described.
+
+| Evidence | What it proves | What it does **not** prove |
+| --- | --- | --- |
+| **Source checkout** (`node dist/cli.js`) | The code in this working tree behaves correctly. | That the package contains the files that behaviour needs. |
+| **Packed tarball** (`npm pack`) | The archive builds and has the expected name/version. | That anything inside it runs. |
+| **Temporary installed candidate** (tarball installed into a fresh temp prefix) | A user installing this exact artifact gets this exact behaviour. | That any *published* version does. |
+| **Current global runtime** (`~/.agents/kyro/current`) | What users have installed **today**. | Anything about the candidate. Never overwrite it to "verify" a release. |
+| **Kyro Lens** | An independent read-only verifier agrees with the artifacts. | That Kyro's own writes are correct beyond what Lens can re-derive. |
+| **Publication** (npm, tags, GitHub release, remote CI) | The artifact is available to users. | Only CI on `main` establishes this. |
+
+Rules that follow from the table:
+
+- A green local matrix **authorizes a release decision; it does not authorize a publish.** It says
+  nothing about npm, git tags, remote CI, or the runtime installed on this machine.
+- **Never replace `~/.agents/kyro/current` to test a candidate.** Install the tarball into a
+  temporary prefix instead. The global runtime is reported as a compatibility observation only.
+- A candidate must be **distinguishable from what users already run.** If the candidate ships new
+  operations, it must ship a new version; `check:original-incident-release` fails when an
+  origin-only runtime and the candidate share a version string.
+- **Lens results are read-only evidence.** Lens is never used to repair a scope, and a Lens run
+  against a temporary copy says nothing about the original project it was copied from.
+
+## Original-incident gate
+
+```bash
+# Source + packed tarball + temporary installed candidate, on the faithful legacy fixture.
+npm run check:original-incident-release
+
+# Additionally probe a real local scope, read-only, remediating only a temporary copy,
+# and have Lens verify that copy under an explicitly supported Node 22 runtime.
+node scripts/check-original-incident-release.mjs \
+  --original-scope <path/to/project> --require-original-scope \
+  --lens <path/to/kyro-lens> --lens-node <path/to/node22> --require-lens
+```
+
+The gate writes only under the OS temp directory and refuses any other target. The original project
+is read, hashed and compared — never written, staged, committed, or re-scoped.
