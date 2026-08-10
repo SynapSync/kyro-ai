@@ -236,4 +236,59 @@ function run(args, root) {
   }
 }
 
+// N) The canonical write boundary is exact (ADR-0001): a legacy-only key, a missing canonical key,
+//    an invalid literal and a wrong type each refuse every mutation, name the offending field path,
+//    and leave the scope byte-identical. Recognizing legacy input is a reader's job, never a licence
+//    to write it back.
+{
+  const drift = [
+    ['extra legacy key', (debt) => { debt.addedSprint = 1; }, 'debt[0].addedSprint is not a canonical debt key'],
+    ['missing canonical key', (debt) => { delete debt.targetSprint; }, 'debt[0].targetSprint must be a number or null'],
+    ['invalid literal', (debt) => { debt.priority = 'blocker'; }, 'debt[0].priority must be one of'],
+    ['wrong type', (debt) => { debt.origin = '1'; }, 'debt[0].origin must be a number'],
+  ];
+
+  for (const [name, mutate, expectedField] of drift) {
+    const root = sandbox();
+    try {
+      run(['debt', 'add', '--title', 'Legacy item', '--priority', 'low', '--kyro-scope', 'demo'], root);
+      const corrupted = readSprint(root);
+      mutate(corrupted.debt[0]);
+      writeFileSync(sprintPath(root), `${JSON.stringify(corrupted, null, 2)}\n`);
+      const before = readFileSync(sprintPath(root), 'utf-8');
+
+      for (const args of [
+        ['debt', 'add', '--title', 'Another', '--priority', 'low', '--kyro-scope', 'demo'],
+        ['debt', 'resolve', 'debt-1', '--note', 'Done.', '--kyro-scope', 'demo'],
+        ['debt', 'escalate', 'debt-1', '--priority', 'high', '--kyro-scope', 'demo'],
+      ]) {
+        const result = run(args, root);
+        const output = `${result.stdout}${result.stderr}`;
+        assert(result.status !== 0, `debt ${args[1]} must refuse ${name}: ${output}`);
+        assert(output.includes(expectedField), `debt ${args[1]} must name the ${name} field path: ${output}`);
+        assert(output.includes('not an authorization'), `debt ${args[1]} must say the compatibility reading is diagnostic only: ${output}`);
+        assert(readFileSync(sprintPath(root), 'utf-8') === before, `debt ${args[1]} must not write while refusing ${name}`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+}
+
+// N+1) `debt add` emits exactly the seven canonical keys — no legacy key survives a fresh write.
+{
+  const root = sandbox();
+  try {
+    const result = run(['debt', 'add', '--title', 'Exact shape', '--priority', 'medium', '--kyro-scope', 'demo'], root);
+    assert(result.status === 0, `debt add must succeed on a canonical scope: ${result.stdout}${result.stderr}`);
+    const written = readSprint(root).debt.at(-1);
+    assert(
+      JSON.stringify(Object.keys(written).sort()) === JSON.stringify(['id', 'note', 'origin', 'priority', 'status', 'targetSprint', 'title']),
+      `debt add must emit exactly the seven canonical keys: ${JSON.stringify(Object.keys(written))}`,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 console.log('check:debt — tool-owned debt mutation verified end-to-end');

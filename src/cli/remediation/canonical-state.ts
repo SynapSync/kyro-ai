@@ -36,3 +36,14 @@ export function remediationStateDigest(sprint: SprintFile): string {
 export function observedValueDigest(value: unknown): string {
   return sha256(canonicalJson(value));
 }
+
+/**
+ * Digest of the complete observed `debt[]` collection.
+ *
+ * A canonicalization binds the whole collection, not the single record it rewrites: if any other
+ * debt entry is added, removed, reordered or edited between preparation and application, the
+ * operator reviewed a different collection and the precondition must fail.
+ */
+export function debtCollectionDigest(debt: readonly unknown[]): string {
+  return observedValueDigest(debt);
+}

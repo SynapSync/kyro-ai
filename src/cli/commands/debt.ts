@@ -1,6 +1,7 @@
 import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
+import { DEBT_CLASSIFICATION, assessRawDebt } from '../artifacts/debt-contract';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
@@ -282,6 +283,28 @@ function parseEscalateArgs(rawArgs: string[]): EscalateArgs {
 
 // --- shared: read/validate/apply ---
 
+/**
+ * Read-only compatibility reading, used purely to tell the operator *what* the live debt is when a
+ * mutation is refused. It never authorizes a write: the command still aborts before touching disk.
+ */
+function describeDebtDrift(value: unknown): string {
+  const debt = isRecord(value) ? value.debt : undefined;
+  if (!Array.isArray(debt)) return '';
+  const notes: string[] = [];
+  debt.forEach((entry, index) => {
+    const assessment = assessRawDebt(entry);
+    if (assessment.classification === DEBT_CLASSIFICATION.CANONICAL) return;
+    const id = isRecord(entry) && typeof entry.id === 'string' ? entry.id : `debt[${index}]`;
+    const blocking = assessment.diagnostics.filter((d) => d.severity === 'blocking').map((d) => d.field);
+    notes.push(`${id} is ${assessment.classification}${blocking.length > 0 ? ` (${blocking.join(', ')})` : ''}`);
+  });
+  return notes.length > 0 ? ` Debt compatibility: ${notes.join('; ')}.` : '';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function readAndValidateSprint(scope: string): SprintFile {
   const read = readJsonSafely(sprintJsonPath(scope));
   if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Create the scope with /kyro:forge (INIT) or choose another scope.');
@@ -289,7 +312,11 @@ function readAndValidateSprint(scope: string): SprintFile {
   const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
   if (issues.length > 0) {
     const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot mutate debt for ${scope}: sprint.json has shape drift — ${detail}.`, 'Fix sprint.json shape first.');
+    throw new KyroCoreError(
+      'INVALID_SPRINT_SHAPE',
+      `Cannot mutate debt for ${scope}: sprint.json has shape drift — ${detail}.${describeDebtDrift(read.value)}`,
+      'Fix sprint.json shape first. The compatibility reading above is a diagnostic, not an authorization to write legacy debt back.',
+    );
   }
   const sprint = asSprintFile(read.value);
   if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" does not match the v4 schema.`, `Run kyro doctor --artifacts --kyro-scope ${scope}.`);

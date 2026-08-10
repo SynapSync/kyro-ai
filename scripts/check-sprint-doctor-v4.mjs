@@ -146,6 +146,60 @@ for (const [name, patch, expectedText] of [
   );
 }
 
+// 1c. The canonical debt boundary is exact: a legacy-only key on live debt is drift, not decoration.
+//     Doctor reads and reports it; the compatibility reader in artifacts/debt-contract exists so the
+//     record can still be understood, never so it can be written back (ADR-0001).
+for (const [name, patch, expectedText] of [
+  ['debt-legacy-detail', { detail: 'Historical prose.' }, 'debt[0].detail is not a canonical debt key'],
+  ['debt-legacy-resolution', { resolution: 'Decide explicitly.' }, 'debt[0].resolution is not a canonical debt key'],
+  ['debt-legacy-added-sprint', { addedSprint: 1 }, 'debt[0].addedSprint is not a canonical debt key'],
+]) {
+  assertCase(name, validKyroJson, { ...validSprintJson, debt: [{ ...validDebt, ...patch }] }, 1, expectedText);
+}
+
+// 1d. A missing canonical key is reported at the same boundary, by field path.
+assertCase(
+  'debt-missing-target-sprint',
+  validKyroJson,
+  { ...validSprintJson, debt: [Object.fromEntries(Object.entries(validDebt).filter(([key]) => key !== 'targetSprint'))] },
+  1,
+  'debt[0].targetSprint must be a number or null',
+);
+
+// 1e. Doctor states what the live debt *is*, one distinct diagnostic per classification, with exact
+//     field paths. A canonical scope passes; anything else is drift and exits non-zero.
+assertCase('debt-contract-canonical', validKyroJson, validSprintJson, 0, 'debt item(s) are canonical.');
+for (const [name, debt, expectedText] of [
+  ['debt-contract-legacy-compatible', { ...validDebt, addedSprint: 1 }, 'legacy-compatible debt (readable, not canonical): debt[0] (legacy keys debt[0].addedSprint'],
+  ['debt-contract-remediation-required', { ...validDebt, origin: 'food-analysis FR-FA-013 revision' }, 'remediation-required debt: debt[0].origin'],
+  ['debt-contract-unsupported', { ...validDebt, status: 'banana' }, 'unsupported debt entr(ies): debt[0].status'],
+]) {
+  assertCase(name, validKyroJson, { ...validSprintJson, debt: [debt] }, 1, expectedText);
+}
+
+// 1f. Anti-conflation regression: a present invalid value must never be laundered into "canonical"
+//     or downgraded to "legacy-compatible", and an absent field must not be reported as unreadable.
+{
+  const dir = makeFixture(validKyroJson, {
+    ...validSprintJson,
+    debt: [{ id: 'D-1', title: 'Legacy shape.', status: 'deferred', origin: 'food-analysis FR-FA-013 revision', detail: 'x', resolution: 'y', addedSprint: 1 }],
+  });
+  try {
+    const { status, output } = runDoctor(dir);
+    const line = output.split('\n').find((l) => l.includes('debt-contract')) ?? '';
+    assert(status !== 0, `debt-contract conflation: expected a non-zero exit\n${output}`);
+    assert(line.includes('remediation-required'), `debt-contract conflation: expected a remediation-required diagnostic\n${output}`);
+    assert(!/are canonical/.test(output), `debt-contract conflation: a legacy record was reported as canonical\n${output}`);
+    assert(!line.includes('legacy-compatible'), `debt-contract conflation: a present invalid origin was downgraded to legacy-compatible\n${output}`);
+    assert(
+      output.includes('debt[0].priority, debt[0].targetSprint, debt[0].note (absent, readable by default, needs an explicit value)'),
+      `debt-contract conflation: absent fields must be reported as readable omissions, not as unreadable\n${output}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 // Legacy v4 files may still contain runtimeVersion as an ignored extra field.
 assertCase(
   'legacy-runtime-version',

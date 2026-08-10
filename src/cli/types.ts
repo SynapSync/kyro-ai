@@ -412,6 +412,21 @@ export interface Debt {
 }
 
 /**
+ * `Debt` above is the exact canonical *output* every writer must emit. The raw *input* contract —
+ * what an observed legacy entry actually is, and whether it may be projected at all — lives in
+ * `artifacts/debt-contract`. Re-exported as types only, so this module stays free of imports.
+ */
+export type {
+  DebtAssessment,
+  DebtAssessmentOptions,
+  DebtClassification,
+  DebtDiagnostic,
+  DebtDiagnosticAuthority,
+  DebtDiagnosticCode,
+  DebtDiagnosticSeverity,
+} from './artifacts/debt-contract';
+
+/**
  * Live anchor to an immutable remediation record under `archive/remediations/`. It stores only the
  * commitment — never a duplicate state image — so the corrected live state stays the single
  * canonical copy while the correction remains independently verifiable.
