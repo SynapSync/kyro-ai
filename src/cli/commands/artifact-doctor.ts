@@ -5,6 +5,7 @@ import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { listScopeFolders } from '../artifacts/scopes';
 import { countClarificationMarkers } from '../core/analysis';
+import { DEBT_CLASSIFICATION, assessRawDebt } from '../artifacts/debt-contract';
 import {
   asProjectState,
   asSprintFile,
@@ -168,6 +169,10 @@ function checkScope(scope: string): CheckResult[] {
     return checks;
   }
   const issues = validateSprintFile(sprintRead.value, `${scope}/sprint.json`);
+  // The debt contract is reported on its own, before and independently of generic shape drift: an
+  // operator needs to know whether the live debt is canonical, merely readable, or unrepairable by
+  // normal commands — a single "shape drift" line cannot say which (ADR-0001).
+  checks.push(...debtContractChecks(scope, sprintRead.value));
   if (issues.length > 0) {
     checks.push(fail(`${scope}/sprint.json`, formatIssues(issues), 'Fix the shape drift (see field paths). Conventions/scopes/debt/ADRs must be structured objects, not loose strings.'));
     checks.push(...scopeVerificationChecks(scope));
@@ -516,6 +521,84 @@ function resolveScopeNames(scopes: KyroScopeEntry[], activeScope: string | null,
   const names = new Set<string>(scopes.map((s) => s.id));
   for (const scope of listScopeFolders()) names.add(scope);
   return [...names].sort();
+}
+
+/**
+ * Report what the live debt actually is, one outcome per classification (ADR-0001).
+ *
+ * Canonical passes. Legacy-compatible warns: it is readable — Kyro and Lens derive the same
+ * projection from it — but it is not canonical output and must never be reported as such.
+ * Remediation-required and unsupported fail with exact field paths, because no reader may invent
+ * a value for a field that is present and wrong.
+ */
+function debtContractChecks(scope: string, sprintValue: unknown): CheckResult[] {
+  const name = `${scope}/debt-contract`;
+  const debt = typeof sprintValue === 'object' && sprintValue !== null ? (sprintValue as { debt?: unknown }).debt : undefined;
+  if (!Array.isArray(debt)) return [];
+  if (debt.length === 0) return [pass(name, 'No debt recorded.')];
+
+  const legacy: string[] = [];
+  const blocked: string[] = [];
+  const unsupported: string[] = [];
+  debt.forEach((entry, index) => {
+    const assessment = assessRawDebt(entry);
+    const path = `debt[${index}]`;
+    const fields = (codes: readonly string[]) =>
+      assessment.diagnostics.filter((d) => codes.includes(d.code)).map((d) => `${path}.${d.field}`);
+    switch (assessment.classification) {
+      case DEBT_CLASSIFICATION.CANONICAL:
+        return;
+      case DEBT_CLASSIFICATION.LEGACY_COMPATIBLE: {
+        const legacyKeys = fields(['LEGACY_KEY_PRESENT', 'UNKNOWN_KEY_PRESENT']);
+        const absent = fields(['MISSING_CANONICAL_FIELD']);
+        const parts = [
+          legacyKeys.length > 0 ? `legacy keys ${legacyKeys.join(', ')}` : '',
+          absent.length > 0 ? `absent ${absent.join(', ')}` : '',
+        ].filter((part) => part !== '');
+        legacy.push(`${path} (${parts.join('; ')})`);
+        return;
+      }
+      case DEBT_CLASSIFICATION.REMEDIATION_REQUIRED: {
+        const invalid = assessment.diagnostics.filter((d) => d.severity === 'blocking').map((d) => `${path}.${d.field}`);
+        // Absent fields are still reported, but as what they are: readable omissions a compatibility
+        // reader normalizes, which canonicalization must nonetheless be told explicitly.
+        const absent = fields(['MISSING_CANONICAL_FIELD']);
+        blocked.push(
+          absent.length > 0
+            ? `${invalid.join(', ')} (present and invalid); ${absent.join(', ')} (absent, readable by default, needs an explicit value)`
+            : invalid.join(', '),
+        );
+        return;
+      }
+      default:
+        unsupported.push(assessment.diagnostics.map((d) => (d.field === '$root' ? path : `${path}.${d.field}`)).join(', '));
+    }
+  });
+
+  const checks: CheckResult[] = [];
+  if (unsupported.length > 0) {
+    checks.push(fail(
+      name,
+      `unsupported debt entr(ies): ${unsupported.join('; ')}`,
+      'The entry is not a readable debt record: its identity or status cannot be defaulted or inferred. Restore it from the archive checkpoint that still holds the original bytes.',
+    ));
+  }
+  if (blocked.length > 0) {
+    checks.push(fail(
+      name,
+      `remediation-required debt: ${blocked.join('; ')}`,
+      'A present value has the wrong type, so no projection may be trusted and normal debt commands refuse the scope. Repairing it needs an operator-authorized canonicalization, not a hand edit.',
+    ));
+  }
+  if (legacy.length > 0) {
+    checks.push(warn(
+      name,
+      `legacy-compatible debt (readable, not canonical): ${legacy.join('; ')}`,
+      'Readers derive one agreed projection from these entries, so nothing is lost by reading them; they are simply not canonical output. New writes emit exactly the seven canonical keys.',
+    ));
+  }
+  if (checks.length === 0) checks.push(pass(name, `${debt.length} debt item(s) are canonical.`));
+  return checks;
 }
 
 function formatIssues(issues: ValidationIssue[]): string {

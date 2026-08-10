@@ -1,0 +1,970 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.debt-contract.golden",
+  "description": "Shared Kyro/Lens golden corpus for raw debt classification and canonical projection. Cases are minimized copies of real shapes; long prose is truncated but no key is added, removed or retyped.",
+  "contract": {
+    "canonical": "Exactly the seven canonical keys, every value valid.",
+    "legacy_compatible": "Every present value is valid; canonical fields may be absent and legacy-only keys may be present, so one explicit projection is derivable.",
+    "remediation_required": "Identity and status are readable but a present canonical value has the wrong type, so no projection may be trusted.",
+    "unsupported": "The raw entry is not a debt object, or its id, title or status is unusable."
+  },
+  "canonicalKeys": [
+    "id",
+    "title",
+    "origin",
+    "priority",
+    "status",
+    "targetSprint",
+    "note"
+  ],
+  "legacyOnlyKeys": [
+    "detail",
+    "resolution",
+    "addedSprint",
+    "severity",
+    "source",
+    "disposition"
+  ],
+  "classifications": [
+    "canonical",
+    "legacy_compatible",
+    "remediation_required",
+    "unsupported"
+  ],
+  "diagnosticCodes": [
+    "LEGACY_KEY_PRESENT",
+    "MISSING_CANONICAL_FIELD",
+    "ORIGIN_NOT_SPRINT_NUMBER",
+    "LEGACY_VALUE_NOT_STRING",
+    "SEVERITY_NOT_RECOGNIZED",
+    "STATUS_NOT_RECOGNIZED",
+    "IDENTITY_NOT_STRING",
+    "NOT_AN_OBJECT"
+  ],
+  "compatibilityDefaults": {
+    "origin": "the enclosing sprint number, or 0 when unknown",
+    "priority": "medium, or the priority the legacy severity vocabulary maps to",
+    "targetSprint": null,
+    "note": "the note joined with Source, Resolution and Disposition prefixes, in that order"
+  },
+  "maxStringLength": 240,
+  "cases": [
+    {
+      "id": "canonical-exact",
+      "title": "Exact seven-field canonical debt",
+      "source": "model-catalog-and-routing sprint.json debt[1] (debt-1), minimized note",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "debt-1",
+        "title": "A malformed upstream model id fails on first request instead of at startup",
+        "origin": 1,
+        "priority": "high",
+        "status": "resolved",
+        "targetSprint": 1,
+        "note": "SUPERSEDED: the eager-construction mechanism described in this item's original note was removed by the resolution of debt-2."
+      },
+      "expected": {
+        "classification": "canonical",
+        "remediable": false,
+        "canonical": {
+          "id": "debt-1",
+          "title": "A malformed upstream model id fails on first request instead of at startup",
+          "origin": 1,
+          "priority": "high",
+          "status": "resolved",
+          "targetSprint": 1,
+          "note": "SUPERSEDED: the eager-construction mechanism described in this item's original note was removed by the resolution of debt-2."
+        },
+        "legacyKeys": [],
+        "diagnostics": [],
+        "lens": {
+          "accepts": true,
+          "projection": {
+            "id": "debt-1",
+            "title": "A malformed upstream model id fails on first request instead of at startup",
+            "origin": 1,
+            "priority": "high",
+            "status": "resolved",
+            "targetSprint": 1,
+            "note": "SUPERSEDED: the eager-construction mechanism described in this item's original note was removed by the resolution of debt-2."
+          },
+          "failure": null
+        }
+      }
+    },
+    {
+      "id": "legacy-compatible-missing-fields",
+      "title": "Readable legacy debt with numeric origin and absent priority, targetSprint and note",
+      "source": "model-catalog legacy key set over a record whose present values are all valid",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "debt-9",
+        "title": "Composition builds TLS infrastructure for unused entries",
+        "status": "resolved",
+        "detail": "Every catalog entry materialised an SSL context and an HTTP client at composition time.",
+        "origin": 1,
+        "resolution": "Move upstream identifier validation into ModelCatalogEntry.",
+        "addedSprint": 1
+      },
+      "expected": {
+        "classification": "legacy_compatible",
+        "remediable": false,
+        "canonical": {
+          "id": "debt-9",
+          "title": "Composition builds TLS infrastructure for unused entries",
+          "origin": 1,
+          "priority": "medium",
+          "status": "resolved",
+          "targetSprint": null,
+          "note": "Resolution: Move upstream identifier validation into ModelCatalogEntry."
+        },
+        "legacyKeys": [
+          "detail",
+          "resolution",
+          "addedSprint"
+        ],
+        "diagnostics": [
+          {
+            "field": "priority",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": "medium"
+          },
+          {
+            "field": "targetSprint",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "note",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "composed from the legacy resolution key",
+            "suggested": null,
+            "lensDefault": "Resolution: Move upstream identifier validation into ModelCatalogEntry."
+          },
+          {
+            "field": "detail",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key dropped by the canonical projection",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "resolution",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key dropped by the canonical projection",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "addedSprint",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key dropped by the canonical projection",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": true,
+          "projection": {
+            "id": "debt-9",
+            "title": "Composition builds TLS infrastructure for unused entries",
+            "origin": 1,
+            "priority": "medium",
+            "status": "resolved",
+            "targetSprint": null,
+            "note": "Resolution: Move upstream identifier validation into ModelCatalogEntry."
+          },
+          "failure": null
+        }
+      }
+    },
+    {
+      "id": "live-d1-remediation-required",
+      "title": "Live model-catalog D1 with string origin and missing canonical fields",
+      "source": "model-catalog-and-routing sprint.json debt[0] (D1), minimized prose",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "D1",
+        "title": "AnalyzeMeal retry path is unreachable in production",
+        "status": "resolved",
+        "detail": "The at-most-one retry triggers only on corroboration DISAGREEMENT, which requires an independent meal estimate. No composed provider emits one, so the retry machinery is exercised only by tests.",
+        "origin": "food-analysis FR-FA-013 revision",
+        "resolution": "Decide explicitly whether the retry stays latent by design until independent-nutrition-corroboration lands, or is re-anchored to a different condition.",
+        "addedSprint": 1,
+        "note": "RESOLVED AS A DECISION, NOT AS A CODE CHANGE (see ADR-0001). The retry stays latent by design: it is not re-anchored to another trigger, and the machinery is not deleted."
+      },
+      "expected": {
+        "classification": "remediation_required",
+        "remediable": true,
+        "canonical": null,
+        "legacyKeys": [
+          "detail",
+          "resolution",
+          "addedSprint"
+        ],
+        "diagnostics": [
+          {
+            "field": "origin",
+            "code": "ORIGIN_NOT_SPRINT_NUMBER",
+            "severity": "blocking",
+            "authority": "evidence",
+            "evidence": "addedSprint=1",
+            "suggested": 1,
+            "lensDefault": null
+          },
+          {
+            "field": "priority",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": "medium"
+          },
+          {
+            "field": "targetSprint",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "detail",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "resolution",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "addedSprint",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0].origin is invalid"
+        }
+      }
+    },
+    {
+      "id": "historical-d1-sprint-1",
+      "title": "Sprint 1 checkpoint variant of D1 without note",
+      "source": "archive/sprint-001-catalog-configuration-and-routing.checkpoint.json beforeClose.debt[0], minimized prose",
+      "target": "history",
+      "context": {
+        "sprintNumber": 1
+      },
+      "raw": {
+        "id": "D1",
+        "title": "AnalyzeMeal retry path is unreachable in production",
+        "status": "open",
+        "detail": "The at-most-one retry triggers only on corroboration DISAGREEMENT, which requires an independent meal estimate. No composed provider emits one, so the retry machinery is exercised only by tests.",
+        "origin": "food-analysis FR-FA-013 revision",
+        "resolution": "Decide explicitly whether the retry stays latent by design until independent-nutrition-corroboration lands, or is re-anchored to a different condition.",
+        "addedSprint": 1
+      },
+      "expected": {
+        "classification": "remediation_required",
+        "remediable": false,
+        "canonical": null,
+        "legacyKeys": [
+          "detail",
+          "resolution",
+          "addedSprint"
+        ],
+        "diagnostics": [
+          {
+            "field": "origin",
+            "code": "ORIGIN_NOT_SPRINT_NUMBER",
+            "severity": "blocking",
+            "authority": "evidence",
+            "evidence": "addedSprint=1",
+            "suggested": 1,
+            "lensDefault": null
+          },
+          {
+            "field": "priority",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": "medium"
+          },
+          {
+            "field": "targetSprint",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "note",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "composed from the legacy resolution key",
+            "suggested": null,
+            "lensDefault": "Resolution: Decide explicitly whether the retry stays latent by design until independent-nutrition-corroboration lands, or is re-anchored to a different condition."
+          },
+          {
+            "field": "detail",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "resolution",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "addedSprint",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0].origin is invalid"
+        }
+      }
+    },
+    {
+      "id": "historical-d1-sprint-2",
+      "title": "Sprint 2 checkpoint variant of D1 with note",
+      "source": "archive/sprint-002-discovery-and-request-selection.checkpoint.json beforeClose.debt[0], minimized prose",
+      "target": "history",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "D1",
+        "title": "AnalyzeMeal retry path is unreachable in production",
+        "status": "resolved",
+        "detail": "The at-most-one retry triggers only on corroboration DISAGREEMENT, which requires an independent meal estimate. No composed provider emits one, so the retry machinery is exercised only by tests.",
+        "origin": "food-analysis FR-FA-013 revision",
+        "resolution": "Decide explicitly whether the retry stays latent by design until independent-nutrition-corroboration lands, or is re-anchored to a different condition.",
+        "addedSprint": 1,
+        "note": "RESOLVED AS A DECISION, NOT AS A CODE CHANGE (see ADR-0001). The retry stays latent by design: it is not re-anchored to another trigger, and the machinery is not deleted."
+      },
+      "expected": {
+        "classification": "remediation_required",
+        "remediable": false,
+        "canonical": null,
+        "legacyKeys": [
+          "detail",
+          "resolution",
+          "addedSprint"
+        ],
+        "diagnostics": [
+          {
+            "field": "origin",
+            "code": "ORIGIN_NOT_SPRINT_NUMBER",
+            "severity": "blocking",
+            "authority": "evidence",
+            "evidence": "addedSprint=1",
+            "suggested": 1,
+            "lensDefault": null
+          },
+          {
+            "field": "priority",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": "medium"
+          },
+          {
+            "field": "targetSprint",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "detail",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "resolution",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "addedSprint",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0].origin is invalid"
+        }
+      }
+    },
+    {
+      "id": "legacy-severity-mapped",
+      "title": "Legacy severity vocabulary supplies the absent priority",
+      "source": "compatibility reader severity mapping (blocker maps to critical)",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "debt-11",
+        "title": "Recorded before priority existed",
+        "status": "open",
+        "origin": 1,
+        "severity": "blocker",
+        "note": "Carried over from the legacy writer."
+      },
+      "expected": {
+        "classification": "legacy_compatible",
+        "remediable": false,
+        "canonical": {
+          "id": "debt-11",
+          "title": "Recorded before priority existed",
+          "origin": 1,
+          "priority": "critical",
+          "status": "open",
+          "targetSprint": null,
+          "note": "Carried over from the legacy writer."
+        },
+        "legacyKeys": [
+          "severity"
+        ],
+        "diagnostics": [
+          {
+            "field": "priority",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": "severity=blocker",
+            "suggested": null,
+            "lensDefault": "critical"
+          },
+          {
+            "field": "targetSprint",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "severity",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key dropped by the canonical projection",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": true,
+          "projection": {
+            "id": "debt-11",
+            "title": "Recorded before priority existed",
+            "origin": 1,
+            "priority": "critical",
+            "status": "open",
+            "targetSprint": null,
+            "note": "Carried over from the legacy writer."
+          },
+          "failure": null
+        }
+      }
+    },
+    {
+      "id": "legacy-severity-unrecognized-with-priority",
+      "title": "Unmapped severity is ignored when an explicit priority is present",
+      "source": "compatibility reader severity guard (only consulted when priority is absent)",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "debt-14",
+        "title": "Priority already decided",
+        "origin": 1,
+        "priority": "low",
+        "status": "open",
+        "targetSprint": null,
+        "note": "n",
+        "severity": "unknown"
+      },
+      "expected": {
+        "classification": "legacy_compatible",
+        "remediable": false,
+        "canonical": {
+          "id": "debt-14",
+          "title": "Priority already decided",
+          "origin": 1,
+          "priority": "low",
+          "status": "open",
+          "targetSprint": null,
+          "note": "n"
+        },
+        "legacyKeys": [
+          "severity"
+        ],
+        "diagnostics": [
+          {
+            "field": "severity",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key dropped by the canonical projection",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": true,
+          "projection": {
+            "id": "debt-14",
+            "title": "Priority already decided",
+            "origin": 1,
+            "priority": "low",
+            "status": "open",
+            "targetSprint": null,
+            "note": "n"
+          },
+          "failure": null
+        }
+      }
+    },
+    {
+      "id": "legacy-severity-not-string",
+      "title": "Non-string severity is a present invalid value",
+      "source": "compatibility reader severity type guard",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "debt-12",
+        "title": "Severity written as a number",
+        "origin": 1,
+        "priority": "high",
+        "status": "open",
+        "targetSprint": null,
+        "note": "n",
+        "severity": 7
+      },
+      "expected": {
+        "classification": "remediation_required",
+        "remediable": true,
+        "canonical": null,
+        "legacyKeys": [
+          "severity"
+        ],
+        "diagnostics": [
+          {
+            "field": "severity",
+            "code": "LEGACY_VALUE_NOT_STRING",
+            "severity": "blocking",
+            "authority": "derived",
+            "evidence": "severity is a number, not a string",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "severity",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0].severity is invalid"
+        }
+      }
+    },
+    {
+      "id": "legacy-severity-unrecognized",
+      "title": "Unmapped severity with no explicit priority blocks the projection",
+      "source": "compatibility reader severity vocabulary guard",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "debt-13",
+        "title": "Severity from another tool",
+        "origin": 1,
+        "status": "open",
+        "targetSprint": null,
+        "note": "n",
+        "severity": "unknown"
+      },
+      "expected": {
+        "classification": "remediation_required",
+        "remediable": true,
+        "canonical": null,
+        "legacyKeys": [
+          "severity"
+        ],
+        "diagnostics": [
+          {
+            "field": "severity",
+            "code": "SEVERITY_NOT_RECOGNIZED",
+            "severity": "blocking",
+            "authority": "operator",
+            "evidence": "severity \"unknown\" maps to no priority and no explicit priority is present",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "priority",
+            "code": "MISSING_CANONICAL_FIELD",
+            "severity": "info",
+            "authority": "operator",
+            "evidence": null,
+            "suggested": null,
+            "lensDefault": "medium"
+          },
+          {
+            "field": "severity",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0].severity is invalid"
+        }
+      }
+    },
+    {
+      "id": "legacy-source-not-string",
+      "title": "Non-string source is a present invalid value",
+      "source": "compatibility reader note-composition type guard",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "debt-15",
+        "title": "Source written as a number",
+        "origin": 1,
+        "priority": "high",
+        "status": "open",
+        "targetSprint": null,
+        "note": "n",
+        "source": 7
+      },
+      "expected": {
+        "classification": "remediation_required",
+        "remediable": true,
+        "canonical": null,
+        "legacyKeys": [
+          "source"
+        ],
+        "diagnostics": [
+          {
+            "field": "source",
+            "code": "LEGACY_VALUE_NOT_STRING",
+            "severity": "blocking",
+            "authority": "derived",
+            "evidence": "source is a number, not a string",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "source",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0].source is invalid"
+        }
+      }
+    },
+    {
+      "id": "legacy-prose-not-string",
+      "title": "Non-string resolution and disposition are present invalid values",
+      "source": "compatibility reader note-composition type guard",
+      "target": "live",
+      "context": {
+        "sprintNumber": 2
+      },
+      "raw": {
+        "id": "debt-16",
+        "title": "Prose keys written as numbers",
+        "origin": 1,
+        "priority": "high",
+        "status": "open",
+        "targetSprint": null,
+        "note": "n",
+        "resolution": 7,
+        "disposition": 7
+      },
+      "expected": {
+        "classification": "remediation_required",
+        "remediable": true,
+        "canonical": null,
+        "legacyKeys": [
+          "resolution",
+          "disposition"
+        ],
+        "diagnostics": [
+          {
+            "field": "resolution",
+            "code": "LEGACY_VALUE_NOT_STRING",
+            "severity": "blocking",
+            "authority": "derived",
+            "evidence": "resolution is a number, not a string",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "disposition",
+            "code": "LEGACY_VALUE_NOT_STRING",
+            "severity": "blocking",
+            "authority": "derived",
+            "evidence": "disposition is a number, not a string",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "resolution",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          },
+          {
+            "field": "disposition",
+            "code": "LEGACY_KEY_PRESENT",
+            "severity": "info",
+            "authority": "derived",
+            "evidence": "legacy-only key retired by canonicalization",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0].resolution is invalid"
+        }
+      }
+    },
+    {
+      "id": "unsupported-bare-string",
+      "title": "Structurally unsupported debt entry",
+      "source": "schema.validateDebtItem bare-string rejection path",
+      "target": "live",
+      "context": {
+        "sprintNumber": 1
+      },
+      "raw": "Retry path is unreachable in production",
+      "expected": {
+        "classification": "unsupported",
+        "remediable": false,
+        "canonical": null,
+        "legacyKeys": [],
+        "diagnostics": [
+          {
+            "field": "$root",
+            "code": "NOT_AN_OBJECT",
+            "severity": "blocking",
+            "authority": "derived",
+            "evidence": "raw debt entry is a string, not an object { id, title, ... }",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0] must include id, title, and status"
+        }
+      }
+    },
+    {
+      "id": "unsupported-missing-id",
+      "title": "Debt object without a usable identity",
+      "source": "Lens normalizeDebt identity rejection path",
+      "target": "live",
+      "context": {
+        "sprintNumber": 1
+      },
+      "raw": {
+        "title": "Retry path is unreachable in production",
+        "status": "open",
+        "origin": 1
+      },
+      "expected": {
+        "classification": "unsupported",
+        "remediable": false,
+        "canonical": null,
+        "legacyKeys": [],
+        "diagnostics": [
+          {
+            "field": "id",
+            "code": "IDENTITY_NOT_STRING",
+            "severity": "blocking",
+            "authority": "derived",
+            "evidence": "identity cannot be defaulted or inferred",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0] must include id, title, and status"
+        }
+      }
+    },
+    {
+      "id": "unsupported-bad-status",
+      "title": "Debt object with an unrecognized status",
+      "source": "Lens normalizeDebt status rejection path",
+      "target": "live",
+      "context": {
+        "sprintNumber": 1
+      },
+      "raw": {
+        "id": "debt-7",
+        "title": "Retry path is unreachable in production",
+        "status": "banana",
+        "origin": 1
+      },
+      "expected": {
+        "classification": "unsupported",
+        "remediable": false,
+        "canonical": null,
+        "legacyKeys": [],
+        "diagnostics": [
+          {
+            "field": "status",
+            "code": "STATUS_NOT_RECOGNIZED",
+            "severity": "blocking",
+            "authority": "derived",
+            "evidence": "status must be open, in_progress, resolved or deferred",
+            "suggested": null,
+            "lensDefault": null
+          }
+        ],
+        "lens": {
+          "accepts": false,
+          "projection": null,
+          "failure": "debt[0].status must be open, in_progress, resolved, or deferred"
+        }
+      }
+    }
+  ],
+  "sentinels": [
+    "live-d1-remediation-required.raw.origin must stay a string",
+    "live-d1-remediation-required.raw must not gain priority or targetSprint",
+    "historical-d1-sprint-1.raw must not gain note",
+    "historical-d1-sprint-2.raw must keep note",
+    "every D1 case must keep detail, resolution and addedSprint",
+    "legacy severity, source, resolution and disposition keep their compatibility type constraints"
+  ],
+  "legacyValueRules": {
+    "typed": "severity, source, resolution and disposition are interpreted by the compatibility reader, so a non-string value is a present invalid value, not decoration",
+    "severity": "an unmapped severity string only blocks while it is the sole source of a priority; with an explicit priority present it is ignored",
+    "opaque": "detail and addedSprint are outside the compatibility vocabulary and constrain nothing"
+  }
+}

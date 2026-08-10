@@ -24,6 +24,17 @@ export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] 
 export const PHASE_STATUS_VALUES = ['pending', 'active', 'blocked', 'done'] as const;
 export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'] as const;
 export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
+/** The exact canonical debt output key set. Kept here so the validator owns no second vocabulary. */
+export const CANONICAL_DEBT_KEY_VALUES = ['id', 'title', 'origin', 'priority', 'status', 'targetSprint', 'note'] as const;
+
+/**
+ * `exact` is the write boundary: canonical debt output, no extra keys (ADR-0001).
+ * `compatible` is the read boundary: required fields must still be valid, but legacy-only keys are
+ * tolerated so a diagnostic or a remediation preparation path can read a legacy scope at all.
+ * Reading a record in `compatible` mode is never authorization to write it back.
+ */
+export const DEBT_VALIDATION_MODE = { EXACT: 'exact', COMPATIBLE: 'compatible' } as const;
+export type DebtValidationMode = (typeof DEBT_VALIDATION_MODE)[keyof typeof DEBT_VALIDATION_MODE];
 export const TASK_VERDICT_RESULT_VALUES = ['pass', 'fail'] as const;
 export const TASK_VERDICT_FINDING_SEVERITY_VALUES = ['critical', 'warning', 'suggestion'] as const;
 export const SPEC_REQUIREMENT_PRIORITY_VALUES = ['must', 'should', 'could'] as const;
@@ -297,8 +308,13 @@ function validateScopeEntry(value: unknown, path: string, prefix: string, issues
   requireLiteralSet(value, 'status', SCOPE_STATUS_VALUES, path, issues, `${prefix}.status`);
 }
 
+export interface SprintFileValidationOptions {
+  /** Debt boundary: `exact` (default) for anything that will be written, `compatible` for readers. */
+  readonly debt?: DebtValidationMode;
+}
+
 /** Validate a v4 sprint.json. Catches shape drift (string conventions, bad snapshot, etc.). */
-export function validateSprintFile(value: unknown, path: string): ValidationIssue[] {
+export function validateSprintFile(value: unknown, path: string, options: SprintFileValidationOptions = {}): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
   requireLiteral(value, 'schemaVersion', 4, path, issues);
@@ -370,7 +386,7 @@ export function validateSprintFile(value: unknown, path: string): ValidationIssu
   if (!Array.isArray(value.debt)) {
     issues.push({ path, field: 'debt', message: 'must be an array' });
   } else {
-    value.debt.forEach((d, i) => validateDebtItem(d, path, `debt[${i}]`, issues));
+    value.debt.forEach((d, i) => validateDebtItem(d, path, `debt[${i}]`, issues, options.debt ?? DEBT_VALIDATION_MODE.EXACT));
   }
 
   // remediations[] is the append-only anchor to post-close corrections. Absent on scopes that were
@@ -746,7 +762,13 @@ function validateTaskVerdictFinding(value: unknown, path: string, prefix: string
   requireNonEmptyString(value, 'detail', path, issues, `${prefix}.detail`);
 }
 
-function validateDebtItem(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+function validateDebtItem(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  mode: DebtValidationMode = DEBT_VALIDATION_MODE.EXACT,
+): void {
   if (typeof value === 'string') {
     issues.push({ path, field: prefix, message: 'must be an object { id, title, ... }, not a bare string' });
     return;
@@ -762,6 +784,15 @@ function validateDebtItem(value: unknown, path: string, prefix: string, issues: 
   requireLiteralSet(value, 'status', DEBT_STATUS_VALUES, path, issues, `${prefix}.status`);
   requireNullableNumber(value, 'targetSprint', path, issues, `${prefix}.targetSprint`);
   requireString(value, 'note', path, issues, `${prefix}.note`);
+  // ADR-0001: canonical debt is an exact output shape. Recognizing a legacy key is a reader's job;
+  // tolerating it here would let a hybrid record be written back as if it were canonical.
+  if (mode === DEBT_VALIDATION_MODE.EXACT) {
+    for (const key of Object.keys(value)) {
+      if (!(CANONICAL_DEBT_KEY_VALUES as readonly string[]).includes(key)) {
+        issues.push({ path, field: `${prefix}.${key}`, message: 'is not a canonical debt key and must not be written' });
+      }
+    }
+  }
 }
 
 function validateRemediationAnchors(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {

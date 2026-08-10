@@ -572,3 +572,109 @@ Lean sprint-plan file shape (`--kyro-scope` is required — this file has no `"s
 ## Spec traceability
 
 `kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces requirements for scope packs and resolved scenarios for task packs. See [spec-traceability.md](spec-traceability.md).
+
+## Legacy debt remediation and recertification (`kyro remediate`, `kyro recertify`)
+
+A closed scope's history is immutable. Checkpoints, snapshots, narratives and ledger commitments are
+never rewritten, not even to fix a record that is genuinely wrong. What *can* change is the live
+canonical projection, and only through an append-only, explicitly typed, preconditioned correction
+that leaves an immutable record of itself.
+
+### What each version can repair
+
+| Runtime | Operations | Repairs |
+| --- | --- | --- |
+| **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
+| **4.44.0** | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+
+**Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
+string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract
+scopes have — `debt.origin.set` cannot fix it: setting `origin` leaves the legacy keys in place and
+the canonical fields still absent. Upgrade to 4.44.0 or later. There is no automatic migration:
+installing a newer Kyro never rewrites an existing scope, and Doctor never repairs one on your
+behalf.
+
+### The canonical debt contract
+
+A canonical debt is exactly these seven keys, and nothing else:
+
+```
+id, title, origin, priority, status, targetSprint, note
+```
+
+`debt.canonicalize` produces exactly that set as an explicit after-image, and names the legacy-only
+keys it retires. It is not a generic patch: it binds the whole observed debt with a SHA-256
+precondition and resolves the record's field issues atomically or not at all.
+
+### Operator authority
+
+Kyro will *suggest* values it has evidence for, and will refuse to invent the rest.
+
+- `origin` usually has real evidence — a legacy `addedSprint` — so preparation offers it as a
+  suggestion.
+- `priority` and `targetSprint` are business judgments. Kyro reports them as unresolved with **no**
+  suggestion at all.
+
+**A suggestion is never an authorization.** Only values you pass explicitly on the command line
+become canonical values. Preparation with anything unsettled returns `INPUT_REQUIRED`, names every
+unresolved field, and produces no manifest.
+
+### The supported workflow
+
+Every step below is copyable. Steps 1–3 write nothing at all.
+
+```bash
+# 1. See the problem. A legacy record makes this exit non-zero and names the offending field.
+kyro doctor --artifacts --kyro-scope <scope>
+
+# 2. Ask what must be decided. READ-ONLY. Returns INPUT_REQUIRED and lists unresolved fields.
+kyro remediate canonicalize-prepare --debt D1 --kyro-scope <scope> \
+  --reason "The record predates the canonical debt contract." --actor "<you>" --json
+
+# 3. Decide explicitly, then save the manifest it prints. Still READ-ONLY — Kyro does not
+#    save the manifest for you, so you review it before anything can be applied.
+kyro remediate canonicalize-prepare --debt D1 --kyro-scope <scope> \
+  --reason "The record predates the canonical debt contract." --actor "<you>" --json \
+  --origin 1 --priority high --target-sprint null > prepared.json
+#    ... extract .manifest into manifest.json and read it ...
+
+# 4. Re-check the manifest against the state on disk, including the whole-debt digest. READ-ONLY.
+kyro remediate canonicalize-preview --manifest manifest.json --kyro-scope <scope> --json
+
+# 5. Apply. Requires --yes. Atomic: any failed digest, precondition, schema or post-write
+#    check aborts the whole batch without advancing the scope.
+kyro remediate apply --manifest manifest.json --kyro-scope <scope> --yes
+
+# 6. Verify the chain replays to live state.
+kyro doctor --artifacts --kyro-scope <scope>
+kyro status --kyro-scope <scope>          # Verification: remediated
+
+# 7. Record that the corrected state was independently validated.
+kyro recertify apply --manifest certification.json --kyro-scope <scope> --yes
+kyro status --kyro-scope <scope>          # Verification: recertified
+```
+
+### Expected failure boundaries
+
+These are refusals by design, not bugs:
+
+- **A stale manifest is refused.** If the debt changed since preparation, the whole-debt SHA-256
+  precondition no longer holds and apply aborts without writing.
+- **An incomplete manifest is refused.** `INPUT_REQUIRED` is terminal until you supply the values.
+- **An interrupted apply resumes; it never duplicates.** Doctor reports `remediation/R-NNN:
+  PREPARED`; re-running the same `remediate apply` finishes that record byte-for-byte and publishes
+  no second `R-NNN`.
+- **Older runtimes fail closed.** A v3 record is `unsupported` to a reader that predates it, rather
+  than being partially understood.
+- **A certificate must bind the current head.** Recertification is refused when the chain does not
+  replay to live state, when the head has moved, when evidence is empty or does not re-derive, or
+  when the verdict is not a pass.
+- **Nothing is migrated automatically.** No install step and no Doctor run canonicalizes a legacy
+  scope for you.
+
+### Verification in Kyro Lens
+
+Kyro Lens is a **read-only verifier**. It never applies, repairs, migrates or writes a scope, and it
+does not trust the state label Kyro emits: it re-parses the artifacts, recomputes the commitments
+and the replay, and reports what *it* derived. A record Lens cannot verify is shown as `diverged`,
+`unsupported` or `corrupt` with an actionable diagnostic — never as a healthy fallback.
