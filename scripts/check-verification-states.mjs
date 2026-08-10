@@ -786,4 +786,304 @@ withFixture({ corrupt: true }, (fx) => {
   assert(JSON.stringify(readJson(sprintPath(fx.root)).ledger) === ledgerBefore, 'unsupported remediation version: ledger changed');
 });
 
+// ---------------------------------------------------------------------------------------------
+// Recertifying a canonicalization chain (T3.3).
+//
+// Certification is revision-agnostic by construction: it binds to the chain HEAD commitment, not to
+// what the head happens to contain. That is a claim, and this section is what makes it a checked
+// one — every case below drives a real v3 head through the real `kyro recertify`.
+// ---------------------------------------------------------------------------------------------
+{
+  const FAITHFUL_D1 = (() => {
+    const corpus = readJson(resolve(repo, 'fixtures/debt-contract/golden.json'));
+    const raw = corpus.cases.find((entry) => entry.id === 'live-d1-remediation-required').raw;
+    assert(typeof raw.origin === 'string' && 'addedSprint' in raw,
+      'the faithful D1 must still carry the incident shape a canonicalization repairs');
+    return raw;
+  })();
+
+  /** A closed scope whose live debt was then rewritten into the legacy shape. */
+  const withCanonicalizableFixture = (fn) => {
+    const root = mkdtempSync(join(tmpdir(), 'kyro-recertify-v3-'));
+    try {
+      cpSync(closeFixture, root, { recursive: true });
+      mkdirSync(join(root, '.home'), { recursive: true });
+      const sprint = readJson(sprintPath(root));
+      sprint.debt = [{
+        id: 'D1', title: FAITHFUL_D1.title, origin: 1, priority: 'low',
+        status: FAITHFUL_D1.status, targetSprint: null, note: FAITHFUL_D1.note,
+      }];
+      writeJson(sprintPath(root), sprint);
+      const closed = run(root, ['close-sprint', '--kyro-scope', SCOPE, '--outcome', 'shipped', '--note', 'Closed.', '--summary', 'Closed.', '--confirm']);
+      assert(closed.status === 0, `recertify-v3 fixture close-sprint failed: ${closed.output}`);
+      const live = readJson(sprintPath(root));
+      live.debt[0] = { ...FAITHFUL_D1 };
+      writeJson(sprintPath(root), live);
+      fn({ root });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  /** Canonicalize D1 through the real prepare → apply route. */
+  const canonicalize = (root, priority = 'high') => {
+    const prepared = run(root, ['remediate', 'canonicalize-prepare', '--debt', 'D1', '--kyro-scope', SCOPE,
+      '--origin', '1', '--priority', priority, '--target-sprint', 'null',
+      '--reason', 'Predates the canonical debt contract.', '--actor', 'verification-states-harness', '--json']);
+    assert(prepared.status === 0, `canonicalize-prepare failed: ${prepared.output}`);
+    const { manifest, status } = JSON.parse(prepared.output);
+    assert(status === 'READY', `canonicalize-prepare must be READY, got ${status}`);
+    writeJson(join(root, 'canonicalize.json'), manifest);
+    return run(root, ['remediate', 'apply', '--manifest', 'canonicalize.json', '--kyro-scope', SCOPE, '--yes']);
+  };
+
+  /** A v3-headed scope plus a certification manifest citing one re-derivable artifact. */
+  const certifiableV3Scope = (root, overrides = {}) => {
+    assert(canonicalize(root).status === 0, 'certification setup: canonicalization failed');
+    const chainHead = readJson(sprintPath(root)).remediations.at(-1).commitment;
+    assert(readJson(join(archiveDir(root), 'remediations/remediation-001.json')).schemaVersion === 3,
+      'certification setup: the head must be a protocol v3 record');
+
+    const evidencePath = 'validation-report.txt';
+    const evidenceBody = 'npm run check: all suites passed\n';
+    writeFileSync(join(root, evidencePath), evidenceBody);
+    writeJson(join(root, 'certification.json'), {
+      schemaVersion: 1,
+      kind: 'scope-certification-manifest',
+      scope: SCOPE,
+      certifiedChainHeadCommitment: chainHead,
+      evidence: [{
+        source: { kind: 'external-artifact', path: evidencePath, contentDigest: digest(evidenceBody) },
+        chainHeadCommitment: chainHead,
+      }],
+      verdict: { checker: 'npm run check', outcome: 'pass' },
+      provenance: { actor: 'verification-states-harness', reason: 'Canonicalization independently validated.' },
+      ...overrides,
+    });
+    return { chainHead, evidencePath };
+  };
+
+  // 14. A v3 head certifies exactly like a v2 one, and both readers say so.
+  withCanonicalizableFixture((fx) => {
+    certifiableV3Scope(fx.root);
+    assertBothReport(fx.root, 'remediated', 'v3 head before certification');
+
+    // Every pre-existing archive file, including the v3 remediation record, must be byte-identical
+    // afterwards. Only the new certificate may appear.
+    const historyBefore = fileTree(archiveDir(fx.root));
+    assert(recertify(fx.root, ['apply', '--yes']).status === 0, 'a verified v3 head must be certifiable');
+
+    const doctor = assertBothReport(fx.root, 'recertified', 'v3 head after certification');
+    assert(doctor.status === 0, `recertified v3 head: doctor must exit 0\n${doctor.output}`);
+    const live = readJson(sprintPath(fx.root));
+    assert(live.certifications.length === 1 && live.certifications[0].id === 'C-001', 'exactly one C-001 must be appended');
+    const record = readJson(join(archiveDir(fx.root), 'certifications/certification-001.json'));
+    assert(record.certifiedChainHeadCommitment === live.remediations.at(-1).commitment,
+      'the certificate must bind the v3 chain head commitment');
+    assert(record.certifiedStateDigest === stateDigest(live), 'the certificate must bind the live business state');
+    const historyAfter = fileTree(archiveDir(fx.root));
+    for (const [name, content] of Object.entries(historyBefore)) {
+      assert(historyAfter[name] === content,
+        `certifying a v3 head modified ${name}; checkpoint, snapshot, narrative and the v3 record are immutable`);
+    }
+  });
+
+  // 15. A later remediation on top of a certified v3 head drops the certificate.
+  withCanonicalizableFixture((fx) => {
+    certifiableV3Scope(fx.root);
+    assert(recertify(fx.root, ['apply', '--yes']).status === 0, 'stale head (v3): initial certification failed');
+    assertBothReport(fx.root, 'recertified', 'stale head (v3): before the second remediation');
+
+    // An origin-only correction now applies, because the record is canonical after R-001.
+    const live = readJson(sprintPath(fx.root));
+    writeJson(join(fx.root, 'origin.json'), {
+      schemaVersion: 1,
+      kind: 'scope-remediation-manifest',
+      scope: SCOPE,
+      base: { stateSha256: stateDigest(live), remediationHead: live.remediations.at(-1).commitment },
+      issues: [{ id: 'I-1', code: 'debt.origin.drift', path: 'debt[0].origin', observedValueSha256: digest(JSON.stringify(canonical(1))) }],
+      operations: [{ id: 'O-1', kind: 'debt.origin.set', resolves: ['I-1'], debtId: 'D1', expectedOriginSha256: digest(JSON.stringify(canonical(1))), origin: 2, reason: 'Origin corrected.' }],
+      provenance: { reason: 'Further correction after certification.', actor: 'verification-states-harness' },
+    });
+    const second = run(fx.root, ['remediate', 'apply', '--manifest', 'origin.json', '--kyro-scope', SCOPE, '--yes']);
+    assert(second.status === 0, `stale head (v3): the second remediation must apply: ${second.output}`);
+
+    const doctor = doctorState(fx.root);
+    assert(doctor.state === 'remediated',
+      `stale head (v3): the certificate must be dropped, not carried forward (state=${doctor.state})`);
+    assert(existsSync(join(archiveDir(fx.root), 'certifications/certification-001.json')),
+      'stale head (v3): the superseded certificate record must be kept as immutable evidence, not deleted');
+
+    // Re-certifying the NEW head issues a second, distinct certificate rather than reviving C-001.
+    const newHead = readJson(sprintPath(fx.root)).remediations.at(-1).commitment;
+    const manifest = readJson(join(fx.root, 'certification.json'));
+    manifest.certifiedChainHeadCommitment = newHead;
+    manifest.evidence[0].chainHeadCommitment = newHead;
+    writeJson(join(fx.root, 'certification.json'), manifest);
+    assert(recertify(fx.root, ['apply', '--yes']).status === 0, 'stale head (v3): the new head must be certifiable');
+    assertBothReport(fx.root, 'recertified', 'stale head (v3): after recertifying the new head');
+    assert(readJson(sprintPath(fx.root)).certifications.map((entry) => entry.id).join(',') === 'C-001,C-002',
+      'stale head (v3): a new certificate must be appended, never overwrite the old one');
+  });
+
+  // 16. Every fail-closed path over a v3 head, including an interrupted publish.
+  for (const [label, overrides] of [
+    ['empty evidence', { evidence: [] }],
+    ['failing verdict', { verdict: { checker: 'npm run check', outcome: 'fail' } }],
+    ['stale chain head', { certifiedChainHeadCommitment: 'c'.repeat(64) }],
+  ]) {
+    withCanonicalizableFixture((fx) => {
+      certifiableV3Scope(fx.root, overrides);
+      const historyBefore = fileTree(archiveDir(fx.root));
+      const result = recertify(fx.root, ['apply', '--yes']);
+      assert(result.status !== 0, `${label} (v3): recertify must refuse, got exit 0\n${result.output}`);
+      assert(!existsSync(join(archiveDir(fx.root), 'certifications')), `${label} (v3): a record was written by a refused apply`);
+      assert(readJson(sprintPath(fx.root)).certifications === undefined, `${label} (v3): an anchor was written by a refused apply`);
+      assert(JSON.stringify(fileTree(archiveDir(fx.root))) === JSON.stringify(historyBefore), `${label} (v3): history was disturbed`);
+      assertBothReport(fx.root, 'remediated', `${label} (v3): the scope must remain merely remediated`);
+    });
+  }
+
+  // Evidence observed against a different head cannot certify this one, even when the artifact
+  // still hashes correctly: evidence certifies the state it was produced against.
+  withCanonicalizableFixture((fx) => {
+    const { chainHead } = certifiableV3Scope(fx.root);
+    const manifest = readJson(join(fx.root, 'certification.json'));
+    manifest.evidence[0].chainHeadCommitment = 'd'.repeat(64);
+    writeJson(join(fx.root, 'certification.json'), manifest);
+    const result = recertify(fx.root, ['apply', '--yes']);
+    assert(result.status !== 0, 'stale evidence (v3): recertify must refuse');
+    assert(result.output.includes(chainHead), `stale evidence (v3): the refusal must name the current head:\n${result.output}`);
+    assert(!existsSync(join(archiveDir(fx.root), 'certifications')), 'stale evidence (v3): a record was written');
+  });
+
+  // An interrupted certification of a v3 head resumes as the SAME C-NNN, never a second one.
+  withCanonicalizableFixture((fx) => {
+    certifiableV3Scope(fx.root);
+    assert(recertify(fx.root, ['apply', '--yes']).status === 0, 'resume (v3): setup failed');
+    const recordBytes = readFileSync(join(archiveDir(fx.root), 'certifications/certification-001.json'), 'utf8');
+
+    const live = readJson(sprintPath(fx.root));
+    delete live.certifications;
+    writeJson(sprintPath(fx.root), live);
+
+    const preview = recertify(fx.root, ['preview']);
+    assert(preview.output.includes('PREPARED'), `resume (v3): interrupted state must report PREPARED:\n${preview.output}`);
+
+    const resumed = recertify(fx.root, ['apply', '--yes']);
+    assert(resumed.status === 0, `resume (v3): retry must complete the transaction:\n${resumed.output}`);
+    assert(readFileSync(join(archiveDir(fx.root), 'certifications/certification-001.json'), 'utf8') === recordBytes,
+      'resume (v3): the existing record must be finished byte-for-byte, not rewritten');
+    assert(!existsSync(join(archiveDir(fx.root), 'certifications/certification-002.json')),
+      'resume (v3): a duplicate certificate was published');
+    assertBothReport(fx.root, 'recertified', 'resume (v3): after completing the interrupted transaction');
+  });
+
+  // 17. CLI and MCP must give the same fail-closed answer over the same v3 head.
+  withCanonicalizableFixture((fx) => {
+    certifiableV3Scope(fx.root, { verdict: { checker: 'npm run check', outcome: 'fail' } });
+    const cli = recertify(fx.root, ['apply', '--yes']);
+    assert(cli.status !== 0, 'MCP parity (v3): the CLI must refuse a failing verdict');
+
+    // The MCP surface reports a refusal as a tool error result rather than by throwing, so the
+    // parity being checked is the outcome and its reason, not the transport.
+    const script = `
+      const { callTool } = require(${JSON.stringify(resolve(repo, 'dist/cli/mcp/handlers.js'))});
+      try {
+        process.stdout.write(JSON.stringify({ threw: false, result: callTool('recertify_scope', { scope: ${JSON.stringify(SCOPE)}, manifest: 'certification.json', confirm: true }) }));
+      } catch (error) {
+        process.stdout.write(JSON.stringify({ threw: true, message: String(error.message ?? error) }));
+      }
+    `;
+    const mcp = spawnSync(process.execPath, ['-e', script], {
+      cwd: fx.root, encoding: 'utf-8', env: { ...process.env, HOME: join(fx.root, '.home') },
+    });
+    const parsed = JSON.parse(mcp.stdout);
+    const refusal = parsed.threw ? parsed.message : JSON.stringify(parsed.result.structuredContent ?? '');
+    assert(parsed.threw || parsed.result.isError === true,
+      `MCP parity (v3): the MCP surface must refuse too, got ${mcp.stdout}`);
+    assert(/Checker verdict is/.test(refusal), `MCP parity (v3): the refusal must name the verdict: ${refusal}`);
+    assert(!existsSync(join(archiveDir(fx.root), 'certifications')), 'MCP parity (v3): the MCP surface wrote a record while refusing');
+    assertBothReport(fx.root, 'remediated', 'MCP parity (v3): the scope must remain merely remediated');
+  });
+
+  // 18. A remediation record that no anchor references must reach BOTH readers.
+  //
+  // This is the T3.2 review finding, made permanent. The chain lens detected a planted record and
+  // the verification derivation did not, so a single `doctor` run reported `R-002: DIVERGED` and
+  // `verification: remediated` together, and `status` — which sees only the derivation — reported a
+  // healthy scope over planted evidence. Every case below asserts the two readers agree, because a
+  // contradiction between them is the defect, not the individual verdicts.
+  {
+    /** Apply the canonicalization and confirm both readers call the result healthy. */
+    const verifiedChain = (root) => {
+      assert(canonicalize(root).status === 0, 'unanchored: the canonicalization must apply');
+      assertBothReport(root, 'remediated', 'unanchored: the chain must be healthy before anything is planted');
+      return join(archiveDir(root), 'remediations');
+    };
+    const recordAt = (root, id) => join(archiveDir(root), `remediations/remediation-${id}.json`);
+
+    // A record that does not continue the chain: planted, never resumable.
+    withCanonicalizableFixture((fx) => {
+      verifiedChain(fx.root);
+      const planted = readJson(recordAt(fx.root, '001'));
+      planted.id = 'R-002';
+      planted.base.remediationHead = 'd'.repeat(64);
+      writeJson(recordAt(fx.root, '002'), planted);
+
+      const doctor = assertBothReport(fx.root, 'diverged', 'planted unanchored record');
+      assert(doctor.status !== 0, 'planted unanchored record: doctor must fail closed');
+      assert(/does not continue the live chain/.test(doctor.output),
+        `planted unanchored record: the reason must be actionable:\n${doctor.output}`);
+      const status = run(fx.root, ['status', '--kyro-scope', SCOPE]);
+      assert(/R-002/.test(status.output), `planted unanchored record: status must name the record:\n${status.output}`);
+    });
+
+    // A genuine interrupted publish: it continues the chain, so it is resumable — but an unresolved
+    // transaction that can still move live state may not be presented as a clean remediation.
+    withCanonicalizableFixture((fx) => {
+      verifiedChain(fx.root);
+
+      // Produce a real R-002 in a copy, then replant it without its anchor.
+      const rehearsal = mkdtempSync(join(tmpdir(), 'kyro-recertify-v3-rehearsal-'));
+      cpSync(fx.root, rehearsal, { recursive: true });
+      const live = readJson(sprintPath(rehearsal));
+      writeJson(join(rehearsal, 'origin.json'), {
+        schemaVersion: 1,
+        kind: 'scope-remediation-manifest',
+        scope: SCOPE,
+        base: { stateSha256: stateDigest(live), remediationHead: live.remediations.at(-1).commitment },
+        issues: [{ id: 'I-1', code: 'debt.origin.drift', path: 'debt[D1].origin', observedValueSha256: digest(JSON.stringify(canonical(1))) }],
+        operations: [{ id: 'O-1', kind: 'debt.origin.set', resolves: ['I-1'], debtId: 'D1', expectedOriginSha256: digest(JSON.stringify(canonical(1))), origin: 2, reason: 'Origin corrected.' }],
+        provenance: { reason: 'Interrupted second link.', actor: 'verification-states-harness' },
+      });
+      assert(run(rehearsal, ['remediate', 'apply', '--manifest', 'origin.json', '--kyro-scope', SCOPE, '--yes']).status === 0,
+        'interrupted publish: the rehearsal apply must succeed');
+      const interrupted = readJson(recordAt(rehearsal, '002'));
+      rmSync(rehearsal, { recursive: true, force: true });
+      writeJson(recordAt(fx.root, '002'), interrupted);
+
+      const doctor = assertBothReport(fx.root, 'diverged', 'interrupted publish over a valid chain');
+      assert(/PREPARED/.test(doctor.output),
+        `interrupted publish: it must be named as an interrupted transaction, not as tampering:\n${doctor.output}`);
+      assert(!/verification: (remediated|recertified)/.test(doctor.output),
+        `interrupted publish: an unresolved transaction must never read as a clean remediation:\n${doctor.output}`);
+    });
+
+    // A certified scope must lose its certification the moment an unanchored record appears: a
+    // certificate over evidence nobody can account for is exactly the false claim to avoid.
+    withCanonicalizableFixture((fx) => {
+      certifiableV3Scope(fx.root);
+      assert(recertify(fx.root, ['apply', '--yes']).status === 0, 'unanchored over certified: setup failed');
+      assertBothReport(fx.root, 'recertified', 'unanchored over certified: before planting');
+
+      const planted = readJson(recordAt(fx.root, '001'));
+      planted.id = 'R-002';
+      planted.base.remediationHead = 'd'.repeat(64);
+      writeJson(recordAt(fx.root, '002'), planted);
+      assertBothReport(fx.root, 'diverged', 'unanchored over certified: after planting');
+    });
+  }
+}
+
 console.log(`check:verification-states — ${passed} assertions passed`);

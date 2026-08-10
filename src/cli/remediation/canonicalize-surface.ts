@@ -6,8 +6,9 @@
  *
  * Everything here reads. Nothing writes state, emits trace, or creates a file — including on the
  * happy path, where a complete manifest is *returned* for the operator to inspect and save, never
- * persisted on their behalf. Application of that manifest is a separate contract that this runtime
- * deliberately does not implement yet.
+ * persisted on their behalf. Applying that manifest is a separate, explicitly confirmed step
+ * (`kyro remediate apply --yes`), which re-derives and re-checks every precondition under the
+ * state-writer lock rather than trusting anything decided here.
  */
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
@@ -200,7 +201,7 @@ export function previewDebtCanonicalization(input: { scope: string; manifestPath
     retiredKeys: accepted ? typed.flatMap((operation) => operation.retiredKeys) : [],
     issues,
     detail: accepted
-      ? `${typed.length} canonicalization(s) are complete and still match the observed debt collection. This runtime prepares and previews them; it does not apply them.`
+      ? `${typed.length} canonicalization(s) are complete and still match the observed debt collection. Apply them with kyro remediate apply --yes; every precondition is re-checked under the state-writer lock.`
       : `${issues.length} problem(s) block this manifest.`,
   };
 }

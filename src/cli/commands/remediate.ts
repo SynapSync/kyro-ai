@@ -331,9 +331,11 @@ The manifest is a scope-remediation-manifest v1 document:
     operations: [{ id, kind, resolves, ... }],
     provenance: { reason, actor } }
 
-Only registry operations are accepted (v1/v2: debt.origin.set). Generic JSON Patch is rejected by
-design. preview writes nothing; apply requires --yes and is atomic — any failed digest, precondition,
-schema or post-write check aborts the whole batch without advancing the scope.
+Only registry operations are accepted (v1/v2: debt.origin.set; v3 adds debt.canonicalize). Generic
+JSON Patch is rejected by design. preview writes nothing; apply requires --yes and is atomic — any
+failed digest, precondition, schema or post-write check aborts the whole batch without advancing the
+scope. A batch is recorded at the lowest revision that admits every operation in it, so an
+origin-only remediation is still written as v2 and only a canonicalization produces a v3 record.
 
 canonicalize-prepare and canonicalize-preview are READ-ONLY. They describe the protocol v3
 debt.canonicalize operation, which repairs a whole legacy debt record: a broken or absent canonical
@@ -346,6 +348,6 @@ field, and legacy-only keys such as detail/resolution/addedSprint that debt.orig
   preview  re-checks a manifest you hold against the state on disk, including the whole-debt digest,
            and shows the exact after-image only when the manifest is complete and still true.
 
-This runtime prepares and previews canonicalizations; it does not apply them. There is no
-canonicalize-apply command, and remediate apply refuses a debt.canonicalize operation.`);
+There is no canonicalize-apply command: a reviewed v3 manifest is applied by remediate apply, the
+same atomic append-only transaction the origin-only flow uses.`);
 }

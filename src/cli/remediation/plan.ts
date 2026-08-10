@@ -7,23 +7,24 @@ import { checkpointCommitmentOfRecord, checkpointIntegrityIssues, sha256 } from 
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import type { CheckResult, RemediationAnchor, ScopeVerification, SprintCloseCheckpointV1, SprintFile } from '../types';
-import { canonicalRemediationState, observedValueDigest } from './canonical-state';
+import { canonicalRemediationState, debtCollectionDigest, observedValueDigest } from './canonical-state';
 import { resolveCertificationForChainHead } from './certification-plan';
 import {
+  CANONICAL_DEBT_AFTER_KEYS,
   REMEDIATION_MANIFEST_KIND,
   COMPACT_REPLAY_WITNESS_KIND,
   COMPACT_REPLAY_WITNESS_SCHEMA_VERSION,
-  CURRENT_SCOPE_REMEDIATION_SCHEMA_VERSION,
   SCOPE_REMEDIATION_KIND,
+  SCOPE_REMEDIATION_SCHEMA_VERSION,
   isScopeRemediationSchemaVersion,
+  requiredRemediationRevision,
   validateRemediationManifest,
   validateScopeRemediation,
+  verifyCanonicalizePreconditions,
+  type CompactScopeRemediation,
   type RemediationManifestV1,
   type RemediationOperation,
   type ScopeRemediation,
-  type ScopeRemediationV1,
-  type ScopeRemediationV2,
-  type SetDebtOriginOperation,
 } from './protocol';
 import { REPLAY_WITNESS_VALIDATION_STATUS, validateReplayWitness } from './replay-witness';
 
@@ -73,7 +74,7 @@ export interface RemediationPlan {
   /** Workspace-relative path the immutable record would occupy. Reported, never written here. */
   recordPath: string;
   sprintPath: string;
-  record: ScopeRemediationV2;
+  record: CompactScopeRemediation;
   /** SHA-256 commitment that the live anchor would carry. */
   commitment: string;
   anchor: RemediationAnchor;
@@ -138,8 +139,9 @@ export function planRemediation(options: RemediationPlanOptions): RemediationPla
   // If anything else about the plan differs, the commitments still diverge and the retry is refused.
   const prepared = readRemediationRecord(options.scope, remediationId);
 
-  const record: ScopeRemediationV2 = {
-    schemaVersion: CURRENT_SCOPE_REMEDIATION_SCHEMA_VERSION,
+  const record: CompactScopeRemediation = {
+    // The batch, not the runtime, picks the revision: only a canonicalization raises it to v3.
+    schemaVersion: requiredRemediationRevision(manifest.operations),
     kind: SCOPE_REMEDIATION_KIND,
     id: remediationId,
     scope: options.scope,
@@ -327,7 +329,7 @@ export function inspectRemediationChain(scope: string): CheckResult[] {
       remedy: 'Do not hand-edit remediations[]. Restore it from versioned storage; anchors are written only by kyro remediate.',
     }];
   }
-  if (anchors.length === 0) return [];
+  if (anchors.length === 0) return inspectUnanchoredRemediationRecords(scope, anchors);
 
   // Record integrity, commitments and continuity are always checked. Only the head-vs-live digest
   // comparison is suppressed while a later sprint is active, because that sprint legitimately owns
@@ -358,7 +360,97 @@ export function inspectRemediationChain(scope: string): CheckResult[] {
     expectedBase = record?.result.stateSha256 ?? null;
     results.push(remediationResult(name, transaction.status, transaction.detail));
   }
+  results.push(...inspectUnanchoredRemediationRecords(scope, anchors, expectedHead, expectedBase));
   return results;
+}
+
+/** What a remediation record that no live anchor references means for the scope. */
+export interface UnanchoredRemediationFinding {
+  id: string;
+  status: RemediationTransactionStatus;
+  detail: string;
+  remedy: string;
+}
+
+/**
+ * Records on disk that no live anchor references.
+ *
+ * The chain walk is driven by anchors, so a record whose anchor was never written is invisible to
+ * it — and that is exactly the state an interrupted publish leaves behind, as well as the state a
+ * planted record imitates. Both must be named, and differently: an interrupted publish continues the
+ * chain and is resumable by re-running the same manifest, while a record that does not continue the
+ * chain was not produced by this scope's transaction and must never be resumed into it.
+ *
+ * This is the SEMANTIC evaluation, deliberately separate from how doctor renders it. Doctor's chain
+ * lens and the verification-state derivation both call this one function, because a reader that
+ * detected a planted record and a reader that reported the scope healthy were describing the same
+ * archive and could not both be right.
+ */
+export function evaluateUnanchoredRemediationRecords(
+  scope: string,
+  anchors: RemediationAnchor[],
+  headCommitment: string | null = null,
+  headResult: string | null = null,
+): UnanchoredRemediationFinding[] {
+  let directory: string;
+  try {
+    directory = assertSafeManagedPath(remediationsDir(scope));
+  } catch {
+    return [];
+  }
+  if (!existsSync(directory)) return [];
+
+  const anchored = new Set(anchors.map((anchor) => anchor.id));
+  const findings: UnanchoredRemediationFinding[] = [];
+  for (const file of readdirSync(directory).sort()) {
+    const match = /^remediation-(\d{3,})\.json$/.exec(file);
+    if (!match) continue;
+    const remediationId = `R-${match[1]}`;
+    if (anchored.has(remediationId)) continue;
+
+    const record = readRemediationRecord(scope, remediationId);
+    if (!record) {
+      findings.push({
+        id: remediationId,
+        status: REMEDIATION_TRANSACTION_STATUS.CORRUPT,
+        detail: `unanchored record ${remediationId} is unreadable or fails the remediation contract`,
+        remedy: 'No live anchor references this record and it cannot be validated. Remove it deliberately; never anchor a record Kyro cannot verify.',
+      });
+      continue;
+    }
+    const brokenLink = chainContinuityIssue(record, headCommitment, headResult);
+    if (brokenLink !== null) {
+      findings.push({
+        id: remediationId,
+        status: REMEDIATION_TRANSACTION_STATUS.DIVERGED,
+        detail: `unanchored record ${remediationId} does not continue the live chain — ${brokenLink}`,
+        remedy: 'A record no anchor references and that does not continue the chain was not produced by this scope\'s remediation. Treat it as planted: remove it deliberately rather than resuming it.',
+      });
+      continue;
+    }
+    findings.push({
+      id: remediationId,
+      status: REMEDIATION_TRANSACTION_STATUS.PREPARED,
+      detail: `record ${remediationId} is persisted but no live anchor references it (persistence was interrupted)`,
+      remedy: 'Re-run kyro remediate apply with the same manifest to finish the interrupted transaction, or remove the prepared record deliberately. It is not an applied remediation.',
+    });
+  }
+  return findings;
+}
+
+/** Doctor rendering of the findings above. PREPARED is resumable, so it warns rather than fails. */
+function inspectUnanchoredRemediationRecords(
+  scope: string,
+  anchors: RemediationAnchor[],
+  headCommitment: string | null = null,
+  headResult: string | null = null,
+): CheckResult[] {
+  return evaluateUnanchoredRemediationRecords(scope, anchors, headCommitment, headResult).map((finding) => ({
+    status: finding.status === REMEDIATION_TRANSACTION_STATUS.PREPARED ? 'warn' as const : 'fail' as const,
+    name: `${scope}/remediation/${finding.id}`,
+    detail: `${finding.status}: ${finding.detail}`,
+    remedy: finding.remedy,
+  }));
 }
 
 /**
@@ -584,6 +676,23 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
     expectedHead = anchor.commitment;
     expectedBase = record?.result.stateSha256 ?? null;
   }
+
+  // A record no anchor references is part of this scope's evidence whether or not the anchor list
+  // mentions it. Doctor's chain lens already refused to ignore one; this derivation must refuse too,
+  // or the same command reports a planted record as DIVERGED and the scope as `remediated` in one
+  // breath, and `status` — which sees only this function — reports nothing wrong at all.
+  //
+  // Fail-closed inside the existing vocabulary rather than adding a sixth state: a new member would
+  // change the contract Lens reads (R7) while Lens is still Sprint 4's to update. An interrupted
+  // publish is diverged here too, and says so in its detail: it is not tampering, but it is an
+  // unresolved transaction that can still move live state, so no reader may call the scope cleanly
+  // remediated or recertified while it exists.
+  const unanchored = evaluateUnanchoredRemediationRecords(scope, anchors, expectedHead, expectedBase);
+  if (unanchored.length > 0) {
+    const finding = unanchored[0];
+    return { state: 'diverged', detail: `${finding.status}: ${finding.detail}` };
+  }
+
   if (unsupportedDetail !== null) {
     return { state: 'unsupported', detail: unsupportedDetail };
   }
@@ -649,12 +758,13 @@ function replayOperations(state: Record<string, unknown>, operations: Remediatio
 }
 
 /**
- * Advance one verified record. v2 intentionally stores no state image: its closed witness says the
- * already-typed operations are the replay proof, so `next` is the only admissible successor. v1
- * retains a versioned snapshot witness for compatibility with immutable historical records.
+ * Advance one verified record. Every compact revision (v2, v3) intentionally stores no state image:
+ * its closed witness says the already-typed operations are the replay proof, so `next` is the only
+ * admissible successor. Only v1 retains a versioned snapshot witness, for compatibility with
+ * immutable historical records that were written before the compact witness existed.
  */
 function advanceReplayState(record: ScopeRemediation, next: Record<string, unknown>, isLast: boolean): Record<string, unknown> | null {
-  if (isLast || record.schemaVersion === 2) return next;
+  if (isLast || record.schemaVersion !== SCOPE_REMEDIATION_SCHEMA_VERSION) return next;
   const witness = validateReplayWitness({
     recordSchemaVersion: record.schemaVersion,
     snapshot: record.result.snapshot,
@@ -845,13 +955,16 @@ function executeOperations(
   if (!Array.isArray(next.debt)) {
     return { failure: new KyroCoreError('INVALID_SPRINT_SHAPE', 'Cannot apply remediation operations: debt[] is not an array.') };
   }
-  const debt = (next.debt as unknown[]).map(asRecord);
+  // Read live from `next.debt` inside each operation rather than from a snapshot taken before the
+  // loop: a canonicalization REPLACES an element, so a pre-computed view would leave a later
+  // operation in the same batch reasoning about a record that no longer exists.
+  const collection = next.debt as unknown[];
   const changes: RemediationChange[] = [];
 
   for (const operation of operations) {
     switch (operation.kind) {
       case 'debt.origin.set': {
-        const target = debt.find((entry) => entry?.id === operation.debtId) ?? null;
+        const target = collection.map(asRecord).find((entry) => entry?.id === operation.debtId) ?? null;
         if (!target) {
           return {
             failure: new KyroCoreError(
@@ -884,16 +997,52 @@ function executeOperations(
         break;
       }
       case 'debt.canonicalize': {
-        // The operation is defined and planable, but nothing applies it yet: atomic application,
-        // resume, replay and recertification are a separate, later contract. Failing closed here is
-        // the point — a half-implemented writer is exactly how a hybrid record would be persisted.
-        return {
-          failure: new KyroCoreError(
-            'UNSUPPORTED_OPERATION',
-            `Operation ${operation.id} is a debt.canonicalize, which this runtime can prepare and preview but not apply.`,
-            'Use the read-only preparation and preview surfaces to produce and review the manifest. Application lands with the canonicalization transaction.',
-          ),
-        };
+        const index = collection.findIndex((entry) => asRecord(entry)?.id === operation.debtId);
+        if (index === -1) {
+          return {
+            failure: new KyroCoreError(
+              'DEBT_NOT_FOUND',
+              `Operation ${operation.id} targets debt "${operation.debtId}", which does not exist in the live state.`,
+              'Remediation never creates records. Correct the debt id in the manifest.',
+            ),
+          };
+        }
+        if (!skipPreconditions) {
+          // The whole collection is the precondition, not just the target record: if any other debt
+          // was added, removed, reordered or edited since preparation, the operator authorized an
+          // after-image for a collection that no longer exists.
+          const issues = verifyCanonicalizePreconditions(
+            operation,
+            collection,
+            debtCollectionDigest,
+            '<live state>',
+            `operation ${operation.id}`,
+          );
+          if (issues.length > 0) {
+            return {
+              failure: new KyroCoreError(
+                'STATE_DIVERGED',
+                `Operation ${operation.id} no longer describes the live debt — ${formatIssues(issues)}.`,
+                'The debt collection changed since the manifest was written, or an earlier operation in this batch already changed it. Re-run kyro remediate canonicalize-prepare and regenerate the manifest.',
+              ),
+            };
+          }
+        }
+        const before = collection[index];
+        // Rebuilt key by key in canonical order rather than spread: the after-image is the whole
+        // point of the operation, so the record that lands on disk carries exactly the seven keys
+        // and nothing a validated payload happened to also hold.
+        const after: Record<string, unknown> = {};
+        for (const key of CANONICAL_DEBT_AFTER_KEYS) after[key] = operation.after[key];
+        collection[index] = after;
+        changes.push({
+          operationId: operation.id,
+          kind: operation.kind,
+          target: `debt[${operation.debtId}]`,
+          from: before,
+          to: after,
+        });
+        break;
       }
       default: {
         const exhaustive: never = operation;

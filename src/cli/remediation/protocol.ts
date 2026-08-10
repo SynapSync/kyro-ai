@@ -20,8 +20,9 @@ export const SCOPE_REMEDIATION_V2_SCHEMA_VERSION = 2 as const;
  *
  * It is an explicit revision rather than a silent extension of v2 so a reader that predates
  * `debt.canonicalize` fails closed as unsupported instead of interpreting a record it cannot
- * execute. `CURRENT_…` deliberately stays at v2: this sprint defines and plans the operation, and
- * nothing yet writes a v3 record, so the existing `debt.origin.set` flow emits exactly what it did.
+ * execute. `CURRENT_…` deliberately stays at v2: a batch is written at the LOWEST revision that
+ * admits every operation in it (see `requiredRemediationRevision`), so an origin-only remediation
+ * still emits exactly the v2 bytes it always did and only a canonicalization raises the revision.
  */
 export const SCOPE_REMEDIATION_V3_SCHEMA_VERSION = 3 as const;
 export const CURRENT_SCOPE_REMEDIATION_SCHEMA_VERSION = SCOPE_REMEDIATION_V2_SCHEMA_VERSION;
@@ -46,6 +47,16 @@ export const OPERATION_KINDS_BY_REVISION: Record<ScopeRemediationSchemaVersion, 
   [SCOPE_REMEDIATION_V2_SCHEMA_VERSION]: ['debt.origin.set'],
   [SCOPE_REMEDIATION_V3_SCHEMA_VERSION]: ['debt.origin.set', 'debt.canonicalize'],
 };
+
+/**
+ * The revisions current Kyro is allowed to WRITE, lowest first. v1 is readable forever but is never
+ * emitted again: its snapshot witness was retired by the compact record.
+ */
+export const WRITABLE_SCOPE_REMEDIATION_SCHEMA_VERSIONS = [
+  SCOPE_REMEDIATION_V2_SCHEMA_VERSION,
+  SCOPE_REMEDIATION_V3_SCHEMA_VERSION,
+] as const;
+export type WritableScopeRemediationSchemaVersion = (typeof WRITABLE_SCOPE_REMEDIATION_SCHEMA_VERSIONS)[number];
 
 /** The exact canonical debt key set an after-image must carry — no more, no fewer. */
 export const CANONICAL_DEBT_AFTER_KEYS = ['id', 'title', 'origin', 'priority', 'status', 'targetSprint', 'note'] as const;
@@ -176,9 +187,15 @@ export interface ScopeRemediationV1 {
   provenance: RemediationProvenance;
 }
 
-/** Immutable compact record emitted by current Kyro. Historic v1 records are never rewritten. */
-export interface ScopeRemediationV2 {
-  schemaVersion: typeof SCOPE_REMEDIATION_V2_SCHEMA_VERSION;
+/**
+ * Immutable compact record emitted by current Kyro. Historic v1 records are never rewritten.
+ *
+ * v2 and v3 share this one shape by design: the revision names which operations the record may
+ * carry, not how the record is laid out. Keeping a single structure is what lets a v3 chain be
+ * verified, replayed and certified by exactly the code paths that already handle v2 (ADR-0003).
+ */
+export interface CompactScopeRemediation {
+  schemaVersion: WritableScopeRemediationSchemaVersion;
   kind: typeof SCOPE_REMEDIATION_KIND;
   id: string;
   scope: string;
@@ -190,7 +207,33 @@ export interface ScopeRemediationV2 {
   provenance: RemediationProvenance;
 }
 
-export type ScopeRemediation = ScopeRemediationV1 | ScopeRemediationV2;
+/** The compact record pinned to one revision, for callers that mean specifically v2 or v3. */
+export type ScopeRemediationV2 = CompactScopeRemediation & { schemaVersion: typeof SCOPE_REMEDIATION_V2_SCHEMA_VERSION };
+export type ScopeRemediationV3 = CompactScopeRemediation & { schemaVersion: typeof SCOPE_REMEDIATION_V3_SCHEMA_VERSION };
+
+export type ScopeRemediation = ScopeRemediationV1 | CompactScopeRemediation;
+
+/**
+ * The LOWEST revision current Kyro writes that admits every operation in a batch.
+ *
+ * Choosing per batch rather than globally is what keeps ADR-0003 honest in both directions: an
+ * origin-only remediation keeps emitting a v2 record byte-for-byte as before, so no existing chain,
+ * reader or fixture is disturbed; a batch containing a `debt.canonicalize` is written as v3, so a
+ * reader that predates the operation refuses the record instead of silently ignoring an operation it
+ * cannot execute. Bumping a global CURRENT_… would have made every remediation unreadable to older
+ * Kyro, which is a migration, not a revision.
+ */
+export function requiredRemediationRevision(
+  operations: readonly RemediationOperation[],
+): WritableScopeRemediationSchemaVersion {
+  for (const revision of WRITABLE_SCOPE_REMEDIATION_SCHEMA_VERSIONS) {
+    const allowed = OPERATION_KINDS_BY_REVISION[revision];
+    if (operations.every((operation) => allowed.includes(operation.kind))) return revision;
+  }
+  // Unreachable while the registry is closed and v3 admits every kind; failing to the newest
+  // revision keeps this total rather than throwing from a pure selector.
+  return SCOPE_REMEDIATION_V3_SCHEMA_VERSION;
+}
 
 const REMEDIATION_KEYS = [
   'schemaVersion',

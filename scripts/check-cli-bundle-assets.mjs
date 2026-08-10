@@ -104,7 +104,7 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
   });
   const verificationOutput = `${verification.stdout ?? ''}${verification.stderr ?? ''}`;
   assert(verification.status === 0, `check-cli-bundle-assets: projected runtime verification failed:\n${verificationOutput}`);
-  assert(verificationOutput.includes('185 assertions passed'), `check-cli-bundle-assets: projected runtime did not report verification coverage:\n${verificationOutput}`);
+  assert(verificationOutput.includes('315 assertions passed'), `check-cli-bundle-assets: projected runtime did not report verification coverage:\n${verificationOutput}`);
 
   // The debt contract must hold in the *installed* runtime, not only in this checkout: the original
   // incident survived a green source build. The projected runtime classifies the same faithful corpus

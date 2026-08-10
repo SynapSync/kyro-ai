@@ -363,8 +363,12 @@ withFixture((fx) => {
   // record write and the state write leaves behind.
   writeFileSync(sprintPath(fx.root), corrupted);
 
+  // The record must be visible AND unmistakably not a remediation. Staying silent about it was the
+  // older behaviour: it hid an interrupted transaction, and equally hid a planted record (T3.2).
   const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
-  assert(!doctor.output.includes('remediation/R-001'), `an unanchored record must not be presented as a remediation: ${doctor.output}`);
+  assert(/remediation\/R-001: PREPARED/.test(doctor.output), `an unanchored record must be reported as PREPARED: ${doctor.output}`);
+  assert(!/remediation\/R-001: APPLIED/.test(doctor.output), `an unanchored record must never be presented as applied: ${doctor.output}`);
+  assert(/\[WARN\][^\n]*remediation\/R-001/.test(doctor.output), `an interrupted publish is a warning, not a healthy record: ${doctor.output}`);
 
   const preview = run(fx.root, ['remediate', 'preview', '--kyro-scope', SCOPE, '--manifest', manifest]);
   assert(preview.status === 0, `preview over a prepared transaction failed: ${preview.output}`);
@@ -871,7 +875,17 @@ withFixture((fx) => {
   rejects(check(canonicalizeOp({ retiredKeys: ['detail', 'resolution', 'addedSprint', 'severity'] })), 'operations[0].retiredKeys', 'retiring a key the record does not carry');
   rejects(check(canonicalizeOp({ debtId: 'D9', after: { ...after, id: 'D9' } })), 'operations[0].debtId', 'no such debt in the observed collection');
 
-  // Application is deliberately absent in this runtime: the executor refuses rather than half-applies.
+  // The revision a batch is WRITTEN at is chosen by its operations, not by the runtime: the
+  // origin-only flow must keep emitting the exact v2 record it always did, or every existing chain,
+  // reader and fixture would be disturbed by a feature they do not use (ADR-0003).
+  {
+    const originOnly = [{ id: 'O-1', kind: 'debt.origin.set', resolves: ['I-1'], debtId: 'D1', expectedOriginSha256: 'd'.repeat(64), origin: 1, reason: 'r' }];
+    assert(protocol.requiredRemediationRevision(originOnly) === 2, 'an origin-only batch must still be written as v2');
+    assert(protocol.requiredRemediationRevision([canonicalizeOp()]) === 3, 'a canonicalization must raise the record to v3');
+    assert(protocol.requiredRemediationRevision([...originOnly, canonicalizeOp()]) === 3, 'a mixed batch must be written at the revision its newest operation needs');
+  }
+
+  // A canonicalization the executor cannot express must still fail closed rather than half-apply.
   // Driven through the real CLI against a real closed scope, so the refusal is the shipped behaviour.
   withFixture((fx) => {
     const live = readJson(sprintPath(fx.root));
@@ -888,7 +902,9 @@ withFixture((fx) => {
         kind: 'debt.canonicalize',
         resolves: ['I-1'],
         debtId: target.id,
-        expectedDebtCollectionSha256: collectionDigest(liveDebt),
+        // The bound collection is deliberately not the one on disk: the operator authorized an
+        // after-image for a debt[] that no longer exists.
+        expectedDebtCollectionSha256: collectionDigest([...liveDebt, { id: 'ghost' }]),
         after: { id: target.id, title: target.title, origin: 1, priority: 'high', status: target.status, targetSprint: null, note: target.note ?? 'Canonicalized.' },
         retiredKeys: [],
         reason: 'The record predates the canonical debt contract.',
@@ -900,8 +916,9 @@ withFixture((fx) => {
       const args = ['remediate', verb, '--manifest', relPath, '--kyro-scope', SCOPE];
       if (verb === 'apply') args.push('--yes');
       const { status, output } = run(fx.root, args);
-      assert(status !== 0, `remediate ${verb} of a canonicalization must fail closed: ${output}`);
-      assert(output.includes('UNSUPPORTED_OPERATION'), `remediate ${verb} must report UNSUPPORTED_OPERATION: ${output}`);
+      assert(status !== 0, `remediate ${verb} of a stale canonicalization must fail closed: ${output}`);
+      assert(output.includes('expectedDebtCollectionSha256') && output.includes('is stale'),
+        `remediate ${verb} must name the stale whole-debt precondition: ${output}`);
     }
     assertNothingApplied(fx, 'refused canonicalization');
     assert(!existsSync(recordPath(fx.root)), 'a refused canonicalization must not publish a record');
@@ -1212,12 +1229,12 @@ withFixture((fx) => {
       `an origin-only manifest must be routed back to the origin-only flow: ${wrongFlow.output}`);
   });
 
-  // 5. The public surface must not advertise what this runtime cannot do.
+  // 5. The public surface must describe the route that exists, and only that route.
   {
     const help = run(repo, ['remediate', '--help']).output;
     assert(help.includes('canonicalize-prepare') && help.includes('canonicalize-preview'), 'help must document both read-only surfaces');
     assert(help.includes('READ-ONLY'), 'help must say the canonicalization surfaces are read-only');
-    assert(help.includes('does not apply them'), 'help must state that this runtime cannot apply a canonicalization');
+    assert(/remediate apply/.test(help), 'help must route a reviewed canonicalization to remediate apply');
     // Naming the absent verb to say it does not exist is honest; listing it as usable is not.
     assert(!/^\s*kyro remediate canonicalize-apply/m.test(help), 'help must not offer an apply verb that does not exist');
     assert(/no\s+canonicalize-apply command/i.test(help), 'help must say plainly that no apply verb exists');
@@ -1234,6 +1251,437 @@ withFixture((fx) => {
     }
     assert(catalog.tools.every((tool) => !tool.name.includes('canonicalize_apply')), 'the catalog must not advertise an apply tool');
   }
+}
+
+// --- Shared canonicalization fixture (T3.1, T3.2, T3.3) -----------------------------------------
+
+const debtCorpus = readJson(resolve(repo, 'fixtures/debt-contract/golden.json'));
+const FAITHFUL_D1 = debtCorpus.cases.find((entry) => entry.id === 'live-d1-remediation-required').raw;
+assert(typeof FAITHFUL_D1.origin === 'string' && 'addedSprint' in FAITHFUL_D1 && !('priority' in FAITHFUL_D1),
+  'the faithful D1 must still carry the incident shape this transaction repairs');
+
+/** An unrelated debt that must survive the transaction byte-for-byte. */
+const BYSTANDER = { id: 'D2', title: 'Unrelated debt', origin: 1, priority: 'medium', status: 'open', targetSprint: null, note: 'Untouched.' };
+const CANONICAL_KEYS = ['id', 'title', 'origin', 'priority', 'status', 'targetSprint', 'note'];
+
+/**
+ * A genuinely closed scope whose live debt was THEN rewritten into the legacy shape.
+ *
+ * The close happens with canonical debt because that is the only thing close-sprint accepts; the
+ * legacy shape is applied afterwards, exactly as the original incident produced it, so the
+ * immutable checkpoint holds the state as committed and remediation must correct only the copy.
+ */
+function withCanonicalizable(fn) {
+  const root = mkdtempSync(join(tmpdir(), 'kyro-canonicalize-'));
+  try {
+    cpSync(closeFixture, root, { recursive: true });
+    mkdirSync(join(root, '.home'), { recursive: true });
+    const sprint = readJson(sprintPath(root));
+    sprint.debt = [
+      { id: 'D1', title: FAITHFUL_D1.title, origin: 1, priority: 'low', status: FAITHFUL_D1.status, targetSprint: null, note: FAITHFUL_D1.note },
+      { ...BYSTANDER },
+    ];
+    writeJson(sprintPath(root), sprint);
+    const closed = run(root, ['close-sprint', '--kyro-scope', SCOPE, '--outcome', 'shipped', '--note', 'Closed.', '--summary', 'Closed.', '--confirm']);
+    assert(closed.status === 0, `canonicalize fixture close-sprint failed: ${closed.output}`);
+
+    const live = readJson(sprintPath(root));
+    live.debt[0] = { ...FAITHFUL_D1 };
+    writeJson(sprintPath(root), live);
+    fn({ root, live: readJson(sprintPath(root)), archive: historicalArchive(root) });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/** Build the manifest through the real read-only preparation surface, not by hand. */
+function prepareManifest(root, extraArgs = []) {
+  const prepared = run(root, ['remediate', 'canonicalize-prepare', '--debt', 'D1', '--kyro-scope', SCOPE,
+    '--origin', '1', '--priority', 'high', '--target-sprint', 'null',
+    '--reason', 'The record predates the canonical debt contract.', '--actor', 'regression-harness',
+    '--json', ...extraArgs]);
+  assert(prepared.status === 0, `preparation failed: ${prepared.output}`);
+  const result = JSON.parse(prepared.output);
+  assert(result.status === 'READY', `preparation must be READY, got ${result.status}: ${prepared.output}`);
+  return result.manifest;
+}
+
+/** Prepare and apply one canonicalization of D1 against the live state as it currently stands. */
+function applyCanonicalization(root, extraArgs = []) {
+  const relPath = writeManifest(root, prepareManifest(root, extraArgs));
+  return run(root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']);
+}
+
+// --- Atomic apply and resume of debt.canonicalize (T3.1) ----------------------------------------
+//
+// The whole point of this operation is that it lands completely or not at all. Every case below is
+// driven through the real CLI against a genuinely closed scope, and every rejection is asserted on
+// BYTES — the archive, the live debt, the anchor and the record directory — because a refusal that
+// still moved something is the failure this contract exists to prevent.
+{
+  const D1 = FAITHFUL_D1;
+  const canonicalizedDebt = (root) => readJson(sprintPath(root)).debt.find((entry) => entry.id === 'D1');
+
+  /** Nothing moved: archive bytes, live debt shape, anchors and the record directory. */
+  const assertUntouched = (fx, label) => {
+    assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive), `${label}: historical archive changed`);
+    const live = readJson(sprintPath(fx.root));
+    assert(JSON.stringify(live.debt) === JSON.stringify(fx.live.debt), `${label}: live debt was modified`);
+    assert(live.remediations === undefined, `${label}: a remediation anchor was written`);
+    assert(!existsSync(recordPath(fx.root)), `${label}: a remediation record was written`);
+  };
+
+  // 1. The happy path: one append-only v3 record, an exact seven-key after-image, history intact.
+  withCanonicalizable((fx) => {
+    const relPath = writeManifest(fx.root, prepareManifest(fx.root));
+    const preview = run(fx.root, ['remediate', 'canonicalize-preview', '--manifest', relPath, '--kyro-scope', SCOPE, '--json']);
+    assert(preview.status === 0, `preview of a complete manifest must be accepted: ${preview.output}`);
+    assert(JSON.parse(preview.output).accepted === true, 'preview must accept the prepared manifest');
+
+    const applied = run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']);
+    assert(applied.status === 0, `apply of a prepared canonicalization must succeed: ${applied.output}`);
+
+    const record = readJson(recordPath(fx.root));
+    assert(record.schemaVersion === 3, `a canonicalization must be recorded at protocol revision 3, got ${record.schemaVersion}`);
+    assert(record.kind === 'scope-remediation' && record.id === 'R-001', 'the record must be the first link of the chain');
+    assert(record.result.witness.kind === 'operations-replay' && !('snapshot' in record.result),
+      'a v3 record must carry the compact witness, never a state image');
+    assert(record.operations.length === 1 && record.operations[0].kind === 'debt.canonicalize',
+      'exactly one typed canonicalization must be recorded');
+    assert(record.operations[0].retiredKeys.join(',') === 'detail,resolution,addedSprint',
+      `the record must name every retired legacy key, got ${record.operations[0].retiredKeys}`);
+
+    const target = canonicalizedDebt(fx.root);
+    assert(JSON.stringify(Object.keys(target)) === JSON.stringify(CANONICAL_KEYS),
+      `the live record must hold exactly the seven canonical keys in order, got ${Object.keys(target)}`);
+    assert(target.origin === 1 && target.priority === 'high' && target.targetSprint === null,
+      'the operator-authorized values must be the ones that landed');
+    assert(target.title === D1.title && target.status === D1.status, 'identity and lifecycle must be preserved from observation');
+    for (const key of ['detail', 'resolution', 'addedSprint']) {
+      assert(!(key in target), `${key} must not survive canonicalization`);
+    }
+
+    const live = readJson(sprintPath(fx.root));
+    assert(JSON.stringify(live.debt.find((entry) => entry.id === 'D2')) === JSON.stringify(BYSTANDER),
+      'an unrelated debt record must not be touched');
+    assert(live.remediations.length === 1 && live.remediations[0].id === 'R-001', 'exactly one anchor must be appended');
+    assert(live.remediations[0].commitment === digest(record), 'the anchor must commit to the published record');
+    assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive),
+      'checkpoint, snapshot, narrative and ledger bytes must be unchanged by a successful canonicalization');
+
+    // The corrected scope is a first-class remediated scope, not merely a file that parses.
+    const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+    assert(doctor.status === 0, `doctor must accept the canonicalized scope: ${doctor.output}`);
+    assert(/APPLIED/.test(doctor.output), `doctor must report the canonicalization as APPLIED: ${doctor.output}`);
+
+    // Re-running the same manifest is refused as stale, not applied twice: the base state is gone.
+    const again = run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']);
+    assert(again.status !== 0, 'a second apply of the same manifest must be refused');
+    assert(again.output.includes('STATE_DIVERGED'), `the second apply must report a stale base: ${again.output}`);
+    assert(!existsSync(recordPath(fx.root, '002')), 'a refused re-apply must not publish a competing record');
+    assert(readJson(sprintPath(fx.root)).remediations.length === 1, 'a refused re-apply must not append a second anchor');
+  });
+
+  // 2. Resume: an interrupted publish finishes as the SAME record, never as a competing second one.
+  withCanonicalizable((fx) => {
+    const manifest = prepareManifest(fx.root);
+    const relPath = writeManifest(fx.root, manifest);
+
+    // Reproduce the interruption exactly: the immutable record is on disk, the live anchor is not.
+    const rehearsal = mkdtempSync(join(tmpdir(), 'kyro-canonicalize-rehearsal-'));
+    cpSync(fx.root, rehearsal, { recursive: true });
+    assert(run(rehearsal, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']).status === 0,
+      'the rehearsal apply must succeed so its record can be replanted');
+    const preparedRecord = readJson(recordPath(rehearsal));
+    rmSync(rehearsal, { recursive: true, force: true });
+
+    mkdirSync(join(fx.root, `.agents/kyro/scopes/${SCOPE}/archive/remediations`), { recursive: true });
+    writeJson(recordPath(fx.root), preparedRecord);
+
+    // Preview is the surface that can see this state: doctor walks anchors, and an interrupted
+    // publish is precisely a record with no anchor yet.
+    const before = run(fx.root, ['remediate', 'preview', '--manifest', relPath, '--kyro-scope', SCOPE, '--json']);
+    assert(before.status === 0, `preview of an interrupted transaction must succeed: ${before.output}`);
+    assert(JSON.parse(before.output).transactionStatus === 'PREPARED',
+      `an interrupted canonicalization must be reported as PREPARED: ${before.output}`);
+
+    const resumed = run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']);
+    assert(resumed.status === 0, `resume must complete the interrupted transaction: ${resumed.output}`);
+    assert(/Resumed interrupted remediation/.test(resumed.output), `resume must report itself as a resume: ${resumed.output}`);
+    assert(JSON.stringify(readJson(recordPath(fx.root))) === JSON.stringify(preparedRecord),
+      'resume must finish the existing record byte-for-byte, not rewrite it');
+    assert(!existsSync(recordPath(fx.root, '002')), 'resume must not publish a duplicate R-NNN');
+    const live = readJson(sprintPath(fx.root));
+    assert(live.remediations.length === 1 && live.remediations[0].commitment === digest(preparedRecord),
+      'resume must anchor exactly the record that was already published');
+    assert(run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]).status === 0, 'the resumed scope must be healthy');
+  });
+
+  // 3. Every way the input can be wrong leaves the scope exactly as it was.
+  const mutations = [
+    ['stale whole-debt precondition', (m) => { m.operations[0].expectedDebtCollectionSha256 = 'a'.repeat(64); }, 'STATE_DIVERGED'],
+    ['stale base state', (m) => { m.base.stateSha256 = 'b'.repeat(64); }, 'STATE_DIVERGED'],
+    ['forged chain head', (m) => { m.base.remediationHead = 'c'.repeat(64); }, 'STATE_DIVERGED'],
+    ['forged after-image identity', (m) => { m.operations[0].after.id = 'D9'; }, 'INVALID_INPUT'],
+    ['renamed title', (m) => { m.operations[0].after.title = 'Renamed by the manifest'; }, 'STATE_DIVERGED'],
+    ['lifecycle moved', (m) => { m.operations[0].after.status = 'open'; }, 'STATE_DIVERGED'],
+    ['hybrid after-image', (m) => { m.operations[0].after.addedSprint = 1; }, 'INVALID_INPUT'],
+    ['unaccounted legacy key', (m) => { m.operations[0].retiredKeys = ['detail']; }, 'STATE_DIVERGED'],
+    ['unknown debt id', (m) => { m.operations[0].debtId = 'D9'; m.operations[0].after.id = 'D9'; }, 'DEBT_NOT_FOUND'],
+    ['unknown protocol revision', (m) => { m.schemaVersion = 4; }, 'INVALID_INPUT'],
+    ['canonicalization smuggled into v1', (m) => { m.schemaVersion = 1; }, 'INVALID_INPUT'],
+  ];
+  for (const [label, mutate, expected] of mutations) {
+    withCanonicalizable((fx) => {
+      const manifest = prepareManifest(fx.root);
+      mutate(manifest);
+      const relPath = writeManifest(fx.root, manifest);
+      const { status, output } = run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']);
+      assert(status !== 0, `${label}: apply must fail closed: ${output}`);
+      assert(output.includes(expected), `${label}: expected ${expected}, got: ${output}`);
+      assertUntouched(fx, label);
+    });
+  }
+
+  // 4. Confirmation is never implied by a valid plan, and a plan is not a write.
+  withCanonicalizable((fx) => {
+    const relPath = writeManifest(fx.root, prepareManifest(fx.root));
+    const unconfirmed = run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE]);
+    assert(unconfirmed.status !== 0 && unconfirmed.output.includes('CONFIRMATION_REQUIRED'),
+      `apply without --yes must stop at the gate: ${unconfirmed.output}`);
+    assert(/debt\[D1\]/.test(unconfirmed.output), `the refused plan must still show the record-level change: ${unconfirmed.output}`);
+    assertUntouched(fx, 'unconfirmed apply');
+
+    const previewed = run(fx.root, ['remediate', 'preview', '--manifest', relPath, '--kyro-scope', SCOPE]);
+    assert(previewed.status === 0, `preview of a canonicalization must succeed: ${previewed.output}`);
+    assertUntouched(fx, 'preview');
+  });
+
+  // 5. The origin-only flow is untouched by all of this: same v2 record, same bytes.
+  withFixture((fx) => {
+    const relPath = writeManifest(fx.root, manifestFor(readJson(sprintPath(fx.root))));
+    assert(run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']).status === 0,
+      'the origin-only remediation must still apply');
+    const record = readJson(recordPath(fx.root));
+    assert(record.schemaVersion === 2, `an origin-only remediation must still be recorded as v2, got ${record.schemaVersion}`);
+    assert(record.operations[0].kind === 'debt.origin.set', 'the origin-only operation must be recorded unchanged');
+    assert(readJson(sprintPath(fx.root)).debt[0].origin === 1, 'the origin-only correction must still land');
+  });
+}
+
+// --- Replay and verification of v1/v2/v3 and mixed chains (T3.2) --------------------------------
+//
+// A chain containing a canonicalization must be replayed by the SAME executor that applied it, at
+// each record's OWN declared revision. Doctor and status must agree, historic records must never be
+// reinterpreted or rewritten, and every forged variant must fail closed with a named diagnostic.
+{
+  /**
+   * Append an origin-only v2 remediation on top of whatever chain already exists.
+   *
+   * `debtId` matters: an origin-only correction of the still-legacy D1 cannot be applied at all,
+   * because the projected state would keep its legacy-only keys and fail strict validation. That is
+   * the motivating incident itself, so a v2 link that precedes canonicalization must target the
+   * already-canonical bystander instead.
+   */
+  const applyOriginSet = (root, debtId, from, to) => {
+    const live = readJson(sprintPath(root));
+    const anchors = live.remediations ?? [];
+    const relPath = writeManifest(root, {
+      schemaVersion: 1,
+      kind: 'scope-remediation-manifest',
+      scope: SCOPE,
+      base: { stateSha256: stateDigest(live), remediationHead: anchors.at(-1)?.commitment ?? null },
+      issues: [{ id: 'I-1', code: 'debt.origin.drift', path: `debt[${debtId}].origin`, observedValueSha256: digest(JSON.stringify(canonical(from))) }],
+      operations: [{
+        id: 'O-1',
+        kind: 'debt.origin.set',
+        resolves: ['I-1'],
+        debtId,
+        expectedOriginSha256: digest(JSON.stringify(canonical(from))),
+        origin: to,
+        reason: 'Origin corrected.',
+      }],
+      provenance: { reason: 'Origin drift after close.', actor: 'regression-harness' },
+    });
+    return run(root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']);
+  };
+
+  // The premise above, asserted rather than assumed. Strict projection is whole-file, so while a
+  // legacy record is present NO remediation applies — not even one that never touches it. The
+  // canonicalization must therefore be the FIRST link of such a scope's chain, which is exactly why
+  // the motivating incident could not be repaired by the origin-only operation at all.
+  withCanonicalizable((fx) => {
+    for (const [label, debtId, from, to] of [
+      ['the legacy record itself', 'D1', FAITHFUL_D1.origin, 1],
+      ['an unrelated canonical record', 'D2', 1, 2],
+    ]) {
+      const refused = applyOriginSet(fx.root, debtId, from, to);
+      assert(refused.status !== 0, `${label}: an origin-only remediation must be refused while a legacy record is present`);
+      assert(refused.output.includes('INVALID_SPRINT_SHAPE'),
+        `${label}: the refusal must name the still-invalid projection: ${refused.output}`);
+      assert(!existsSync(recordPath(fx.root)), `${label}: a refused remediation must publish nothing`);
+    }
+  });
+
+  /**
+   * The verification state status reports, or `refused:<code>` when status will not report at all.
+   *
+   * Refusing is itself a fail-closed answer: a live state that no longer satisfies the schema is one
+   * status must not summarize, and saying so beats inventing a verification state for it.
+   */
+  const verificationOf = (root) => {
+    const status = run(root, ['status', '--kyro-scope', SCOPE]);
+    if (status.status !== 0) {
+      const code = /Code: (\w+)/.exec(status.output);
+      return `refused:${code === null ? 'unknown' : code[1]}`;
+    }
+    const match = /Verification: (\w+)/.exec(status.output);
+    return match === null ? null : match[1];
+  };
+
+  // 1. A single v3 chain replays: doctor, status and the checkpoint lens all agree.
+  withCanonicalizable((fx) => {
+    assert(applyCanonicalization(fx.root).status === 0, 'the canonicalization must apply');
+    const recordBytes = readFileSync(recordPath(fx.root, '001'), 'utf8');
+
+    const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+    assert(doctor.status === 0, `a v3 chain must verify: ${doctor.output}`);
+    assert(doctor.output.includes('replayed through R-001'), `the checkpoint lens must name the replayed chain: ${doctor.output}`);
+    assert(/remediation\/R-001[\s\S]*?APPLIED/.test(doctor.output), `the v3 record must be APPLIED: ${doctor.output}`);
+    assert(verificationOf(fx.root) === 'remediated', 'a replayed v3 chain must make the scope remediated');
+    assert(readFileSync(recordPath(fx.root, '001'), 'utf8') === recordBytes, 'replay must not rewrite the v3 record');
+    assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive),
+      'the original close must stay historical evidence, byte-for-byte, after canonicalization');
+  });
+
+  // 2. A mixed v3 → v2 chain: each record replays at its own revision, never at the head's.
+  //    The reverse order does not exist by construction — see the ordering property above.
+  withCanonicalizable((fx) => {
+    assert(applyCanonicalization(fx.root).status === 0, 'v3 link must apply');
+    const second = applyOriginSet(fx.root, 'D1', 1, 2);
+    assert(second.status === 0, `v2 link must apply on top of a v3 link: ${second.output}`);
+
+    const revisions = ['001', '002'].map((id) => readJson(recordPath(fx.root, id)).schemaVersion);
+    assert(JSON.stringify(revisions) === JSON.stringify([3, 2]),
+      `the chain must genuinely mix revisions in order, got ${revisions}`);
+    const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+    assert(doctor.status === 0, `a mixed chain must verify: ${doctor.output}`);
+    assert(doctor.output.includes('replayed through R-002'), `the head must be named: ${doctor.output}`);
+    assert(/remediation\/R-001[\s\S]*?APPLIED/.test(doctor.output), `the earlier link must not read as diverged: ${doctor.output}`);
+    assert(verificationOf(fx.root) === 'remediated', 'a mixed chain must be remediated');
+    assert(readJson(sprintPath(fx.root)).debt.find((entry) => entry.id === 'D1').origin === 2,
+      'the head result must be the live value');
+    assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive), 'history must be untouched');
+  });
+
+  // 3. A v1 record as an INTERMEDIATE link of a chain headed past a canonicalization.
+  //
+  //    v1 is the only revision that carries a snapshot witness, and that witness is only consulted
+  //    for a non-final record. A v1 link can never hold the canonicalization itself (the revision
+  //    binding rejects that), so the shape under test is v3 → v1 → v2: the canonicalization opens
+  //    the chain, and a historic v1 record sits in the middle supplying its own replay image.
+  withCanonicalizable((fx) => {
+    assert(applyCanonicalization(fx.root).status === 0, 'v3→v1→v2: the canonicalization must open the chain');
+    assert(applyOriginSet(fx.root, 'D1', 1, 2).status === 0, 'v3→v1→v2: the intermediate link must apply');
+    const intermediateSnapshot = readJson(sprintPath(fx.root));
+    assert(applyOriginSet(fx.root, 'D1', 2, 3).status === 0, 'v3→v1→v2: the head link must apply');
+
+    // Rewrite the middle record as historic v1 evidence, then re-anchor the links downstream of it
+    // so the chain stays coherent and only the replay path is under test.
+    const middle = rewriteFixtureRecordAsV1(fx.root, '002', intermediateSnapshot);
+    const live = readJson(sprintPath(fx.root));
+    const head = readJson(recordPath(fx.root, '003'));
+    head.base.remediationHead = digest(middle);
+    writeJson(recordPath(fx.root, '003'), head);
+    live.remediations[2].commitment = digest(head);
+    writeJson(sprintPath(fx.root), live);
+    const historicBytes = readFileSync(recordPath(fx.root, '002'), 'utf8');
+
+    const revisions = ['001', '002', '003'].map((id) => readJson(recordPath(fx.root, id)).schemaVersion);
+    assert(JSON.stringify(revisions) === JSON.stringify([3, 1, 2]), `the chain must be v3 → v1 → v2, got ${revisions}`);
+    const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+    assert(doctor.status === 0, `a v3 → v1 → v2 chain must verify: ${doctor.output}`);
+    assert(doctor.output.includes('replayed through R-003'), `the head must be named: ${doctor.output}`);
+    assert(verificationOf(fx.root) === 'remediated', 'a v3 → v1 → v2 chain must be remediated');
+    assert(readFileSync(recordPath(fx.root, '002'), 'utf8') === historicBytes,
+      'replaying must not rewrite historic v1 evidence under a later revision\'s semantics');
+    assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive), 'history must be untouched');
+  });
+
+  // 4. Every forged variant of a v3 chain fails closed, on both surfaces, with a named diagnostic.
+  const forgeries = [
+    ['forged after-image in the record', (root) => {
+      const record = readJson(recordPath(root, '001'));
+      record.operations[0].after.priority = 'low';
+      writeJson(recordPath(root, '001'), record);
+    }, 'DIVERGED', 'diverged'],
+    ['result digest that no operation produces', (root) => {
+      const record = readJson(recordPath(root, '001'));
+      record.result.stateSha256 = 'f'.repeat(64);
+      writeJson(recordPath(root, '001'), record);
+    }, 'DIVERGED', 'diverged'],
+    ['anchor commitment detached from the record', (root) => {
+      const live = readJson(sprintPath(root));
+      live.remediations[0].commitment = 'e'.repeat(64);
+      writeJson(sprintPath(root), live);
+    }, 'DIVERGED', 'diverged'],
+    ['unknown protocol revision on the record', (root) => {
+      const record = readJson(recordPath(root, '001'));
+      record.schemaVersion = 99;
+      writeJson(recordPath(root, '001'), record);
+      const live = readJson(sprintPath(root));
+      live.remediations[0].commitment = digest(record);
+      writeJson(sprintPath(root), live);
+    }, 'UNSUPPORTED_VERSION', 'unsupported'],
+    ['live debt edited behind the applied record', (root) => {
+      const live = readJson(sprintPath(root));
+      live.debt.find((entry) => entry.id === 'D1').priority = 'low';
+      writeJson(sprintPath(root), live);
+    }, 'DIVERGED', 'diverged'],
+    ['legacy key reintroduced into the canonicalized record', (root) => {
+      const live = readJson(sprintPath(root));
+      live.debt.find((entry) => entry.id === 'D1').addedSprint = 1;
+      writeJson(sprintPath(root), live);
+      // A retired legacy key coming back is not a verification question but a schema one: status
+      // must refuse to summarize a state it cannot read, rather than name a verification for it.
+    }, 'DIVERGED', 'refused:INVALID_SPRINT_SHAPE'],
+  ];
+  for (const [label, forge, expected, expectedState] of forgeries) {
+    withCanonicalizable((fx) => {
+      assert(applyCanonicalization(fx.root).status === 0, `${label}: setup canonicalization must apply`);
+      forge(fx.root);
+      const doctor = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+      assert(doctor.status === 1, `${label}: doctor must fail closed: ${doctor.output}`);
+      assert(doctor.output.includes(expected), `${label}: doctor must report ${expected}: ${doctor.output}`);
+      const verification = verificationOf(fx.root);
+      assert(verification === expectedState, `${label}: status must report ${expectedState}, got ${verification}`);
+      assert(JSON.stringify(historicalArchive(fx.root)) === JSON.stringify(fx.archive),
+        `${label}: a failing verification must not touch the archive`);
+    });
+  }
+
+  // 5. An unanchored record is named, and named for what it is: resumable or planted.
+  withCanonicalizable((fx) => {
+    const relPath = writeManifest(fx.root, prepareManifest(fx.root));
+    const beforeApply = readFileSync(sprintPath(fx.root), 'utf8');
+    assert(run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']).status === 0,
+      'setup apply must succeed');
+    writeFileSync(sprintPath(fx.root), beforeApply);
+
+    const interrupted = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+    assert(/remediation\/R-001: PREPARED/.test(interrupted.output),
+      `an interrupted v3 publish must be reported as PREPARED: ${interrupted.output}`);
+    assert(!/remediation\/R-001: APPLIED/.test(interrupted.output), 'an unanchored record must never read as applied');
+
+    // Now make the same orphan a record that does NOT continue the chain: it is not resumable.
+    const planted = readJson(recordPath(fx.root, '001'));
+    planted.base.remediationHead = 'd'.repeat(64);
+    writeJson(recordPath(fx.root, '001'), planted);
+    const forged = run(fx.root, ['doctor', '--artifacts', '--kyro-scope', SCOPE]);
+    assert(forged.status === 1, `a planted unanchored record must fail doctor: ${forged.output}`);
+    assert(/does not continue the live chain/.test(forged.output),
+      `a planted record must be distinguished from an interrupted publish: ${forged.output}`);
+  });
 }
 
 console.log(`check:scope-remediation — ${passed} assertions passed`);
