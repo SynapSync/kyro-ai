@@ -26,6 +26,7 @@ Usage:
   kyro recertify <subcommand>  Certify a remediated scope against re-verified evidence: preview, apply
   kyro status [mode]           Read-only scope progress, review debt, and debt report
   kyro close-sprint [options]  Checkpoint + close the active sprint (lossless, tool-owned)
+  kyro clarify --from <file>   Tool-owned clarification resolution write
   kyro context-pack [options]  Emit a context package for a scope from sprint.json
   kyro capabilities [--json]   List supported tool-owned verbs (runtime handshake)
   kyro eval [options]          Run deterministic behavioral eval cases
@@ -67,6 +68,7 @@ Examples:
   kyro status debt --kyro-scope auth-refactor
   kyro record-evidence T1.1 --kyro-scope auth-refactor --summary "..." --validation "npm test" --file src/x.ts
   kyro plan --from lean-plan.json --kyro-scope auth-refactor --dry-run
+  kyro clarify --from clarifications.json --kyro-scope auth-refactor --dry-run
   kyro review T1.1 --kyro-scope auth-refactor --verdict pass --yes
   kyro debt add --title "Missing test" --priority high --kyro-scope auth-refactor
   kyro add-emergent --title "Add missing migration" --description "..." --acceptance "Migration runs clean." --kyro-scope auth-refactor

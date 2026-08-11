@@ -6,6 +6,7 @@ export const CLI_COMMANDS = [
   'review',
   'repair',
   'close-sprint',
+  'clarify',
   'context-pack',
   'scope',
   'sync',

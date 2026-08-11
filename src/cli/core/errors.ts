@@ -24,6 +24,8 @@ export type KyroErrorCode =
   | 'SCOPE_ALREADY_INITIALIZED'
   | 'SPRINT_ALREADY_ACTIVE'
   | 'NOT_READY_TO_PLAN'
+  | 'NOT_READY_TO_CLARIFY'
+  | 'CLARIFICATION_NOT_FOUND'
   | 'WRITE_NOT_PERMITTED'
   /** A defined, parseable operation this runtime can prepare or preview but deliberately not apply. */
   | 'UNSUPPORTED_OPERATION'

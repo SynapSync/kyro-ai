@@ -200,6 +200,7 @@ Thin routers over scope state — they load only what the current step needs.
 | Verb | Purpose |
 | ---- | ------- |
 | `… plan --from <file>` | Bootstrap scope or materialize the next sprint |
+| `… clarify --from <file>` | Record accepted design clarifications without hand-editing scope state |
 | `… record-evidence <task> …` | Maker evidence on a task |
 | `… review <task> --verdict pass\|fail …` | Checker verdict |
 | `… debt add\|start\|resolve\|…` | Formal debt lifecycle |
@@ -328,7 +329,7 @@ kyro sync --scope workspace --yes
 
 **Can agents hand-edit `sprint.json`?**
 
-No. Kyro enforces schema and gates through CLI verbs, not prompt discipline. Use `kyro plan --from <file>`, `kyro record-evidence`, `kyro review`, and `kyro close-sprint` instead of hand-edits.
+No. Kyro enforces schema and gates through CLI verbs, not prompt discipline. Use `kyro plan --from <file>`, `kyro clarify --from <file>`, `kyro record-evidence`, `kyro review`, and `kyro close-sprint` instead of hand-edits.
 
 **My team has scopes already. How do I join?**
 
