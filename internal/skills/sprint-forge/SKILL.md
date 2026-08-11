@@ -83,9 +83,13 @@ The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/revie
 
 ## Artifact Write Contract (MANDATORY)
 
-Every mutation of `sprint.json` or project state MUST be a **safe write**:
+Every mutation of `sprint.json` or project state MUST be owned by a CLI verb. The CLI performs the
+safe write internally:
 
 > Read the whole file → `JSON.parse` → mutate the object → serialize → overwrite in one write → re-parse to confirm. If the re-parse fails, restore and report.
+
+Agents must not perform those steps themselves. If a required state-changing verb is absent, stop for
+a runtime update; never substitute an editor, patch, or script.
 
 NEVER partial/string-replace structural changes (nulling `activeSprint`, removing a nested block) — it orphans and corrupts the JSON. Exception: the archive snapshot (fresh file, pure write).
 
@@ -99,6 +103,7 @@ Irreversible or schema-critical operations are CLI-owned, never hand-rolled:
 | `{{KYRO_CLI}} doctor --artifacts --kyro-scope <scope>` | Validates shape drift, checkpoint state/digests/artifacts, legacy snapshots, and unresolved `[NEEDS CLARIFICATION]`. |
 | `{{KYRO_CLI}} analyze --kyro-scope <scope>` | Semantic cross-check (clarity, coverage, deps, debt, principles); non-zero on CRITICAL/HIGH. Gate before close. |
 | `{{KYRO_CLI}} repair --kyro-scope <scope>` | Normalizes `sprint.json` formatting. |
+| `{{KYRO_CLI}} clarify --from <file> --kyro-scope <scope>` | Records one or more accepted clarification decisions and safely advances routing when clear. |
 | `{{KYRO_CLI}} rule add ... [--global]` | Adds a scope rule; `--global` also writes `project.json` after approval. |
 
 Claude Code's `PreToolUse` hook blocks edits nulling `activeSprint`; others rely on this contract.

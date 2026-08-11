@@ -133,7 +133,7 @@ Install/sync probe PATH once, write the result into the **runtime manifest**, an
 
 **Safe from either root (including the projected runtime CLI):**
 
-- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `record-evidence`, `review`, `scenario add|link`, `context-pack`, and other scope workflow commands
+- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `clarify`, `record-evidence`, `review`, `scenario add|link`, `context-pack`, and other scope workflow commands
 
 Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai@latest` remedy.
 
@@ -443,7 +443,27 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 `kyro capabilities [--json]` lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start: a missing verb — or an `UNKNOWN_COMMAND` failure on the command itself — means the installed runtime predates the skill assets and the forge must abort with an upgrade request instead of improvising hand-edits. `kyro doctor` probes the installed runtime with the same handshake (`CLI capabilities` check).
 
-The payload covers the sprint-lifecycle verbs plus the tool-owned state writers agents reach for (`scenario`, `adr`, `status`). It excludes operator surface (`install`, `sync`, `uninstall`, `detect`, `eval`, `tui`, `mcp`, `trace`, `scope`) and `capabilities` itself — the handshake cannot verify itself, since its absence is the staleness signal. `npm run check:capabilities` enforces both directions: every `{{KYRO_CLI}} <verb>` the shipped assets invoke must be advertised, and every advertised verb must be dispatchable.
+The payload covers the sprint-lifecycle verbs plus the tool-owned state writers agents reach for (`clarify`, `scenario`, `adr`, `status`). It excludes operator surface (`install`, `sync`, `uninstall`, `detect`, `eval`, `tui`, `mcp`, `trace`, `scope`) and `capabilities` itself — the handshake cannot verify itself, since its absence is the staleness signal. `npm run check:capabilities` enforces both directions: every `{{KYRO_CLI}} <verb>` the shipped assets invoke must be advertised, and every advertised verb must be dispatchable.
+
+## Tool-owned clarification resolution (`kyro clarify`)
+
+`kyro clarify --from <resolutions.json> [--kyro-scope <scope>] [--dry-run]` resolves design ambiguity through the CLI; agents never edit `sprint.json` directly. The normal interaction asks one contextual question at a time, then writes one accepted answer. A batch is allowed only when the user explicitly asks to defer registration.
+
+```json
+{
+  "resolutions": [
+    {
+      "target": { "kind": "open_question", "text": "Exact current open question" },
+      "answer": "Accepted decision.",
+      "requirements": [
+        { "id": "R5", "statement": "Verifiable consequence.", "priority": "must" }
+      ]
+    }
+  ]
+}
+```
+
+Each target is either an exact `open_question` or a clarification `marker`. The command validates every resolution before writing; rejects duplicate, stale, empty, or malformed entries without changing state; appends the durable clarification record; and leaves `nextAction: clarify` until all questions and markers are resolved. Once clear, it routes to `plan_sprint` (no active sprint) or `execute_task` (an existing sprint).
 
 ## Tool-owned debt mutation (`kyro debt`)
 
