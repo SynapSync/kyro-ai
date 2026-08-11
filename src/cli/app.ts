@@ -20,6 +20,7 @@ import { runPlanCommand } from './commands/plan';
 import { runDebtCommand } from './commands/debt';
 import { runAddEmergentCommand } from './commands/add-emergent';
 import { runScenarioCommand } from './commands/scenario';
+import { runClarifyCommand } from './commands/clarify';
 import { runAdrCommand } from './commands/adr';
 import { runRuleCommand } from './commands/rule';
 import { runCapabilitiesCommand } from './commands/capabilities';
@@ -109,6 +110,11 @@ export async function runCli(): Promise<void> {
     return;
   }
 
+  if (command === 'clarify') {
+    runClarifyCommand(args);
+    return;
+  }
+
   if (command === 'adr') {
     runAdrCommand(args);
     return;
@@ -185,7 +191,7 @@ function isMutatingInvocation(command: string, args: string[]): boolean {
   if (args.includes('--dry-run')) return false;
   // close-sprint owns its lock after interactive confirmation so prompts never block writers.
   // install owns a post-prompt lock and rebuilds its plan from fresh state.
-  if (['sync', 'uninstall', 'repair', 'remediate', 'recertify', 'review', 'record-evidence', 'plan', 'debt', 'add-emergent', 'scenario', 'adr', 'rule'].includes(command)) return true;
+  if (['sync', 'uninstall', 'repair', 'remediate', 'recertify', 'review', 'record-evidence', 'plan', 'debt', 'add-emergent', 'scenario', 'clarify', 'adr', 'rule'].includes(command)) return true;
   if (command === 'scope' && args[0] === 'set-active') return true;
   return command === 'trace' && args.includes('--clear');
 }

@@ -18,6 +18,7 @@ export const TOOL_OWNED_VERBS = [
   'adr',
   'analyze',
   'close-sprint',
+  'clarify',
   'context-pack',
   'debt',
   'doctor',

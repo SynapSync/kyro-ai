@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.45.0] - 2026-08-10
+
+### Added
+
+- **`kyro clarify --from <resolutions.json>`.** A tool-owned clarification writer that records one
+  accepted decision at a time or an explicitly deferred batch, validates every target and derived
+  requirement before writing, and advances routing only after all open questions and markers are
+  resolved.
+
+### Changed
+
+- **Clarify is now a guided conversation.** The workflow explains why the scope is paused, asks one
+  contextual question at a time, presents evidence-backed options and trade-offs, and never falls
+  back to editing `sprint.json` when a CLI verb is unavailable.
+
 ## [4.44.0] - 2026-08-10
 
 ### Added
