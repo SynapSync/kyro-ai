@@ -221,9 +221,10 @@ that leaves an immutable record of itself.
 **Kyro 4.43.5 is origin-only.** Its single operation, `debt.origin.set`, repairs `origin` and
 nothing else, so it cannot repair a record-level legacy shape: a debt that carries a string `origin`
 *and* legacy-only keys like `detail`/`resolution`/`addedSprint` *and* missing canonical fields.
-**4.44.0** adds `debt.canonicalize` (remediation protocol v3), which repairs the whole record at
-once, emits exactly the seven canonical keys `id, title, origin, priority, status, targetSprint,
-note`, and names the legacy keys it retires.
+**4.44.0 and later** adds `debt.canonicalize` (remediation protocol v3), which repairs the whole
+record at once, emits exactly the seven canonical keys `id, title, origin, priority, status,
+targetSprint, note`, and names the legacy keys it retires. The current release, **4.45.0**, carries
+that operation unchanged.
 
 Nothing is migrated for you. Installing a newer Kyro never rewrites an existing scope, and Doctor
 never repairs one on your behalf. The supported path is

@@ -58,7 +58,7 @@ when none remain, Kyro routes to planning or execution.
 
 ## Routing out
 
-`kyro clarify` sets `handoff.nextAction`:
+`{{KYRO_CLI}} clarify` sets `handoff.nextAction`:
 - `plan_sprint` if tasks are not generated yet (the normal path from INIT/plan).
 - `execute_task` if tasks already exist and only ambiguity blocked them.
 - `clarify` while any open question or marker remains.
