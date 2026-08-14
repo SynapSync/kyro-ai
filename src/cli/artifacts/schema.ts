@@ -1,4 +1,4 @@
-import { ADR_LINK_KEYS, ADR_STATUS } from '../types';
+import { ADR_LINK_KEYS, ADR_STATUS, KYRO_SCOPE_ENTRY_STATUS } from '../types';
 import type {
   AdrLinkKey,
   KyroLocalProjectState,
@@ -9,16 +9,11 @@ import type {
   TaskVerdict,
 } from '../types';
 
-export const KYRO_SCOPE_STATUS = {
-  PLANNING: 'planning',
-  ACTIVE: 'active',
-  COMPLETED: 'completed',
-  BLOCKED: 'blocked',
-} as const;
+export const KYRO_SCOPE_STATUS = KYRO_SCOPE_ENTRY_STATUS;
 
 export type KyroScopeStatus = (typeof KYRO_SCOPE_STATUS)[keyof typeof KYRO_SCOPE_STATUS];
 
-export const SCOPE_STATUS_VALUES = ['planning', 'active', 'blocked', 'completed'] as const;
+export const SCOPE_STATUS_VALUES = Object.values(KYRO_SCOPE_STATUS);
 export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'done'] as const;
 export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
 export const PHASE_STATUS_VALUES = ['pending', 'active', 'blocked', 'done'] as const;
@@ -306,6 +301,7 @@ function validateScopeEntry(value: unknown, path: string, prefix: string, issues
   requireString(value, 'id', path, issues, `${prefix}.id`);
   requireString(value, 'title', path, issues, `${prefix}.title`);
   requireLiteralSet(value, 'status', SCOPE_STATUS_VALUES, path, issues, `${prefix}.status`);
+  validateRetirementInvariant(value, path, prefix, issues);
 }
 
 export interface SprintFileValidationOptions {
@@ -322,6 +318,7 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
   requireString(value, 'title', path, issues);
   requireString(value, 'status', path, issues);
   requireString(value, 'objective', path, issues);
+  validateRetirementInvariant(value, path, '', issues);
 
   // author is optional (captured at init from git when available). Present-only so pre-feature
   // scopes and sandboxes without git identity still validate.
@@ -413,8 +410,37 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
     }
     requireLiteralSet(value.handoff, 'nextAction', NEXT_ACTION_VALUES, path, issues, 'handoff.nextAction');
     requireNullableString(value.handoff, 'nextTaskId', path, issues);
+    if (value.retirement !== undefined && value.handoff.nextAction !== 'done') {
+      issues.push({ path, field: 'handoff.nextAction', message: 'must be done when retirement is present' });
+    }
+  }
+  if (value.retirement !== undefined && value.activeSprint !== null) {
+    issues.push({ path, field: 'activeSprint', message: 'must be null when retirement is present' });
   }
   return issues;
+}
+
+function validateRetirementInvariant(value: Record<string, unknown>, path: string, prefix: string, issues: ValidationIssue[]): void {
+  const field = (name: string): string => prefix ? `${prefix}.${name}` : name;
+  const retirement = value.retirement;
+  if (value.status === 'retired' && retirement === undefined) {
+    issues.push({ path, field: field('retirement'), message: 'is required when status is retired' });
+    return;
+  }
+  if (retirement === undefined) return;
+  if (value.status !== 'retired') {
+    issues.push({ path, field: field('status'), message: 'must be retired when retirement is present' });
+  }
+  if (!isRecord(retirement)) {
+    issues.push({ path, field: field('retirement'), message: 'must be an object' });
+    return;
+  }
+  requireNonEmptyString(retirement, 'reason', path, issues, field('retirement.reason'));
+  requireIsoString(retirement, 'retiredAt', path, issues, field('retirement.retiredAt'));
+  if (typeof retirement.planDigest !== 'string' || !SHA256_HEX_PATTERN.test(retirement.planDigest)) {
+    issues.push({ path, field: field('retirement.planDigest'), message: 'must be a lowercase SHA-256 digest' });
+  }
+  if ('supersededBy' in retirement) requireNonEmptyString(retirement, 'supersededBy', path, issues, field('retirement.supersededBy'));
 }
 
 function validateClarification(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {

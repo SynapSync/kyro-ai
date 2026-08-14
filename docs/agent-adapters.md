@@ -45,6 +45,7 @@ There is intentionally no generic adapter. Root `AGENTS.md` is the standard cros
 | task context | `kyro-task-context` | `/kyro:task-context` |
 | idea maturation and executable planning | `kyro-idea` | `/kyro:idea` |
 | certification and quality audit | `kyro-qa` | `/kyro:qa` |
+| human-gated scope retirement | `kyro-scope-retire` | `/kyro:scope-retire` |
 
 Each skill loads its command router first. The router then names the exact mode/helper/template needed for the current step.
 
@@ -57,6 +58,8 @@ Beyond command-skill routing, Kyro ships tool-owned CLI verbs that mutate scope 
 - `kyro review <task> --kyro-scope <scope> --verdict pass|fail ...` — record a checker verdict
 - `kyro debt add|start|resolve|defer|escalate` — mutate `sprint.json.debt[]`
 - `kyro add-emergent --title <t> --description <d> --acceptance <a> ...` — append a task discovered mid-sprint
+- `kyro scope retire --kyro-scope <scope> --reason <reason>` — prepare a read-only retirement plan;
+  a human must approve its exact digest before the separate `--digest <sha256> --yes` apply
 
 See [cli.md](cli.md) for full syntax and [maker-checker.md](maker-checker.md) for the evidence/review contract.
 
@@ -78,14 +81,14 @@ Use:
 npx kyro-ai@latest install --agent opencode --scope workspace --yes
 ```
 
-OpenCode should invoke the native `/kyro/forge`, `/kyro/status`, `/kyro/task-context`, `/kyro/idea`, and `/kyro/qa` commands, or the installed `kyro-*` skills under `~/.config/opencode/skills/`. It should not copy Kyro core into the project.
+OpenCode should invoke the native `/kyro/forge`, `/kyro/status`, `/kyro/task-context`, `/kyro/idea`, `/kyro/qa`, and `/kyro/scope-retire` commands, or the installed `kyro-*` skills under `~/.config/opencode/skills/`. It should not copy Kyro core into the project.
 
 Kyro preserves existing `opencode.json` content and owns only `agent.kyro-orchestrator`. MCP merge is not enabled until there is a concrete Kyro MCP server contract.
 
 ## Claude
 
 Claude plugin support remains first-class through `.claude-plugin/`. Its public surface is exactly
-`/kyro-ai:forge`, `/kyro-ai:status`, `/kyro-ai:task-context`, `/kyro-ai:idea`, and `/kyro-ai:qa`.
+`/kyro-ai:forge`, `/kyro-ai:status`, `/kyro-ai:task-context`, `/kyro-ai:idea`, `/kyro-ai:qa`, and `/kyro-ai:scope-retire`.
 Provider wrappers delegate to the canonical command routers; `sprint-forge`, `seedbed`, `qa-review`,
 and `kyro-sprint-executor` remain internal assets and must not appear in Claude's command menu. The
 CLI adapter path complements the plugin; it does not retire it.

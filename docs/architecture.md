@@ -9,7 +9,7 @@ This document describes Kyro's Command > Agent > Skill workflow architecture and
 Kyro is organized in three layers:
 
 ```
-User Command (/kyro:forge, /kyro:status, /kyro:task-context)
+User Command (/kyro:forge, /kyro:status, /kyro:task-context, /kyro:idea, /kyro:qa, /kyro:scope-retire)
   |
   v
 Agent (orchestrator)
@@ -28,6 +28,9 @@ Commands are the user-facing interface. Each command is defined as a markdown fi
 | `/kyro:forge` | orchestrator | Full cycle: Analyze, Plan, Implement, Review, Close |
 | `/kyro:status` | orchestrator | Read-only project progress and debt summary |
 | `/kyro:task-context` | orchestrator | Read-only prompt generation for a fresh agent context |
+| `/kyro:idea` | direct skill | Optional evidence-grounded pre-scope planning |
+| `/kyro:qa` | direct skill | Independent scope certification audit |
+| `/kyro:scope-retire` | direct router | Human-gated terminal lifecycle operation |
 
 ### Agent
 

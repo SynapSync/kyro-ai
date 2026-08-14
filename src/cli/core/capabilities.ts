@@ -9,7 +9,7 @@ import { readPackageVersion } from '../help';
  * agent use. `scenario`, `adr`, and `rule` qualify under the second half (they mutate Kyro state — see
  * isMutatingInvocation in app.ts — and docs/spec-traceability.md drives agents to them).
  *
- * Deliberately excluded: install, sync, uninstall, detect, eval, tui, mcp, trace, scope —
+ * Deliberately excluded: install, sync, uninstall, detect, eval, tui, mcp, trace —
  * operator/runtime surface, not sprint-lifecycle verbs. Also excluded: `capabilities` itself, since
  * the handshake cannot verify itself; its absence IS the staleness signal.
  */
@@ -28,6 +28,7 @@ export const TOOL_OWNED_VERBS = [
   'review',
   'rule',
   'scenario',
+  'scope',
   'status',
 ] as const;
 

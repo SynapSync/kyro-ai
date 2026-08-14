@@ -37,6 +37,7 @@ export function deriveActiveSprintStatus(active: ActiveSprint): DerivedSprintSta
  * Without one: all roadmap sprints closed → completed; else planning.
  */
 export function deriveScopeStatus(sprint: SprintFile, hasActiveSprint: boolean): KyroScopeStatus {
+  if (sprint.retirement) return 'retired';
   if (hasActiveSprint && sprint.activeSprint) {
     const tasks = collectSprintTasks(sprint.activeSprint);
     const blocked = tasks.some((t) => t.status === 'blocked') || (sprint.handoff.blockers ?? []).length > 0;

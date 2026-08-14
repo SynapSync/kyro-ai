@@ -7,7 +7,7 @@ Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based p
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/kyro:forge, /kyro:status, /kyro:task-context, /kyro:qa, /kyro:idea)
+User Command (/kyro:forge, /kyro:status, /kyro:task-context, /kyro:qa, /kyro:idea, /kyro:scope-retire)
   └── Agent (orchestrator, or direct skill load for qa and idea)
         └── Skill (core)
 ```
@@ -18,18 +18,19 @@ User Command (/kyro:forge, /kyro:status, /kyro:task-context, /kyro:qa, /kyro:ide
 kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
-├── commands/         # 5 slash commands
+├── commands/         # 6 slash commands
 │   ├── forge.md      # /kyro:forge — full cycle with gates
 │   ├── status.md     # /kyro:status — progress and debt summary
 │   ├── task-context.md # /kyro:task-context — fresh-context prompt generation
 │   ├── idea.md       # /kyro:idea — idea maturation pre-scope (optional)
-│   └── qa.md         # /kyro:qa — certification audit (independent)
+│   ├── qa.md         # /kyro:qa — certification audit (independent)
+│   └── scope-retire.md # /kyro:scope-retire — human-gated scope retirement
 ├── internal/skills/  # 4 workflow engines; not Claude slash commands
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │   ├── seedbed/           # Idea maturation pre-scope — matures a rough idea into a structured brief
 │   ├── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
 │   └── kyro-sprint-executor/ # Strict standalone executor projected to external agent skill roots
-├── providers/claude/commands/ # 5 public Claude wrappers over canonical command routers
+├── providers/claude/commands/ # 6 public Claude wrappers over canonical command routers
 ├── .claude-plugin/  # Claude Code adapter packaging
 │   ├── plugin.json   # Plugin manifest (version must match package.json)
 │   ├── marketplace.json # Marketplace listing metadata
@@ -126,7 +127,7 @@ When bumping version or changing the description:
 <!-- kyro-ai:agents-md:start -->
 ## Kyro AI
 
-Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-qa`, `kyro-idea`.
+Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-qa`, `kyro-idea`, `kyro-scope-retire`.
 
 Runtime: `~/.agents/kyro/current/`
 Project state: `.agents/kyro/project.json` + `local.json`

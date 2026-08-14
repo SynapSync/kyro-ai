@@ -32,7 +32,7 @@ Usage:
   kyro eval [options]          Run deterministic behavioral eval cases
   kyro mcp <subcommand>        Run or inspect the Kyro MCP server
   kyro trace [options]          Read or clear the append-only scope trace
-  kyro scope <subcommand>      List, inspect, or set active Kyro scopes
+  kyro scope <subcommand>      List, inspect, activate, or retire Kyro scopes
   kyro sync [options]          Refresh managed workspace assets
   kyro uninstall [options]     Remove managed workspace assets
 

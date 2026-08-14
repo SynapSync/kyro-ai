@@ -9,7 +9,7 @@ import { KyroCoreError } from '../core/errors';
 import { deriveScopeVerificationState } from '../remediation/plan';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
 import { ADR_STATUS } from '../types';
-import type { ActiveSprint, AdrRecord, AdrStatus, Debt, ScopeAuthor, ScopeVerification, SprintFile, Task, TaskStatus } from '../types';
+import type { ActiveSprint, AdrRecord, AdrStatus, Debt, ScopeAuthor, ScopeRetirement, ScopeVerification, SprintFile, Task, TaskStatus } from '../types';
 
 const STATUS_MODE = {
   BRIEF: 'brief',
@@ -72,6 +72,7 @@ interface BriefStatusReport {
   scope: string;
   status: string;
   objective: string;
+  retirement: ScopeRetirement | null;
   activeSprint: ActiveSprintStatusSummary | null;
   nextAction: string;
   nextTask: TaskReference | null;
@@ -222,6 +223,7 @@ function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusR
     scope,
     status: deriveScopeStatus(sprint, Boolean(activeSprint)),
     objective: sprint.objective,
+    retirement: sprint.retirement ?? null,
     activeSprint: activeSprint ? {
       n: activeSprint.n,
       slug: activeSprint.slug,
@@ -359,6 +361,11 @@ function recentAdrs(adrs: AdrRecord[]): RecentAdr[] {
 function printBriefStatus(report: BriefStatusReport): void {
   console.log(`Scope: ${report.scope} (${report.status})`);
   console.log(`Objective: ${report.objective}`);
+  if (report.retirement) {
+    console.log(`Retired at: ${report.retirement.retiredAt}`);
+    console.log(`Retirement reason: ${report.retirement.reason}`);
+    if (report.retirement.supersededBy) console.log(`Superseded by: ${report.retirement.supersededBy}`);
+  }
   console.log(`Active sprint: ${formatActiveSprint(report.activeSprint)}`);
   console.log(`Next action: ${report.nextAction}`);
   console.log(`Next task: ${formatTaskReference(report.nextTask)}`);

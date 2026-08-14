@@ -193,5 +193,6 @@ function isMutatingInvocation(command: string, args: string[]): boolean {
   // install owns a post-prompt lock and rebuilds its plan from fresh state.
   if (['sync', 'uninstall', 'repair', 'remediate', 'recertify', 'review', 'record-evidence', 'plan', 'debt', 'add-emergent', 'scenario', 'clarify', 'adr', 'rule'].includes(command)) return true;
   if (command === 'scope' && args[0] === 'set-active') return true;
+  if (command === 'scope' && args[0] === 'retire' && args.includes('--yes')) return true;
   return command === 'trace' && args.includes('--clear');
 }

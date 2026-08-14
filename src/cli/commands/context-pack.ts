@@ -91,6 +91,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     scope,
     status: sprint.status,
     objective: sprint.objective,
+    retirement: sprint.retirement ?? null,
     nextAction: sprint.handoff.nextAction,
     nextTaskId: sprint.handoff.nextTaskId,
     activeSprintSlug: sprint.activeSprint?.slug ?? null,
