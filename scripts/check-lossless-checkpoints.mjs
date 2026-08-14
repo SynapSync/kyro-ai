@@ -853,15 +853,17 @@ for (const mode of ['corrupt', 'unsupported']) {
     });
     assert(crashed.status === 86, `reclaim crash hook did not terminate after durable claim publication: ${output(crashed)}`);
     assert(readdirSync(root).some((name) => name.startsWith('.kyro-state-writer.lock.reclaim-')), 'crashed reclaimer left no recoverable claim fixture');
-    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '500' });
+    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS });
     assert(recovered.status === 0, `next writer could not recover a crashed reclaim claim: ${output(recovered)}`);
     assert(!existsSync(lock) && !readdirSync(root).some((name) => name.startsWith('.kyro-state-writer.lock.reclaim-')), `reclaim recovery left lock/claim debris: ${readdirSync(root).join(', ')}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
 // PID reuse cannot keep an expired lease alive; heartbeat token/expiry is authoritative.
-// Use a compact owner/heartbeat shape (production writes one-line JSON) and a reclaim-friendly
-// lease env so slow CI fsync cannot drop the reclaim claim before winner selection.
+// Use a compact owner/heartbeat shape (production writes one-line JSON). The fixture lease is
+// already expired (leaseUntil in the past); KYRO_TEST_LOCK_LEASE_MS only bounds the *new*
+// writer's own heartbeat. 500ms expires under Windows runner load during reclaim+repair
+// (Worker start + first renew), which is not what this case is testing.
 {
   const root = makeSandbox();
   try {
@@ -871,7 +873,7 @@ for (const mode of ['corrupt', 'unsupported']) {
     const old = Date.now() - 10_000;
     writeFileSync(join(lock, 'owner.json'), `${JSON.stringify({ pid: process.pid, token, createdAt: old })}\n`);
     writeFileSync(join(lock, 'heartbeat.json'), `${JSON.stringify({ token, renewedAt: old, leaseUntil: old + 100 })}\n`);
-    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: '500' });
+    const recovered = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], { KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS });
     assert(
       recovered.status === 0 && !existsSync(lock),
       `live reused PID incorrectly protected an expired token lease (status=${recovered.status}, lock=${existsSync(lock)}): ${output(recovered)}`,
