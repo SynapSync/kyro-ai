@@ -24,7 +24,7 @@ Kyro is a **sprint harness** for AI coding agents. Install once, every agent use
 - **One scope file** — `.agents/kyro/scopes/{scope}/sprint.json` is the single source of truth
 - **CLI-owned state** — schema and gates run every time; agents can't invent enums or hand-edit
 - **Team-safe by default** — commit `project.json` + scopes; each dev has personal `local.json`
-- **5 slash commands** — `/kyro:forge` (full cycle), `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context`
+- **6 slash commands** — `/kyro:forge` (full cycle), `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context`, `/kyro:scope-retire`
 
 **Why it matters:** AI agents forget context, invent process, and edit planning files by hand. Across Claude, Codex, OpenCode, and others you re-explain the same workflow every session. Kyro stops this.
 
@@ -141,7 +141,7 @@ kyro doctor
 
 | Host | How to install | Invocation |
 | ---- | --------------- | ---------- |
-| **Claude Code** ⭐ | **Plugin** (recommended): `/plugin marketplace add SynapSync/kyro-ai` → `/plugin install kyro-ai` → `/reload-plugins` | `/kyro:forge`, `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context` |
+| **Claude Code** ⭐ | **Plugin** (recommended): `/plugin marketplace add SynapSync/kyro-ai` → `/plugin install kyro-ai` → `/reload-plugins` | `/kyro:forge`, `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context`, `/kyro:scope-retire` |
 | **Claude Code** (npx) | From project root: `npx kyro-ai@latest install --init-workspace --yes` | Commands via terminal or `~/.agents/skills/kyro-*` |
 | **Codex** | From project root: `npx kyro-ai@latest install --agent codex --init-workspace --yes` | Skills `kyro-*` (auto-loaded in root `AGENTS.md`) |
 | **OpenCode** | From project root: `npx kyro-ai@latest install --agent opencode --init-workspace --yes` | Native `/kyro/*` commands |
@@ -172,6 +172,7 @@ claude --plugin-dir /path/to/kyro-ai
 | Get a summary before switching contexts | `/kyro:task-context` (copy-paste into a fresh session) |
 | Audit code & architecture independently | `/kyro:qa` (runs outside the forge cycle) |
 | Mature a rough idea into a plan | `/kyro:idea design a rate-limiting strategy` |
+| Retire an inactive scope | `/kyro:scope-retire <scope>` (prepare, show plan, require fresh human approval) |
 | Record evidence on a task | `kyro record-evidence <task> --evidence "…"` |
 | Mark a task complete after review | `kyro review <task> --verdict pass` |
 | Track technical debt | `kyro debt add --title "refactor auth" --tag database` |
@@ -192,6 +193,7 @@ Thin routers over scope state — they load only what the current step needs.
 | `/kyro:idea` · `kyro-idea` | Optional pre-scope: mature an idea into an execution-ready brief |
 | `/kyro:qa` · `kyro-qa` | Independent certification audit (not the forge review gate) |
 | `/kyro:task-context` · `kyro-task-context` | Copy-paste prompt to continue in a fresh context |
+| `/kyro:scope-retire` · `kyro-scope-retire` | Two-phase retirement with a state-bound human approval gate |
 
 ### Tool-owned CLI (required for state changes)
 
@@ -206,6 +208,7 @@ Thin routers over scope state — they load only what the current step needs.
 | `… debt add\|start\|resolve\|…` | Formal debt lifecycle |
 | `… rule add --rule "…" --tag process [--global]` | Register a scope rule; optionally promote it to every scope |
 | `… close-sprint --outcome …` | Lossless close + checkpoint (never null `activeSprint` by hand) |
+| `… scope retire --kyro-scope <scope> --reason "…"` | Read-only retirement plan; apply only with its digest and explicit human `--yes` |
 | `… context-pack --json` | Lean read for routing (prefer over opening full `sprint.json`) |
 | `… doctor` / `… doctor --artifacts` | Health and artifact shape |
 | `… analyze` | Semantic gates before close |
@@ -223,7 +226,7 @@ nothing else, so it cannot repair a record-level legacy shape: a debt that carri
 *and* legacy-only keys like `detail`/`resolution`/`addedSprint` *and* missing canonical fields.
 **4.44.0 and later** adds `debt.canonicalize` (remediation protocol v3), which repairs the whole
 record at once, emits exactly the seven canonical keys `id, title, origin, priority, status,
-targetSprint, note`, and names the legacy keys it retires. The current release, **4.45.0**, carries
+targetSprint, note`, and names the legacy keys it retires. The current release, **4.46.0**, carries
 that operation unchanged.
 
 Nothing is migrated for you. Installing a newer Kyro never rewrites an existing scope, and Doctor

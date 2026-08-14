@@ -17,6 +17,7 @@ import { projectStatePath, sprintJsonPath } from '../artifacts/paths';
 import { asProjectState, validateProjectStateShape, validateSprintFile } from '../artifacts/schema';
 import { PROJECT_STATE_PATH, KYRO_STATE_PATH } from '../constants';
 import { KyroCoreError, describeWriteFailure } from '../core/errors';
+import { assertNotRetiredSprintOverwrite } from '../core/retirement-guard';
 import { deriveScopeStatus } from '../core/status';
 import {
   hasLayeredProjectStateOnDisk,
@@ -576,6 +577,7 @@ export function publishExclusive(path: string, content: string, label: string): 
 /** Durable rename-based replacement of a managed file. Exported for the same reason as publishExclusive. */
 export function atomicReplace(path: string, content: string): void {
   const target = assertSafeManagedPath(path);
+  assertNotRetiredSprintOverwrite(target);
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
   let failure: unknown = null;
   try {
@@ -638,7 +640,7 @@ function diverged(path: string, detail: string): KyroCoreError {
 function validateScopeEntry(value: unknown, path: string, issues: string[]): void {
   const entry = asRecord(value);
   if (!entry || typeof entry.id !== 'string' || typeof entry.title !== 'string'
-    || !['planning', 'active', 'blocked', 'completed'].includes(String(entry.status))) issues.push(`${path} must be a KyroScopeEntry`);
+    || !['planning', 'active', 'blocked', 'completed', 'retired'].includes(String(entry.status))) issues.push(`${path} must be a KyroScopeEntry`);
 }
 
 function assertSafePathSegmentForValidation(value: string, path: string, issues: string[]): void {

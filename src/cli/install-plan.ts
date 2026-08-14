@@ -135,11 +135,11 @@ function buildInstallPlanForMode(
   }
 
   // Markdown-bearing copies carry the {{KYRO_CLI}} substitution map (design.md §5.3) so every
-  // projected occurrence resolves to the runnable invocation. `commands/` references only slash
-  // commands, never the CLI binary (audit-phase0.md §1), so it stays verbatim.
+  // projected occurrence resolves to the runnable invocation. Most command routers reference only
+  // slash commands; the human-gated scope-retire router intentionally invokes the CLI directly.
   const substitutions = { [KYRO_CLI_PLACEHOLDER]: kyroInvocation };
   addCopyDirectoryPlan(plan, 'agents', `${runtimeRoot}/core/agents`, substitutions);
-  addCopyDirectoryPlan(plan, 'commands', `${runtimeRoot}/commands`);
+  addCopyDirectoryPlan(plan, 'commands', `${runtimeRoot}/commands`, substitutions);
   addCopyDirectoryPlan(plan, 'internal/skills', `${runtimeRoot}/skills`, substitutions);
   addCopyFilePlan(plan, 'config.json', `${runtimeRoot}/core/config.json`);
   addCopyFilePlan(plan, 'WORKFLOW.yaml', `${runtimeRoot}/core/WORKFLOW.yaml`);

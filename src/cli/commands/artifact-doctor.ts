@@ -28,6 +28,7 @@ import {
   validateSprintCloseCheckpoint,
 } from '../checkpoints/sprint-close';
 import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase } from '../remediation/plan';
+import { inspectScopeRetirement, retirementCheckpointIsApplied } from '../checkpoints/scope-retirement';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import {
   formatBootstrapRemedy,
@@ -157,6 +158,7 @@ function checkScope(scope: string): CheckResult[] {
   if (!sprintRead.exists) {
     checks.push(fail(`${scope}/sprint.json`, 'missing', `Run /kyro:forge (INIT) to create it.`));
     checks.push(...scopeVerificationChecks(scope));
+    checks.push(...inspectScopeRetirement(scope));
     checks.push(...inspectSprintCloseCheckpoints(scope));
     checks.push(...inspectRemediationChain(scope));
     return checks;
@@ -164,6 +166,7 @@ function checkScope(scope: string): CheckResult[] {
   if (sprintRead.error) {
     checks.push(fail(`${scope}/sprint.json`, sprintRead.error, 'Fix invalid JSON or run kyro repair --kyro-scope <scope>.'));
     checks.push(...scopeVerificationChecks(scope));
+    checks.push(...inspectScopeRetirement(scope));
     checks.push(...inspectSprintCloseCheckpoints(scope));
     checks.push(...inspectRemediationChain(scope));
     return checks;
@@ -176,6 +179,7 @@ function checkScope(scope: string): CheckResult[] {
   if (issues.length > 0) {
     checks.push(fail(`${scope}/sprint.json`, formatIssues(issues), 'Fix the shape drift (see field paths). Conventions/scopes/debt/ADRs must be structured objects, not loose strings.'));
     checks.push(...scopeVerificationChecks(scope));
+    checks.push(...inspectScopeRetirement(scope));
     checks.push(...inspectSprintCloseCheckpoints(scope));
     checks.push(...inspectRemediationChain(scope));
     return checks;
@@ -242,6 +246,7 @@ function checkScope(scope: string): CheckResult[] {
       checks.push(warn(`${scope}/evidence`, `done task(s) with non-object evidence: ${looseEvidence.join(', ')}`, 'Record task.evidence as { summary, validation, files_changed, notes } (see execute-task.md).'));
     }
   }
+  checks.push(...inspectScopeRetirement(scope));
   checks.push(...inspectSprintCloseCheckpoints(scope));
   // Chain state is reported even when the live file fails validation — a scope awaiting remediation
   // is exactly the case where the reader must still say whether a correction was applied.
@@ -287,11 +292,12 @@ export function inspectSprintCloseCheckpoints(scope: string): CheckResult[] {
   const sprintRead = readJsonSafely(sprintJsonPath(scope));
   const activeRecord = asRecord(asRecord(sprintRead.value)?.activeSprint);
   const activeN = typeof activeRecord?.n === 'number' ? activeRecord.n : null;
+  const retiredApplied = retirementCheckpointIsApplied(scope);
   return files.map((file) => {
     const path = `${archiveDir(scope)}/${file}`;
     const checkpoint = valid.find((candidate) => candidate.path === path)?.checkpoint;
     const supersededByActiveSprint = activeN !== null && checkpoint !== undefined && activeN > checkpoint.identity.sprintN;
-    return inspectCheckpoint(scope, path, path === latestPath && !supersededByActiveSprint);
+    return inspectCheckpoint(scope, path, path === latestPath && !supersededByActiveSprint && !retiredApplied);
   });
 }
 

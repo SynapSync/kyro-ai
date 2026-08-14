@@ -86,7 +86,36 @@ export function buildCommandSkill(command: KyroCommandName): string {
   const description = getCommandDescription(command);
   const packageVersion = readPackageVersion();
   const cli = resolveKyroInvocation().raw;
-  return `---\nname: kyro-${command}\ndescription: ${description}\nlicense: Apache-2.0\nmetadata:\n  author: synapsync\n  version: "1.0"\n  runtimeVersion: "${packageVersion}"\n  scope: [root]\n---\n\n# ${title}\n\nCommand stub. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`, then load only the files that router requests.\n\nRuntime package: ${packageVersion}\nRuntime: \`${KYRO_ROOT}/\`\nCLI: \`${cli}\`\nArtifacts: \`${ARTIFACT_ROOT}/{scope}/\`\n\nAlways prefer this projected runtime over any host plugin cache path (older version trees under plugin caches are not the SoT).\n\nCLI workflow: invoke via the CLI line above (or the same form in runtime modes): \`status\`, \`doctor --artifacts\`, \`analyze\`, \`scenario add|link\`, \`record-evidence\`, \`review\`, \`repair\`, \`close-sprint\`, \`plan --from\`.\nInstall/update Kyro: only via the full npm package (\`npx kyro-ai install …\` or global \`kyro install\`). Do not treat \`${KYRO_ROOT}\` as the install source.\n\nDo not ask the user to restate this workflow in natural language.\n`;
+  return [
+    '---',
+    `name: kyro-${command}`,
+    `description: ${description}`,
+    'license: Apache-2.0',
+    'metadata:',
+    '  author: synapsync',
+    '  version: "1.0"',
+    `  runtimeVersion: "${packageVersion}"`,
+    '  scope: [root]',
+    '---',
+    '',
+    `# ${title}`,
+    '',
+    `Command stub. Read \`${KYRO_COMMANDS_ROOT}/${command}.md\`, then load only the files that router requests.`,
+    '',
+    `Runtime package: ${packageVersion}`,
+    `Runtime: \`${KYRO_ROOT}/\``,
+    `CLI: \`${cli}\``,
+    `Artifacts: \`${ARTIFACT_ROOT}/{scope}/\``,
+    '',
+    'Always prefer this projected runtime over any host plugin cache path (older version trees under plugin caches are not the SoT).',
+    '',
+    'CLI workflow: invoke via the CLI line above (or the same form in runtime modes): `status`, `doctor --artifacts`, `analyze`, `scenario add|link`, `record-evidence`, `review`, `repair`, `close-sprint`, `plan --from`.',
+    'Scope retirement is operator-only: only the `kyro-scope-retire` router may prepare it, pause for fresh human approval, and then invoke `scope retire` apply.',
+    `Install/update Kyro: only via the full npm package (\`npx kyro-ai install …\` or global \`kyro install\`). Do not treat \`${KYRO_ROOT}\` as the install source.`,
+    '',
+    'Do not ask the user to restate this workflow in natural language.',
+    '',
+  ].join('\n');
 }
 
 /** Extract metadata.runtimeVersion from a projected skill stub body (null if absent/unparseable). */
@@ -102,6 +131,7 @@ function getCommandDescription(command: KyroCommandName): string {
   if (command === 'status') return 'Show Kyro project status through the installed workspace harness';
   if (command === 'idea') return 'Mature a rough or mature idea into an evidence-grounded, execution-ready pre-scope plan (optional)';
   if (command === 'qa') return 'Certify a scope\'s implementation and planning against its full specification (independent audit)';
+  if (command === 'scope-retire') return 'Prepare and human-authorize an auditable terminal scope retirement';
   return 'Generate a fresh-context prompt for continuing Kyro work';
 }
 
@@ -109,5 +139,6 @@ function getCommandTitle(command: KyroCommandName): string {
   if (command === 'task-context') return 'Kyro Task Context';
   if (command === 'idea') return 'Kyro Idea';
   if (command === 'qa') return 'Kyro QA';
+  if (command === 'scope-retire') return 'Kyro Scope Retire';
   return `Kyro ${command.slice(0, 1).toUpperCase()}${command.slice(1)}`;
 }

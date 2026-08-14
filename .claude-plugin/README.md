@@ -1,6 +1,6 @@
 # Kyro Claude Code Adapter
 
-This directory packages Kyro for Claude Code. Kyro itself is a portable, markdown-first workflow kit for AI coding agents; this adapter registers exactly five public commands. Workflow engines and the packaged orchestrator remain internal implementation assets and are not registered as Claude plugin components.
+This directory packages Kyro for Claude Code. Kyro itself is a portable, markdown-first workflow kit for AI coding agents; this adapter registers exactly six public commands. Workflow engines and the packaged orchestrator remain internal implementation assets and are not registered as Claude plugin components.
 
 ## Installation
 

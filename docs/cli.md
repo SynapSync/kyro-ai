@@ -18,6 +18,7 @@ kyro capabilities       # List supported tool-owned verbs + version (runtime han
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
 kyro scope set-active <scope> --yes  # Change active scope with guardrail confirmation
+kyro scope retire --kyro-scope <scope> --reason "..."  # Read-only retirement preparation
 kyro trace              # Read append-only trace events for a scope
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
@@ -133,7 +134,7 @@ Install/sync probe PATH once, write the result into the **runtime manifest**, an
 
 **Safe from either root (including the projected runtime CLI):**
 
-- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `clarify`, `record-evidence`, `review`, `scenario add|link`, `context-pack`, and other scope workflow commands
+- `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `clarify`, `record-evidence`, `review`, `scenario add|link`, `scope retire`, `context-pack`, and other scope workflow commands
 
 Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai@latest` remedy.
 
@@ -144,6 +145,7 @@ Global command skills are installed for agent discovery:
 ├── kyro-forge/SKILL.md
 ├── kyro-status/SKILL.md
 ├── kyro-task-context/SKILL.md
+├── kyro-scope-retire/SKILL.md
 └── kyro-idea/SKILL.md
 ```
 
@@ -354,6 +356,7 @@ Scope lifecycle helpers:
 kyro scope list
 kyro scope inspect auth-refactor
 kyro scope set-active auth-refactor --yes
+kyro scope retire --kyro-scope legacy-auth --reason "Superseded by auth-refactor" --superseded-by auth-refactor
 ```
 
 ## Sync Semantics
@@ -431,7 +434,7 @@ Trace files are audit data only. They are never read for routing or workflow dec
 
 ## Portable guardrails
 
-Kyro evaluates dangerous operations through a shared policy core. `scope set-active` now requires `--yes`; MCP mutating tools use the existing two-phase `confirm: true` protocol. Use `kyro doctor --adapters` to see whether each adapter is `enforced` or `advisory` for guarded operations. See [guardrails.md](guardrails.md).
+Kyro evaluates dangerous operations through a shared policy core. `scope set-active` requires `--yes`. `scope retire` is stricter: preparation is read-only, then apply requires the reviewed state-bound digest plus `--yes`; stale state returns `DIVERGED`, and missing confirmation returns `HUMAN_APPROVAL_REQUIRED`. MCP mutating tools use their existing two-phase `confirm: true` protocol. Use `kyro doctor --adapters` to see whether each adapter is `enforced` or `advisory` for guarded operations. See [guardrails.md](guardrails.md).
 
 ## Maker/checker review
 
@@ -443,7 +446,36 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 `kyro capabilities [--json]` lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start: a missing verb — or an `UNKNOWN_COMMAND` failure on the command itself — means the installed runtime predates the skill assets and the forge must abort with an upgrade request instead of improvising hand-edits. `kyro doctor` probes the installed runtime with the same handshake (`CLI capabilities` check).
 
-The payload covers the sprint-lifecycle verbs plus the tool-owned state writers agents reach for (`clarify`, `scenario`, `adr`, `status`). It excludes operator surface (`install`, `sync`, `uninstall`, `detect`, `eval`, `tui`, `mcp`, `trace`, `scope`) and `capabilities` itself — the handshake cannot verify itself, since its absence is the staleness signal. `npm run check:capabilities` enforces both directions: every `{{KYRO_CLI}} <verb>` the shipped assets invoke must be advertised, and every advertised verb must be dispatchable.
+The payload covers the sprint-lifecycle verbs plus the tool-owned state writers agents reach for (`clarify`, `scenario`, `adr`, `scope`, `status`). It excludes operator surface (`install`, `sync`, `uninstall`, `detect`, `eval`, `tui`, `mcp`, `trace`) and `capabilities` itself — the handshake cannot verify itself, since its absence is the staleness signal. `npm run check:capabilities` enforces both directions: every `{{KYRO_CLI}} <verb>` the shipped assets invoke must be advertised, and every advertised verb must be dispatchable.
+
+## Human-gated scope retirement (`kyro scope retire`)
+
+Preparation is the default and never writes:
+
+```bash
+kyro scope retire --kyro-scope legacy-auth --reason "Superseded" --superseded-by auth-v2
+```
+
+It validates registration, absence of an active sprint, successor state and every close checkpoint;
+prints current state, affected files and validations; fingerprints `archive/`; and returns a digest
+bound to the exact inputs and observed sprint/project state. An agent must present that complete plan,
+ask “¿Autorizas retirar el scope `<scope>` con este plan?”, and stop.
+
+Only a later, unequivocal human approval permits:
+
+```bash
+kyro scope retire --kyro-scope legacy-auth --reason "Superseded" --superseded-by auth-v2 \
+  --digest <reviewed-sha256> --yes
+```
+
+Apply rebuilds the plan under the state-writer lock, rejects stale/incorrect digests before writes,
+publishes a resumable retirement checkpoint, CAS-updates `sprint.json` and project layers, clears
+`local.json.activeScope` only when it points at the retired scope, and verifies `archive/` byte
+identity. The terminal state is `status: retired`, `handoff.nextAction: done`, with reason,
+application timestamp and optional successor in both live scope and registry metadata. Identical
+retries are safe. Other state-writing verbs reject the terminal scope with `SCOPE_RETIRED`; its
+read-only status, context, doctor, analyze and repair-plan surfaces remain available. Retirement is
+never reachable from Forge, routing or handoffs.
 
 ## Tool-owned clarification resolution (`kyro clarify`)
 
@@ -605,7 +637,7 @@ that leaves an immutable record of itself.
 | Runtime | Operations | Repairs |
 | --- | --- | --- |
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
-| **4.44.0 and later** (current: **4.45.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+| **4.44.0 and later** (current: **4.46.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract
