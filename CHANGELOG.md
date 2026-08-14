@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.46.0] - 2026-08-14
+
+### Added
+
+- **Human-gated `kyro scope retire`.** Adds a read-only preparation phase with a state-bound digest
+  and a separate `--digest <sha256> --yes` apply phase. Retirement is locked, CAS-protected,
+  resumable and idempotent; records reason/date/successor, routes to `done`, and never modifies or
+  deletes existing `archive/` checkpoints, snapshots or narratives. The shared write boundary
+  rejects later attempts to mutate a retired `sprint.json`.
+
 ## [4.45.0] - 2026-08-10
 
 ### Added

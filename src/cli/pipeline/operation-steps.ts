@@ -19,6 +19,7 @@ import { dirname, join, resolve } from 'node:path';
 import { removeManagedBlock, upsertManagedBlock } from '../injectors/managed-block';
 import { mergeJsonObjectContent, removeJsonPathContent } from '../injectors/json-merge';
 import { describeWriteFailure } from '../core/errors';
+import { assertNotRetiredSprintOverwrite } from '../core/retirement-guard';
 import type { OperationPlan } from '../types';
 import { PipelineOrchestrator } from './orchestrator';
 import type { PipelineResult, StagePlan, Step } from './types';
@@ -37,6 +38,11 @@ type TargetSnapshot =
 
 export function applyOperationPlan(plan: OperationPlan[], context: OperationExecutionContext): void {
   withStateWriterLock(() => {
+    for (const operation of plan) {
+      if (operation.action !== 'mkdir' && operation.action !== 'rmdir-if-empty') {
+        assertNotRetiredSprintOverwrite(context.resolveManagedPath(operation.path));
+      }
+    }
     const result = new PipelineOrchestrator('stop-on-error').execute(operationPlanToStagePlan(plan, context));
     if (result.error) throw formatPipelineError(result);
   });
@@ -66,6 +72,9 @@ class OperationStep implements Step {
   run(): void {
     assertStateWriterLeaseHealthy();
     const target = this.context.resolveManagedPath(this.operation.path);
+    if (this.operation.action !== 'mkdir' && this.operation.action !== 'rmdir-if-empty') {
+      assertNotRetiredSprintOverwrite(target);
+    }
     this.snapshot = snapshotTarget(target);
     assertStateWriterLeaseHealthy();
     applyOperation(this.operation, target, this.context);

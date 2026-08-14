@@ -4,6 +4,7 @@ import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile, type ValidationIssue } from '../artifacts/schema';
 import { checkpointCommitmentOfRecord, checkpointIntegrityIssues, sha256 } from '../checkpoints/sprint-close';
+import { inspectScopeRetirement } from '../checkpoints/scope-retirement';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import type { CheckResult, RemediationAnchor, ScopeVerification, SprintCloseCheckpointV1, SprintFile } from '../types';
@@ -642,6 +643,20 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
   const live = readLiveStateOrNull(scope);
   const checkpoint = latestValidCloseCheckpoint(scope);
   if (live === null || checkpoint === null) return null;
+
+  // Retirement is an authorized terminal transition beyond the last close checkpoint. Its own
+  // immutable transaction binds that checkpoint-clean before-state to the live retired state, so
+  // the ordinary remediation lens must not misclassify the intentional terminal delta as drift.
+  if (live.retirement) {
+    const retirement = inspectScopeRetirement(scope)[0];
+    if (retirement?.status === 'pass') {
+      return { state: 'historical', detail: 'retired terminal state matches its immutable retirement checkpoint' };
+    }
+    return {
+      state: 'diverged',
+      detail: retirement?.detail ?? 'retirement metadata exists without an immutable retirement checkpoint',
+    };
+  }
 
   const anchors = readAnchorsSafely(scope, live);
   if (anchors === null) {

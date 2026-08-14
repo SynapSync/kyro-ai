@@ -1,6 +1,6 @@
 # Commands Reference
 
-Kyro provides 5 slash commands, most of them thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. `/kyro:idea` is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid. `/kyro:qa` is an independent **certification audit** that can be run anytime to validate a scope against its specification, standing outside the forge gate lifecycle.
+Kyro provides 6 slash commands, most of them thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. `/kyro:idea` is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid. `/kyro:qa` is an independent **certification audit** that can be run anytime to validate a scope against its specification, standing outside the forge gate lifecycle. `/kyro:scope-retire` is an operator-only terminal lifecycle flow and is never selected by Forge or a handoff.
 
 ## Cost-Aware Routing
 
@@ -199,6 +199,29 @@ All metrics come directly from `sprint.json` fields — there are no separate su
 **Generate a copy-paste prompt for continuing Kyro work in a fresh context.**
 
 Reads the active scope, `kyro context-pack`, the current git status, and referenced task/sprint artifacts. It is read-only: it returns one fenced prompt and does not mutate `sprint.json`.
+
+---
+
+## /kyro:scope-retire
+
+**Prepare and explicitly authorize an auditable terminal scope retirement.**
+
+### Syntax
+
+```text
+/kyro:scope-retire <scope> --reason "<reason>" [--superseded-by <scope>]
+```
+
+The router first runs the read-only preparation form of `kyro scope retire`, presents the complete
+plan and its state-bound digest, asks exactly “¿Autorizas retirar el scope `<scope>` con este
+plan?”, and stops. It may run apply only after a fresh, unequivocal human approval. Apply requires
+the same inputs, the reviewed `--digest`, and `--yes`; stale state returns `DIVERGED` without writes.
+
+Retirement requires a registered scope with no active sprint and intact close checkpoints. It
+preserves `archive/` byte-for-byte, records the reason, timestamp and optional successor, clears the
+active-scope pointer when necessary, and leaves the scope terminal at `handoff.nextAction: done`.
+The command does not claim to prove the approver's cryptographic identity and is never auto-invoked
+from Forge, routing, or handoffs.
 
 ---
 

@@ -4,6 +4,17 @@ export type Agent = (typeof AGENT)[keyof typeof AGENT];
 export type InstallScope = (typeof SCOPE)[keyof typeof SCOPE];
 export type KyroCommandName = (typeof COMMAND_NAMES)[number];
 
+export const KYRO_SCOPE_ENTRY_STATUS = {
+  PLANNING: 'planning',
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  BLOCKED: 'blocked',
+  RETIRED: 'retired',
+} as const;
+
+export type KyroScopeEntryStatus =
+  (typeof KYRO_SCOPE_ENTRY_STATUS)[keyof typeof KYRO_SCOPE_ENTRY_STATUS];
+
 export interface KyroInstalledAdapter {
   agent: Agent;
   scope: InstallScope;
@@ -17,7 +28,17 @@ export interface KyroInstalledAdapter {
 export interface KyroScopeEntry {
   id: string;
   title: string;
-  status: 'planning' | 'active' | 'blocked' | 'completed';
+  status: KyroScopeEntryStatus;
+  /** Tool-owned terminal transition metadata. Absent on scopes that remain in the work lifecycle. */
+  retirement?: ScopeRetirement;
+}
+
+/** Human-authorized, state-bound reason a scope left the active work lifecycle. */
+export interface ScopeRetirement {
+  reason: string;
+  retiredAt: string;
+  supersededBy?: string;
+  planDigest: string;
 }
 
 /** Built-in, machine-checkable predicates a principle can bind to (enforced by `kyro analyze`). */
@@ -595,6 +616,8 @@ export interface SprintFile {
    * Each cert in certifications[] is bound to a chain head commitment; remediating again drops the cert.
    */
   certifications?: CertificationAnchor[];
+  /** Present only after `kyro scope retire` applies its human-approved terminal transition. */
+  retirement?: ScopeRetirement;
   handoff: Handoff;
 }
 
@@ -666,7 +689,7 @@ export interface OperationPlan {
 
 // --- portable guardrail policy ---
 
-export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
+export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'scope_retire' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
 export type GuardLevel = 'tool_owned' | 'confirm' | 'blocked';
 export type GuardDecisionKind = 'allow' | 'confirmation_required' | 'blocked';
 export type EnforcementTier = 'enforced' | 'advisory';
@@ -808,6 +831,7 @@ export interface ContextPackOutput {
   scope: string;
   status: string | null;
   objective: string | null;
+  retirement: ScopeRetirement | null;
   nextAction: string | null;
   nextTaskId: string | null;
   activeSprintSlug: string | null;

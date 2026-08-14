@@ -65,7 +65,8 @@ Global command skills:
 ├── kyro-status/SKILL.md
 ├── kyro-task-context/SKILL.md
 ├── kyro-idea/SKILL.md
-└── kyro-qa/SKILL.md
+├── kyro-qa/SKILL.md
+└── kyro-scope-retire/SKILL.md
 ```
 
 OpenCode installs equivalent native entrypoints under `~/.config/opencode/` when you use `--agent opencode`.
