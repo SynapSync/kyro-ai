@@ -21,12 +21,12 @@ import {
   checkpointCommitment,
   checkpointIntegrityIssues,
   checkpointSchemaIssues,
-  isHistoricalCheckpoint,
   isLegacyIntermediateActiveScopeAfter,
   legacyNormalizedProjectScopeAfter,
   sha256,
-  validateSprintCloseCheckpoint,
 } from '../checkpoints/sprint-close';
+import { EFFECTIVE_CHECKPOINT_STATUS, resolveEffectiveCheckpoint, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
+import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
 import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase } from '../remediation/plan';
 import { inspectScopeRetirement, retirementCheckpointIsApplied } from '../checkpoints/scope-retirement';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
@@ -282,11 +282,13 @@ export function inspectSprintCloseCheckpoints(scope: string): CheckResult[] {
   const files = readdirSync(directory).filter((file) => file.endsWith('.checkpoint.json'));
   const valid = files.flatMap((file) => {
     const path = `${archiveDir(scope)}/${file}`;
-    const read = readJsonSafely(path);
-    if (!read.exists || read.error || validateSprintCloseCheckpoint(read.value, path).length > 0) return [];
-    const checkpoint = read.value as SprintCloseCheckpointV1;
-    if (checkpoint.identity.scope !== scope) return [];
-    return [{ path, checkpoint }];
+    const resolved = resolveEffectiveCheckpointAtPath(scope, path);
+    if (
+      (resolved.status !== EFFECTIVE_CHECKPOINT_STATUS.VALID && resolved.status !== EFFECTIVE_CHECKPOINT_STATUS.CANONICALIZED)
+      || !resolved.checkpoint
+      || resolved.checkpoint.identity.scope !== scope
+    ) return [];
+    return [{ path, checkpoint: resolved.checkpoint }];
   }).sort((left, right) => compareCheckpointRecency(right.checkpoint, left.checkpoint));
   const latestPath = valid[0]?.path ?? null;
   const sprintRead = readJsonSafely(sprintJsonPath(scope));
@@ -316,9 +318,22 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   }
   // Separate integrity from schema: a checkpoint with valid commitment but stale schema
   // is historical evidence, not corruption (T2.2, S6).
-  const integrityIssues = checkpointIntegrityIssues(read.value, path);
+  const resolved = resolveEffectiveCheckpointAtPath(scope, path);
+  if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.UNSUPPORTED) {
+    return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.UNSUPPORTED_VERSION, resolved.detail);
+  }
+  if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.CORRUPT || !resolved.checkpoint) {
+    return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CORRUPT, resolved.detail);
+  }
+  if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.DIVERGED) {
+    return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.DIVERGED, resolved.detail);
+  }
+  const integrityIssues = resolved.status === EFFECTIVE_CHECKPOINT_STATUS.VALID
+    ? checkpointIntegrityIssues(read.value, path)
+    : [];
   if (integrityIssues.length > 0) return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CORRUPT, integrityIssues.join('; '));
-  const checkpoint = read.value as SprintCloseCheckpointV1;
+  const checkpoint = resolved.checkpoint;
+  const canonicalized = resolved.status === EFFECTIVE_CHECKPOINT_STATUS.CANONICALIZED;
   if (checkpoint.identity.scope !== scope) return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CORRUPT, `identity scope ${checkpoint.identity.scope} does not match directory ${scope}`);
 
   // If schema failed but integrity is sound, this is a historical checkpoint with stale fields.
@@ -332,6 +347,9 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const snapshotState = inspectArtifact(checkpoint.paths.legacySnapshot, checkpoint.digests.legacySnapshot);
   const narrativeState = inspectArtifact(checkpoint.paths.narrative, checkpoint.digests.narrative);
   if (!compareLiveState) {
+    if (canonicalized && snapshotState === 'ok' && narrativeState === 'ok') {
+      return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CANONICALIZED, withHistoricalNote(`${resolved.detail}; snapshot=${snapshotState}, narrative=${narrativeState}`));
+    }
     const status = snapshotState === 'ok' && narrativeState === 'ok'
       ? SPRINT_CLOSE_TRANSACTION_STATUS.APPLIED
       : snapshotState === 'conflict' || narrativeState === 'conflict'
@@ -347,6 +365,10 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const projectDigest = projectEntry ? sha256(projectEntry) : null;
 
   let sprintPosition = digestPosition(sprintDigest, checkpoint.digests.beforeClose, checkpoint.digests.intendedAfterClose);
+  if (sprintPosition === 'other' && canonicalized) {
+    const physicalAfter = asRecord(read.value)?.intendedAfterClose;
+    if (physicalAfter && sprintDigest === sha256(physicalAfter)) sprintPosition = 'after';
+  }
   // An append-only remediation is expected to move live state off the checkpoint's after-image, so
   // two narrow allowances keep an audited correction from reading as tampering. Neither may ever be
   // reachable by drift that Kyro did not itself produce.
@@ -367,7 +389,8 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
       // 2. Replay: re-execute the chain from the checkpoint's after-image and require it to
       //    reproduce the live state exactly. A record cannot be believed about a transformation it
       //    could not perform, and drift outside the declared operations never replays.
-      const rebase = resolveRemediationRebase(scope, checkpoint.intendedAfterClose);
+      const physicalAfterImage = asRecord(read.value)?.intendedAfterClose ?? checkpoint.intendedAfterClose;
+      const rebase = resolveRemediationRebase(scope, canonicalized ? physicalAfterImage : checkpoint.intendedAfterClose);
       if (rebase.kind === 'remediated') {
         sprintPosition = 'after';
         remediationLabel = `after (replayed through ${rebase.through})`;
@@ -389,7 +412,7 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   if (snapshotState === 'conflict' || narrativeState === 'conflict' || sprintPosition === 'other' || scopePosition === 'other') {
     status = SPRINT_CLOSE_TRANSACTION_STATUS.DIVERGED;
   } else if (isAfterPosition(sprintPosition) && isAfterPosition(scopePosition) && snapshotState === 'ok' && narrativeState === 'ok') {
-    status = SPRINT_CLOSE_TRANSACTION_STATUS.APPLIED;
+    status = canonicalized ? SPRINT_CLOSE_TRANSACTION_STATUS.CANONICALIZED : SPRINT_CLOSE_TRANSACTION_STATUS.APPLIED;
   } else if (isBeforePosition(sprintPosition) && isBeforePosition(scopePosition) && snapshotState === 'missing' && narrativeState === 'missing') {
     status = SPRINT_CLOSE_TRANSACTION_STATUS.PREPARED;
   } else {
@@ -424,13 +447,23 @@ function validateLedgerCheckpointReferences(
       results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `referenced checkpoint is unreadable: ${read.error}`, 'Restore the immutable checkpoint; do not rewrite the ledger to hide the failure.'));
       continue;
     }
-    const integrityIssues = checkpointIntegrityIssues(read.value, path);
-    const checkpoint = read.value as Partial<SprintCloseCheckpointV1>;
-    if (integrityIssues.length > 0 || checkpoint.identity?.sprintN !== entry.n || checkpoint.identity?.sprintSlug !== entry.slug) {
-      results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `referenced checkpoint is invalid or mismatched: ${integrityIssues.join('; ') || 'identity mismatch'}`, 'Restore the checkpoint that matches this ledger entry.'));
+    const resolved = resolveEffectiveCheckpoint(scope, entry);
+    if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.CORRUPT || resolved.status === EFFECTIVE_CHECKPOINT_STATUS.UNSUPPORTED || !resolved.checkpoint) {
+      results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `referenced checkpoint is invalid or mismatched: ${resolved.detail}`, 'Restore the checkpoint that matches this ledger entry or apply a valid compatibility overlay.'));
+    } else if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.DIVERGED) {
+      results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `referenced checkpoint diverged: ${resolved.detail}`, 'Treat the archive or overlay as tampered. Restore trusted bytes.'));
     } else if (!entry.checkpointSha256) {
       results.push(warn(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `${entry.checkpoint} has no external ledger commitment`, 'This pre-anchor checkpoint remains readable, but archive-only tampering cannot be detected. Future closes record checkpointSha256.'));
-    } else if (entry.checkpointSha256 !== checkpointCommitment(checkpoint as SprintCloseCheckpointV1)) {
+    } else if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.CANONICALIZED) {
+      const canonical = checkpointCommitment(resolved.checkpoint);
+      const overlay = findCanonicalizationForBytes(scope, path, resolved.originalSha256 ?? '');
+      const observed = overlay?.observedLedgerCommitment;
+      if (entry.checkpointSha256 !== canonical && entry.checkpointSha256 !== observed) {
+        results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `canonicalized checkpoint commitment does not match live ledger anchor for ${entry.checkpoint}`, 'Reanchor the ledger to the effective checkpoint or restore trusted bytes.'));
+      } else {
+        results.push(pass(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `${entry.checkpoint} is CANONICALIZED and matches ledger identity.`));
+      }
+    } else if (entry.checkpointSha256 !== checkpointCommitment(resolved.checkpoint)) {
       results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `checkpoint commitment does not match live ledger anchor for ${entry.checkpoint}`, 'Treat the archive as tampered or corrupted. Restore the checkpoint bytes/content from trusted versioned storage.'));
     } else {
       results.push(pass(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `${entry.checkpoint} matches ledger identity and external commitment.`));
@@ -442,7 +475,7 @@ function validateLedgerCheckpointReferences(
 function checkpointResult(scope: string, path: string, status: SprintCloseTransactionStatus, detail: string): CheckResult {
   const name = `${scope}/checkpoint/${path.split('/').pop() ?? path}`;
   const message = `${status}: ${detail}`;
-  if (status === SPRINT_CLOSE_TRANSACTION_STATUS.APPLIED) return pass(name, message);
+  if (status === SPRINT_CLOSE_TRANSACTION_STATUS.APPLIED || status === SPRINT_CLOSE_TRANSACTION_STATUS.CANONICALIZED) return pass(name, message);
   if (status === SPRINT_CLOSE_TRANSACTION_STATUS.PREPARED || status === SPRINT_CLOSE_TRANSACTION_STATUS.PARTIAL) {
     return warn(name, message, 'Retry kyro close-sprint with the checkpoint\'s frozen close inputs to resume safely.');
   }

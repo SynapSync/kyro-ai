@@ -3,7 +3,9 @@ import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile, type ValidationIssue } from '../artifacts/schema';
-import { checkpointCommitmentOfRecord, checkpointIntegrityIssues, sha256 } from '../checkpoints/sprint-close';
+import { canonicalJson, checkpointCommitmentOfRecord, sha256 } from '../checkpoints/sprint-close';
+import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
+import { EFFECTIVE_CHECKPOINT_STATUS, effectiveCommitment, resolveEffectiveCheckpoint, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
 import { inspectScopeRetirement } from '../checkpoints/scope-retirement';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
@@ -17,6 +19,7 @@ import {
   COMPACT_REPLAY_WITNESS_SCHEMA_VERSION,
   SCOPE_REMEDIATION_KIND,
   SCOPE_REMEDIATION_SCHEMA_VERSION,
+  SCOPE_REMEDIATION_V4_SCHEMA_VERSION,
   isScopeRemediationSchemaVersion,
   requiredRemediationRevision,
   validateRemediationManifest,
@@ -208,6 +211,123 @@ export function planRemediation(options: RemediationPlanOptions): RemediationPla
     anchor,
     projectedSprint: anchoredSprint,
     changes,
+    transactionStatus: transaction.status,
+    transactionDetail: transaction.detail,
+  };
+}
+
+export interface ExplanationRemediationOptions {
+  scope: string;
+  operations: RemediationOperation[];
+  issues: CompactScopeRemediation['issues'];
+  baseState: Record<string, unknown>;
+  liveState: Record<string, unknown>;
+  now: string;
+  kyroVersion: string;
+  reason: string;
+  actor: string;
+}
+
+/** True only when the current chain head is the exact approved batch and still describes live. */
+export function remediationBatchAlreadyApplied(
+  scope: string,
+  operations: RemediationOperation[],
+  liveState: Record<string, unknown>,
+): boolean {
+  const anchors = readAnchors(scope, liveState);
+  const head = anchors[anchors.length - 1];
+  if (!head) return false;
+  const record = readRemediationRecord(scope, head.id);
+  if (!record || record.schemaVersion !== SCOPE_REMEDIATION_V4_SCHEMA_VERSION) return false;
+  if (sha256(record) !== head.commitment) return false;
+  if (canonicalJson(record.operations) !== canonicalJson(operations)) return false;
+  if (record.result.stateSha256 !== stateDigest(liveState)) return false;
+  const transaction = inspectRemediationTransaction(scope, head.id, head.commitment, record.result.stateSha256);
+  return transaction.status === REMEDIATION_TRANSACTION_STATUS.APPLIED;
+}
+
+/**
+ * Plan a remediations record that *explains* live state already observed after close.
+ * Replay must reproduce the live business digest from the close after-image.
+ */
+export function planExplanationRemediation(options: ExplanationRemediationOptions): RemediationPlan {
+  const executed = executeOperations(options.baseState, options.operations);
+  if ('failure' in executed) throw executed.failure;
+  const replayDigest = stateDigest(executed.state);
+  const liveDigest = stateDigest(options.liveState);
+  if (replayDigest !== liveDigest) {
+    throw new KyroCoreError(
+      'DIVERGED',
+      `Replaying the approved live operations from the close checkpoint does not reproduce live ${options.scope}.`,
+      'The live state changed. Re-run prepare.',
+    );
+  }
+
+  const anchors = readAnchors(options.scope, options.liveState);
+  const head = anchors.length > 0 ? anchors[anchors.length - 1].commitment : null;
+  const remediationId = nextRemediationId(anchors);
+  const recordPath = remediationRecordPath(options.scope, remediationId);
+  const prepared = readRemediationRecord(options.scope, remediationId);
+  const record: CompactScopeRemediation = {
+    schemaVersion: requiredRemediationRevision(options.operations),
+    kind: SCOPE_REMEDIATION_KIND,
+    id: remediationId,
+    scope: options.scope,
+    createdAt: prepared?.createdAt ?? options.now,
+    base: {
+      stateSha256: stateDigest(options.baseState),
+      remediationHead: head,
+      checkpoints: collectCheckpointCommitments(options.baseState),
+    },
+    issues: options.issues,
+    operations: options.operations,
+    result: {
+      stateSha256: liveDigest,
+      witness: {
+        schemaVersion: COMPACT_REPLAY_WITNESS_SCHEMA_VERSION,
+        kind: COMPACT_REPLAY_WITNESS_KIND,
+      },
+    },
+    provenance: {
+      reason: options.reason,
+      actor: options.actor,
+      kyroVersion: options.kyroVersion,
+    },
+  };
+  const recordIssues = validateScopeRemediation(record, recordPath);
+  if (recordIssues.length > 0) {
+    throw new KyroCoreError(
+      'INVALID_INPUT',
+      `Projected remediation record is invalid — ${formatIssues(recordIssues)}.`,
+      'This is a planner defect. Do not apply it.',
+    );
+  }
+  const commitment = sha256(record);
+  const anchor: RemediationAnchor = {
+    id: remediationId,
+    path: relativeRecordPath(remediationId),
+    commitment,
+  };
+  const liveSprint = options.liveState as unknown as SprintFile;
+  const anchoredSprint = { ...liveSprint, remediations: [...anchors, anchor] };
+  const projectedIssues = validateSprintFile(anchoredSprint, sprintJsonPath(options.scope));
+  if (projectedIssues.length > 0) {
+    throw new KyroCoreError(
+      'INVALID_SPRINT_SHAPE',
+      `Anchoring remediation ${remediationId} failed validation — ${formatIssues(projectedIssues)}.`,
+    );
+  }
+  const transaction = inspectRemediationTransaction(options.scope, remediationId, commitment, record.result.stateSha256);
+  return {
+    scope: options.scope,
+    remediationId,
+    recordPath,
+    sprintPath: sprintJsonPath(options.scope),
+    record,
+    commitment,
+    anchor,
+    projectedSprint: anchoredSprint,
+    changes: executed.changes,
     transactionStatus: transaction.status,
     transactionDetail: transaction.detail,
   };
@@ -494,6 +614,11 @@ export type RemediationRebase =
   /** A chain exists but does not explain the live state; the caller must keep reporting divergence. */
   | { kind: 'broken' };
 
+export type RemediationReplayState =
+  | { kind: 'none'; state: Record<string, unknown>; headCommitment: null; through: null }
+  | { kind: 'remediated'; state: Record<string, unknown>; headCommitment: string; through: string }
+  | { kind: 'broken'; detail: string };
+
 /**
  * Explain a live state that matches neither side of a close checkpoint.
  *
@@ -510,27 +635,43 @@ export type RemediationRebase =
 export function resolveRemediationRebase(scope: string, closedState: unknown): RemediationRebase {
   const live = readLiveStateOrNull(scope);
   if (!live) return { kind: 'none' };
+  const replay = resolveRemediationReplayState(scope, closedState);
+  if (replay.kind === 'broken') return { kind: 'broken' };
+  if (replay.kind === 'none') return { kind: 'none' };
+  if (stateDigest(replay.state) !== stateDigest(live)) return { kind: 'broken' };
+  return { kind: 'remediated', through: replay.through };
+}
+
+/**
+ * Replay the anchored remediation chain without requiring its head to equal current live state.
+ * Integrity prepare uses this state as the baseline for a later, legitimate post-close delta.
+ */
+export function resolveRemediationReplayState(scope: string, closedState: unknown): RemediationReplayState {
+  const live = readLiveStateOrNull(scope);
+  if (!live) return { kind: 'broken', detail: 'live scope state is missing or unreadable' };
   const anchors = readAnchorsSafely(scope, live);
-  if (anchors === null) return { kind: 'broken' };
-  if (anchors.length === 0) return { kind: 'none' };
+  if (anchors === null) return { kind: 'broken', detail: 'remediations[] is malformed' };
 
   const closed = asRecord(closedState);
-  if (!closed) return { kind: 'broken' };
+  if (!closed) return { kind: 'broken', detail: 'closed state is not an object' };
+  const initial = canonicalRemediationState(closed as unknown as SprintFile);
+  if (anchors.length === 0) return { kind: 'none', state: initial, headCommitment: null, through: null };
   const ledger = ledgerCommitmentMap(closed);
 
-  let replayed = canonicalRemediationState(closed as unknown as SprintFile);
+  let replayed = initial;
   let expectedHead: string | null = null;
 
   for (let i = 0; i < anchors.length; i += 1) {
     const anchor = anchors[i];
     const isFirst = expectedHead === null;
     const isLast = i === anchors.length - 1;
-    const transaction = inspectRemediationTransaction(scope, anchor.id, anchor.commitment, null, isLast);
-    if (!isAppliedRemediationStatus(transaction.status)) return { kind: 'broken' };
+    const transaction = inspectRemediationTransaction(scope, anchor.id, anchor.commitment, null, false);
+    if (!isAppliedRemediationStatus(transaction.status)) return { kind: 'broken', detail: `${anchor.id}: ${transaction.detail}` };
     const record = readRemediationRecord(scope, anchor.id);
-    if (!record || record.base.remediationHead !== expectedHead) return { kind: 'broken' };
+    if (!record) return { kind: 'broken', detail: `${anchor.id}: record is unreadable or invalid` };
+    if (record.base.remediationHead !== expectedHead) return { kind: 'broken', detail: `${anchor.id}: remediation head does not continue the chain` };
     for (const checkpoint of record.base.checkpoints) {
-      if (ledger.get(checkpoint.path) !== checkpoint.commitment) return { kind: 'broken' };
+      if (ledger.get(checkpoint.path) !== checkpoint.commitment) return { kind: 'broken', detail: `${anchor.id}: checkpoint commitment does not match the closed state` };
     }
     // If the first record has a base that differs from the checkpoint (corrected a corruption),
     // replay its operations without verifying preconditions (the true base is unknown, so
@@ -538,24 +679,28 @@ export function resolveRemediationRebase(scope: string, closedState: unknown): R
     // were forged, they won't produce the declared result.
     if (isFirst && record.base.stateSha256 !== stateDigest(replayed)) {
       const next = replayOperations(replayed, record.operations, true);
-      if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
+      if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken', detail: `${anchor.id}: replay does not reproduce its result digest` };
       const advanced = advanceReplayState(record, next, isLast);
-      if (!advanced) return { kind: 'broken' };
+      if (!advanced) return { kind: 'broken', detail: `${anchor.id}: replay witness is invalid` };
       replayed = advanced;
     } else {
       // Normal replay: verify continuity for non-first records and execute operations with preconditions.
-      if (!isFirst && record.base.stateSha256 !== stateDigest(replayed)) return { kind: 'broken' };
+      if (!isFirst && record.base.stateSha256 !== stateDigest(replayed)) return { kind: 'broken', detail: `${anchor.id}: base digest does not equal the previous result` };
       const next = replayOperations(replayed, record.operations, false);
-      if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken' };
+      if (!next || record.result.stateSha256 !== stateDigest(next)) return { kind: 'broken', detail: `${anchor.id}: replay does not reproduce its result digest` };
       const advanced = advanceReplayState(record, next, isLast);
-      if (!advanced) return { kind: 'broken' };
+      if (!advanced) return { kind: 'broken', detail: `${anchor.id}: replay witness is invalid` };
       replayed = advanced;
     }
     expectedHead = anchor.commitment;
   }
 
-  if (stateDigest(replayed) !== stateDigest(live)) return { kind: 'broken' };
-  return { kind: 'remediated', through: anchors[anchors.length - 1].id };
+  return {
+    kind: 'remediated',
+    state: replayed,
+    headCommitment: anchors[anchors.length - 1].commitment,
+    through: anchors[anchors.length - 1].id,
+  };
 }
 
 // --- scope verification state (T2.1) ------------------------------------------------------------
@@ -589,16 +734,10 @@ export function listValidCloseCheckpoints(scope: string): ValidCloseCheckpoint[]
   for (const file of readdirSync(directory)) {
     if (!file.endsWith('.checkpoint.json')) continue;
     const path = `${archiveDir(scope)}/${file}`;
-    const read = readJsonSafely(path);
-    if (!read.exists || read.error) continue;
-    const checkpoint = read.value as SprintCloseCheckpointV1;
-    // A checkpoint is valid if its integrity is sound (commitment matches ledger anchor, structure intact).
-    // Historical checkpoints with stale schema are still valid evidence; their schema issues are named
-    // separately in doctor output (S6, AC3).
-    const integrityIssues = checkpointIntegrityIssues(read.value, path);
-    if (integrityIssues.length > 0) continue;
-    if (checkpoint.identity.scope !== scope) continue;
-    entries.push({ path, checkpoint });
+    const resolved = resolveEffectiveCheckpointAtPath(scope, path);
+    if (resolved.status !== EFFECTIVE_CHECKPOINT_STATUS.VALID && resolved.status !== EFFECTIVE_CHECKPOINT_STATUS.CANONICALIZED) continue;
+    if (!resolved.checkpoint || resolved.checkpoint.identity.scope !== scope) continue;
+    entries.push({ path, checkpoint: resolved.checkpoint });
   }
   entries.sort((left, right) => compareCheckpointRecency(right.checkpoint, left.checkpoint));
   return entries;
@@ -607,6 +746,10 @@ export function listValidCloseCheckpoints(scope: string): ValidCloseCheckpoint[]
 /** The most recent valid close checkpoint for a scope, or null when none exists. */
 export function latestValidCloseCheckpoint(scope: string): SprintCloseCheckpointV1 | null {
   return listValidCloseCheckpoints(scope)[0]?.checkpoint ?? null;
+}
+
+export function latestValidCloseCheckpointEntry(scope: string): ValidCloseCheckpoint | null {
+  return listValidCloseCheckpoints(scope)[0] ?? null;
 }
 
 /**
@@ -730,13 +873,22 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
 
   const liveBusiness = businessStateDigest(live);
   const afterBusiness = businessStateDigest(checkpoint.intendedAfterClose);
-  const atAfterImage = liveBusiness !== null && afterBusiness !== null && liveBusiness === afterBusiness;
+  const physicalRead = readJsonSafely(listValidCloseCheckpoints(scope)[0]?.path ?? '');
+  const physicalAfter = physicalRead.exists && !physicalRead.error
+    ? (physicalRead.value as { intendedAfterClose?: unknown }).intendedAfterClose
+    : null;
+  const physicalAfterBusiness = physicalAfter ? businessStateDigest(physicalAfter) : null;
+  const atAfterImage = liveBusiness !== null && (
+    (afterBusiness !== null && liveBusiness === afterBusiness)
+    || (physicalAfterBusiness !== null && liveBusiness === physicalAfterBusiness)
+  );
 
   // A present chain must be replayed even when it net-restored the after-image. The head digest
   // only binds the claimed result to live state; without replaying operations, a re-anchored record
   // could alter its operation payload while retaining that digest and be reported as remediated.
   if (anchors.length > 0) {
-    const rebase = resolveRemediationRebase(scope, checkpoint.intendedAfterClose);
+    const rebaseClosed = physicalAfter ?? checkpoint.intendedAfterClose;
+    const rebase = resolveRemediationRebase(scope, rebaseClosed);
     if (rebase.kind === 'remediated') {
       const certification = resolveCertificationForHead(scope);
       if (certification.kind === 'valid') {
@@ -892,17 +1044,39 @@ function verifyLedgerCheckpoints(scope: string, state: Record<string, unknown>):
     if (typeof entry.checkpointSha256 !== 'string') {
       throw new KyroCoreError('CHECKPOINT_CONFLICT', `${label} checkpoint ${entry.checkpoint} is unanchored (no checkpointSha256).`, 'Without a live commitment, archive tampering cannot be ruled out. Remediation refuses to proceed on unanchored history.');
     }
-    const path = `${scopeRoot(scope)}/${entry.checkpoint}`;
-    const read = readJsonSafely(path);
-    if (!read.exists) {
-      throw new KyroCoreError('CHECKPOINT_CORRUPT', `${label} references a missing checkpoint (${entry.checkpoint}).`, 'Restore the immutable checkpoint from versioned storage before remediating.');
+    const resolved = resolveEffectiveCheckpoint(scope, {
+      n: typeof entry.n === 'number' ? entry.n : undefined,
+      slug: typeof entry.slug === 'string' ? entry.slug : undefined,
+      checkpoint: entry.checkpoint,
+      checkpointSha256: typeof entry.checkpointSha256 === 'string' ? entry.checkpointSha256 : undefined,
+    });
+    if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.CORRUPT || resolved.status === EFFECTIVE_CHECKPOINT_STATUS.UNSUPPORTED) {
+      throw new KyroCoreError('CHECKPOINT_CORRUPT', `${label} checkpoint ${entry.checkpoint} is ${resolved.status}: ${resolved.detail}.`, 'Restore the immutable checkpoint or apply a valid canonicalization overlay before remediating.');
     }
-    if (read.error) {
-      throw new KyroCoreError('CHECKPOINT_CORRUPT', `${label} checkpoint ${entry.checkpoint} is unreadable (${read.error}).`, 'Restore the immutable checkpoint; never rewrite it to make remediation proceed.');
+    if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.DIVERGED || !resolved.checkpoint) {
+      throw new KyroCoreError('CHECKPOINT_CONFLICT', `${label} checkpoint ${entry.checkpoint} is ${resolved.status}: ${resolved.detail}.`, 'Treat the archive or overlay as tampered. Restore trusted bytes before remediating.');
     }
-    const commitment = checkpointCommitmentOfRecord(read.value);
-    if (commitment !== entry.checkpointSha256) {
-      throw new KyroCoreError('CHECKPOINT_CONFLICT', `${label} checkpoint ${entry.checkpoint} does not match its ledger commitment.`, 'Treat the archive as tampered. Restore the checkpoint bytes from trusted versioned storage before remediating.');
+    const liveSha = entry.checkpointSha256;
+    if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.VALID) {
+      const commitment = checkpointCommitmentOfRecord(resolved.checkpoint);
+      if (commitment !== liveSha) {
+        throw new KyroCoreError('CHECKPOINT_CONFLICT', `${label} checkpoint ${entry.checkpoint} does not match its ledger commitment.`, 'Treat the archive as tampered. Restore the checkpoint bytes from trusted versioned storage before remediating.');
+      }
+    } else {
+      const overlay = resolved;
+      const physical = readJsonSafely(`${scopeRoot(scope)}/${entry.checkpoint}`);
+      const observed = typeof physical.value === 'object' && physical.value !== null
+        ? ((physical.value as { intendedAfterClose?: { ledger?: Array<{ checkpointSha256?: string }> } }).intendedAfterClose?.ledger ?? []).slice(-1)[0]?.checkpointSha256
+        : undefined;
+      const canonical = checkpointCommitmentOfRecord(resolved.checkpoint);
+      if (liveSha !== observed && liveSha !== canonical) {
+        throw new KyroCoreError(
+          'CHECKPOINT_CONFLICT',
+          `${label} checkpoint ${entry.checkpoint} ledger commitment matches neither the original overlay binding nor the canonical commitment.`,
+          'Re-run repair integrity prepare so the ledger can be reanchored to the effective checkpoint.',
+        );
+      }
+      void overlay;
     }
   });
 }
@@ -961,6 +1135,14 @@ function readRemediationRecord(scope: string, remediationId: string): ScopeRemed
  * verification — an honestly applied remediation that doctor reported as tampering. One executor
  * makes that class of disagreement impossible by construction.
  */
+export function executeRemediationOperations(
+  state: Record<string, unknown>,
+  operations: RemediationOperation[],
+  skipPreconditions = false,
+): { state: Record<string, unknown>; changes: RemediationChange[] } | { failure: KyroCoreError } {
+  return executeOperations(state, operations, skipPreconditions);
+}
+
 function executeOperations(
   state: Record<string, unknown>,
   operations: RemediationOperation[],
@@ -1059,6 +1241,146 @@ function executeOperations(
         });
         break;
       }
+      case 'convention.append': {
+        if (!Array.isArray(next.conventions)) {
+          return { failure: new KyroCoreError('INVALID_SPRINT_SHAPE', 'Cannot apply convention.append: conventions[] is not an array.') };
+        }
+        const conventions = next.conventions as unknown[];
+        if (!skipPreconditions) {
+          const observed = observedValueDigest(conventions);
+          if (observed !== operation.expectedConventionCollectionSha256) {
+            return {
+              failure: new KyroCoreError(
+                'STATE_DIVERGED',
+                `Operation ${operation.id} expected conventions[] digest ${operation.expectedConventionCollectionSha256} but the live collection digests to ${observed}.`,
+                'The convention collection changed since the plan was written. Re-run repair integrity prepare.',
+              ),
+            };
+          }
+        }
+        const duplicate = conventions.map(asRecord).find((entry) => entry?.id === operation.after.id);
+        if (duplicate) {
+          if (canonicalJson(duplicate) !== canonicalJson(operation.after)) {
+            return {
+              failure: new KyroCoreError(
+                'INVALID_INPUT',
+                `Operation ${operation.id} conflicts with existing convention "${operation.after.id}".`,
+                'Convention ids must be unique. Do not reuse an id with a different rule.',
+              ),
+            };
+          }
+          break;
+        }
+        const after = {
+          id: operation.after.id,
+          rule: operation.after.rule,
+          tags: [...operation.after.tags],
+          addedSprint: operation.after.addedSprint,
+        };
+        conventions.push(after);
+        changes.push({
+          operationId: operation.id,
+          kind: operation.kind,
+          target: `conventions[${operation.after.id}]`,
+          from: null,
+          to: after,
+        });
+        break;
+      }
+      case 'adr.append': {
+        if (!Array.isArray(next.adrs)) next.adrs = [];
+        const adrs = next.adrs as unknown[];
+        if (!skipPreconditions) {
+          const observed = observedValueDigest(adrs);
+          if (observed !== operation.expectedAdrCollectionSha256) {
+            return {
+              failure: new KyroCoreError(
+                'STATE_DIVERGED',
+                `Operation ${operation.id} expected adrs[] digest ${operation.expectedAdrCollectionSha256} but the live collection digests to ${observed}.`,
+                'The ADR collection changed since the plan was written. Re-run repair integrity prepare.',
+              ),
+            };
+          }
+        }
+        const duplicate = adrs.map(asRecord).find((entry) => entry?.id === operation.after.id);
+        if (duplicate) {
+          if (canonicalJson(duplicate) !== canonicalJson(operation.after)) {
+            return {
+              failure: new KyroCoreError(
+                'INVALID_INPUT',
+                `Operation ${operation.id} conflicts with existing ADR "${operation.after.id}".`,
+              ),
+            };
+          }
+          break;
+        }
+        adrs.push(JSON.parse(JSON.stringify(operation.after)));
+        changes.push({
+          operationId: operation.id,
+          kind: operation.kind,
+          target: `adrs[${operation.after.id}]`,
+          from: null,
+          to: operation.after,
+        });
+        break;
+      }
+      case 'ledger.checkpoint.reanchor': {
+        if (!Array.isArray(next.ledger)) {
+          return { failure: new KyroCoreError('INVALID_SPRINT_SHAPE', 'Cannot apply ledger.checkpoint.reanchor: ledger[] is not an array.') };
+        }
+        const ledger = next.ledger as unknown[];
+        const index = ledger.findIndex((entry) => {
+          const record = asRecord(entry);
+          return record?.n === operation.sprintN && record?.slug === operation.sprintSlug;
+        });
+        if (index === -1) {
+          return {
+            failure: new KyroCoreError(
+              'INVALID_INPUT',
+              `Operation ${operation.id} targets ledger sprint ${operation.sprintN} (${operation.sprintSlug}), which does not exist.`,
+            ),
+          };
+        }
+        const target = asRecord(ledger[index]);
+        if (!target) {
+          return { failure: new KyroCoreError('INVALID_SPRINT_SHAPE', `ledger[${index}] is not an object.`) };
+        }
+        const current = typeof target.checkpointSha256 === 'string' ? target.checkpointSha256 : '';
+        if (!skipPreconditions && current !== operation.expectedOldSha256) {
+          return {
+            failure: new KyroCoreError(
+              'STATE_DIVERGED',
+              `Operation ${operation.id} expected ledger checkpointSha256 ${operation.expectedOldSha256} but the live value is ${current || '(missing)'}.`,
+              'The ledger commitment changed since the plan was written. Re-run repair integrity prepare.',
+            ),
+          };
+        }
+        if (!skipPreconditions && !reanchorTargetAllowed(next, operation, target)) {
+          return {
+            failure: new KyroCoreError(
+              'CHECKPOINT_CONFLICT',
+              `Operation ${operation.id} reanchor target ${operation.afterSha256} is not the effective checkpoint commitment.`,
+              'Reanchor only to the effective or originally observed ledger commitment. Doctor would reject any other destination.',
+            ),
+          };
+        }
+        const keys = Object.keys(target);
+        const allowed = new Set(['n', 'slug', 'outcome', 'closedAt', 'archive', 'snapshot', 'checkpoint', 'checkpointSha256', 'recommendations']);
+        for (const key of keys) {
+          if (!allowed.has(key)) {
+            return { failure: new KyroCoreError('INVALID_INPUT', `Operation ${operation.id} refuses to touch unexpected ledger key ${key}.`) };
+          }
+        }
+        changes.push({
+          operationId: operation.id,
+          kind: operation.kind,
+          target: `ledger[${operation.sprintN}].checkpointSha256`,
+          from: current,
+          to: operation.afterSha256,
+        });
+        target.checkpointSha256 = operation.afterSha256;
+        break;
+      }
       default: {
         const exhaustive: never = operation;
         return { failure: new KyroCoreError('INVALID_INPUT', `Unsupported remediation operation ${JSON.stringify(exhaustive)}.`, 'Only registry operations can be planned.') };
@@ -1110,4 +1432,28 @@ function formatIssues(issues: ValidationIssue[]): string {
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function reanchorTargetAllowed(
+  state: Record<string, unknown>,
+  operation: Extract<RemediationOperation, { kind: 'ledger.checkpoint.reanchor' }>,
+  target: Record<string, unknown>,
+): boolean {
+  const scope = typeof state.scope === 'string' ? state.scope : '';
+  const checkpointPath = typeof target.checkpoint === 'string' ? target.checkpoint : '';
+  if (!scope || !checkpointPath) return false;
+  const resolved = resolveEffectiveCheckpoint(scope, {
+    n: operation.sprintN,
+    slug: operation.sprintSlug,
+    checkpoint: checkpointPath,
+    checkpointSha256: operation.afterSha256,
+  });
+  const allowed = new Set<string>();
+  const effective = effectiveCommitment(resolved);
+  if (effective) allowed.add(effective);
+  if (resolved.originalSha256) {
+    const overlay = findCanonicalizationForBytes(scope, `${scopeRoot(scope)}/${checkpointPath}`, resolved.originalSha256);
+    if (overlay) allowed.add(overlay.observedLedgerCommitment);
+  }
+  return allowed.has(operation.afterSha256);
 }

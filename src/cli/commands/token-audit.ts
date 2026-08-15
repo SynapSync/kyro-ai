@@ -34,7 +34,10 @@ const TOKEN_BUDGET = {
   // Sized against a machine with the runtime INSTALLED (projected router ~180t), not against a
   // bare checkout (stub router ~46t). CI measures the stub and therefore reads ~134 tokens lower
   // per path — sizing to CI would leave `kyro doctor --tokens` failing for every real user.
-  runtimeForgeExecuteTokens: 4180,
+  // 4.47.0 raised this from 4180: Forge/orchestrator/SKILL now diagnose integrity *before*
+  // scope resolution. That step is load-bearing for an empty activeScope; trimming it to
+  // keep the old ceiling would leave recovery unreachable on the execute route.
+  runtimeForgeExecuteTokens: 4320,
   runtimeForgeReviewTokens: 4570,
   runtimeForgePlanTokens: 4940,
   runtimeForgeCloseTokens: 5610,

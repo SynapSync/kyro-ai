@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.integrity-repair-fixture-family",
+  "description": "Portable identities for 11 rebuildable legacy checkpoints (no private checkout required).",
+  "scopes": [
+    { "id": "svc-foundation", "sprints": [{ "n": 1, "slug": "official-bootstrap" }] },
+    { "id": "svc-auth", "sprints": [{ "n": 1, "slug": "session-boundary" }, { "n": 2, "slug": "token-refresh" }] },
+    { "id": "svc-intake", "sprints": [{ "n": 1, "slug": "image-intake" }, { "n": 2, "slug": "intake-errors" }] },
+    { "id": "svc-analysis", "sprints": [{ "n": 1, "slug": "food-analysis" }, { "n": 2, "slug": "nutrition-safety" }] },
+    { "id": "svc-catalog", "sprints": [{ "n": 1, "slug": "model-catalog" }, { "n": 2, "slug": "routing" }] },
+    { "id": "svc-render", "sprints": [{ "n": 1, "slug": "response-rendering" }, { "n": 2, "slug": "localization" }] }
+  ]
+}

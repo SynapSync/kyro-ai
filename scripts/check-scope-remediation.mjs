@@ -1428,7 +1428,7 @@ function applyCanonicalization(root, extraArgs = []) {
     ['hybrid after-image', (m) => { m.operations[0].after.addedSprint = 1; }, 'INVALID_INPUT'],
     ['unaccounted legacy key', (m) => { m.operations[0].retiredKeys = ['detail']; }, 'STATE_DIVERGED'],
     ['unknown debt id', (m) => { m.operations[0].debtId = 'D9'; m.operations[0].after.id = 'D9'; }, 'DEBT_NOT_FOUND'],
-    ['unknown protocol revision', (m) => { m.schemaVersion = 4; }, 'INVALID_INPUT'],
+    ['unknown protocol revision', (m) => { m.schemaVersion = 5; }, 'INVALID_INPUT'],
     ['canonicalization smuggled into v1', (m) => { m.schemaVersion = 1; }, 'INVALID_INPUT'],
   ];
   for (const [label, mutate, expected] of mutations) {

@@ -21,7 +21,7 @@ Usage:
   kyro scenario <subcommand>   Tool-owned scenario add / task link (no hand-edit)
   kyro adr <subcommand>        Tool-owned ADR append (full v4 record)
   kyro rule <subcommand>       Tool-owned scope/global convention append
-  kyro repair [options]        Validate and normalize a scope's sprint.json
+  kyro repair [options]        Normalize a scope, or repair integrity (prepare/apply)
   kyro remediate <subcommand>  Typed, append-only correction of a CLOSED scope: preview, apply
   kyro recertify <subcommand>  Certify a remediated scope against re-verified evidence: preview, apply
   kyro status [mode]           Read-only scope progress, review debt, and debt report
@@ -62,6 +62,8 @@ Examples:
   kyro detect --json
   kyro doctor --tokens --artifacts
   kyro repair --kyro-scope auth-refactor --dry-run
+  kyro repair integrity prepare --json
+  kyro repair integrity apply --digest <sha256> --yes
   kyro remediate preview --kyro-scope auth-refactor --manifest remediation.json
   kyro recertify preview --kyro-scope auth-refactor --manifest certification.json
   kyro status --kyro-scope auth-refactor --json
