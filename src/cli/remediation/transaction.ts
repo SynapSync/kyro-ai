@@ -37,38 +37,54 @@ export interface RemediationApplyResult {
 export function applyRemediationTransaction(options: RemediationPlanOptions): RemediationApplyResult {
   return withStateWriterLock(() => {
     const plan = planRemediation(options);
-    assertSafeManagedPath(plan.recordPath);
-    assertSafeManagedPath(plan.sprintPath);
+    return commitRemediationPlanUnlocked(plan);
+  });
+}
 
-    // planRemediation already refuses a stale base digest, so an already-applied manifest never
-    // reaches this point: its base state no longer exists. What can reach it is an interrupted
-    // attempt (PREPARED), which is resumed rather than duplicated.
-    const resumed = plan.transactionStatus === REMEDIATION_TRANSACTION_STATUS.PREPARED;
-    if (plan.transactionStatus !== REMEDIATION_TRANSACTION_STATUS.NOT_APPLIED && !resumed) {
-      throw new KyroCoreError(
-        'STATE_DIVERGED',
-        `Remediation ${plan.remediationId} is ${plan.transactionStatus}: ${plan.transactionDetail}.`,
-        'Reconcile the existing remediation record and live anchor before applying anything else. Kyro will not write over an ambiguous transaction.',
-      );
-    }
+/**
+ * Single remediations write primitive. Caller must already hold the state-writer lock.
+ * Accepts live state that is still the base (normal apply) or already the result (explain/resume).
+ */
+export function commitRemediationPlanUnlocked(plan: RemediationPlan): RemediationApplyResult {
+  assertSafeManagedPath(plan.recordPath);
+  assertSafeManagedPath(plan.sprintPath);
 
-    if (!resumed) {
-      publishExclusive(plan.recordPath, `${JSON.stringify(plan.record, null, 2)}\n`, `remediation record ${plan.remediationId}`);
-    }
-    verifyPublishedRecord(plan);
-    compareAndSwapSprint(plan);
-    verifyApplied(plan);
-
+  const resumed = plan.transactionStatus === REMEDIATION_TRANSACTION_STATUS.PREPARED;
+  if (plan.transactionStatus === REMEDIATION_TRANSACTION_STATUS.APPLIED) {
     return {
       scope: plan.scope,
       remediationId: plan.remediationId,
       recordPath: plan.recordPath,
       sprintPath: plan.sprintPath,
       commitment: plan.commitment,
-      resumed,
+      resumed: true,
       plan,
     };
-  });
+  }
+  if (plan.transactionStatus !== REMEDIATION_TRANSACTION_STATUS.NOT_APPLIED && !resumed) {
+    throw new KyroCoreError(
+      'STATE_DIVERGED',
+      `Remediation ${plan.remediationId} is ${plan.transactionStatus}: ${plan.transactionDetail}.`,
+      'Reconcile the existing remediation record and live anchor before applying anything else. Kyro will not write over an ambiguous transaction.',
+    );
+  }
+
+  if (!resumed) {
+    publishExclusive(plan.recordPath, `${JSON.stringify(plan.record, null, 2)}\n`, `remediation record ${plan.remediationId}`);
+  }
+  verifyPublishedRecord(plan);
+  compareAndSwapSprint(plan);
+  verifyApplied(plan);
+
+  return {
+    scope: plan.scope,
+    remediationId: plan.remediationId,
+    recordPath: plan.recordPath,
+    sprintPath: plan.sprintPath,
+    commitment: plan.commitment,
+    resumed,
+    plan,
+  };
 }
 
 /** The immutable record must be on disk, parseable, contract-valid and commit to the planned digest. */
@@ -97,7 +113,7 @@ function compareAndSwapSprint(plan: RemediationPlan): void {
   const anchored = hasAnchor(current, plan.anchor);
 
   if (currentDigest === plan.record.result.stateSha256 && anchored) return;
-  if (currentDigest !== plan.record.base.stateSha256) {
+  if (currentDigest !== plan.record.result.stateSha256 && currentDigest !== plan.record.base.stateSha256) {
     throw diverged(plan.sprintPath, 'live state matches neither the remediation base nor its result');
   }
   atomicReplace(plan.sprintPath, `${JSON.stringify(plan.projectedSprint, null, 2)}\n`);

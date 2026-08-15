@@ -25,16 +25,24 @@ export const SCOPE_REMEDIATION_V2_SCHEMA_VERSION = 2 as const;
  * still emits exactly the v2 bytes it always did and only a canonicalization raises the revision.
  */
 export const SCOPE_REMEDIATION_V3_SCHEMA_VERSION = 3 as const;
+export const SCOPE_REMEDIATION_V4_SCHEMA_VERSION = 4 as const;
 export const CURRENT_SCOPE_REMEDIATION_SCHEMA_VERSION = SCOPE_REMEDIATION_V2_SCHEMA_VERSION;
 export const SCOPE_REMEDIATION_SCHEMA_VERSIONS = {
   V1: SCOPE_REMEDIATION_SCHEMA_VERSION,
   V2: SCOPE_REMEDIATION_V2_SCHEMA_VERSION,
   V3: SCOPE_REMEDIATION_V3_SCHEMA_VERSION,
+  V4: SCOPE_REMEDIATION_V4_SCHEMA_VERSION,
 } as const;
 export type ScopeRemediationSchemaVersion = (typeof SCOPE_REMEDIATION_SCHEMA_VERSIONS)[keyof typeof SCOPE_REMEDIATION_SCHEMA_VERSIONS];
 
 /** Closed operation registry across every revision. An unknown kind fails before any plan is produced. */
-export const REMEDIATION_OPERATION_KINDS = ['debt.origin.set', 'debt.canonicalize'] as const;
+export const REMEDIATION_OPERATION_KINDS = [
+  'debt.origin.set',
+  'debt.canonicalize',
+  'convention.append',
+  'adr.append',
+  'ledger.checkpoint.reanchor',
+] as const;
 export type RemediationOperationKind = (typeof REMEDIATION_OPERATION_KINDS)[number];
 
 /**
@@ -46,6 +54,13 @@ export const OPERATION_KINDS_BY_REVISION: Record<ScopeRemediationSchemaVersion, 
   [SCOPE_REMEDIATION_SCHEMA_VERSION]: ['debt.origin.set'],
   [SCOPE_REMEDIATION_V2_SCHEMA_VERSION]: ['debt.origin.set'],
   [SCOPE_REMEDIATION_V3_SCHEMA_VERSION]: ['debt.origin.set', 'debt.canonicalize'],
+  [SCOPE_REMEDIATION_V4_SCHEMA_VERSION]: [
+    'debt.origin.set',
+    'debt.canonicalize',
+    'convention.append',
+    'adr.append',
+    'ledger.checkpoint.reanchor',
+  ],
 };
 
 /**
@@ -55,6 +70,7 @@ export const OPERATION_KINDS_BY_REVISION: Record<ScopeRemediationSchemaVersion, 
 export const WRITABLE_SCOPE_REMEDIATION_SCHEMA_VERSIONS = [
   SCOPE_REMEDIATION_V2_SCHEMA_VERSION,
   SCOPE_REMEDIATION_V3_SCHEMA_VERSION,
+  SCOPE_REMEDIATION_V4_SCHEMA_VERSION,
 ] as const;
 export type WritableScopeRemediationSchemaVersion = (typeof WRITABLE_SCOPE_REMEDIATION_SCHEMA_VERSIONS)[number];
 
@@ -145,7 +161,58 @@ export interface CanonicalDebtAfterImage {
   note: string;
 }
 
-export type RemediationOperation = SetDebtOriginOperation | CanonicalizeDebtOperation;
+/** Append one structured convention. Binds the whole observed conventions[] collection. */
+export interface AppendConventionOperation {
+  id: string;
+  kind: 'convention.append';
+  resolves: string[];
+  expectedConventionCollectionSha256: string;
+  after: {
+    id: string;
+    rule: string;
+    tags: string[];
+    addedSprint: number;
+  };
+  reason: string;
+}
+
+export interface AppendAdrOperation {
+  id: string;
+  kind: 'adr.append';
+  resolves: string[];
+  expectedAdrCollectionSha256: string;
+  after: {
+    id: string;
+    title: string;
+    status: string;
+    date: string;
+    context: string;
+    decision: string;
+    consequences: string[];
+    alternatives: string[];
+    links?: Record<string, string[]>;
+  };
+  reason: string;
+}
+
+/** Change only checkpointSha256 on one ledger row identified by sprint number and slug. */
+export interface ReanchorLedgerCheckpointOperation {
+  id: string;
+  kind: 'ledger.checkpoint.reanchor';
+  resolves: string[];
+  sprintN: number;
+  sprintSlug: string;
+  expectedOldSha256: string;
+  afterSha256: string;
+  reason: string;
+}
+
+export type RemediationOperation =
+  | SetDebtOriginOperation
+  | CanonicalizeDebtOperation
+  | AppendConventionOperation
+  | AppendAdrOperation
+  | ReanchorLedgerCheckpointOperation;
 
 export interface RemediationResult {
   stateSha256: string;
@@ -210,6 +277,7 @@ export interface CompactScopeRemediation {
 /** The compact record pinned to one revision, for callers that mean specifically v2 or v3. */
 export type ScopeRemediationV2 = CompactScopeRemediation & { schemaVersion: typeof SCOPE_REMEDIATION_V2_SCHEMA_VERSION };
 export type ScopeRemediationV3 = CompactScopeRemediation & { schemaVersion: typeof SCOPE_REMEDIATION_V3_SCHEMA_VERSION };
+export type ScopeRemediationV4 = CompactScopeRemediation & { schemaVersion: typeof SCOPE_REMEDIATION_V4_SCHEMA_VERSION };
 
 export type ScopeRemediation = ScopeRemediationV1 | CompactScopeRemediation;
 
@@ -230,9 +298,7 @@ export function requiredRemediationRevision(
     const allowed = OPERATION_KINDS_BY_REVISION[revision];
     if (operations.every((operation) => allowed.includes(operation.kind))) return revision;
   }
-  // Unreachable while the registry is closed and v3 admits every kind; failing to the newest
-  // revision keeps this total rather than throwing from a pure selector.
-  return SCOPE_REMEDIATION_V3_SCHEMA_VERSION;
+  return SCOPE_REMEDIATION_V4_SCHEMA_VERSION;
 }
 
 const REMEDIATION_KEYS = [
@@ -251,6 +317,9 @@ const REMEDIATION_KEYS = [
 const OPERATION_KEYS: Record<RemediationOperationKind, readonly string[]> = {
   'debt.origin.set': ['id', 'kind', 'resolves', 'debtId', 'expectedOriginSha256', 'origin', 'reason'],
   'debt.canonicalize': ['id', 'kind', 'resolves', 'debtId', 'expectedDebtCollectionSha256', 'after', 'retiredKeys', 'reason'],
+  'convention.append': ['id', 'kind', 'resolves', 'expectedConventionCollectionSha256', 'after', 'reason'],
+  'adr.append': ['id', 'kind', 'resolves', 'expectedAdrCollectionSha256', 'after', 'reason'],
+  'ledger.checkpoint.reanchor': ['id', 'kind', 'resolves', 'sprintN', 'sprintSlug', 'expectedOldSha256', 'afterSha256', 'reason'],
 };
 
 /**
@@ -263,6 +332,9 @@ const OPERATION_VALIDATORS: Record<
 > = {
   'debt.origin.set': validateSetDebtOriginOperation,
   'debt.canonicalize': validateCanonicalizeDebtOperation,
+  'convention.append': validateAppendConventionOperation,
+  'adr.append': validateAppendAdrOperation,
+  'ledger.checkpoint.reanchor': validateReanchorLedgerCheckpointOperation,
 };
 
 export function isRemediationOperationKind(value: unknown): value is RemediationOperationKind {
@@ -280,6 +352,9 @@ export function validateScopeRemediation(value: unknown, path: string): Validati
   // v3 reuses the compact record shape; only the operation registry widens (ADR-0003).
   if (value.schemaVersion === SCOPE_REMEDIATION_V3_SCHEMA_VERSION) {
     return validateScopeRemediationV2(value, path, SCOPE_REMEDIATION_V3_SCHEMA_VERSION);
+  }
+  if (value.schemaVersion === SCOPE_REMEDIATION_V4_SCHEMA_VERSION) {
+    return validateScopeRemediationV2(value, path, SCOPE_REMEDIATION_V4_SCHEMA_VERSION);
   }
   return [{
     path,
@@ -373,7 +448,10 @@ export const REMEDIATION_MANIFEST_KIND = 'scope-remediation-manifest' as const;
  * transaction Kyro has not evaluated yet.
  */
 export interface RemediationManifestV1 {
-  schemaVersion: typeof SCOPE_REMEDIATION_SCHEMA_VERSION | typeof SCOPE_REMEDIATION_V3_SCHEMA_VERSION;
+  schemaVersion:
+    | typeof SCOPE_REMEDIATION_SCHEMA_VERSION
+    | typeof SCOPE_REMEDIATION_V3_SCHEMA_VERSION
+    | typeof SCOPE_REMEDIATION_V4_SCHEMA_VERSION;
   kind: typeof REMEDIATION_MANIFEST_KIND;
   scope: string;
   base: {
@@ -397,14 +475,20 @@ export function validateRemediationManifest(value: unknown, path: string): Valid
   // A manifest declares which protocol revision it was written against, so an operator cannot smuggle
   // a canonicalization into the older revision's semantics — nor lose the ability to write a v1 one.
   const manifestRevision: ScopeRemediationSchemaVersion =
-    value.schemaVersion === SCOPE_REMEDIATION_V3_SCHEMA_VERSION
-      ? SCOPE_REMEDIATION_V3_SCHEMA_VERSION
-      : SCOPE_REMEDIATION_SCHEMA_VERSION;
-  if (value.schemaVersion !== SCOPE_REMEDIATION_SCHEMA_VERSION && value.schemaVersion !== SCOPE_REMEDIATION_V3_SCHEMA_VERSION) {
+    value.schemaVersion === SCOPE_REMEDIATION_V4_SCHEMA_VERSION
+      ? SCOPE_REMEDIATION_V4_SCHEMA_VERSION
+      : value.schemaVersion === SCOPE_REMEDIATION_V3_SCHEMA_VERSION
+        ? SCOPE_REMEDIATION_V3_SCHEMA_VERSION
+        : SCOPE_REMEDIATION_SCHEMA_VERSION;
+  if (
+    value.schemaVersion !== SCOPE_REMEDIATION_SCHEMA_VERSION
+    && value.schemaVersion !== SCOPE_REMEDIATION_V3_SCHEMA_VERSION
+    && value.schemaVersion !== SCOPE_REMEDIATION_V4_SCHEMA_VERSION
+  ) {
     issues.push({
       path,
       field: 'schemaVersion',
-      message: `must be ${SCOPE_REMEDIATION_SCHEMA_VERSION} or ${SCOPE_REMEDIATION_V3_SCHEMA_VERSION}`,
+      message: `must be ${SCOPE_REMEDIATION_SCHEMA_VERSION}, ${SCOPE_REMEDIATION_V3_SCHEMA_VERSION} or ${SCOPE_REMEDIATION_V4_SCHEMA_VERSION}`,
     });
   }
   if (value.kind !== REMEDIATION_MANIFEST_KIND) {
@@ -676,6 +760,67 @@ function validateCanonicalizeDebtOperation(
   }
 
   validateCanonicalDebtAfterImage(value.after, value.debtId, path, `${prefix}.after`, issues);
+}
+
+function validateAppendConventionOperation(
+  value: Record<string, unknown>,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+): void {
+  requireDigest(value, 'expectedConventionCollectionSha256', path, issues, `${prefix}.expectedConventionCollectionSha256`);
+  requireNonEmptyString(value, 'reason', path, issues, `${prefix}.reason`);
+  if (!isRecord(value.after)) {
+    issues.push({ path, field: `${prefix}.after`, message: 'must be an object { id, rule, tags, addedSprint }' });
+    return;
+  }
+  requireUnknownKeys(value.after, ['id', 'rule', 'tags', 'addedSprint'], path, `${prefix}.after`, issues);
+  requireNonEmptyString(value.after, 'id', path, issues, `${prefix}.after.id`);
+  requireNonEmptyString(value.after, 'rule', path, issues, `${prefix}.after.rule`);
+  if (!Array.isArray(value.after.tags) || value.after.tags.some((tag) => typeof tag !== 'string')) {
+    issues.push({ path, field: `${prefix}.after.tags`, message: 'must be an array of strings' });
+  }
+  if (typeof value.after.addedSprint !== 'number' || !Number.isInteger(value.after.addedSprint) || value.after.addedSprint < 1) {
+    issues.push({ path, field: `${prefix}.after.addedSprint`, message: 'must be an integer sprint number >= 1' });
+  }
+}
+
+function validateAppendAdrOperation(
+  value: Record<string, unknown>,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+): void {
+  requireDigest(value, 'expectedAdrCollectionSha256', path, issues, `${prefix}.expectedAdrCollectionSha256`);
+  requireNonEmptyString(value, 'reason', path, issues, `${prefix}.reason`);
+  if (!isRecord(value.after)) {
+    issues.push({ path, field: `${prefix}.after`, message: 'must be an ADR object' });
+    return;
+  }
+  for (const key of ['id', 'title', 'status', 'date', 'context', 'decision'] as const) {
+    requireNonEmptyString(value.after, key, path, issues, `${prefix}.after.${key}`);
+  }
+  if (!Array.isArray(value.after.consequences) || value.after.consequences.some((item) => typeof item !== 'string')) {
+    issues.push({ path, field: `${prefix}.after.consequences`, message: 'must be an array of strings' });
+  }
+  if (!Array.isArray(value.after.alternatives) || value.after.alternatives.some((item) => typeof item !== 'string')) {
+    issues.push({ path, field: `${prefix}.after.alternatives`, message: 'must be an array of strings' });
+  }
+}
+
+function validateReanchorLedgerCheckpointOperation(
+  value: Record<string, unknown>,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+): void {
+  if (typeof value.sprintN !== 'number' || !Number.isInteger(value.sprintN) || value.sprintN < 1) {
+    issues.push({ path, field: `${prefix}.sprintN`, message: 'must be an integer sprint number >= 1' });
+  }
+  requireNonEmptyString(value, 'sprintSlug', path, issues, `${prefix}.sprintSlug`);
+  requireDigest(value, 'expectedOldSha256', path, issues, `${prefix}.expectedOldSha256`);
+  requireDigest(value, 'afterSha256', path, issues, `${prefix}.afterSha256`);
+  requireNonEmptyString(value, 'reason', path, issues, `${prefix}.reason`);
 }
 
 /**

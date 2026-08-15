@@ -17,12 +17,28 @@ import { resolveScope } from '../core/scope-resolution';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun } from '../core/trace';
+import { parseOptions } from '../options';
+import { applyIntegrityPlan, resolveIntegrityTraceScope } from '../repair/integrity-apply';
+import { formatIntegritySummary, prepareIntegrityPlan } from '../repair/integrity-plan';
 
 /**
  * Repair: validate and normalize a scope's sprint.json (derived status fields + stable formatting).
  * Does NOT restore checkpoint after-images or reverse tool-owned post-close mutations (rules, debt, ADRs).
  * The sprint.json is the single source of truth for live scope state.
  */
+export async function runRepairCommand(args: string[]): Promise<void> {
+  if (args[0] === 'integrity') {
+    runIntegrityRepair(args.slice(1));
+    return;
+  }
+  const options = parseOptions(args);
+  if (options.help) {
+    printRepairHelp();
+    return;
+  }
+  await repair(options);
+}
+
 export async function repair(options: CliOptions): Promise<void> {
   const scope = resolveScope(options.kyroScope);
   const plan = buildRepairPlan(scope);
@@ -121,4 +137,105 @@ function buildScopeStatusReconcilePlan(scope: string, normalizedSprint: unknown)
     { action: 'write', path: PROJECT_STATE_PATH, content: sharedContent },
     { action: 'write', path: LOCAL_STATE_PATH, content: `${JSON.stringify(sanitizeLocalForWrite(local), null, 2)}\n` },
   ];
+}
+
+function runIntegrityRepair(args: string[]): void {
+  const parsed = parseIntegrityArgs(args);
+  if (parsed.help || parsed.command === '') {
+    printRepairHelp();
+    return;
+  }
+  if (parsed.command === 'prepare') {
+    const plan = prepareIntegrityPlan({ kyroScope: parsed.scope, reason: parsed.reason });
+    if (parsed.json) {
+      console.log(JSON.stringify({
+        targets: plan.targets,
+        findings: plan.findings,
+        blockers: plan.blockers,
+        digest: plan.digest,
+        kyroVersion: plan.kyroVersion,
+        operations: plan.operations,
+      }, null, 2));
+      return;
+    }
+    if (plan.findings.length === 0) {
+      console.log('No integrity findings.');
+      return;
+    }
+    console.log(formatIntegritySummary(plan));
+    console.log('\nPreparation complete. No files changed. Human approval is required before apply.');
+    console.log('Approval question: ¿Autorizas la reparación?');
+    return;
+  }
+  if (parsed.command !== 'apply') {
+    throw new KyroCoreError('UNKNOWN_SUBCOMMAND', `Unknown repair integrity subcommand: ${parsed.command}.`, 'Run kyro repair --help.');
+  }
+  if (!parsed.digest || !parsed.yes) {
+    throw new KyroCoreError(
+      'HUMAN_APPROVAL_REQUIRED',
+      'Applying an integrity plan requires both the reviewed --digest and explicit --yes confirmation.',
+      'Present the prepared targets to a human, ask whether to authorize the repair, stop, and apply only after an affirmative response.',
+    );
+  }
+  const traceScope = resolveIntegrityTraceScope(parsed.digest, { kyroScope: parsed.scope, reason: parsed.reason });
+  const guard = evaluateGuard('repair_scope', { surface: 'cli', scope: traceScope, confirmed: true });
+  if (guard.kind === 'blocked') {
+    throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
+  }
+  const result = applyIntegrityPlan(parsed.digest, { kyroScope: parsed.scope, reason: parsed.reason });
+  emitGateApproved(traceScope, 'repair_scope');
+  emitToolCommandRun(traceScope, 'cli', 'repair integrity apply', { digest: parsed.digest });
+  if (parsed.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log(`Integrity repair applied. digest=${result.digest} resumed=${result.resumed}`);
+  if (result.applied.length > 0) console.log(`Applied: ${result.applied.join(', ')}`);
+  if (result.skipped.length > 0) console.log(`Already applied: ${result.skipped.join(', ')}`);
+}
+
+function parseIntegrityArgs(args: string[]): {
+  command: string;
+  scope: string | null;
+  reason: string | undefined;
+  digest: string | null;
+  yes: boolean;
+  json: boolean;
+  help: boolean;
+} {
+  const command = args[0] ?? '';
+  let scope: string | null = null;
+  let reason: string | undefined;
+  let digest: string | null = null;
+  let yes = false;
+  let json = false;
+  let help = false;
+  for (let index = command === 'prepare' || command === 'apply' ? 1 : 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--help' || arg === '-h') help = true;
+    else if (arg === '--json') json = true;
+    else if (arg === '--yes' || arg === '-y') yes = true;
+    else if (arg === '--kyro-scope') scope = requiredRepairValue(args, ++index, arg);
+    else if (arg === '--reason') reason = requiredRepairValue(args, ++index, arg);
+    else if (arg === '--digest') digest = requiredRepairValue(args, ++index, arg);
+    else throw new KyroCoreError('INVALID_INPUT', `Unknown repair integrity option: ${arg}`, 'Run kyro repair --help.');
+  }
+  return { command, scope, reason, digest, yes, json, help };
+}
+
+function requiredRepairValue(args: string[], index: number, flag: string): string {
+  const value = args[index];
+  if (!value || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value.`);
+  return value;
+}
+
+function printRepairHelp(): void {
+  console.log(`Usage:
+  kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]
+  kyro repair integrity prepare [--kyro-scope <scope>] [--reason <text>] [--json]
+  kyro repair integrity apply --digest <sha256> --yes [--kyro-scope <scope>] [--json]
+
+The first form normalizes derived status fields. The integrity form is a read-only
+prepare plus a digest-bound apply for registry, checkpoint compatibility, and
+explained post-close live evolution.`);
 }

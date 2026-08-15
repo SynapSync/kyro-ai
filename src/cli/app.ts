@@ -3,7 +3,7 @@ import { analyze } from './commands/analyze';
 import { detect } from './commands/detect';
 import { install, sync } from './commands/install';
 import { runTui } from './commands/tui';
-import { repair } from './commands/repair';
+import { runRepairCommand } from './commands/repair';
 import { runRecertifyCommand } from './commands/recertify';
 import { runRemediateCommand } from './commands/remediate';
 import { contextPack } from './commands/context-pack';
@@ -125,6 +125,11 @@ export async function runCli(): Promise<void> {
     return;
   }
 
+  if (command === 'repair') {
+    await runRepairCommand(args);
+    return;
+  }
+
   if (command === 'scope') {
     runScopeCommand(args);
     return;
@@ -169,9 +174,6 @@ export async function runCli(): Promise<void> {
       break;
     case 'analyze':
       analyze(options);
-      break;
-    case 'repair':
-      await repair(options);
       break;
     case 'sync':
       sync(options);
