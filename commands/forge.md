@@ -10,8 +10,9 @@ Continue Kyro work without loading the whole workflow upfront.
 ## Startup
 
 1. Read `.agents/kyro/project.json` + `.agents/kyro/local.json` if they exist.
-2. Resolve the active scope from `$ARGUMENTS`, `local.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
-3. Resolve routing with `kyro context-pack --kyro-scope <scope> --json` (lean pack). Do not open the full `sprint.json`, archive Markdown, findings, templates, or helpers to route. Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint` (see the Read Path Contract in `skills/sprint-forge/SKILL.md`).
+2. Silently run `{{KYRO_CLI}} repair integrity prepare --json` *before* scope resolution or `context-pack` (even if `activeScope` is empty). Findings/blockers → load `skills/sprint-forge/assets/modes/recover.md` and stop. None → discard and continue; do not ask.
+3. Resolve the active scope from `$ARGUMENTS`, `local.json.activeScope`, or the only directory under `.agents/kyro/scopes/`.
+4. Resolve routing with `kyro context-pack --kyro-scope <scope> --json` (lean pack). Do not open the full `sprint.json`, archive Markdown, findings, templates, or helpers to route. Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint` (see the Read Path Contract in `skills/sprint-forge/SKILL.md`).
 
 ## Route (on the pack's `nextAction`)
 

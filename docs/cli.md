@@ -19,6 +19,8 @@ kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
 kyro scope set-active <scope> --yes  # Change active scope with guardrail confirmation
 kyro scope retire --kyro-scope <scope> --reason "..."  # Read-only retirement preparation
+kyro repair integrity prepare --json                   # Read-only integrity diagnosis
+kyro repair integrity apply --digest <sha256> --yes    # Digest-bound integrity apply
 kyro trace              # Read append-only trace events for a scope
 kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
@@ -637,7 +639,7 @@ that leaves an immutable record of itself.
 | Runtime | Operations | Repairs |
 | --- | --- | --- |
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
-| **4.44.0 and later** (current: **4.46.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+| **4.44.0 and later** (current: **4.47.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

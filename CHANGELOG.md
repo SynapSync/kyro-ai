@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.47.0] - 2026-08-14
+
+### Added
+
+- **`kyro repair integrity prepare|apply`.** A composed, human-gated repair for registry drift,
+  recoverable legacy checkpoint metadata (append-only overlays; original bytes stay intact), and
+  typed post-close live evolution (`convention.append`, `adr.append`, `ledger.checkpoint.reanchor` on
+  remediations protocol v4). `/kyro:forge` runs a silent prepare *before* scope resolution; empty
+  findings add no user step. Recover mode presents every target, one digest, and applies only after
+  approval. Apply is warrant-first and idempotent for the same digest. Unsupported, diverged,
+  irreconcilable, and identity conflicts are explicit blockers. Overlays carry a `recordCommitment`
+  and are verified by rebuilding the projection from original bytes.
+
+### Changed
+
+- Doctor, ledger validation, retire, remediations, and recertify share `resolveEffectiveCheckpoint`.
+  A valid overlay is reported as `CANONICALIZED`, never as a healthy original file.
+- Forge recover mode no longer authorizes hand-writing `sprint.json`.
+- `runtimeForgeExecuteTokens` 4180 → 4320 so the execute route can carry the integrity-prepare-first
+  startup step. Trimming that step to keep the old ceiling would leave recovery unreachable when
+  `activeScope` is empty.
+
 ## [4.46.0] - 2026-08-14
 
 ### Added

@@ -50,15 +50,18 @@ its own (`kyro-ai:sprint-forge`), and on that path the orchestrator is never loa
    Substitute the resolved value mentally everywhere `{{KYRO_CLI}}` appears in this or any other loaded
    skill asset for the rest of the session — never run the literal 12 characters `{{KYRO_CLI}}`.
 2. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`.
-3. Resolve the scope from user input, `local.json.activeScope`, or the only directory under
+3. Silently run `{{KYRO_CLI}} repair integrity prepare --json` before scope resolution or
+   `context-pack`, even if `activeScope` is empty. Findings/blockers → load `modes/recover.md` and
+   stop. None → continue.
+4. Resolve the scope from user input, `local.json.activeScope`, or the only directory under
    `.agents/kyro/scopes/`.
-4. **Capability handshake:** run `{{KYRO_CLI}} capabilities --json`. Unknown command, or
+5. **Capability handshake:** run `{{KYRO_CLI}} capabilities --json`. Unknown command, or
    `record-evidence`/`review` missing — runtime too old: ABORT and report `{{KYRO_CLI}} --version`.
    Never work around a missing verb by hand (invariant 9).
-5. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack:
+6. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack:
    `nextAction`, `nextTaskId`, `reviewPending`, `conventions`, budget). Do not open the full
    `sprint.json` to route. No `sprint.json` → INIT.
-6. Load the single mode named by the pack's `nextAction` (see Routing below).
+7. Load the single mode named by the pack's `nextAction` (see Routing below).
 
 **If Step 0 did not complete, no Kyro artifact gets written.** A CLI you could not resolve, a failed
 handshake, or a missing runtime are all STOP conditions — never a reason to hand-author `sprint.json`,
