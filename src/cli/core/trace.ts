@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { assertStateWriterLeaseHealthyIfHeld } from '../pipeline/state-writer-lock';
 import { basename } from 'node:path';
 import { resolveManagedPath } from '../fs';
-import { traceDir, traceEventsPath } from '../artifacts/paths';
+import { legacyTraceEventsPath, traceDir, traceEventsPath } from '../artifacts/paths';
 import type { TraceEvent, TraceEventType } from '../types';
 
 export const TRACE_EVENT_TYPES = [
@@ -41,8 +41,42 @@ export function emitTraceEvent(event: TraceEvent): void {
   }
 }
 
+/**
+ * Read a scope's trace from the current path plus the legacy one it used through 4.47.0.
+ *
+ * This runtime only ever appends to the current path, but that is not a guarantee about the file
+ * on disk: a rollback, a mixed-version team, or an older binary run by hand can still append to the
+ * legacy path *after* current-path events exist. So the two files are merged by timestamp rather
+ * than concatenated — otherwise `--tail` would drop genuinely newer events. Ties keep legacy first
+ * and preserve each file's own line order, so the same inputs always render the same output.
+ */
 export function readTrace(scope: string, options: TraceReadOptions = {}): TraceReadResult {
-  const path = resolveManagedPath(traceEventsPath(scope));
+  const legacy = parseTraceFile(resolveManagedPath(legacyTraceEventsPath(scope)), options.type);
+  const current = parseTraceFile(resolveManagedPath(traceEventsPath(scope)), options.type);
+  const events = mergeTraceEventsByTime(legacy.events, current.events);
+  const skipped = legacy.skipped + current.skipped;
+  const tail = normalizeTail(options.tail);
+  return { events: tail === null ? events : events.slice(-tail), skipped };
+}
+
+/**
+ * Total, deterministic order: ISO-8601 `ts` compares lexicographically (every writer emits
+ * `toISOString()`, always UTC), then legacy before current, then original line index.
+ */
+function mergeTraceEventsByTime(legacyEvents: TraceEvent[], currentEvents: TraceEvent[]): TraceEvent[] {
+  const tagged = [
+    ...legacyEvents.map((event, index) => ({ event, source: 0, index })),
+    ...currentEvents.map((event, index) => ({ event, source: 1, index })),
+  ];
+  tagged.sort((left, right) => {
+    if (left.event.ts !== right.event.ts) return left.event.ts < right.event.ts ? -1 : 1;
+    if (left.source !== right.source) return left.source - right.source;
+    return left.index - right.index;
+  });
+  return tagged.map((entry) => entry.event);
+}
+
+function parseTraceFile(path: string, type: TraceEventType | undefined): TraceReadResult {
   if (!existsSync(path)) return { events: [], skipped: 0 };
   const text = readFileSync(path, 'utf-8');
   const events: TraceEvent[] = [];
@@ -51,14 +85,13 @@ export function readTrace(scope: string, options: TraceReadOptions = {}): TraceR
     if (line.trim() === '') continue;
     try {
       const parsed = JSON.parse(line) as unknown;
-      if (isTraceEvent(parsed) && (!options.type || parsed.type === options.type)) events.push(parsed);
+      if (isTraceEvent(parsed) && (!type || parsed.type === type)) events.push(parsed);
       else skipped += 1;
     } catch {
       skipped += 1;
     }
   }
-  const tail = normalizeTail(options.tail);
-  return { events: tail === null ? events : events.slice(-tail), skipped };
+  return { events, skipped };
 }
 
 export function traceSnapshotId(snapshotPath: string): string {

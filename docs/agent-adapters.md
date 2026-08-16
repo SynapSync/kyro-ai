@@ -104,7 +104,7 @@ Keep platform-specific behavior in adapters. The core workflow must remain porta
 
 ## Trace events
 
-All adapters can inspect Kyro's append-only trace through `kyro trace`. Trace files live under `.agents/kyro/scopes/{scope}/trace/events.ndjson`, are best-effort, and are never used for routing. See [trace.md](trace.md).
+All adapters can inspect Kyro's append-only trace through `kyro trace`. Trace files live under `.agents/kyro/trace/{scope}/events.ndjson`, are best-effort, and are never used for routing. See [trace.md](trace.md).
 
 
 ## Portable guardrails

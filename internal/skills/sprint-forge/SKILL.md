@@ -49,12 +49,12 @@ its own (`kyro-ai:sprint-forge`), and on that path the orchestrator is never loa
      not a license to hand-edit `sprint.json` or improvise; same rule as a missing verb in Step 4.
    Substitute the resolved value mentally everywhere `{{KYRO_CLI}}` appears in this or any other loaded
    skill asset for the rest of the session — never run the literal 12 characters `{{KYRO_CLI}}`.
-2. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`.
-3. Silently run `{{KYRO_CLI}} repair integrity prepare --json` before scope resolution or
-   `context-pack`, even if `activeScope` is empty. Findings/blockers → load `modes/recover.md` and
-   stop. None → continue.
-4. Resolve the scope from user input, `local.json.activeScope`, or the only directory under
-   `.agents/kyro/scopes/`.
+2. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`. Unreadable/corrupt → stop here.
+3. Resolve the scope from user input, `local.json.activeScope`, or the only directory under
+   `.agents/kyro/scopes/`. Ambiguous or none → ask the user before continuing.
+4. Silently run `{{KYRO_CLI}} repair integrity prepare --kyro-scope <scope> --json` before
+   `context-pack`, using the scope resolved above. Never omit `--kyro-scope` here — it isolates this
+   scope from unrelated drift. Findings/blockers → load `modes/recover.md` and stop. None → continue.
 5. **Capability handshake:** run `{{KYRO_CLI}} capabilities --json`. Unknown command, or
    `record-evidence`/`review` missing — runtime too old: ABORT and report `{{KYRO_CLI}} --version`.
    Never work around a missing verb by hand (invariant 9).
