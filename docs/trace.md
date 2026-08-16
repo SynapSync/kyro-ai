@@ -5,8 +5,12 @@ Kyro trace is an append-only, per-scope audit trail for diagnosing why workflow 
 Trace files live at:
 
 ```text
-.agents/kyro/scopes/{scope}/trace/events.ndjson
+.agents/kyro/trace/{scope}/events.ndjson
 ```
+
+This is a sibling of `.agents/kyro/scopes/`, never a child of it — scope discovery scans `scopes/`
+for directories, and a trace writer must never be able to create something it could mistake for a
+scope.
 
 Each line is one JSON event. The file is written best-effort: trace failures never fail the command that emitted the event.
 

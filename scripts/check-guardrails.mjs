@@ -73,7 +73,7 @@ function assertScopeSetActiveConfirmAndTrace() {
 
     const approved = run(['scope', 'set-active', 'demo', '--yes'], root);
     assert(approved.status === 0, `scope set-active --yes should pass: ${approved.stderr}`);
-    const trace = readFileSync(join(root, '.agents/kyro/scopes/demo/trace/events.ndjson'), 'utf-8');
+    const trace = readFileSync(join(root, '.agents/kyro/trace/demo/events.ndjson'), 'utf-8');
     assert(trace.includes('"type":"blocked_reason"') && trace.includes('CONFIRMATION_REQUIRED'), 'confirmation denial should be traced');
     assert(trace.includes('"type":"gate_approved"') && trace.includes('scope_set_active'), 'approval should be traced');
   } finally {
@@ -95,7 +95,7 @@ async function assertMcpBlockedZeroWrite() {
     });
     const after = sig(sprintPath);
     assert(before.bytes === after.bytes && before.mtimeMs === after.mtimeMs, 'blocked MCP close_sprint must not write sprint.json');
-    const trace = readFileSync(join(root, '.agents/kyro/scopes/demo/trace/events.ndjson'), 'utf-8');
+    const trace = readFileSync(join(root, '.agents/kyro/trace/demo/events.ndjson'), 'utf-8');
     assert(trace.includes('POLICY_BLOCKED'), 'blocked MCP decision should be traced');
   } finally {
     rmSync(root, { recursive: true, force: true });

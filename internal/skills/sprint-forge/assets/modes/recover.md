@@ -5,7 +5,9 @@ Recover when `sprint.json` is missing/unparseable, or when `repair integrity pre
 ## Inputs
 
 1. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`.
-2. Run `{{KYRO_CLI}} repair integrity prepare --json`.
+2. Run `{{KYRO_CLI}} repair integrity prepare --kyro-scope <scope> --json`, where `<scope>` is the
+   scope the router already resolved before loading this mode. Never drop `--kyro-scope` here —
+   doing so re-scans every scope and lets an unrelated scope's drift block this one.
 3. If `sprint.json` is missing, also inspect close checkpoints for a resume path.
 
 ## Workflow
@@ -15,9 +17,11 @@ Recover when `sprint.json` is missing/unparseable, or when `repair integrity pre
 3. If prepare reports findings without blockers, show the human target list from the JSON (`targets`), including every convention, ADR, and ledger reanchor, not internal operation kinds. Ask exactly: “¿Autorizas la reparación?” Stop. Do not apply in the same unanswered turn.
 4. After an explicit yes for that digest, run only:
 
-   `{{KYRO_CLI}} repair integrity apply --digest <digest> --yes`
+   `{{KYRO_CLI}} repair integrity apply --kyro-scope <scope> --digest <digest> --yes`
 
-   Then `{{KYRO_CLI}} doctor --artifacts`. If doctor exits 0, report PASS and continue routing. If apply returns `DIVERGED`, prepare again, show the new targets, and ask again. Retrying the same approved digest after a crash is required; do not treat a completed prefix as a new plan.
+   Then `{{KYRO_CLI}} doctor --artifacts --kyro-scope <scope>`. Never drop `--kyro-scope` here either
+   — without it doctor falls back to auditing every scope, and unrelated drift can fail this check
+   after the target scope was already repaired. If doctor exits 0, report PASS and continue routing. If apply returns `DIVERGED`, prepare again, show the new targets, and ask again. Retrying the same approved digest after a crash is required; do not treat a completed prefix as a new plan.
 5. If `sprint.json` is missing and a close checkpoint can resume, retry `{{KYRO_CLI}} close-sprint` with that checkpoint's frozen inputs. Do not invent state.
 6. Never hand-edit `sprint.json`, `project.json`, `local.json`, checkpoints, snapshots, or narratives.
 

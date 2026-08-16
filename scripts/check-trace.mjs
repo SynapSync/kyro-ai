@@ -96,7 +96,8 @@ function assertGoldenCatalog() {
 function assertNonFatal() {
   const sandbox = makeSandbox();
   try {
-    const tracePath = join(sandbox, '.agents/kyro/scopes/demo/trace');
+    const tracePath = join(sandbox, '.agents/kyro/trace/demo');
+    mkdirSync(join(sandbox, '.agents/kyro/trace'), { recursive: true });
     writeFileSync(tracePath, 'not a directory');
     const result = spawnCli(['close-sprint', '--kyro-scope', 'demo', '--outcome', 'shipped', '--yes'], sandbox);
     assert(result.status === 0, `trace failure must not fail close-sprint: ${result.stderr || result.stdout}`);
@@ -111,7 +112,7 @@ function assertNdjsonAndCrashTolerantRead() {
   try {
     const result = spawnCli(['close-sprint', '--kyro-scope', 'demo', '--outcome', 'shipped', '--yes'], sandbox);
     assert(result.status === 0, `close-sprint should succeed: ${result.stderr || result.stdout}`);
-    const eventsPath = join(sandbox, '.agents/kyro/scopes/demo/trace/events.ndjson');
+    const eventsPath = join(sandbox, '.agents/kyro/trace/demo/events.ndjson');
     assert(existsSync(eventsPath), 'trace events should exist');
     const lines = readFileSync(eventsPath, 'utf-8').trim().split('\n');
     for (const line of lines) {
@@ -146,7 +147,7 @@ function assertKillSwitch() {
   try {
     const result = spawnCli(['close-sprint', '--kyro-scope', 'demo', '--outcome', 'shipped', '--yes'], sandbox, { KYRO_TRACE: '0' });
     assert(result.status === 0, `close-sprint should succeed with KYRO_TRACE=0: ${result.stderr || result.stdout}`);
-    assert(!existsSync(join(sandbox, '.agents/kyro/scopes/demo/trace/events.ndjson')), 'KYRO_TRACE=0 should not write events');
+    assert(!existsSync(join(sandbox, '.agents/kyro/trace/demo/events.ndjson')), 'KYRO_TRACE=0 should not write events');
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
   }
