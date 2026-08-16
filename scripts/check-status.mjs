@@ -233,7 +233,7 @@ function assertCliStatusCommand() {
     assert(readFileSync(sprintPath(root), 'utf-8') === debtSprintText, 'debt status and rejected debt mutations must not mutate sprint.json');
     assert(readFileSync(statePath, 'utf-8') === debtStateText, 'debt status and rejected debt mutations must not mutate kyro.json');
 
-    const tracePath = join(root, '.agents/kyro/scopes/demo/trace/events.ndjson');
+    const tracePath = join(root, '.agents/kyro/trace/demo/events.ndjson');
     assert(!existsSync(tracePath), `kyro status must not emit trace events: ${tracePath}`);
 
     const globalHelp = run(['--help'], root);

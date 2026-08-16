@@ -1,6 +1,6 @@
 import { existsSync, rmSync } from 'node:fs';
 import { assertStateWriterLeaseHealthy } from '../pipeline/state-writer-lock';
-import { traceEventsPath } from '../artifacts/paths';
+import { legacyTraceEventsPath, traceEventsPath } from '../artifacts/paths';
 import { resolveManagedPath } from '../fs';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
@@ -84,13 +84,17 @@ function parseType(value: string): TraceEventType {
 
 function clearTrace(scope: string): void {
   const path = resolveManagedPath(traceEventsPath(scope));
-  if (existsSync(path)) {
-    assertStateWriterLeaseHealthy();
-    rmSync(path, { force: true });
-    console.log(`Trace cleared for scope ${scope}: ${traceEventsPath(scope)}`);
+  const legacyPath = resolveManagedPath(legacyTraceEventsPath(scope));
+  const hadCurrent = existsSync(path);
+  const hadLegacy = existsSync(legacyPath);
+  if (!hadCurrent && !hadLegacy) {
+    console.log(`Trace already empty for scope ${scope}: ${traceEventsPath(scope)}`);
     return;
   }
-  console.log(`Trace already empty for scope ${scope}: ${traceEventsPath(scope)}`);
+  assertStateWriterLeaseHealthy();
+  if (hadCurrent) rmSync(path, { force: true });
+  if (hadLegacy) rmSync(legacyPath, { force: true });
+  console.log(`Trace cleared for scope ${scope}: ${traceEventsPath(scope)}${hadLegacy ? ` (and legacy ${legacyTraceEventsPath(scope)})` : ''}`);
 }
 
 function printTrace(scope: string, events: Array<{ ts: string; type: string }>, skipped: number): void {

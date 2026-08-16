@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.47.1] - 2026-08-16
+
+### Fixed
+
+- **Integrity blast radius.** `repair integrity prepare` invoked with no `--kyro-scope` (the router,
+  the sprint-forge skill, the orchestrator, and recover mode's post-repair `doctor --artifacts`) used
+  to scan every scope before the target scope was even resolved, so drift in one scope could block
+  routing, closing, or recovery of an unrelated, healthy scope. All four startup surfaces now resolve
+  the target scope first and pass `--kyro-scope` through prepare, apply, and the post-repair doctor
+  check. A global scan (no `--kyro-scope`) is still available and still reports every scope — it is
+  just never run implicitly during routing anymore.
+- **Trace moved out of `scopes/`.** `traceDir` now writes to `.agents/kyro/trace/{scope}/`, a sibling
+  of `.agents/kyro/scopes/`, instead of a child of it. Previously any trace write for a scope name
+  without a `sprint.json` (a stale guard, a retry, a phantom target) could create a directory under
+  `scopes/` that discovery then misclassified as an invalid scope — the same mechanism behind an
+  earlier blast-radius incident. `kyro trace` and `doctor --trace` transparently merge pre-upgrade
+  history from the old location, and `kyro trace --clear` removes both. Scope discovery
+  (`listScopeFolders`) also now ignores any existing directory whose only content is a leftover
+  `trace/` folder, so upgraded installs stop carrying phantom scopes forward.
+
 ## [4.47.0] - 2026-08-14
 
 ### Added
