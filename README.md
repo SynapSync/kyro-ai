@@ -226,7 +226,7 @@ nothing else, so it cannot repair a record-level legacy shape: a debt that carri
 *and* legacy-only keys like `detail`/`resolution`/`addedSprint` *and* missing canonical fields.
 **4.44.0 and later** adds `debt.canonicalize` (remediation protocol v3), which repairs the whole
 record at once, emits exactly the seven canonical keys `id, title, origin, priority, status,
-targetSprint, note`, and names the legacy keys it retires. The current release, **4.47.1**, carries
+targetSprint, note`, and names the legacy keys it retires. The current release, **4.47.2**, carries
 that operation unchanged.
 
 Nothing is migrated for you. Installing a newer Kyro never rewrites an existing scope, and Doctor

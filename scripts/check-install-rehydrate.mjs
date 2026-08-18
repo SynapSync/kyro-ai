@@ -4,7 +4,7 @@
  * Covers the multi-dev pattern: scopes + project.json committed, local.json gitignored.
  */
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -222,13 +222,15 @@ withWorkspace('kyro-rehydrate-multi-', (cwd) => {
 
   writeScope(cwd, 'oauth-impl', minimalSprint('oauth-impl', 'OAuth Implementation', { active: true }));
   writeScope(cwd, 'ui-redesign', minimalSprint('ui-redesign', 'UI Redesign'));
-  writeScope(cwd, 'empty-folder'); // no sprint.json
+  // A directory with no sprint.json and no Kyro artifacts is not a scope. Registering it used to
+  // mint a fabricated `planning` entry, which is how a stray folder became permanent project state.
+  writeScope(cwd, 'empty-folder'); // foreign: no sprint.json, no archive
 
   captureLogs(() => install(cliOptions({ agents: [standard], initWorkspace: true })));
   assertLayeredInstall(cwd, 'multi');
   const state = readEffectiveState(cwd);
   assert(Array.isArray(state.scopes), 'multi: scopes array present');
-  assert(state.scopes.length === 3, `multi: expected 3 scopes, got ${state.scopes.length}`);
+  assert(state.scopes.length === 2, `multi: expected 2 scopes, got ${state.scopes.length}`);
   assert(state.activeScope === null, 'multi: activeScope must stay null with multiple scopes');
 
   const byId = Object.fromEntries(state.scopes.map((s) => [s.id, s]));
@@ -236,8 +238,7 @@ withWorkspace('kyro-rehydrate-multi-', (cwd) => {
   assert(byId['oauth-impl'].status === 'active', 'multi: status derived from active sprint');
   assert(byId['ui-redesign'].title === 'UI Redesign', 'multi: second title from sprint.json');
   assert(byId['ui-redesign'].status === 'planning', 'multi: planning when no active sprint');
-  assert(byId['empty-folder'].title === 'empty-folder', 'multi: folder without sprint uses id as title');
-  assert(byId['empty-folder'].status === 'planning', 'multi: folder without sprint defaults to planning');
+  assert(byId['empty-folder'] === undefined, 'multi: a foreign directory must never be registered as a scope');
 
   // Doctor should pass registry check after rehydrate
   const checks = runDoctorChecks(false, false, false, false, null);
@@ -251,6 +252,29 @@ withWorkspace('kyro-rehydrate-multi-', (cwd) => {
   const gitignoreAfter = readFileSync(join(kyroDir(cwd), '.gitignore'), 'utf-8');
   assert(gitignoreAfter.includes('# custom keep'), 'multi: re-install must not drop custom gitignore lines');
   assert(gitignoreAfter.includes('local.json'), 'multi: re-install keeps local.json ignore');
+});
+
+// --- valid sprint with an unsafe managed ancestor never rehydrates ---
+withWorkspace('kyro-rehydrate-unsafe-', (cwd) => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install, sync } = require(join(repo, 'dist/cli/commands/install.js'));
+  const standard = parseAgent('standard');
+  writeScope(cwd, 'safe-scope', minimalSprint('safe-scope', 'Safe Scope'));
+  writeScope(cwd, 'unsafe-valid', minimalSprint('unsafe-valid', 'Unsafe Valid'));
+  const unsafeArchiveTarget = join(cwd, 'unsafe-archive-target');
+  mkdirSync(unsafeArchiveTarget, { recursive: true });
+  symlinkSync(unsafeArchiveTarget, join(kyroDir(cwd), 'scopes', 'unsafe-valid', 'archive'));
+
+  captureLogs(() => install(cliOptions({ agents: [standard], initWorkspace: true })));
+  assert(
+    !readEffectiveState(cwd).scopes.some((entry) => entry.id === 'unsafe-valid'),
+    'unsafe: install must not register a valid sprint whose managed archive is a symlink',
+  );
+  captureLogs(() => sync(cliOptions({ agents: [standard] })));
+  assert(
+    !readEffectiveState(cwd).scopes.some((entry) => entry.id === 'unsafe-valid'),
+    'unsafe: sync must not register a valid sprint whose managed archive is a symlink',
+  );
 });
 
 // --- single-scope sets activeScope ---

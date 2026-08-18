@@ -1,7 +1,5 @@
-import { listScopeFolders, listScopeNames } from '../artifacts/scopes';
-import { readJsonSafely } from '../artifacts/json';
-import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile } from '../artifacts/schema';
+import { listRegistrableScopeDirectories, listScopeFolders, listScopeNames, readScopeSprint } from '../artifacts/scopes';
+import { KyroCoreError } from './errors';
 import { readProjectState } from '../state';
 import type { KyroProjectState, KyroScopeEntry } from '../types';
 import { deriveScopeStatus } from './status';
@@ -32,7 +30,11 @@ export function rehydrateScopesFromDisk(state: KyroProjectState): KyroProjectSta
     if (entry && typeof entry.id === 'string' && entry.id.length > 0) byId.set(entry.id, entry);
   }
 
-  for (const id of listScopeFolders()) {
+  // Only directories Kyro can describe truthfully. A corrupt, recoverable, or foreign directory
+  // must never be minted into the registry with a fabricated status — that is how a stray folder
+  // became a permanent "planning" scope. Committed scopes (the case rehydrate exists for) always
+  // have a valid sprint.json, so nothing legitimate is lost.
+  for (const id of listRegistrableScopeDirectories()) {
     if (byId.has(id)) continue;
     byId.set(id, discoverScopeEntry(id));
   }
@@ -69,17 +71,23 @@ export function formatWorkspaceInitPrompt(scopeFolders: string[]): string {
   );
 }
 
+/**
+ * Callers must pass an id that already classified as a valid scope. The old `planning` fallback for
+ * an unreadable sprint.json invented a status Kyro could not justify; there is no honest default, so
+ * an unreadable sprint is a programming error here rather than something to paper over.
+ */
 function discoverScopeEntry(id: string): KyroScopeEntry {
-  const read = readJsonSafely(sprintJsonPath(id));
-  if (read.exists && !read.error) {
-    const sprint = asSprintFile(read.value);
-    if (sprint) {
-      return {
-        id,
-        title: sprint.title || id,
-        status: deriveScopeStatus(sprint, Boolean(sprint.activeSprint)),
-      };
-    }
+  const read = readScopeSprint(id);
+  if (read.kind !== 'valid') {
+    throw new KyroCoreError(
+      'INTERNAL',
+      `Refusing to register scope ${id}: its sprint.json is not valid.`,
+      'Only directories classified as valid scopes may be registered; this is a discovery bug, not a workspace problem.',
+    );
   }
-  return { id, title: id, status: 'planning' };
+  return {
+    id,
+    title: read.sprint.title || id,
+    status: deriveScopeStatus(read.sprint, Boolean(read.sprint.activeSprint)),
+  };
 }

@@ -76,22 +76,36 @@ export function assertSafeManagedPath(path: string): string {
     throw new KyroCoreError('INVALID_INPUT', `Managed path escapes the workspace: ${path}.`, 'Use a path below the current workspace.');
   }
   const realWorkspace = realpathSync(workspace);
-  let existingAncestor = target;
-  while (!existsSync(existingAncestor)) existingAncestor = dirname(existingAncestor);
-  const realAncestor = realpathSync(existingAncestor);
+  let deepestExistingAncestor = workspace;
+  let current = workspace;
+  const parts = rel.split(sep);
+  for (const [index, part] of parts.entries()) {
+    current = resolve(current, part);
+    const stat = lstatIfPresent(current);
+    if (!stat) break;
+    if (stat.isSymbolicLink()) {
+      throw new KyroCoreError('INVALID_INPUT', `Managed path traverses a symbolic link: ${current}.`, 'Replace the symlink with a real workspace directory before mutating Kyro state.');
+    }
+    if (index < parts.length - 1 && !stat.isDirectory()) {
+      throw new KyroCoreError('INVALID_INPUT', `Managed path traverses a non-directory component: ${current}.`, 'Replace the component with a real workspace directory before mutating Kyro state.');
+    }
+    deepestExistingAncestor = current;
+  }
+  const realAncestor = realpathSync(deepestExistingAncestor);
   const realRel = relative(realWorkspace, realAncestor);
   if (realRel === '..' || realRel.startsWith(`..${sep}`) || isAbsolute(realRel)) {
     throw new KyroCoreError('INVALID_INPUT', `Managed path resolves outside the workspace: ${path}.`, 'Use real directories below the current workspace.');
   }
-  let current = workspace;
-  for (const part of rel.split(sep)) {
-    current = resolve(current, part);
-    if (!existsSync(current)) continue;
-    if (lstatSync(current).isSymbolicLink()) {
-      throw new KyroCoreError('INVALID_INPUT', `Managed path traverses a symbolic link: ${current}.`, 'Replace the symlink with a real workspace directory before mutating Kyro state.');
-    }
-  }
   return target;
+}
+
+function lstatIfPresent(path: string): ReturnType<typeof lstatSync> | null {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
 }
 
 export function fsyncParentDirectory(target: string): void { fsyncDirectory(dirname(target)); }
@@ -465,6 +479,7 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     };
     let lastLeaseUntil = readPublishedLeaseUntil() ?? 0;
     let injectedTransient = 0;
+    if (workerData.startDelayMs > 0) Atomics.wait(state, 0, 0, workerData.startDelayMs);
     const renew = () => {
       verifyOwnership();
       const now = Date.now();
@@ -567,6 +582,7 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     transientAfter: Number.isFinite(transientAfter) && transientAfter >= 1 ? transientAfter : null,
     transientErrorCode: process.env.KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_CODE ?? 'EPERM',
     transientTimes: Math.max(1, Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_TIMES ?? '1', 10) || 1),
+    startDelayMs: Math.max(0, Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_START_DELAY_MS ?? '0', 10) || 0),
   } });
   const fenceParent = (reason?: unknown): void => {
     if (Atomics.load(state, 4) !== 0) return;
@@ -579,7 +595,12 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
   worker.on('error', fenceParent);
   worker.on('exit', () => fenceParent());
   worker.unref();
-  const deadline = Date.now() + Math.min(2_000, leaseMs);
+  // Readiness is the first completed renewal, not merely Worker construction: returning while that
+  // atomic rename is in flight lets the main thread's no-follow ownership read race the rename.
+  // Keep a lease-relative margin instead of the old fixed 2s ceiling; loaded CI filesystems can take
+  // longer than 2s to start and fsync a Worker even though the already-published 5s lease is healthy.
+  const startupMargin = Math.max(LOCK_POLL_MS * 2, Math.floor(leaseMs / 6));
+  const deadline = Date.now() + Math.max(100, leaseMs - startupMargin);
   while (Atomics.load(state, 1) === 0 && Atomics.load(state, 3) === 0 && Date.now() < deadline) Atomics.wait(state, 1, 0, LOCK_POLL_MS);
   if (Atomics.load(state, 3) !== 0 || Atomics.load(state, 1) === 0) {
     Atomics.store(state, 4, 1);

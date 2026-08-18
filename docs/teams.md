@@ -63,7 +63,10 @@ What install does:
 
 1. Writes or refreshes **`project.json` + `local.json`** (not a live monolito SoT).
 2. Ensures **`.agents/kyro/.gitignore`** ignores `local.json`, legacy `kyro.json` / `kyro.json.migrated`, and lock files — and **never** ignores `project.json` or `scopes/`.
-3. **Rehydrates** on-disk scope folders into the shared registry.
+3. **Rehydrates** on-disk scope folders into the shared registry. Only directories with a valid
+   `sprint.json` and safe managed ancestors are registered: a directory Kyro cannot describe
+   truthfully (foreign, corrupt, missing its sprint, or containing a symlinked managed path) is never
+   minted into `project.json` with an invented status.
 4. Sets `activeScope` automatically only when it is null and **exactly one** scope is known.
 
 You do **not** need to gitignore the entire `.agents/kyro/` directory.
