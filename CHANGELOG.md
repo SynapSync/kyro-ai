@@ -63,7 +63,9 @@ All notable changes to this project are documented here. The format is based on
 - **State-writer heartbeat startup under load.** The keeper still must complete and durably publish
   its first renewal before protected work starts, but its startup budget is now derived from the
   active lease instead of an arbitrary two-second ceiling. This removes false startup failures on
-  loaded filesystems without weakening token, inode, expiry or fail-stop checks.
+  loaded filesystems without weakening token, inode, expiry or fail-stop checks. Protected writes
+  also wait for an explicitly fenced heartbeat publication to finish before revalidating ownership,
+  avoiding false lease loss when Windows briefly hides the rename-over-existing target.
 
 ## [4.47.1] - 2026-08-16
 
