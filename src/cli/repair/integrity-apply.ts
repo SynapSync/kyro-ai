@@ -1,8 +1,14 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync } from 'node:fs';
 import { ARTIFACT_ROOT } from '../constants';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
+import { SCOPE_DIR_CLASS, classifyScopeDirectory } from '../artifacts/scopes';
+import {
+  CHECKPOINT_DISCOVERY_STATUS,
+  inspectManagedRegularFile,
+  MANAGED_PATH_LEVEL,
+} from '../checkpoints/discovery';
 import {
   canonicalJson,
   publishExclusive,
@@ -159,9 +165,16 @@ function applyIntegrityPlanUnlocked(
 }
 
 function applyUnregister(operation: Extract<IntegrityOperation, { kind: 'registry.unregister-orphan' }>, actor: string, now: string): boolean {
+  // Two things can make a registry entry an orphan: the directory is gone, or the directory is not
+  // Kyro's at all (an earlier install/sync rehydrate registered a stray folder). Both are cleaned
+  // the same way — by removing the registry entry and nothing else. Refusing whenever the path
+  // merely exists would leave that contamination unfixable.
   const root = resolveManagedPath(`${ARTIFACT_ROOT}/${operation.scope}`);
-  if (existsSync(root)) {
-    throw new KyroCoreError('DIVERGED', `Scope directory ${operation.scope} reappeared before apply.`, 'Re-run prepare. Unregister only proceeds when the directory is absent.');
+  if (pathEntryExists(root)) {
+    const directory = classifyScopeDirectory(operation.scope);
+    if (directory.class !== SCOPE_DIR_CLASS.FOREIGN || directory.issues.length > 0) {
+      throw new KyroCoreError('DIVERGED', `Scope directory ${operation.scope} reappeared before apply (${directory.detail}).`, 'Re-run prepare. Unregister only proceeds when the directory is absent or holds no Kyro artifacts.');
+    }
   }
   const state = readProjectState();
   if (!state) throw new KyroCoreError('INVALID_PROJECT_STATE', 'Project state is missing.', 'Initialize the workspace before repairing integrity.');
@@ -206,6 +219,16 @@ function applyUnregister(operation: Extract<IntegrityOperation, { kind: 'registr
   return present || !alreadyEvidenced;
 }
 
+function pathEntryExists(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    return true;
+  }
+}
+
 function applyRegister(operation: Extract<IntegrityOperation, { kind: 'registry.register-on-disk' }>): boolean {
   const classified = classifyRegistry(operation.scope)[0];
   if (classified?.classification === REGISTRY_CLASS.IDENTITY_CONFLICT) {
@@ -229,6 +252,14 @@ function applyRegister(operation: Extract<IntegrityOperation, { kind: 'registry.
 }
 
 function applyCanonicalize(operation: Extract<IntegrityOperation, { kind: 'checkpoint.canonicalize' }>, actor: string, now: string): boolean {
+  const inspection = inspectManagedRegularFile(operation.originalPath, MANAGED_PATH_LEVEL.CHECKPOINT);
+  if (inspection.status !== CHECKPOINT_DISCOVERY_STATUS.SAFE) {
+    throw new KyroCoreError(
+      'DIVERGED',
+      `Checkpoint ${operation.originalPath} is no longer a safe regular file (${inspection.detail}).`,
+      'Restore the approved regular checkpoint file or prepare again.',
+    );
+  }
   const rebuilt = rebuildCanonicalCheckpointFromDisk(operation.originalPath);
   if (!rebuilt || rebuilt.originalSha256 !== operation.originalSha256) {
     throw new KyroCoreError(

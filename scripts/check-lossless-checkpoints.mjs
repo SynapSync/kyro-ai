@@ -817,6 +817,21 @@ for (const mode of ['corrupt', 'unsupported']) {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
+// Worker startup readiness is lease-relative, not an arbitrary 2s wall-clock cutoff. The initial
+// heartbeat is already durable; a loaded runner may need more than 2s to start and fsync the first
+// renewal, but must still finish before the 5s lease loses its safety margin.
+{
+  const root = makeSandbox();
+  try {
+    const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
+      KYRO_TEST_LOCK_LEASE_MS: '5000',
+      KYRO_TEST_LOCK_HEARTBEAT_START_DELAY_MS: '2500',
+    });
+    assert(result.status === 0, `lease-relative heartbeat startup budget rejected a healthy delayed worker: ${output(result)}`);
+    assertNoLockDebris(root, 'delayed heartbeat startup');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
 // An empty partial lock remains reclaimable when Windows rejects directory fsync.
 // Use the CI-safe lease: a 500ms lease expires under Windows runner load during reclaim+repair
 // (Worker start + first renew), which is not what this case is testing.
@@ -927,6 +942,30 @@ for (const mode of ['corrupt', 'unsupported']) {
     assert(holderResult.status !== 0, `heartbeat-failed holder resumed or reported success: ${holderResult.text}`);
     assert(contenderResult.status === 0, `contender did not proceed after fenced holder lease expired: ${contenderResult.text}`);
     assert(!existsSync(paths(root).checkpoint), 'fenced holder resumed and published checkpoint side effects');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// Windows rename-over-existing can briefly hide heartbeat.json. Protected work must wait for the
+// fenced publication to finish, then re-verify the complete lease instead of reporting false loss.
+{
+  const root = makeSandbox();
+  try {
+    const ready = join(root, 'publish-gap-holder-ready');
+    const gate = join(root, 'publish-gap-holder-release');
+    const gapReady = join(root, 'publish-gap-ready');
+    const holder = runAsync(root, closeArgs, {
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
+      KYRO_TEST_LOCK_READY_FILE: ready,
+      KYRO_TEST_LOCK_RELEASE_GATE: gate,
+      KYRO_TEST_LOCK_HEARTBEAT_PUBLISH_GAP_MS: '250',
+      KYRO_TEST_LOCK_HEARTBEAT_PUBLISH_GAP_READY_FILE: gapReady,
+    });
+    await waitForChild(holder, () => existsSync(ready), 'publish-gap holder never acquired lock');
+    await waitForChild(holder, () => existsSync(gapReady), 'heartbeat worker never exposed the simulated Windows publication gap', LEASE_EVENT_BUDGET_MS);
+    writeFileSync(gate, 'release during publication gap\n');
+    const result = await holder.completed;
+    assert(result.status === 0, `healthy owner failed during a fenced heartbeat publication gap: ${result.text}`);
+    assertNoLockDebris(root, 'fenced heartbeat publication gap');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 

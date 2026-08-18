@@ -42,6 +42,7 @@ import {
 } from '../artifacts/schema';
 import { runTokenAuditChecks } from './token-audit';
 import { listScopes, unregisteredScopeFolders } from '../core/scopes';
+import { listForeignScopeDirectories } from '../artifacts/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import type { Agent, CheckResult, CliOptions } from '../types';
@@ -85,6 +86,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
     ...packagingChecks,
     ...checkProjectState(),
     checkUnregisteredScopes(),
+    ...(kyroScope ? [] : checkForeignScopeDirectories()),
     checkTeamMinPackageVersion(),
     checkGlobalRuntime(),
     checkCliInvocation(),
@@ -375,6 +377,30 @@ function checkProjectState(): CheckResult[] {
     detail: `effective project state is valid (${source})`,
   });
   return results;
+}
+
+/**
+ * Advisory: directories under scopes/ that hold no Kyro artifacts. They are ignored everywhere else,
+ * so without this the user has no way to learn why their folder never shows up as a scope. Only
+ * reported by a global run — a scoped Doctor must not be polluted with findings about other paths.
+ */
+function checkForeignScopeDirectories(): CheckResult[] {
+  const foreign = listForeignScopeDirectories();
+  if (foreign.length === 0) return [];
+  const names = foreign.map((entry) => entry.id).sort();
+  const unsafe = foreign
+    .filter((entry) => entry.issues.length > 0)
+    .map((entry) => `${entry.id} (${[...new Set(entry.issues.map((issue) => issue.level))].join(', ')})`)
+    .sort();
+  const unsafeDetail = unsafe.length > 0
+    ? ` Unsafe managed-path entries were not followed: ${unsafe.join(', ')}.`
+    : '';
+  return [{
+    status: 'warn',
+    name: 'scope directories',
+    detail: `${names.length} namespace entr(y|ies) under ${ARTIFACT_ROOT} are not Kyro scopes and were ignored: ${names.join(', ')}.${unsafeDetail}`,
+    remedy: `Move them out of ${ARTIFACT_ROOT} if they do not belong there. Kyro never reads, writes, or registers them.`,
+  }];
 }
 
 /** Advisory: scope folders on disk that never made it into the project registry. */

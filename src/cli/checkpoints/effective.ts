@@ -1,5 +1,7 @@
+import { lstatSync } from 'node:fs';
 import { readJsonSafely } from '../artifacts/json';
 import { scopeRoot } from '../artifacts/paths';
+import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import {
   checkpointCommitment,
   checkpointIntegrityIssues,
@@ -56,6 +58,23 @@ export function resolveEffectiveCheckpointAtPath(
   path: string,
   ledgerEntry?: LedgerCheckpointRef,
 ): EffectiveCheckpoint {
+  try {
+    const absolute = assertSafeManagedPath(path);
+    if (!lstatSync(absolute).isFile()) {
+      return { status: EFFECTIVE_CHECKPOINT_STATUS.CORRUPT, path, checkpoint: null, originalSha256: null, detail: 'unsafe-path: checkpoint is not a regular file' };
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { status: EFFECTIVE_CHECKPOINT_STATUS.CORRUPT, path, checkpoint: null, originalSha256: null, detail: `missing ${path}` };
+    }
+    return {
+      status: EFFECTIVE_CHECKPOINT_STATUS.CORRUPT,
+      path,
+      checkpoint: null,
+      originalSha256: null,
+      detail: `unsafe-path: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
   const read = readJsonSafely(path);
   if (!read.exists) {
     return { status: EFFECTIVE_CHECKPOINT_STATUS.CORRUPT, path, checkpoint: null, originalSha256: null, detail: `missing ${path}` };

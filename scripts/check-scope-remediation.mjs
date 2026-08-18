@@ -610,7 +610,7 @@ withFixture((fx) => {
     const manifest = writeManifest(fx.root, manifestFor(fx.live));
     const applied = run(fx.root, ['remediate', 'apply', '--kyro-scope', SCOPE, '--manifest', manifest, '--yes']);
     assert(applied.status !== 0, 'apply into a symlinked remediations directory must be refused');
-    assert(applied.output.includes('outside the workspace'), `refusal must name the escaping path: ${applied.output}`);
+    assert(/symbolic link|outside the workspace/i.test(applied.output), `refusal must name the unsafe managed path: ${applied.output}`);
     assert(fileTree(outside) && Object.keys(fileTree(outside)).length === 0, 'nothing may be written outside the workspace');
   } finally {
     rmSync(outside, { recursive: true, force: true });

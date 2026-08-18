@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
@@ -229,14 +229,35 @@ export function listCanonicalizationCandidates(scope: string): CanonicalizationC
   let absolute: string;
   try {
     absolute = assertSafeManagedPath(directory);
-  } catch {
-    return [];
+  } catch (error) {
+    return [{
+      path: directory,
+      value: null,
+      error: `unsafe-path: ${error instanceof Error ? error.message : String(error)}`,
+    }];
   }
   if (!existsSync(absolute)) return [];
+  try {
+    if (!lstatSync(absolute).isDirectory()) {
+      return [{ path: directory, value: null, error: 'unsafe-path: canonicalization container is not a real directory' }];
+    }
+  } catch (error) {
+    return [{ path: directory, value: null, error: error instanceof Error ? error.message : String(error) }];
+  }
   const candidates: CanonicalizationCandidate[] = [];
-  for (const file of readdirSync(absolute).sort()) {
-    if (!file.endsWith('.json') || file.endsWith('.checkpoint.json')) continue;
-    const path = `${directory}/${file}`;
+  for (const entry of readdirSync(absolute, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+    if (!entry.name.endsWith('.json') || entry.name.endsWith('.checkpoint.json')) continue;
+    const path = `${directory}/${entry.name}`;
+    if (!entry.isFile()) {
+      candidates.push({ path, value: null, error: 'unsafe-path: canonicalization candidate is not a regular file' });
+      continue;
+    }
+    try {
+      assertSafeManagedPath(path);
+    } catch (error) {
+      candidates.push({ path, value: null, error: `unsafe-path: ${error instanceof Error ? error.message : String(error)}` });
+      continue;
+    }
     const read = readJsonSafely(path);
     if (!read.exists) continue;
     candidates.push({ path, value: read.value, ...(read.error ? { error: read.error } : {}) });

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { printPlan, resolveManagedPath } from '../fs';
@@ -12,6 +12,7 @@ import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { projectScopeWritePath } from '../checkpoints/sprint-close';
+import { surveyScopeCheckpoints } from '../checkpoints/discovery';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import {
   applySprintCloseTransaction,
@@ -433,11 +434,7 @@ function assertMatchingCloseInputs(expected: SprintCloseInputs, args: CloseSprin
 
 function findLatestCheckpoint(scope: string): { path: string; checkpoint: SprintCloseCheckpointV1 } | null {
   const directory = archiveDir(scope);
-  assertSafeManagedPath(directory);
-  const absolute = resolveManagedPath(directory);
-  if (!existsSync(absolute)) return null;
-  const candidates = readdirSync(absolute)
-    .filter((name) => name.endsWith('.checkpoint.json'));
+  const candidates = surveyScopeCheckpoints(scope).safeFiles;
   const parsed: Array<{ path: string; checkpoint: SprintCloseCheckpointV1 }> = [];
   for (const name of candidates) {
     const path = `${directory}/${name}`;

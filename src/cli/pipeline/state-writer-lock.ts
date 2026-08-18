@@ -55,7 +55,7 @@ interface LockHeartbeat { token: string; renewedAt: number; leaseUntil: number }
 interface ReclaimClaim { token: string; targetDev: string; targetIno: string; createdAt: number; leaseUntil: number }
 interface LockIdentity { dev: number | bigint; ino: number | bigint }
 interface LeaseKeeper { worker: Worker; state: Int32Array }
-interface LocalLease { lockPath: string; identity: LockIdentity; ownerRaw: string; keeper: LeaseKeeper }
+interface LocalLease { lockPath: string; identity: LockIdentity; ownerRaw: string; leaseMs: number; keeper: LeaseKeeper }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const CLAIM_NAME = new RegExp(`^${RECLAIM_PREFIX}(${UUID})$`, 'i');
@@ -76,22 +76,36 @@ export function assertSafeManagedPath(path: string): string {
     throw new KyroCoreError('INVALID_INPUT', `Managed path escapes the workspace: ${path}.`, 'Use a path below the current workspace.');
   }
   const realWorkspace = realpathSync(workspace);
-  let existingAncestor = target;
-  while (!existsSync(existingAncestor)) existingAncestor = dirname(existingAncestor);
-  const realAncestor = realpathSync(existingAncestor);
+  let deepestExistingAncestor = workspace;
+  let current = workspace;
+  const parts = rel.split(sep);
+  for (const [index, part] of parts.entries()) {
+    current = resolve(current, part);
+    const stat = lstatIfPresent(current);
+    if (!stat) break;
+    if (stat.isSymbolicLink()) {
+      throw new KyroCoreError('INVALID_INPUT', `Managed path traverses a symbolic link: ${current}.`, 'Replace the symlink with a real workspace directory before mutating Kyro state.');
+    }
+    if (index < parts.length - 1 && !stat.isDirectory()) {
+      throw new KyroCoreError('INVALID_INPUT', `Managed path traverses a non-directory component: ${current}.`, 'Replace the component with a real workspace directory before mutating Kyro state.');
+    }
+    deepestExistingAncestor = current;
+  }
+  const realAncestor = realpathSync(deepestExistingAncestor);
   const realRel = relative(realWorkspace, realAncestor);
   if (realRel === '..' || realRel.startsWith(`..${sep}`) || isAbsolute(realRel)) {
     throw new KyroCoreError('INVALID_INPUT', `Managed path resolves outside the workspace: ${path}.`, 'Use real directories below the current workspace.');
   }
-  let current = workspace;
-  for (const part of rel.split(sep)) {
-    current = resolve(current, part);
-    if (!existsSync(current)) continue;
-    if (lstatSync(current).isSymbolicLink()) {
-      throw new KyroCoreError('INVALID_INPUT', `Managed path traverses a symbolic link: ${current}.`, 'Replace the symlink with a real workspace directory before mutating Kyro state.');
-    }
-  }
   return target;
+}
+
+function lstatIfPresent(path: string): ReturnType<typeof lstatSync> | null {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
 }
 
 export function fsyncParentDirectory(target: string): void { fsyncDirectory(dirname(target)); }
@@ -170,13 +184,26 @@ export function assertStateWriterLeaseHealthy(): void {
   if (Atomics.load(lease.keeper.state, 5) !== 0) throw leaseLost('Heartbeat worker is exiting unexpectedly.');
   if (lease.keeper.worker.threadId === -1 && Atomics.load(lease.keeper.state, 4) === 0) throw leaseLost('Heartbeat worker terminated unexpectedly.');
   if (Atomics.load(lease.keeper.state, 3) !== 0) throw leaseLost('Heartbeat renewal failed.');
-  let current: LockIdentity;
-  try { current = lockIdentity(lease.lockPath); }
-  catch { throw leaseLost('Lock directory is missing or was replaced.'); }
-  const ownerRaw = readRegularFileNoFollow(`${lease.lockPath}/${OWNER_FILE}`);
-  const heartbeat = parseHeartbeat(readRegularFileNoFollow(`${lease.lockPath}/${HEARTBEAT_FILE}`));
   const owner = parseOwner(lease.ownerRaw);
-  if (!sameIdentity(current, lease.identity) || ownerRaw !== lease.ownerRaw || !owner || !heartbeat || heartbeat.token !== owner.token || heartbeat.leaseUntil <= Date.now()) {
+  const publicationDeadline = Date.now() + Math.max(LOCK_POLL_MS * 4, Math.floor(lease.leaseMs / 3));
+  let firstAttempt = true;
+  while (true) {
+    let current: LockIdentity | null = null;
+    try { current = lockIdentity(lease.lockPath); } catch { /* Verified below after any in-flight publication. */ }
+    const ownerRaw = readRegularFileNoFollow(`${lease.lockPath}/${OWNER_FILE}`);
+    const heartbeat = parseHeartbeat(readRegularFileNoFollow(`${lease.lockPath}/${HEARTBEAT_FILE}`));
+    if (current && sameIdentity(current, lease.identity) && ownerRaw === lease.ownerRaw && owner && heartbeat && heartbeat.token === owner.token && heartbeat.leaseUntil > Date.now()) return;
+
+    // On Windows, rename-over-existing can expose a short target gap while the heartbeat worker
+    // holds the publication fence. Never let protected work continue through that gap: wait for the
+    // completed publish and re-verify the full token + inode + expiry snapshot. One unconditional
+    // retry closes the race where the worker clears the fence just after this thread's failed read.
+    const publishing = Atomics.load(lease.keeper.state, 6) !== 0;
+    if ((publishing || firstAttempt) && Atomics.load(lease.keeper.state, 3) === 0 && Date.now() < publicationDeadline) {
+      firstAttempt = false;
+      Atomics.wait(lease.keeper.state, 6, publishing ? 1 : 0, publishing ? LOCK_POLL_MS : 1);
+      continue;
+    }
     throw leaseLost('Token, inode, or heartbeat lease no longer matches the writer.');
   }
 }
@@ -229,7 +256,7 @@ function acquireStateWriterLock(): () => void {
   }
 
   localLockDepth = 1;
-  localLease = { lockPath, identity, ownerRaw, keeper };
+  localLease = { lockPath, identity, ownerRaw, leaseMs, keeper };
   localRelease = () => releaseOwnedLock(lockPath, identity, ownerRaw, keeper);
   signalTestLockAcquired();
   waitForTestReleaseGate();
@@ -413,7 +440,7 @@ function atomicWriteHeartbeat(path: string, content: string): void {
 }
 
 function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: string, token: string, leaseMs: number): LeaseKeeper {
-  const state = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 6));
+  const state = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 7));
   const heartbeatPath = `${lockPath}/${HEARTBEAT_FILE}`;
   const source = `
     const { workerData } = require('node:worker_threads');
@@ -465,6 +492,7 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     };
     let lastLeaseUntil = readPublishedLeaseUntil() ?? 0;
     let injectedTransient = 0;
+    if (workerData.startDelayMs > 0) Atomics.wait(state, 0, 0, workerData.startDelayMs);
     const renew = () => {
       verifyOwnership();
       const now = Date.now();
@@ -493,10 +521,21 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
           injected.code = workerData.transientErrorCode;
           throw injected;
         }
-        fs.renameSync(temporary, workerData.path);
-        published = true;
-        syncDir(pathApi.dirname(workerData.path));
-        lastLeaseUntil = now + workerData.leaseMs;
+        Atomics.store(state, 6, 1); Atomics.notify(state, 6);
+        try {
+          if (workerData.publishGapMs > 0 && renewalCount >= 1) {
+            // Test-only model of Windows rename-over-existing exposing a short target gap.
+            fs.unlinkSync(workerData.path);
+            if (workerData.publishGapReadyFile) fs.writeFileSync(workerData.publishGapReadyFile, 'ready\\n', 'utf8');
+            Atomics.wait(state, 6, 1, workerData.publishGapMs);
+          }
+          fs.renameSync(temporary, workerData.path);
+          published = true;
+          syncDir(pathApi.dirname(workerData.path));
+          lastLeaseUntil = now + workerData.leaseMs;
+        } finally {
+          Atomics.store(state, 6, 0); Atomics.notify(state, 6);
+        }
       } finally {
         // A renewal that failed before publishing must not leave its temporary behind: release
         // rmdir()s the lock directory and would fail with ENOTEMPTY once the owner survives a
@@ -567,6 +606,9 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
     transientAfter: Number.isFinite(transientAfter) && transientAfter >= 1 ? transientAfter : null,
     transientErrorCode: process.env.KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_CODE ?? 'EPERM',
     transientTimes: Math.max(1, Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_TRANSIENT_TIMES ?? '1', 10) || 1),
+    startDelayMs: Math.max(0, Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_START_DELAY_MS ?? '0', 10) || 0),
+    publishGapMs: Math.max(0, Number.parseInt(process.env.KYRO_TEST_LOCK_HEARTBEAT_PUBLISH_GAP_MS ?? '0', 10) || 0),
+    publishGapReadyFile: process.env.KYRO_TEST_LOCK_HEARTBEAT_PUBLISH_GAP_READY_FILE ?? null,
   } });
   const fenceParent = (reason?: unknown): void => {
     if (Atomics.load(state, 4) !== 0) return;
@@ -579,7 +621,12 @@ function startLeaseKeeper(lockPath: string, identity: LockIdentity, ownerRaw: st
   worker.on('error', fenceParent);
   worker.on('exit', () => fenceParent());
   worker.unref();
-  const deadline = Date.now() + Math.min(2_000, leaseMs);
+  // Readiness is the first completed renewal, not merely Worker construction: returning while that
+  // atomic rename is in flight lets the main thread's no-follow ownership read race the rename.
+  // Keep a lease-relative margin instead of the old fixed 2s ceiling; loaded CI filesystems can take
+  // longer than 2s to start and fsync a Worker even though the already-published 5s lease is healthy.
+  const startupMargin = Math.max(LOCK_POLL_MS * 2, Math.floor(leaseMs / 6));
+  const deadline = Date.now() + Math.max(100, leaseMs - startupMargin);
   while (Atomics.load(state, 1) === 0 && Atomics.load(state, 3) === 0 && Date.now() < deadline) Atomics.wait(state, 1, 0, LOCK_POLL_MS);
   if (Atomics.load(state, 3) !== 0 || Atomics.load(state, 1) === 0) {
     Atomics.store(state, 4, 1);

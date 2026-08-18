@@ -4,6 +4,7 @@ import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { listScopeFolders } from '../artifacts/scopes';
+import { assertNotForeignDirectory } from '../core/scope-resolution';
 import { countClarificationMarkers } from '../core/analysis';
 import { DEBT_CLASSIFICATION, assessRawDebt } from '../artifacts/debt-contract';
 import {
@@ -26,10 +27,14 @@ import {
   sha256,
 } from '../checkpoints/sprint-close';
 import { EFFECTIVE_CHECKPOINT_STATUS, resolveEffectiveCheckpoint, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
+import {
+  CHECKPOINT_DISCOVERY_STATUS,
+  MANAGED_PATH_LEVEL,
+  surveyScopeCheckpoints,
+} from '../checkpoints/discovery';
 import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
 import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase } from '../remediation/plan';
 import { inspectScopeRetirement, retirementCheckpointIsApplied } from '../checkpoints/scope-retirement';
-import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import {
   formatBootstrapRemedy,
   hasLayeredProjectStateOnDisk,
@@ -147,8 +152,12 @@ export function inspectScope(scope: string): CheckResult[] {
 function checkScope(scope: string): CheckResult[] {
   const checks: CheckResult[] = [];
   const root = scopeRoot(scope);
-  if (!existsSync(resolveManagedPath(root))) {
+  const managed = surveyScopeCheckpoints(scope);
+  if (managed.root.status === CHECKPOINT_DISCOVERY_STATUS.ABSENT) {
     return [fail(`${scope}`, `${root} not found`, 'Create the scope with /kyro:forge (INIT) or choose an existing scope.')];
+  }
+  if (managed.issues.length > 0) {
+    return managedPathFailures(scope, managed);
   }
 
   // Checkpoints are independent recovery artifacts. Inspect them even when live sprint.json is
@@ -275,11 +284,12 @@ function scopeVerificationChecks(scope: string): CheckResult[] {
 }
 
 export function inspectSprintCloseCheckpoints(scope: string): CheckResult[] {
-  let directory: string;
-  try { directory = assertSafeManagedPath(archiveDir(scope)); }
-  catch (error) { return [fail(`${scope}/checkpoints`, error instanceof Error ? error.message : String(error), 'Replace symlinked or escaping artifact paths with real directories inside the workspace.')]; }
-  if (!existsSync(directory)) return [];
-  const files = readdirSync(directory).filter((file) => file.endsWith('.checkpoint.json'));
+  const survey = surveyScopeCheckpoints(scope);
+  const unsafe = managedPathFailures(scope, survey);
+  if (survey.container.status === CHECKPOINT_DISCOVERY_STATUS.ABSENT && survey.files.length === 0) {
+    return unsafe;
+  }
+  const files = survey.safeFiles;
   const valid = files.flatMap((file) => {
     const path = `${archiveDir(scope)}/${file}`;
     const resolved = resolveEffectiveCheckpointAtPath(scope, path);
@@ -291,15 +301,43 @@ export function inspectSprintCloseCheckpoints(scope: string): CheckResult[] {
     return [{ path, checkpoint: resolved.checkpoint }];
   }).sort((left, right) => compareCheckpointRecency(right.checkpoint, left.checkpoint));
   const latestPath = valid[0]?.path ?? null;
-  const sprintRead = readJsonSafely(sprintJsonPath(scope));
+  const sprintRead = survey.sprint.status === CHECKPOINT_DISCOVERY_STATUS.SAFE
+    ? readJsonSafely(sprintJsonPath(scope))
+    : { exists: false, value: null };
   const activeRecord = asRecord(asRecord(sprintRead.value)?.activeSprint);
   const activeN = typeof activeRecord?.n === 'number' ? activeRecord.n : null;
-  const retiredApplied = retirementCheckpointIsApplied(scope);
-  return files.map((file) => {
+  const retiredApplied = survey.root.status === CHECKPOINT_DISCOVERY_STATUS.SAFE
+    ? retirementCheckpointIsApplied(scope)
+    : false;
+  return [...unsafe, ...files.map((file) => {
     const path = `${archiveDir(scope)}/${file}`;
     const checkpoint = valid.find((candidate) => candidate.path === path)?.checkpoint;
     const supersededByActiveSprint = activeN !== null && checkpoint !== undefined && activeN > checkpoint.identity.sprintN;
     return inspectCheckpoint(scope, path, path === latestPath && !supersededByActiveSprint && !retiredApplied);
+  })];
+}
+
+function managedPathFailures(
+  scope: string,
+  survey: ReturnType<typeof surveyScopeCheckpoints>,
+): CheckResult[] {
+  const unsafe = survey.unusable.filter((candidate) => (
+    candidate.status === CHECKPOINT_DISCOVERY_STATUS.UNSAFE_PATH
+    || candidate.status === CHECKPOINT_DISCOVERY_STATUS.UNREADABLE
+  ));
+  const seen = new Set<string>();
+  return unsafe.flatMap((candidate) => {
+    const key = `${candidate.path}\0${candidate.status}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    const label = new Set<string>([MANAGED_PATH_LEVEL.CHECKPOINT]).has(candidate.level)
+      ? `${scope}/checkpoint/${candidate.path.split('/').pop() ?? candidate.path}`
+      : `${scope}/${candidate.level}`;
+    return [fail(
+      label,
+      `${candidate.status.toUpperCase().replace('-', '_')}: ${candidate.detail}`,
+      'Restore a real regular file or directory at this managed path inside the workspace; symbolic links are not usable recovery evidence.',
+    )];
   });
 }
 
@@ -555,7 +593,10 @@ function validateNarrative(root: string, entry: { n?: number; archive?: string }
 }
 
 function resolveScopeNames(scopes: KyroScopeEntry[], activeScope: string | null, requestedScope: string | null): string[] {
-  if (requestedScope) return [requestedScope];
+  if (requestedScope) {
+    assertNotForeignDirectory(requestedScope);
+    return [requestedScope];
+  }
   if (activeScope) return [activeScope];
   const names = new Set<string>(scopes.map((s) => s.id));
   for (const scope of listScopeFolders()) names.add(scope);

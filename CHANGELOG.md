@@ -6,6 +6,67 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.47.2] - 2026-08-18
+
+### Fixed
+
+- **Scope identity now comes from evidence, not from a directory existing.** `listScopeFolders()`
+  treated every directory under `.agents/kyro/scopes/` as a scope, so a notes folder, an editor
+  artifact or a half-finished checkout became an `IRRECONCILABLE` integrity blocker — and
+  install/sync's rehydrate minted it into `project.json` with a fabricated `planning` status, turning
+  a filesystem accident into persisted project state. Directories are now classified as
+  `VALID_SCOPE`, `CORRUPT_SPRINT`, `RECOVERABLE`, `OWNED_DAMAGED` or `FOREIGN`, and the action is
+  derived from that class crossed with whether the registry knows the id.
+  - Ownership is proved only by names Kyro itself writes, and only when they are **regular files**:
+    `sprint.json`, `retirement.checkpoint.json`, an `archive/sprint-NNN-<slug>.{json,md,checkpoint.json}`
+    close artifact, any `archive/*.checkpoint.json`, or a record file inside its own directory —
+    `archive/certifications/certification-NNN.json`,
+    `archive/remediations/remediation-NNN.json`,
+    `archive/checkpoint-remediations/canonicalization-NNN.json`. `NNN` is three digits or more,
+    matching what every writer pads to, so `remediation-1.json` is a name Kyro cannot produce and is
+    not recognized. A symlink wearing one of these names is not recognized either: where the name is
+    the whole proof, anything reachable on the filesystem could otherwise claim a directory as
+    Kyro's. A directory alone is never evidence — `archive/` is an ordinary word, so a human's
+    `notes-backup/archive/README.md` stays `FOREIGN`, and an empty `archive/remediations/` holds no
+    history to protect, so it stays `FOREIGN` too. A record whose bytes are corrupt still counts:
+    the recognizable name is what proves Kyro wrote there, not whether the file still parses.
+  - A `FOREIGN` directory is ignored by discovery, resolution, `scope list` and integrity, is never
+    registered, and is reported by a **global** `doctor` as a non-blocking WARN so the user still
+    learns why their folder is not a scope. This includes an unregistered namespace entry whose
+    scope root, `sprint.json` or `archive/` is a symlink: Kyro reports the managed level but never
+    follows or reveals the link target. A scoped `doctor` never mentions it.
+  - `RECOVERABLE` (sprint.json gone, at least one close checkpoint that actually resolves and names
+    this scope) is reported as `recoverable-no-sprint` and points at the checkpoint resume path.
+    `OWNED_DAMAGED` (Kyro artifacts, but nothing resumable) is reported separately and promises
+    nothing — a remediation record, a corrupt checkpoint or a checkpoint symlink is not a recovery
+    path. Checkpoint discovery uses the same safe-path contract as `close-sprint`, so it never
+    advertises a resume that the transaction reader will reject. Scope roots, `sprint.json`,
+    `archive/` and checkpoint candidates are inspected without dereferencing symlinks; any unsafe
+    ancestor on a registered or otherwise Kyro-owned scope is `OWNED_DAMAGED`, produces no repair
+    operations or commitments, and must be restored as a real managed path.
+  - A registered id whose directory is `FOREIGN` is now a `REGISTERED_ORPHAN`, so
+    `repair integrity` can clean up contamination an earlier rehydrate wrote. `unregister-orphan`
+    previously refused whenever the path existed at all, which made that cleanup impossible; it now
+    re-verifies the directory is still foreign, removes only the registry entry, and never touches a
+    byte of the directory. If the directory becomes a symlink, unsafe path or gains Kyro evidence
+    between prepare and apply, apply returns `DIVERGED` without writing.
+  - An explicit `--kyro-scope` pointing at an **unregistered** foreign directory fails
+    `SCOPE_NOT_FOUND` across `status`, `context-pack`, `repair integrity prepare` and
+    `doctor --artifacts`, instead of being reported as a damaged scope. A *registered* id whose
+    directory is foreign stays addressable — it is a registry entry to clean, not a wrong name — so
+    the contamination above can be repaired scoped, not only through a global scan.
+  - A registered scope whose `sprint.json` is invalid no longer classifies as healthy: it previously
+    fell through to `present-and-registered` because identity derivation returned null and nothing
+    checked.
+  - The 4.47.1 special case that skipped `trace/`-only leftovers is removed — the general rule
+    subsumes it.
+- **State-writer heartbeat startup under load.** The keeper still must complete and durably publish
+  its first renewal before protected work starts, but its startup budget is now derived from the
+  active lease instead of an arbitrary two-second ceiling. This removes false startup failures on
+  loaded filesystems without weakening token, inode, expiry or fail-stop checks. Protected writes
+  also wait for an explicitly fenced heartbeat publication to finish before revalidating ownership,
+  avoiding false lease loss when Windows briefly hides the rename-over-existing target.
+
 ## [4.47.1] - 2026-08-16
 
 ### Fixed
