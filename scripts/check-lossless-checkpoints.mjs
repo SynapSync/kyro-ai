@@ -817,6 +817,21 @@ for (const mode of ['corrupt', 'unsupported']) {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
+// Worker startup readiness is lease-relative, not an arbitrary 2s wall-clock cutoff. The initial
+// heartbeat is already durable; a loaded runner may need more than 2s to start and fsync the first
+// renewal, but must still finish before the 5s lease loses its safety margin.
+{
+  const root = makeSandbox();
+  try {
+    const result = run(root, ['repair', '--kyro-scope', 'demo', '--confirm'], {
+      KYRO_TEST_LOCK_LEASE_MS: '5000',
+      KYRO_TEST_LOCK_HEARTBEAT_START_DELAY_MS: '2500',
+    });
+    assert(result.status === 0, `lease-relative heartbeat startup budget rejected a healthy delayed worker: ${output(result)}`);
+    assertNoLockDebris(root, 'delayed heartbeat startup');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
 // An empty partial lock remains reclaimable when Windows rejects directory fsync.
 // Use the CI-safe lease: a 500ms lease expires under Windows runner load during reclaim+repair
 // (Worker start + first renew), which is not what this case is testing.

@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { listScopeFolders } from '../artifacts/scopes';
+import { listRegistrableScopeDirectories } from '../artifacts/scopes';
 import { buildInstallPlan, buildRuntimeInstallPlan } from '../install-plan';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope, uniqueAgents } from '../options';
@@ -120,7 +120,7 @@ function shouldInstallWorkspace(options: CliOptions, hasWorkspaceState: boolean)
 async function confirmWorkspaceInit(): Promise<boolean> {
   const rl = createInterface({ input, output });
   try {
-    const answer = await rl.question(formatWorkspaceInitPrompt(listScopeFolders()));
+    const answer = await rl.question(formatWorkspaceInitPrompt(listRegistrableScopeDirectories()));
     return answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes';
   } finally {
     rl.close();

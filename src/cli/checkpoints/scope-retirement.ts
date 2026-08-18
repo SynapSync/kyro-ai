@@ -428,7 +428,9 @@ function readValidSprint(scope: string): SprintFile {
   const root = scopeRoot(scope);
   assertSafeManagedPath(root);
   if (!existsSync(resolveManagedPath(root))) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see registered scopes.');
-  const read = readJsonSafely(sprintJsonPath(scope));
+  const sprintPath = sprintJsonPath(scope);
+  assertSafeManagedPath(sprintPath);
+  const read = readJsonSafely(sprintPath);
   if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Restore its live state before retirement.');
   if (read.error) throw new KyroCoreError('INVALID_JSON', `Cannot retire "${scope}": sprint.json is invalid (${read.error}).`, 'Restore from an intact checkpoint; do not edit archive history.');
   const issues = validateSprintFile(read.value, `${scope}/sprint.json`);

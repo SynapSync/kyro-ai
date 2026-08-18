@@ -2,9 +2,10 @@ import { existsSync, readdirSync } from 'node:fs';
 import { KYRO_PROJECT_ROOT } from '../constants';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
-import { archiveDir, sprintJsonPath } from '../artifacts/paths';
-import { listScopeFolders } from '../artifacts/scopes';
-import { asSprintFile } from '../artifacts/schema';
+import { archiveDir } from '../artifacts/paths';
+import { listScopeFolders, readScopeSprint } from '../artifacts/scopes';
+import { assertNotForeignDirectory } from '../core/scope-resolution';
+import { CHECKPOINT_DISCOVERY_STATUS, surveyScopeCheckpoints } from '../checkpoints/discovery';
 import { canonicalJson, sha256 } from '../checkpoints/sprint-close';
 import { rebuildCanonicalCheckpointFromDisk } from '../checkpoints/canonicalize';
 import { EFFECTIVE_CHECKPOINT_STATUS, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
@@ -102,7 +103,16 @@ export type IntegrityOperation =
   };
 
 export type IntegrityFindingClass = 'register' | 'unregister' | 'canonicalize' | 'live' | 'activeScope' | 'blocker';
-export type IntegrityBlockerCode = 'unsupported' | 'diverged' | 'irreconcilable' | 'identity-conflict' | 'unrecoverable';
+export type IntegrityBlockerCode =
+  | 'unsupported'
+  | 'diverged'
+  | 'irreconcilable'
+  | 'identity-conflict'
+  | 'unrecoverable'
+  /** sprint.json is gone but a usable close checkpoint can resume the scope. */
+  | 'recoverable-no-sprint'
+  /** Kyro artifacts are present but nothing here can be resumed. */
+  | 'owned-damaged';
 
 export interface IntegrityFinding {
   class: IntegrityFindingClass;
@@ -185,6 +195,7 @@ export function prepareIntegrityPlan(options: {
   reason?: string;
 }): IntegrityPlan {
   const requested = options.kyroScope ?? null;
+  if (requested) assertNotForeignDirectory(requested);
   const classifications = classifyRegistry(requested);
   const operations: IntegrityOperation[] = [];
   const findings: IntegrityFinding[] = [];
@@ -216,6 +227,28 @@ export function prepareIntegrityPlan(options: {
       const blocker: IntegrityFinding = { class: 'blocker', code: 'identity-conflict', summary: `${row.id}: ${row.detail}` };
       blockers.push(blocker);
       findings.push(blocker);
+    } else if (row.classification === REGISTRY_CLASS.RECOVERABLE_CANDIDATE) {
+      // A usable close checkpoint exists, so this scope genuinely can come back — but restoring
+      // sprint.json from a checkpoint after-image is the resume path, not an integrity repair.
+      // Name the recovery route; never auto-write it here.
+      const usable = surveyScopeCheckpoints(row.id).usable.length;
+      const blocker: IntegrityFinding = {
+        class: 'blocker',
+        code: 'recoverable-no-sprint',
+        summary: `${row.id}: sprint.json is absent; ${usable} usable close checkpoint(s) in archive/ can resume it`,
+      };
+      blockers.push(blocker);
+      findings.push(blocker);
+    } else if (row.classification === REGISTRY_CLASS.OWNED_DAMAGED) {
+      // Kyro artifacts prove ownership, not resumability. Say exactly that — promising a resume
+      // that does not exist is worse than reporting damage.
+      const blocker: IntegrityFinding = {
+        class: 'blocker',
+        code: 'owned-damaged',
+        summary: `${row.id}: ${row.detail}; no usable close checkpoint, so there is no automatic recovery path`,
+      };
+      blockers.push(blocker);
+      findings.push(blocker);
     } else if (row.classification === REGISTRY_CLASS.IRRECONCILABLE) {
       const blocker: IntegrityFinding = { class: 'blocker', code: 'irreconcilable', summary: `${row.id}: ${row.detail}` };
       blockers.push(blocker);
@@ -232,7 +265,19 @@ export function prepareIntegrityPlan(options: {
 
   const checkpointFiles: Array<{ path: string; sha256: string }> = [];
   for (const scope of scopesForCheckpoints) {
-    for (const file of listCheckpointFiles(scope)) {
+    const checkpointSurvey = surveyScopeCheckpoints(scope);
+    for (const unsafe of checkpointSurvey.unusable.filter((candidate) => (
+      candidate.status === CHECKPOINT_DISCOVERY_STATUS.UNSAFE_PATH
+      || candidate.status === CHECKPOINT_DISCOVERY_STATUS.UNREADABLE
+    ))) {
+      const summary = `${unsafe.path}: ${unsafe.detail}`;
+      if (!blockers.some((blocker) => blocker.code === 'owned-damaged' && blocker.summary.includes(unsafe.path))) {
+        const blocker: IntegrityFinding = { class: 'blocker', code: 'owned-damaged', summary };
+        blockers.push(blocker);
+        findings.push(blocker);
+      }
+    }
+    for (const file of checkpointSurvey.safeFiles) {
       const path = `${archiveDir(scope)}/${file}`;
       const resolved = resolveEffectiveCheckpointAtPath(scope, path);
       if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.VALID || resolved.status === EFFECTIVE_CHECKPOINT_STATUS.CANONICALIZED) continue;
@@ -608,27 +653,21 @@ function planLiveEvolution(scope: string, live: SprintFile, after: SprintFile, o
 }
 
 function readLiveSprint(scope: string): SprintFile | null {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists || read.error) return null;
-  return asSprintFile(read.value);
-}
-
-function listCheckpointFiles(scope: string): string[] {
-  try {
-    const absolute = resolveManagedPath(archiveDir(scope));
-    if (!existsSync(absolute)) return [];
-    return readdirSync(absolute).filter((file) => file.endsWith('.checkpoint.json')).sort();
-  } catch {
-    return [];
-  }
+  const read = readScopeSprint(scope);
+  return read.kind === 'valid' ? read.sprint : null;
 }
 
 function latestCheckpointPath(scope: string): string | null {
-  const files = listCheckpointFiles(scope);
+  const files = surveyScopeCheckpoints(scope).safeFiles;
   if (files.length === 0) return null;
   return `${archiveDir(scope)}/${files[files.length - 1]}`;
 }
 
+/**
+ * Deliberately the full owned set, not just scopes with a valid sprint.json: this is the one scan
+ * that must still reach a scope whose sprint.json is gone so its checkpoints are inspected and
+ * canonicalized. Foreign directories are already excluded upstream by scope discovery.
+ */
 function listArchiveScopes(): string[] {
   return listScopeFolders();
 }

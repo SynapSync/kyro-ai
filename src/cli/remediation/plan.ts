@@ -6,6 +6,7 @@ import { validateSprintFile, type ValidationIssue } from '../artifacts/schema';
 import { canonicalJson, checkpointCommitmentOfRecord, sha256 } from '../checkpoints/sprint-close';
 import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
 import { EFFECTIVE_CHECKPOINT_STATUS, effectiveCommitment, resolveEffectiveCheckpoint, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
+import { surveyScopeCheckpoints } from '../checkpoints/discovery';
 import { inspectScopeRetirement } from '../checkpoints/scope-retirement';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
@@ -723,16 +724,8 @@ export function compareCheckpointRecency(left: SprintCloseCheckpointV1, right: S
 
 /** Every valid close checkpoint for a scope, newest first. One shared scan for doctor and status. */
 export function listValidCloseCheckpoints(scope: string): ValidCloseCheckpoint[] {
-  let directory: string;
-  try {
-    directory = assertSafeManagedPath(archiveDir(scope));
-  } catch {
-    return [];
-  }
-  if (!existsSync(directory)) return [];
   const entries: ValidCloseCheckpoint[] = [];
-  for (const file of readdirSync(directory)) {
-    if (!file.endsWith('.checkpoint.json')) continue;
+  for (const file of surveyScopeCheckpoints(scope).safeFiles) {
     const path = `${archiveDir(scope)}/${file}`;
     const resolved = resolveEffectiveCheckpointAtPath(scope, path);
     if (resolved.status !== EFFECTIVE_CHECKPOINT_STATUS.VALID && resolved.status !== EFFECTIVE_CHECKPOINT_STATUS.CANONICALIZED) continue;
