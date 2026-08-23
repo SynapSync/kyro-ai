@@ -166,6 +166,36 @@ export interface Clarification {
 
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
 export type DebtStatus = 'open' | 'in_progress' | 'resolved' | 'deferred';
+
+/** Terminal explanation for unfinished work. Not a success status and not a checker verdict. */
+export const TASK_DISPOSITION_KIND = {
+  DEFERRED: 'deferred',
+  BLOCKED: 'blocked',
+  SUPERSEDED: 'superseded',
+  CANCELLED: 'cancelled',
+} as const;
+export type TaskDispositionKind = (typeof TASK_DISPOSITION_KIND)[keyof typeof TASK_DISPOSITION_KIND];
+
+export const TASK_DISPOSITION_TARGET_KIND = {
+  DEBT: 'debt',
+  TASK: 'task',
+  SPRINT: 'sprint',
+} as const;
+export type TaskDispositionTargetKind =
+  (typeof TASK_DISPOSITION_TARGET_KIND)[keyof typeof TASK_DISPOSITION_TARGET_KIND];
+
+export interface TaskDispositionTarget {
+  kind: TaskDispositionTargetKind;
+  id: string;
+}
+
+export interface TaskDisposition {
+  kind: TaskDispositionKind;
+  reason: string;
+  by: string;
+  recordedAt: string;
+  target?: TaskDispositionTarget;
+}
 export const TASK_VERDICT_RESULT = {
   PASS: 'pass',
   FAIL: 'fail',
@@ -402,6 +432,8 @@ export interface Task {
   status: TaskStatus;
   evidence: TaskEvidence | null;
   verdict: TaskVerdict | null;
+  /** Absent on historical tasks and on work that is still in progress. Never a pass. */
+  disposition?: TaskDisposition;
 }
 
 export interface Phase {

@@ -1,10 +1,17 @@
-import { ADR_LINK_KEYS, ADR_STATUS, KYRO_SCOPE_ENTRY_STATUS } from '../types';
+import {
+  ADR_LINK_KEYS,
+  ADR_STATUS,
+  KYRO_SCOPE_ENTRY_STATUS,
+  TASK_DISPOSITION_KIND,
+  TASK_DISPOSITION_TARGET_KIND,
+} from '../types';
 import type {
   AdrLinkKey,
   KyroLocalProjectState,
   KyroProjectState,
   KyroSharedProjectState,
   SprintFile,
+  TaskDisposition,
   TaskEvidence,
   TaskVerdict,
 } from '../types';
@@ -16,6 +23,8 @@ export type KyroScopeStatus = (typeof KYRO_SCOPE_STATUS)[keyof typeof KYRO_SCOPE
 export const SCOPE_STATUS_VALUES = Object.values(KYRO_SCOPE_STATUS);
 export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'done'] as const;
 export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
+export const TASK_DISPOSITION_KIND_VALUES = Object.values(TASK_DISPOSITION_KIND);
+export const TASK_DISPOSITION_TARGET_KIND_VALUES = Object.values(TASK_DISPOSITION_TARGET_KIND);
 export const PHASE_STATUS_VALUES = ['pending', 'active', 'blocked', 'done'] as const;
 export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'] as const;
 export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
@@ -378,7 +387,8 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
     value.ledger.forEach((e, i) => validateLedgerEntry(e, path, `ledger[${i}]`, issues));
   }
 
-  if (value.activeSprint !== null) validateActiveSprint(value.activeSprint, path, 'activeSprint', issues);
+  const refs = collectDispositionRefs(value);
+  if (value.activeSprint !== null) validateActiveSprint(value.activeSprint, path, 'activeSprint', issues, refs);
 
   if (!Array.isArray(value.debt)) {
     issues.push({ path, field: 'debt', message: 'must be an array' });
@@ -676,7 +686,13 @@ function validateRoadmapSprint(value: unknown, path: string, prefix: string, iss
  * Validate every field the runtime (close-sprint, analyze, context-pack) reads from activeSprint.
  * Contract: if this passes, no downstream command may crash on a missing field.
  */
-function validateActiveSprint(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+function validateActiveSprint(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  refs: DispositionRefs,
+): void {
   if (!isRecord(value)) {
     issues.push({ path, field: prefix, message: 'must be an object or null' });
     return;
@@ -703,12 +719,57 @@ function validateActiveSprint(value: unknown, path: string, prefix: string, issu
         issues.push({ path, field: `${prefix}.phases[${pi}].tasks`, message: 'must be an array' });
         return;
       }
-      phase.tasks.forEach((task, ti) => validateTask(task, path, `${prefix}.phases[${pi}].tasks[${ti}]`, issues));
+      phase.tasks.forEach((task, ti) => validateTask(task, path, `${prefix}.phases[${pi}].tasks[${ti}]`, issues, refs));
     });
+  }
+  if ('emergentTasks' in value) {
+    if (!Array.isArray(value.emergentTasks)) {
+      issues.push({ path, field: `${prefix}.emergentTasks`, message: 'must be an array when present' });
+    } else {
+      value.emergentTasks.forEach((task, ti) => validateTask(task, path, `${prefix}.emergentTasks[${ti}]`, issues, refs));
+    }
   }
 }
 
-function validateTask(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+interface DispositionRefs {
+  taskIds: Set<string>;
+  debtIds: Set<string>;
+}
+
+function collectDispositionRefs(sprint: Record<string, unknown>): DispositionRefs {
+  const taskIds = new Set<string>();
+  const debtIds = new Set<string>();
+  const active = sprint.activeSprint;
+  if (isRecord(active)) {
+    if (Array.isArray(active.phases)) {
+      for (const phase of active.phases) {
+        if (!isRecord(phase) || !Array.isArray(phase.tasks)) continue;
+        for (const task of phase.tasks) {
+          if (isRecord(task) && typeof task.id === 'string') taskIds.add(task.id);
+        }
+      }
+    }
+    if (Array.isArray(active.emergentTasks)) {
+      for (const task of active.emergentTasks) {
+        if (isRecord(task) && typeof task.id === 'string') taskIds.add(task.id);
+      }
+    }
+  }
+  if (Array.isArray(sprint.debt)) {
+    for (const item of sprint.debt) {
+      if (isRecord(item) && typeof item.id === 'string') debtIds.add(item.id);
+    }
+  }
+  return { taskIds, debtIds };
+}
+
+function validateTask(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  refs: DispositionRefs,
+): void {
   if (!isRecord(value)) {
     issues.push({ path, field: prefix, message: 'must be an object' });
     return;
@@ -721,6 +782,98 @@ function validateTask(value: unknown, path: string, prefix: string, issues: Vali
   if ('acceptance_criteria' in value) requireStringArrayField(value, 'acceptance_criteria', path, issues, `${prefix}.acceptance_criteria`);
   if ('depends_on' in value) requireStringArrayField(value, 'depends_on', path, issues, `${prefix}.depends_on`);
   if ('scenario_refs' in value) requireStringArrayField(value, 'scenario_refs', path, issues, `${prefix}.scenario_refs`);
+  if ('disposition' in value) {
+    const selfId = typeof value.id === 'string' ? value.id : '';
+    validateTaskDisposition(value.disposition, path, `${prefix}.disposition`, issues, refs, selfId);
+    if (value.status === 'done') {
+      issues.push({ path, field: `${prefix}.disposition`, message: 'must not be present when status is done' });
+    }
+    if (isRecord(value.verdict) && value.verdict.result === 'pass') {
+      issues.push({ path, field: `${prefix}.disposition`, message: 'must not accompany a pass verdict' });
+    }
+  }
+}
+
+const DISPOSITION_KEYS = ['kind', 'reason', 'by', 'recordedAt', 'target'] as const;
+const DISPOSITION_TARGET_KEYS = ['kind', 'id'] as const;
+
+function validateTaskDisposition(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  refs: DispositionRefs,
+  selfId: string,
+): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object when present' });
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!DISPOSITION_KEYS.includes(key as (typeof DISPOSITION_KEYS)[number])) {
+      issues.push({ path, field: `${prefix}.${key}`, message: 'is not a disposition key' });
+    }
+  }
+  requireLiteralSet(value, 'kind', TASK_DISPOSITION_KIND_VALUES, path, issues, `${prefix}.kind`);
+  requireNonEmptyString(value, 'reason', path, issues, `${prefix}.reason`);
+  requireNonEmptyString(value, 'by', path, issues, `${prefix}.by`);
+  requireIsoString(value, 'recordedAt', path, issues, `${prefix}.recordedAt`);
+  const kind = value.kind;
+  const requiresTarget = kind === TASK_DISPOSITION_KIND.DEFERRED || kind === TASK_DISPOSITION_KIND.SUPERSEDED;
+  if (requiresTarget && !('target' in value)) {
+    issues.push({ path, field: `${prefix}.target`, message: `is required for ${String(kind)} dispositions` });
+  }
+  if ('target' in value) {
+    validateTaskDispositionTarget(value.target, path, `${prefix}.target`, issues, refs, selfId, typeof kind === 'string' ? kind : null);
+  }
+}
+
+function validateTaskDispositionTarget(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  refs: DispositionRefs,
+  selfId: string,
+  dispositionKind: string | null,
+): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { kind, id }' });
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!DISPOSITION_TARGET_KEYS.includes(key as (typeof DISPOSITION_TARGET_KEYS)[number])) {
+      issues.push({ path, field: `${prefix}.${key}`, message: 'is not a disposition target key' });
+    }
+  }
+  requireLiteralSet(value, 'kind', TASK_DISPOSITION_TARGET_KIND_VALUES, path, issues, `${prefix}.kind`);
+  requireNonEmptyString(value, 'id', path, issues, `${prefix}.id`);
+  const targetKind = value.kind;
+  const targetId = value.id;
+  if (typeof targetKind !== 'string' || typeof targetId !== 'string') return;
+  if (dispositionKind === TASK_DISPOSITION_KIND.DEFERRED && targetKind !== TASK_DISPOSITION_TARGET_KIND.DEBT && targetKind !== TASK_DISPOSITION_TARGET_KIND.SPRINT) {
+    issues.push({ path, field: prefix, message: 'deferred target kind must be debt or sprint' });
+  }
+  if (dispositionKind === TASK_DISPOSITION_KIND.SUPERSEDED && targetKind !== TASK_DISPOSITION_TARGET_KIND.TASK) {
+    issues.push({ path, field: prefix, message: 'superseded target kind must be task' });
+  }
+  if (targetKind === TASK_DISPOSITION_TARGET_KIND.DEBT && !refs.debtIds.has(targetId)) {
+    issues.push({ path, field: `${prefix}.id`, message: `must reference an existing debt id (unknown "${targetId}")` });
+  }
+  if (targetKind === TASK_DISPOSITION_TARGET_KIND.TASK) {
+    if (!refs.taskIds.has(targetId)) {
+      issues.push({ path, field: `${prefix}.id`, message: `must reference an existing task id (unknown "${targetId}")` });
+    } else if (targetId === selfId) {
+      issues.push({ path, field: `${prefix}.id`, message: 'must not reference the same task' });
+    }
+  }
+  if (targetKind === TASK_DISPOSITION_TARGET_KIND.SPRINT && !isPositiveSprintId(targetId)) {
+    issues.push({ path, field: `${prefix}.id`, message: 'must be a positive integer sprint number' });
+  }
+}
+
+function isPositiveSprintId(value: string): boolean {
+  return /^[1-9]\d*$/.test(value);
 }
 
 function validateTaskEvidence(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
@@ -1054,6 +1207,24 @@ export function asTaskVerdict(value: unknown): TaskVerdict | null {
   if (value === null) return null;
   validateTaskVerdict(value, 'task.verdict', 'verdict', issues);
   return issues.length === 0 ? value as TaskVerdict : null;
+}
+
+export function asTaskDisposition(
+  value: unknown,
+  refs: { taskIds: Iterable<string>; debtIds: Iterable<string> } = { taskIds: [], debtIds: [] },
+  selfId = '',
+): TaskDisposition | null {
+  const issues: ValidationIssue[] = [];
+  if (value === undefined) return null;
+  validateTaskDisposition(
+    value,
+    'task.disposition',
+    'disposition',
+    issues,
+    { taskIds: new Set(refs.taskIds), debtIds: new Set(refs.debtIds) },
+    selfId,
+  );
+  return issues.length === 0 ? value as TaskDisposition : null;
 }
 
 export function asScopeState(value: unknown): KyroScopeState | null {

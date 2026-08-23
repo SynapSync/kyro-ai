@@ -13,7 +13,7 @@ Usage:
   kyro detect                  Detect local agent adapters
   kyro doctor                  Check package/workspace health
   kyro analyze [options]       Semantic cross-check of a scope (clarity, coverage, deps, debt)
-  kyro record-evidence <task>  Tool-owned maker evidence write (sets status, routes to review)
+  kyro record-evidence <task>  Tool-owned maker evidence or disposition write
   kyro plan --from <file>      Tool-owned scope bootstrap (init) or next-sprint materialization (sprint)
   kyro review <task> [options] Tool-owned maker/checker verdict write
   kyro debt <subcommand>       Tool-owned debt mutation: add, start, resolve, defer, escalate
@@ -103,7 +103,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'analyze') {
     console.log('Usage: kyro analyze [--kyro-scope <scope>] [--json]');
   } else if (command === 'record-evidence') {
-    console.log('Usage: kyro record-evidence <task> [--kyro-scope <scope>] --summary <text> --validation <text> [--validation <text> ...] [--file <path> ...] [--notes <text>] [--by <actor>] [--status done|blocked] [--dry-run]');
+    console.log('Usage: kyro record-evidence <task> [--kyro-scope <scope>] --summary <text> --validation <text> [--validation <text> ...] [--file <path> ...] [--notes <text>] [--by <actor>] [--status done|blocked] [--disposition deferred|blocked|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]] [--dry-run]');
   } else if (command === 'plan') {
     console.log('Usage: kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]  (mode auto-detected: init when the scope has no sprint.json, sprint when it is ready to plan its next sprint; run kyro plan --help for both file shapes)');
   } else if (command === 'review') {

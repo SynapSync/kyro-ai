@@ -97,3 +97,9 @@ Kyro exposes status through both agent routers and a read-only CLI path:
 - `analyze` findings report status drift and checker debt.
 
 The CLI status command is intentionally read-only. Mutating debt intents such as `kyro status debt-add`, `kyro status debt-resolve`, and `kyro status debt-escalate` fail with `INVALID_INPUT`; debt changes belong in the workflow artifacts/gates, not the status renderer.
+
+## Task disposition (additive contract)
+
+`task.status` remains the progress leaf. Unfinished work that leaves a sprint is *not* another success-like status; it is an optional `task.disposition` (`deferred`, `blocked`, `superseded`, `cancelled`) written only by `kyro record-evidence`. Absence of the field is valid historical state and must not be inferred as a disposition.
+
+Disposition does not change `derivePhaseStatus` / `deriveActiveSprintStatus` / `deriveScopeStatus` in this increment. A non-blocked disposition must not be treated as verified completion (`done` + `pass`) and must not mint `handoff.nextAction: done`. Field owners, target rules, and checkpoint compatibility are in [adr-adaptive-sprint-lifecycle.md](plans/adr-adaptive-sprint-lifecycle.md).

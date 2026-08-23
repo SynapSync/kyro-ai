@@ -499,6 +499,17 @@ never reachable from Forge, routing or handoffs.
 
 Each target is either an exact `open_question` or a clarification `marker`. The command validates every resolution before writing; rejects duplicate, stale, empty, or malformed entries without changing state; appends the durable clarification record; and leaves `nextAction: clarify` until all questions and markers are resolved. Once clear, it routes to `plan_sprint` (no active sprint) or `execute_task` (an existing sprint).
 
+## Tool-owned task evidence and disposition (`kyro record-evidence`)
+
+`kyro record-evidence <task> --summary <text> --validation <text> [--file <path> ...] [--status done|blocked] [--disposition deferred|blocked|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]]` is the single maker write onto a located task. It never hand-edits `sprint.json`.
+
+- Default `--status done` records evidence and routes to `review_task`. The checker verdict stays on `kyro review`.
+- `--status blocked` without `--disposition` is the in-sprint block (still reviewable).
+- `--disposition` records a typed terminal explanation for unfinished work. It requires a non-empty `--reason`. `deferred` and `superseded` also require `--target` (`debt:<id>` must exist in `debt[]`; `task:<id>` must be a different task in the sprint; `sprint:<n>` is a positive integer and may name a future sprint). Unknown kinds, blank reasons, `--status done`, and invalid targets fail with no write.
+- A disposition is not `done` and not `pass`. Historical tasks omit the field.
+
+See [adr-adaptive-sprint-lifecycle.md](plans/adr-adaptive-sprint-lifecycle.md) and [status-coherence.md](status-coherence.md).
+
 ## Tool-owned debt mutation (`kyro debt`)
 
 `kyro debt <subcommand> [--kyro-scope <scope>] [--dry-run]` mutates `sprint.json.debt[]` deterministically, so the agent never hand-edits the fat `sprint.json` for debt. Debt is never deleted — only its status, priority, target sprint, or note change.
