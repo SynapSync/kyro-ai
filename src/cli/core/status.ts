@@ -34,7 +34,8 @@ export function deriveActiveSprintStatus(active: ActiveSprint): DerivedSprintSta
 
 /**
  * With an active sprint: any blocked task OR non-empty handoff.blockers → blocked; else active.
- * Without one: all roadmap sprints closed → completed; else planning.
+ * Without one: `handoff.nextAction === 'done'` (historical completion or retirement companion)
+ * → completed; else planning. Roadmap exhaustion is not completion.
  */
 export function deriveScopeStatus(sprint: SprintFile, hasActiveSprint: boolean): KyroScopeStatus {
   if (sprint.retirement) return 'retired';
@@ -43,8 +44,7 @@ export function deriveScopeStatus(sprint: SprintFile, hasActiveSprint: boolean):
     const blocked = tasks.some((t) => t.status === 'blocked') || (sprint.handoff.blockers ?? []).length > 0;
     return blocked ? 'blocked' : 'active';
   }
-  const roadmapSprints = sprint.roadmap?.sprints ?? [];
-  if (roadmapSprints.length > 0 && roadmapSprints.every((s) => s.state === 'closed')) return 'completed';
+  if (sprint.handoff?.nextAction === 'done') return 'completed';
   return 'planning';
 }
 
@@ -67,9 +67,47 @@ export function normalizeStoredPhaseStatus(stored: string): DerivedPhaseStatus |
   }
 }
 
-function collectSprintTasks(active: ActiveSprint): Task[] {
+export function collectSprintTasks(active: ActiveSprint): Task[] {
   const out: Task[] = [];
   for (const phase of active.phases ?? []) for (const task of phase.tasks ?? []) out.push(task);
   for (const task of active.emergentTasks ?? []) out.push(task);
   return out;
+}
+
+/** Verified completion: done + pass, and never a disposition. */
+export function isTaskVerifiedComplete(task: Task): boolean {
+  return task.status === 'done' && task.verdict?.result === 'pass' && task.disposition === undefined;
+}
+
+/** Unfinished tasks that still lack a typed disposition — close must refuse these. */
+export function undisposedCloseTasks(active: ActiveSprint): Task[] {
+  return collectSprintTasks(active).filter((task) => !isTaskVerifiedComplete(task) && !task.disposition);
+}
+
+export function disposedCloseTasks(active: ActiveSprint): Task[] {
+  return collectSprintTasks(active).filter((task) => Boolean(task.disposition));
+}
+
+/** Sprint-level close class. Callers still refuse undisposed tasks before persisting. */
+export function deriveSprintCloseOutcomeClass(active: ActiveSprint): 'completed' | 'partial' {
+  const tasks = collectSprintTasks(active);
+  if (tasks.length === 0 || tasks.every((task) => isTaskVerifiedComplete(task))) return 'completed';
+  return 'partial';
+}
+
+/**
+ * Pure "next executable task" selector, shared by every routing writer so record-evidence and review
+ * cannot drift apart. Returns the first task — in phase order then emergent order — that is pending
+ * or in_progress and has no disposition. A disposed task is not executable regardless of its kind,
+ * and a blocked task is neither pending nor in_progress, so it stays excluded as before. Returns
+ * null when no executable task remains; closing semantics belong to the caller (never inferred here).
+ */
+export function nextExecutableTaskId(active: ActiveSprint, skipId?: string): string | null {
+  const tasks = collectSprintTasks(active);
+  const next = tasks.find((task) => (
+    (skipId === undefined || task.id !== skipId)
+    && !task.disposition
+    && (task.status === 'pending' || task.status === 'in_progress')
+  ));
+  return next?.id ?? null;
 }

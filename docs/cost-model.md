@@ -37,7 +37,7 @@ The audit includes command stubs, routers, eager agent/skill files, routed modes
 | Task close | `kyro record-evidence` writes the task's evidence + status; `kyro review` writes the verdict (tool-owned, no hand-edit) |
 | Phase close | update `sprint.json.handoff.nextAction` only |
 | Sprint close | publish the immutable scope checkpoint, retain the verbatim ActiveSprint snapshot and narrative, then atomically reconcile live state |
-| Scope complete (`done`) | no further write — terminal handoff from `close-sprint` |
+| Scope retire (`done`) | no further write — human-gated terminal handoff from `scope retire` |
 
 This keeps work recoverable without rewriting large artifacts after every task.
 
@@ -62,7 +62,7 @@ Conventions and technical debt are tracked as fields on `sprint.json`, not as se
 - task pack or `execute_task` → `execute`
 - `review_task` → `review`
 - `close_sprint` → `close`
-- `done` → `brief` (terminal; no work mode)
+- `done` → `brief` (terminal; emitted only by retirement)
 
 The selected class appears in context-pack output as `budgetClass`, `reasoningTier`, `maxContextTokens`, and `budgetGuidance`.
 

@@ -167,6 +167,53 @@ export function deriveSprintCloseTransition(
   narrativePath: string,
   checkpointPath: string,
 ): { intendedAfterClose: SprintFile; projectScopeAfter: KyroScopeEntry } {
+  return deriveSprintCloseTransitionWithPolicy(
+    beforeClose,
+    projectScopeBefore,
+    close,
+    createdAt,
+    legacySnapshotPath,
+    narrativePath,
+    checkpointPath,
+    'open-scope',
+  );
+}
+
+/**
+ * Pre-T1.4 writer: exhausting the original roadmap minted `nextAction: done` and scope `completed`.
+ * Kept only so immutable historical checkpoints still match their authorized transition.
+ */
+function deriveHistoricalRoadmapExhaustionCloseTransition(
+  beforeClose: SprintFile,
+  projectScopeBefore: KyroScopeEntry,
+  close: SprintCloseInputs,
+  createdAt: string,
+  legacySnapshotPath: string,
+  narrativePath: string,
+  checkpointPath: string,
+): { intendedAfterClose: SprintFile; projectScopeAfter: KyroScopeEntry } {
+  return deriveSprintCloseTransitionWithPolicy(
+    beforeClose,
+    projectScopeBefore,
+    close,
+    createdAt,
+    legacySnapshotPath,
+    narrativePath,
+    checkpointPath,
+    'legacy-roadmap-exhaustion',
+  );
+}
+
+function deriveSprintCloseTransitionWithPolicy(
+  beforeClose: SprintFile,
+  projectScopeBefore: KyroScopeEntry,
+  close: SprintCloseInputs,
+  createdAt: string,
+  legacySnapshotPath: string,
+  narrativePath: string,
+  checkpointPath: string,
+  policy: 'open-scope' | 'legacy-roadmap-exhaustion',
+): { intendedAfterClose: SprintFile; projectScopeAfter: KyroScopeEntry } {
   const active = beforeClose.activeSprint;
   if (!active) throw new KyroCoreError('CHECKPOINT_CORRUPT', 'beforeClose.activeSprint must exist to derive a close transition.');
   const closedAt = createdAt.slice(0, 10);
@@ -183,10 +230,14 @@ export function deriveSprintCloseTransition(
   };
   const roadmapSprints = beforeClose.roadmap.sprints.map((sprint) => sprint.n === active.n ? { ...sprint, state: 'closed' } : sprint);
   const remaining = roadmapSprints.filter((sprint) => sprint.state !== 'closed').length;
+  const nextAction = policy === 'legacy-roadmap-exhaustion'
+    ? (remaining > 0 ? 'plan_sprint' : 'done')
+    : 'plan_sprint';
   const intendedAfterClose: SprintFile = {
     ...beforeClose,
-    // Sprint-level status formula is intentionally unchanged (out of scope for intermediate scope fix).
-    status: remaining === 0 ? 'completed' : beforeClose.status,
+    status: policy === 'legacy-roadmap-exhaustion'
+      ? (remaining === 0 ? 'completed' : beforeClose.status)
+      : beforeClose.status,
     ledger: [...beforeClose.ledger, ledgerEntry],
     previousSprint: {
       n: active.n,
@@ -198,19 +249,55 @@ export function deriveSprintCloseTransition(
     roadmap: { ...beforeClose.roadmap, sprints: roadmapSprints },
     handoff: {
       ...beforeClose.handoff,
-      nextAction: remaining > 0 ? 'plan_sprint' : 'done',
+      nextAction,
       nextTaskId: null,
-      note: close.note ?? `Sprint ${active.n} (${active.slug}) closed as ${close.outcome}. ${remaining > 0 ? `${remaining} sprint(s) remain.` : 'No sprints remain — scope objective met.'}`,
+      note: close.note ?? (
+        policy === 'legacy-roadmap-exhaustion'
+          ? `Sprint ${active.n} (${active.slug}) closed as ${close.outcome}. ${remaining > 0 ? `${remaining} sprint(s) remain.` : 'No sprints remain — scope objective met.'}`
+          : `Sprint ${active.n} (${active.slug}) closed as ${close.outcome}. Scope remains open for planning.`
+      ),
       lastUpdated: closedAt,
     },
   };
-  // Scope entry status uses the same SSOT as repair/status/analyze. Intermediate closes become
-  // planning; non-empty all-closed roadmaps become completed; empty roadmaps yield planning.
+  if (policy === 'open-scope') {
+    intendedAfterClose.status = deriveScopeStatus(intendedAfterClose, false);
+  }
   const projectScopeAfter: KyroScopeEntry = {
     ...projectScopeBefore,
     status: deriveScopeStatus(intendedAfterClose, false),
   };
   return { intendedAfterClose, projectScopeAfter };
+}
+
+function stampCloseLedgerCommitment(
+  derived: { intendedAfterClose: SprintFile },
+  typed: SprintCloseCheckpointV1,
+): void {
+  const last = derived.intendedAfterClose.ledger[derived.intendedAfterClose.ledger.length - 1];
+  if (last) last.checkpointSha256 = checkpointCommitment({ ...typed, intendedAfterClose: derived.intendedAfterClose });
+}
+
+/** Current writer, then the pre-T1.4 roadmap-exhaustion writer — never rewrite historical bytes. */
+function authorizeCloseTransition(
+  typed: SprintCloseCheckpointV1,
+  path: string,
+): { intendedAfterClose: SprintFile; projectScopeAfter: KyroScopeEntry } | null {
+  const args = [
+    typed.beforeClose,
+    typed.projectScopeBefore,
+    typed.close,
+    typed.createdAt,
+    typed.paths.legacySnapshot,
+    typed.paths.narrative,
+    path,
+  ] as const;
+  const current = deriveSprintCloseTransition(...args);
+  stampCloseLedgerCommitment(current, typed);
+  if (canonicalJson(current.intendedAfterClose) === canonicalJson(typed.intendedAfterClose)) return current;
+  const historical = deriveHistoricalRoadmapExhaustionCloseTransition(...args);
+  stampCloseLedgerCommitment(historical, typed);
+  if (canonicalJson(historical.intendedAfterClose) === canonicalJson(typed.intendedAfterClose)) return historical;
+  return null;
 }
 
 /**
@@ -364,16 +451,15 @@ export function checkpointIntegrityIssues(value: unknown, path: string): string[
   if (issues.length === 0) {
     const typed = value as SprintCloseCheckpointV1;
     try {
-      const derived = deriveSprintCloseTransition(typed.beforeClose, typed.projectScopeBefore, typed.close, typed.createdAt, typed.paths.legacySnapshot, typed.paths.narrative, path);
-      const derivedLast = derived.intendedAfterClose.ledger[derived.intendedAfterClose.ledger.length - 1];
-      if (derivedLast) derivedLast.checkpointSha256 = checkpointCommitment({ ...typed, intendedAfterClose: derived.intendedAfterClose });
-      if (canonicalJson(derived.intendedAfterClose) !== canonicalJson(typed.intendedAfterClose)) {
+      const authorized = authorizeCloseTransition(typed, path);
+      if (!authorized) {
         issues.push(`${path}:intendedAfterClose is not the authorized transition derived from beforeClose and frozen inputs`);
-      }
-      const scopeAfterMismatch = canonicalJson(derived.projectScopeAfter) !== canonicalJson(typed.projectScopeAfter);
-      // Accept historical intermediate v1 residual active without rewriting the immutable checkpoint.
-      if (scopeAfterMismatch && !isLegacyIntermediateActiveScopeAfter(typed)) {
-        issues.push(`${path}:projectScopeAfter is not the authorized transition`);
+      } else {
+        const scopeAfterMismatch = canonicalJson(authorized.projectScopeAfter) !== canonicalJson(typed.projectScopeAfter);
+        // Accept historical intermediate v1 residual active without rewriting the immutable checkpoint.
+        if (scopeAfterMismatch && !isLegacyIntermediateActiveScopeAfter(typed)) {
+          issues.push(`${path}:projectScopeAfter is not the authorized transition`);
+        }
       }
     } catch (error) {
       issues.push(`${path}:semantic transition invalid (${error instanceof Error ? error.message : String(error)})`);

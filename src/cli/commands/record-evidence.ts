@@ -2,7 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { deriveActiveSprintStatus, derivePhaseStatus } from '../core/status';
+import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { countClarificationMarkers } from '../core/analysis';
 import { resolveScope } from '../core/scope-resolution';
@@ -267,16 +267,6 @@ function withRecordedEvidence(
       lastUpdated: recordedAt,
     },
   };
-}
-
-function nextExecutableTaskId(active: NonNullable<SprintFile['activeSprint']>, skipId: string): string | null {
-  const tasks = active.phases.flatMap((phase) => phase.tasks).concat(active.emergentTasks);
-  const next = tasks.find((task) => (
-    task.id !== skipId
-    && !task.disposition
-    && (task.status === 'pending' || task.status === 'in_progress')
-  ));
-  return next?.id ?? null;
 }
 
 function locateTask(sprint: SprintFile, taskId: string): LocatedTask | null {

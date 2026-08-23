@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Verifies close-sprint's post-close handoff guidance: when sprints remain (plan_sprint) it
-// recommends a FRESH session + paste-ready handoff facts; when none remain (done) it reports
-// scope complete with no fresh-session nudge. Portable, deterministic half of the fresh-context nudge.
+// Verifies close-sprint's post-close handoff guidance: every non-retired scope stays routable
+// to plan_sprint, including after its original roadmap is exhausted. Portable, deterministic
+// half of the fresh-context nudge.
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -56,20 +56,20 @@ function run(root) {
   }
 }
 
-// Case 2 — no sprints remain -> done -> no fresh-session nudge, scope complete.
+// Case 2 — no original sprints remain -> plan_sprint -> scope remains open.
 {
   const root = sandbox();
   try {
     const res = run(root);
     const out = res.stdout + res.stderr;
     assert(res.status === 0, `happy close should succeed: ${out}`);
-    assert(out.includes('Next action: done'), `expected done next action: ${out}`);
-    assert(out.includes('Scope objective met'), `expected scope-complete message: ${out}`);
-    assert(!out.includes('FRESH session'), `fresh-session nudge must not appear on done: ${out}`);
-    assert(!out.includes('wrap_up'), `wrap_up must not appear: ${out}`);
+    assert(out.includes('Next action: plan_sprint'), `expected plan_sprint next action: ${out}`);
+    assert(out.includes('Scope remains open for planning'), `expected open-scope message: ${out}`);
+    assert(out.includes('FRESH session'), `expected fresh-session nudge after final roadmap sprint: ${out}`);
+    assert(out.includes('task-context'), `expected task-context pointer after final roadmap sprint: ${out}`);
     const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
-    assert(sprint.handoff.nextAction === 'done', `sprint.json nextAction must be done, got ${sprint.handoff.nextAction}`);
-    assert(sprint.status === 'completed', `sprint.json status must be completed, got ${sprint.status}`);
+    assert(sprint.handoff.nextAction === 'plan_sprint', `sprint.json nextAction must be plan_sprint, got ${sprint.handoff.nextAction}`);
+    assert(sprint.status === 'planning', `sprint.json status must remain planning, got ${sprint.status}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

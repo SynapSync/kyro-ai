@@ -281,6 +281,15 @@ export interface SprintCloseIdentity {
   sprintSlug: string;
 }
 
+export const SPRINT_CLOSE_OUTCOME = {
+  SHIPPED: 'shipped',
+  COMPLETED: 'completed',
+  PARTIAL: 'partial',
+  ABANDONED: 'abandoned',
+  ABORTED: 'aborted',
+} as const;
+export type SprintCloseOutcome = (typeof SPRINT_CLOSE_OUTCOME)[keyof typeof SPRINT_CLOSE_OUTCOME];
+
 export interface SprintCloseInputs {
   outcome: string;
   note: string | null;

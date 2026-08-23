@@ -30,6 +30,10 @@ export type KyroErrorCode =
   | 'NOT_READY_TO_CLARIFY'
   | 'CLARIFICATION_NOT_FOUND'
   | 'WRITE_NOT_PERMITTED'
+  /** A task with a disposition is terminal for execution; no checker review path may reopen it. */
+  | 'DISPOSED_TASK_NOT_REVIEWABLE'
+  /** Close refused because an unfinished task has no typed disposition. */
+  | 'UNDISPOSED_TASKS'
   /** A defined, parseable operation this runtime can prepare or preview but deliberately not apply. */
   | 'UNSUPPORTED_OPERATION'
   | 'INTERNAL';

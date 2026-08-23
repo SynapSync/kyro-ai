@@ -334,7 +334,17 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
   };
 
   const roadmapEntry = next.roadmap.sprints.find((entry) => entry.n === input.sprint.n);
-  if (roadmapEntry) roadmapEntry.state = 'active';
+  if (roadmapEntry) {
+    roadmapEntry.state = 'active';
+  } else {
+    next.roadmap.sprints.push({
+      n: input.sprint.n,
+      slug: input.sprint.slug,
+      title: input.sprint.title,
+      state: 'active',
+    });
+    next.roadmap.plannedSprintCount = Math.max(next.roadmap.plannedSprintCount, next.roadmap.sprints.length);
+  }
   // Deliberate scope cut for this increment: sprint mode does not auto-transition debt[] items (e.g.
   // marking due debt "in_progress" the way the plan-sprint workflow does by hand). Debt is left as-is;
   // the agent/checker can transition it explicitly. Never dropped or reset either way.

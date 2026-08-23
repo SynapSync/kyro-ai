@@ -96,6 +96,7 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
   const closeArgs: CloseSprintArgs = {
     scope,
     outcome: requiredString(args.outcome, 'outcome'),
+    outcomeExplicit: true,
     note: optionalString(args.note),
     summary: optionalString(args.summary),
     recommendations: optionalStringArray(args.recommendations),

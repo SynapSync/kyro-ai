@@ -6,6 +6,13 @@ import { readProjectState } from '../state';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { collectFindings } from '../core/analysis';
 import { KyroCoreError } from '../core/errors';
+import {
+  collectSprintTasks,
+  deriveSprintCloseOutcomeClass,
+  disposedCloseTasks,
+  isTaskVerifiedComplete,
+  undisposedCloseTasks,
+} from '../core/status';
 import { isInteractiveTerminal } from '../core/tty';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
@@ -22,7 +29,8 @@ import {
   readSprintCloseCheckpoint,
   type SprintCloseTransaction,
 } from '../checkpoints/sprint-close';
-import type { ActiveSprint, OperationPlan, SprintCloseCheckpointV1, SprintCloseInputs, SprintFile } from '../types';
+import type { ActiveSprint, OperationPlan, SprintCloseCheckpointV1, SprintCloseInputs, SprintFile, Task } from '../types';
+import { SPRINT_CLOSE_OUTCOME } from '../types';
 import { assertSafeManagedPath, assertSafePathSegment, withStateWriterLock } from '../pipeline/state-writer-lock';
 
 /**
@@ -38,6 +46,7 @@ import { assertSafeManagedPath, assertSafePathSegment, withStateWriterLock } fro
 export interface CloseSprintArgs {
   scope: string | null;
   outcome: string;
+  outcomeExplicit: boolean;
   note: string | null;
   summary: string | null;
   recommendations: string[];
@@ -62,6 +71,7 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
   printPlan(`Close sprint ${identity.sprintN} (${identity.sprintSlug}) — lossless scope checkpoint`, plan);
   console.log(`\nCheckpoint (written first, immutable complete scope state): ${checkpointPath}`);
   console.log(`Legacy ActiveSprint snapshot (never overwritten): ${snapshotPath}`);
+  printCloseTruthSummary(transaction);
 
   if (args.dryRun) {
     console.log('Dry run complete. No files changed.');
@@ -92,7 +102,7 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
 function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
   const fresh = buildClosePlan(scope, args);
   const identity = fresh.transaction.checkpoint.identity;
-  emitToolCommandRun(scope, 'cli', 'close-sprint', { outcome: args.outcome });
+  emitToolCommandRun(scope, 'cli', 'close-sprint', { outcome: fresh.transaction.checkpoint.close.outcome });
   const guard = evaluateGuard('close_sprint', { surface: 'cli', scope, confirmed: true });
   if (guard.kind === 'blocked') {
     emitBlockedReason(scope, guard.message, guard.code);
@@ -137,7 +147,7 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
     if (handoff.note) console.log(`    note:        ${handoff.note}`);
   } else if (handoff.nextAction === 'done') {
     console.log('');
-    console.log('▶ Scope objective met — no sprints remain. This scope is complete.');
+    console.log('▶ Scope is terminal (historical completion or retirement). No further forge modes.');
   }
 }
 
@@ -157,7 +167,7 @@ export function buildClosePlan(
   if (!read.exists) {
     const recovered = findLatestCheckpoint(scope);
     if (!recovered) throw new KyroCoreError('SCOPE_NOT_FOUND', `Cannot close ${scope}: sprint.json not found and no checkpoint can resume it. Run recovery or /kyro:forge (INIT).`);
-    assertMatchingCloseInputs(recovered.checkpoint.close, args, recovered.path);
+    assertMatchingCloseInputs(recovered.checkpoint.close, retryCloseInputs(recovered.checkpoint, args), recovered.path);
     return closePlanResult(recovered.checkpoint.intendedAfterClose, transactionFromExisting(recovered.path, recovered.checkpoint));
   }
   if (read.error) {
@@ -180,7 +190,7 @@ export function buildClosePlan(
       const checkpointPath = `${root}/${latest.checkpoint}`;
       const checkpoint = readSprintCloseCheckpoint(checkpointPath);
       if (!checkpoint) throw new KyroCoreError('CHECKPOINT_CORRUPT', `Ledger references missing checkpoint ${checkpointPath}.`, 'Restore the checkpoint before retrying the close.');
-      assertMatchingCloseInputs(checkpoint.close, args, checkpointPath);
+      assertMatchingCloseInputs(checkpoint.close, retryCloseInputs(checkpoint, args), checkpointPath);
       const priorActive = checkpoint.beforeClose.activeSprint;
       if (!priorActive) throw new KyroCoreError('CHECKPOINT_CORRUPT', `Checkpoint ${checkpointPath} has no beforeClose.activeSprint.`);
       const transaction = transactionFromExisting(checkpointPath, checkpoint);
@@ -219,13 +229,27 @@ export function buildClosePlan(
     );
   }
 
+  if (!existingCheckpoint) {
+    const undisposed = undisposedCloseTasks(active);
+    if (undisposed.length > 0) {
+      const detail = undisposed.map((task) => `${task.id} (${task.status})`).join(', ');
+      throw new KyroCoreError(
+        'UNDISPOSED_TASKS',
+        `Cannot close ${scope}: unfinished task(s) lack a disposition: ${detail}.`,
+        'Record a disposition with kyro record-evidence <task> --disposition deferred|blocked|superseded|cancelled --reason "..." [--target debt:<id>|task:<id>|sprint:<n>], or complete and review the task.',
+      );
+    }
+  }
+
   if (existingCheckpoint) {
-    assertMatchingCloseInputs(existingCheckpoint.close, args, checkpointPath);
+    assertMatchingCloseInputs(existingCheckpoint.close, retryCloseInputs(existingCheckpoint, args), checkpointPath);
     if (existingCheckpoint.identity.scope !== scope || existingCheckpoint.identity.sprintN !== active.n || existingCheckpoint.identity.sprintSlug !== active.slug) {
       throw new KyroCoreError('CHECKPOINT_CONFLICT', `Checkpoint identity at ${checkpointPath} does not match the active sprint.`, 'Do not overwrite the checkpoint; reconcile the conflicting sprint identity.');
     }
     return closePlanResult(sprint, transactionFromExisting(checkpointPath, existingCheckpoint));
   }
+
+  const closeInputs = buildCloseInputs(active, args);
 
   const state = readProjectState();
   const projectScopeBefore = state?.scopes.find((entry) => entry.id === scope);
@@ -238,7 +262,6 @@ export function buildClosePlan(
   }
   const createdAt = new Date().toISOString();
   const closedAt = createdAt.slice(0, 10);
-  const closeInputs = frozenCloseInputs(args);
   const transition = deriveSprintCloseTransition(sprint, projectScopeBefore, closeInputs, createdAt, snapshotPath, narrativePath, checkpointPath);
   const closed = transition.intendedAfterClose;
   const projectScopeAfter = transition.projectScopeAfter;
@@ -316,6 +339,11 @@ function renderNarrative(sprint: SprintFile, active: ActiveSprint, args: SprintC
       lines.push('');
       lines.push(`**Status**: ${task.status}`);
       lines.push('');
+      const dispositionLine = renderDisposition(task);
+      if (dispositionLine) {
+        lines.push(`**Disposition**: ${dispositionLine}`);
+        lines.push('');
+      }
       if (task.description) {
         lines.push(`**Description**: ${task.description}`);
         lines.push('');
@@ -324,6 +352,19 @@ function renderNarrative(sprint: SprintFile, active: ActiveSprint, args: SprintC
       lines.push(`**Verdict**: ${renderVerdict(task.verdict)}`);
       lines.push('');
       lines.push('---');
+    }
+  }
+  lines.push('');
+
+  const unfinished = collectSprintTasks(active).filter((task) => !isTaskVerifiedComplete(task));
+  lines.push('## Unfinished work');
+  lines.push('');
+  if (unfinished.length === 0) {
+    lines.push('_None — every task is done with a passing verdict._');
+  } else {
+    for (const task of unfinished) {
+      const dispositionLine = renderDisposition(task) ?? `${task.status}, no disposition`;
+      lines.push(`- **${task.id}** (${task.title}): ${dispositionLine}`);
     }
   }
   lines.push('');
@@ -422,12 +463,91 @@ function transactionFromExisting(checkpointPath: string, checkpoint: SprintClose
   return { checkpointPath, checkpoint, checkpointContent: `${JSON.stringify(checkpoint, null, 2)}\n`, legacySnapshotContent, narrativeContent };
 }
 
-function frozenCloseInputs(args: CloseSprintArgs): SprintCloseInputs {
-  return { outcome: args.outcome, note: args.note, summary: args.summary, recommendations: [...args.recommendations], learnings: [...args.learnings] };
+function retryCloseInputs(checkpoint: SprintCloseCheckpointV1, args: CloseSprintArgs): SprintCloseInputs {
+  const active = checkpoint.beforeClose.activeSprint;
+  if (!active) {
+    throw new KyroCoreError('CHECKPOINT_CORRUPT', `Checkpoint ${checkpoint.identity.sprintN} has no beforeClose.activeSprint.`, 'Restore the checkpoint before retrying the close.');
+  }
+  return {
+    outcome: args.outcomeExplicit
+      ? args.outcome
+      : deriveSprintCloseOutcomeClass(active) === 'completed'
+        ? SPRINT_CLOSE_OUTCOME.SHIPPED
+        : SPRINT_CLOSE_OUTCOME.PARTIAL,
+    note: args.note,
+    summary: args.summary,
+    recommendations: [...args.recommendations],
+    learnings: [...args.learnings],
+  };
 }
 
-function assertMatchingCloseInputs(expected: SprintCloseInputs, args: CloseSprintArgs, checkpointPath: string): void {
-  if (canonicalJson(expected) !== canonicalJson(frozenCloseInputs(args))) {
+function buildCloseInputs(active: ActiveSprint, args: CloseSprintArgs): SprintCloseInputs {
+  return {
+    outcome: resolveCloseOutcome(active, args),
+    note: args.note,
+    summary: args.summary,
+    recommendations: [...args.recommendations],
+    learnings: [...args.learnings],
+  };
+}
+
+const COMPLETED_CLOSE_OUTCOMES = new Set<string>([SPRINT_CLOSE_OUTCOME.SHIPPED, SPRINT_CLOSE_OUTCOME.COMPLETED]);
+const PARTIAL_CLOSE_OUTCOMES = new Set<string>([SPRINT_CLOSE_OUTCOME.PARTIAL]);
+const ABANDONED_CLOSE_OUTCOMES = new Set<string>([SPRINT_CLOSE_OUTCOME.ABANDONED, SPRINT_CLOSE_OUTCOME.ABORTED]);
+
+function resolveCloseOutcome(active: ActiveSprint, args: CloseSprintArgs): string {
+  const derived = deriveSprintCloseOutcomeClass(active);
+  const requested = args.outcome;
+  if (derived === 'completed') {
+    if (!args.outcomeExplicit) return SPRINT_CLOSE_OUTCOME.SHIPPED;
+    if (PARTIAL_CLOSE_OUTCOMES.has(requested)) {
+      throw new KyroCoreError(
+        'INVALID_INPUT',
+        `Cannot close as ${requested}: every task is done with a passing verdict.`,
+        'Omit --outcome or pass --outcome shipped/completed.',
+      );
+    }
+    return requested;
+  }
+  if (!args.outcomeExplicit) return SPRINT_CLOSE_OUTCOME.PARTIAL;
+  if (COMPLETED_CLOSE_OUTCOMES.has(requested)) {
+    throw new KyroCoreError(
+      'INVALID_INPUT',
+      `Cannot close as ${requested}: disposed or unfinished work cannot be recorded as shipped/completed.`,
+      'Omit --outcome to persist partial, or pass --outcome partial or --outcome abandoned.',
+    );
+  }
+  if (PARTIAL_CLOSE_OUTCOMES.has(requested) || ABANDONED_CLOSE_OUTCOMES.has(requested)) return requested;
+  throw new KyroCoreError(
+    'INVALID_INPUT',
+    `Unknown close outcome "${requested}" for a partial sprint.`,
+    'Use --outcome partial or --outcome abandoned.',
+  );
+}
+
+function renderDisposition(task: Task): string | null {
+  const disposition = task.disposition;
+  if (!disposition) return null;
+  const target = disposition.target ? ` → ${disposition.target.kind}:${disposition.target.id}` : '';
+  return `${disposition.kind}${target} — ${disposition.reason}`;
+}
+
+function printCloseTruthSummary(transaction: SprintCloseTransaction): void {
+  const active = transaction.checkpoint.beforeClose.activeSprint;
+  const outcome = transaction.checkpoint.close.outcome;
+  if (!active) return;
+  const disposed = disposedCloseTasks(active);
+  const verified = collectSprintTasks(active).filter((task) => isTaskVerifiedComplete(task)).length;
+  console.log(`\nClose outcome: ${outcome} (${verified} verified complete, ${disposed.length} disposed).`);
+  if (disposed.length === 0) return;
+  console.log('Disposed tasks:');
+  for (const task of disposed) {
+    console.log(`  ${task.id}: ${renderDisposition(task)}`);
+  }
+}
+
+function assertMatchingCloseInputs(expected: SprintCloseInputs, actual: SprintCloseInputs, checkpointPath: string): void {
+  if (canonicalJson(expected) !== canonicalJson(actual)) {
     throw new KyroCoreError('CHECKPOINT_CONFLICT', `Close inputs conflict with frozen metadata in ${checkpointPath}.`, 'Retry with exactly the outcome, note, summary, recommendations, and learnings stored in the checkpoint.');
   }
 }
@@ -455,6 +575,7 @@ export function compareCheckpointRecency(left: SprintCloseCheckpointV1, right: S
 function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
   let scope: string | null = null;
   let outcome = 'shipped';
+  let outcomeExplicit = false;
   let note: string | null = null;
   let summary: string | null = null;
   const recommendations: string[] = [];
@@ -477,7 +598,10 @@ function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
     else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
     else if (arg === '--help' || arg === '-h') help = true;
     else if (arg === '--kyro-scope' || arg.startsWith('--kyro-scope=')) [scope, i] = takeValue(arg, i);
-    else if (arg === '--outcome' || arg.startsWith('--outcome=')) [outcome, i] = takeValue(arg, i);
+    else if (arg === '--outcome' || arg.startsWith('--outcome=')) {
+      [outcome, i] = takeValue(arg, i);
+      outcomeExplicit = true;
+    }
     else if (arg === '--note' || arg.startsWith('--note=')) [note, i] = takeValue(arg, i);
     else if (arg === '--summary' || arg.startsWith('--summary=')) [summary, i] = takeValue(arg, i);
     else if (arg === '--recommendation' || arg.startsWith('--recommendation=')) {
@@ -491,7 +615,7 @@ function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
     } else throw new KyroCoreError('INVALID_INPUT', `Unknown option: ${arg}`);
   }
 
-  return { scope, outcome, note, summary, recommendations, learnings, dryRun, yes, help };
+  return { scope, outcome, outcomeExplicit, note, summary, recommendations, learnings, dryRun, yes, help };
 }
 
 function printCloseSprintHelp(): void {
@@ -505,7 +629,9 @@ Usage:
 
 Options:
   --kyro-scope <scope>     Scope to close (defaults to the active/only scope)
-  --outcome <text>         Sprint outcome (default: shipped)
+  --outcome <text>         Sprint outcome. Default shipped when every task is done+pass;
+                           derived partial when any task is disposed. shipped/completed
+                           are refused for disposed work.
   --note <text>            handoff.note for the next session
   --summary <text>         previousSprint summary (defaults to the sprint objective)
   --recommendation <text>  Recommendation for the next sprint (repeatable)

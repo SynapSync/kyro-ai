@@ -444,6 +444,8 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 `kyro close-sprint` is the only verb that confirms interactively. Outside a TTY (agent harness, CI, piped shell) it fails immediately with `CONFIRMATION_REQUIRED` instead of prompting for input that can never arrive — pass `--yes` to complete the gate non-interactively, or `--dry-run` to preview it.
 
+Close requires every unfinished task to have a typed `task.disposition`. The persisted outcome is `shipped`/`completed` only when every task is `done` with a passing verdict; otherwise it is derived `partial` (or explicit `abandoned`). Dry-run, the narrative, the checkpoint `beforeClose` image, and the ledger entry all expose those dispositions. Closing a sprint never completes the scope: `handoff.nextAction` returns to `plan_sprint` so a later sprint can be materialized with `kyro plan --from`. Retirement remains the only terminal path.
+
 ## Runtime capability handshake (`kyro capabilities`)
 
 `kyro capabilities [--json]` lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start: a missing verb — or an `UNKNOWN_COMMAND` failure on the command itself — means the installed runtime predates the skill assets and the forge must abort with an upgrade request instead of improvising hand-edits. `kyro doctor` probes the installed runtime with the same handshake (`CLI capabilities` check).

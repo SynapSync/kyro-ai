@@ -14,7 +14,7 @@ enforced by `check:status`.
 |---|---|
 | `derivePhaseStatus(phase)` | no tasks → `pending`; any task `blocked` → `blocked`; all `done` → `done`; any `in_progress` or a done/pending mix → `active`; else `pending` |
 | `deriveActiveSprintStatus(active)` | no tasks → `planned`; all tasks still `pending` → `planned`; all `done` → `complete`; else `executing` |
-| `deriveScopeStatus(sprint, hasActiveSprint)` | active sprint with a blocked task or `handoff.blockers` → `blocked`; active sprint → `active`; all roadmap sprints closed → `completed`; else `planning` |
+| `deriveScopeStatus(sprint, hasActiveSprint)` | active sprint with a blocked task or `handoff.blockers` → `blocked`; active sprint → `active`; `handoff.nextAction === 'done'` (historical completion or retirement companion) → `completed`; else `planning`. Exhausting the original roadmap does not complete a scope. |
 
 These three signals answer different questions:
 

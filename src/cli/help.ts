@@ -126,7 +126,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'rule') {
     console.log('Usage: kyro rule add --rule <text> [--tag <tag> ...] [--id <id>] [--global] [--kyro-scope <scope>] [--dry-run]');
   } else if (command === 'close-sprint') {
-    console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome <text>] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
+    console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome shipped|completed|partial|abandoned] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
   } else if (command === 'context-pack') {
     console.log('Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--verbosity concise|detailed] [--json]');
   } else if (command === 'eval') {
