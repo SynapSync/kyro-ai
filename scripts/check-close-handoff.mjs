@@ -26,8 +26,8 @@ function sprintPath(root) {
   return join(root, '.agents/kyro/scopes/demo/sprint.json');
 }
 
-function run(root) {
-  return spawnSync(process.execPath, [cli, 'close-sprint', '--kyro-scope', 'demo', '--outcome', 'shipped', '--yes'], {
+function run(root, extra = []) {
+  return spawnSync(process.execPath, [cli, 'close-sprint', '--kyro-scope', 'demo', '--outcome', 'shipped', '--yes', ...extra], {
     cwd: root,
     env: { ...process.env, HOME: join(root, '.home') },
     encoding: 'utf-8',
@@ -70,6 +70,78 @@ function run(root) {
     const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
     assert(sprint.handoff.nextAction === 'plan_sprint', `sprint.json nextAction must be plan_sprint, got ${sprint.handoff.nextAction}`);
     assert(sprint.status === 'planning', `sprint.json status must remain planning, got ${sprint.status}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// Case 3 — adversarial partial close: the final originally-planned sprint has a disposed task, so
+// the close persists a partial outcome and the scope STAYS open for planning. Closing the last
+// roadmap sprint must never mint nextAction "done" just because the roadmap is exhausted (R2/S2).
+{
+  const root = sandbox();
+  try {
+    const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+    sprint.activeSprint.phases[0].tasks.push({
+      id: 'T1.2',
+      title: 'Deferred demo work',
+      description: 'Carried work.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Deferred.'],
+      depends_on: [],
+      status: 'pending',
+      evidence: { summary: 'Deferred.', validation: 'user decision', files_changed: [], notes: '', by: 'maker', recordedAt: '2026-07-02T00:02:00.000Z' },
+      verdict: null,
+      disposition: { kind: 'cancelled', reason: 'Dropped before close.', by: 'maker', recordedAt: '2026-07-02T00:02:00.000Z' },
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const res = run(root, ['--outcome', 'partial']);
+    const out = res.stdout + res.stderr;
+    assert(res.status === 0, `partial close should succeed: ${out}`);
+    assert(out.includes('partial'), `partial close should report a partial outcome: ${out}`);
+    assert(out.includes('Next action: plan_sprint'), `final-roadmap partial close must route to plan_sprint, got: ${out}`);
+    assert(out.includes('Scope remains open for planning'), `expected open-scope message on partial close: ${out}`);
+    assert(!out.includes('Scope objective met'), `done message must never appear for an open post-close scope: ${out}`);
+
+    const closed = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+    assert(closed.handoff.nextAction === 'plan_sprint', `sprint.json nextAction must be plan_sprint, got ${closed.handoff.nextAction}`);
+    assert(closed.status === 'planning', `scope must remain planning after partial final close, got ${closed.status}`);
+    assert(closed.activeSprint === null, 'activeSprint must be cleared by close');
+    assert(closed.ledger.length === 1 && closed.ledger[0].outcome === 'partial', 'ledger must record the partial outcome');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// Case 4 — close refuses a sprint whose unfinished task still lacks a typed disposition (R1): the
+// close must fail closed with UNDISPOSED_TASKS and write nothing.
+{
+  const root = sandbox();
+  try {
+    const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+    sprint.activeSprint.phases[0].tasks.push({
+      id: 'T1.2',
+      title: 'Unfinished demo work',
+      description: 'Incomplete.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Done.'],
+      depends_on: [],
+      status: 'pending',
+      evidence: { summary: 'partial', validation: 'none', files_changed: [], notes: '', by: 'maker', recordedAt: '2026-07-02T00:02:00.000Z' },
+      verdict: null,
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+    const before = readFileSync(sprintPath(root), 'utf-8');
+
+    const res = run(root);
+    const out = res.stdout + res.stderr;
+    assert(res.status !== 0, 'close with an undisposed unfinished task must fail');
+    assert(out.includes('UNDISPOSED_TASKS'), `close should report UNDISPOSED_TASKS: ${out}`);
+    assert(out.includes('--disposition'), `close remedy should point to record-evidence disposition: ${out}`);
+    assert(readFileSync(sprintPath(root), 'utf-8') === before, 'refused close must not write sprint.json');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

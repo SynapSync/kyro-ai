@@ -721,4 +721,82 @@ function initScope(root, scope = 'demo-scope') {
   }
 }
 
+// 14) S3 — a scope whose original roadmap is fully closed and which has NO active sprint can plan a
+//     later sprint through the normal tool-owned route (plan sprint mode), without any recovery.
+//     This falsifies the prior "roadmap exhausted => done" behavior end-to-end: the post-close
+//     handoff stays plan_sprint and plan materializes the next sprint directly.
+{
+  const root = sandbox();
+  try {
+    const leanPath = writeLeanPlan(root, validLeanPlan());
+    const initResult = run(['plan', '--from', leanPath], root);
+    assert(initResult.status === 0, `init should succeed: ${initResult.stdout}${initResult.stderr}`);
+
+    const sprintLean = writeLeanSprintPlan(root, validLeanSprintPlan());
+    const sprintResult = run(['plan', '--from', sprintLean, '--kyro-scope', 'demo-scope'], root);
+    assert(sprintResult.status === 0, `sprint 1 plan should succeed: ${sprintResult.stdout}${sprintResult.stderr}`);
+
+    // Disposition the only task so the close is a truthful partial close.
+    const sprint = readSprint(root, 'demo-scope');
+    sprint.activeSprint.phases[0].tasks[0].disposition = {
+      kind: 'cancelled',
+      reason: 'Dropped before close.',
+      by: 'maker',
+      recordedAt: '2026-07-02T00:02:00.000Z',
+    };
+    writeFileSync(sprintPath(root, 'demo-scope'), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const closeResult = run(['close-sprint', '--kyro-scope', 'demo-scope', '--outcome', 'partial', '--yes'], root);
+    assert(closeResult.status === 0, `partial close should succeed: ${closeResult.stdout}${closeResult.stderr}`);
+    const closed = readSprint(root, 'demo-scope');
+    assert(closed.handoff.nextAction === 'plan_sprint', `post-close handoff must be plan_sprint, got ${closed.handoff.nextAction}`);
+    assert(closed.status === 'planning', `post-close scope must remain planning, got ${closed.status}`);
+    assert(closed.activeSprint === null, 'activeSprint must be null after close');
+
+    // Simulate an old/stale stored scope status. Context-pack must expose the canonical derived
+    // lifecycle state instead of blindly rendering this field: the scope is still open to plan.
+    closed.status = 'completed';
+    writeFileSync(sprintPath(root, 'demo-scope'), `${JSON.stringify(closed, null, 2)}\n`);
+    const packResult = run(['context-pack', '--kyro-scope', 'demo-scope', '--json'], root);
+    assert(packResult.status === 0, `post-close context-pack should succeed: ${packResult.stdout}${packResult.stderr}`);
+    const pack = JSON.parse(packResult.stdout);
+    assert(pack.status === 'planning', `context-pack must derive planning instead of stale completed, got ${pack.status}`);
+    assert(pack.nextAction === 'plan_sprint', `context-pack must preserve plan_sprint routing, got ${pack.nextAction}`);
+
+    // Now plan Sprint 2 (outside the original roadmap) through the normal route.
+    const second = writeLeanSprintPlan(root, validLeanSprintPlan({
+      sprint: { n: 2, slug: 'hardening', title: 'Hardening', objective: 'Harden it.' },
+      phases: [
+        {
+          id: 'P1',
+          title: 'Phase 1',
+          objective: 'Harden the core.',
+          tasks: [
+            {
+              id: 'T2.1',
+              title: 'Task 2',
+              description: 'Harden the thing.',
+              files_to_touch: ['src/harden.ts'],
+              context: 'ctx',
+              acceptance_criteria: ['It is hardened.'],
+              depends_on: [],
+              scenario_refs: [],
+            },
+          ],
+        },
+      ],
+    }), 'second-sprint.json');
+    const planResult = run(['plan', '--from', second, '--kyro-scope', 'demo-scope'], root);
+    assert(planResult.status === 0, `planning sprint 2 after exhausted roadmap should succeed: ${planResult.stdout}${planResult.stderr}`);
+    assert(planResult.stdout.includes('Sprint 2 planned'), `expected Sprint 2 to be planned: ${planResult.stdout}`);
+
+    const planned = readSprint(root, 'demo-scope');
+    assert(planned.activeSprint && planned.activeSprint.n === 2, `activeSprint should be sprint 2, got ${planned.activeSprint && planned.activeSprint.n}`);
+    assert(planned.handoff.nextAction === 'execute_task' && planned.handoff.nextTaskId === 'T2.1', `handoff should route to T2.1, got ${planned.handoff.nextAction}/${planned.handoff.nextTaskId}`);
+    assert(planned.roadmap.sprints.some((s) => s.n === 2 && s.state === 'active'), 'roadmap must record sprint 2 as active');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 console.log('check:plan — tool-owned scope bootstrap (init) and sprint materialization (sprint) verified end-to-end');

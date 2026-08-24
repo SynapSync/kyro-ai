@@ -263,6 +263,84 @@ function assertDescribeWriteFailureClassifiesErrno() {
   assert(plain === null, `describeWriteFailure(generic Error) should return null, got ${JSON.stringify(plain)}`);
 }
 
+// 8. No-auto-complete mutation guard (R2): deriveScopeStatus must return "planning", not "completed",
+//    for a scope whose original roadmap is exhausted but whose handoff is NOT "done". Only an explicit
+//    terminal handoff mints "completed". If this derivation regresses to "roadmap closed => completed",
+//    an open post-close scope would falsely read as a completed terminal scope.
+function assertDeriveScopeStatusMutationGuard() {
+  const { deriveScopeStatus } = require(resolve(repo, 'dist/cli/core/status.js'));
+  const makeClosedRoadmapSprint = (overrides = {}) => ({
+    schemaVersion: 4,
+    scope: 'demo',
+    title: 'Demo',
+    status: 'planning',
+    objective: 'Demo objective',
+    successCriteria: ['Demo works.'],
+    clarifications: [],
+    conventions: [],
+    roadmap: {
+      plannedSprintCount: 1,
+      sizingRationale: 'One sprint is enough.',
+      sprints: [{ n: 1, slug: 'demo-sprint', title: 'Demo Sprint', state: 'closed' }],
+    },
+    ledger: [],
+    previousSprint: null,
+    activeSprint: null,
+    debt: [],
+    handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: 'Resume.', lastUpdated: '2026-07-02' },
+    ...overrides,
+  });
+
+  // Open post-close scope: roadmap exhausted, but nextAction is plan_sprint -> must be planning.
+  const openPostClose = deriveScopeStatus(makeClosedRoadmapSprint(), false);
+  assert(openPostClose === 'planning', `exhausted-roadmap + plan_sprint must derive planning, got ${openPostClose}`);
+
+  // Explicit terminal handoff (historical completion / retirement companion) -> completed.
+  const terminal = deriveScopeStatus(makeClosedRoadmapSprint({ handoff: { nextAction: 'done', nextTaskId: null, blockers: [], note: 'Retired.', lastUpdated: '2026-07-02' } }), false);
+  assert(terminal === 'completed', `explicit done handoff must derive completed, got ${terminal}`);
+
+  // Active sprint -> active (unchanged).
+  const active = deriveScopeStatus(makeClosedRoadmapSprint({ activeSprint: { n: 1, slug: 's', title: 'S', objective: 'o', status: 'complete', phases: [], emergentTasks: [], definitionOfDone: [] } }), true);
+  assert(active === 'active', `active sprint must derive active, got ${active}`);
+}
+
+// 9. CLI status must distinguish verified completion from disposed work in the full task summary
+//    (AC1 of T1.5): a disposed task is never counted as verified, and its kind is reported.
+function assertStatusTaskSummaryDistinguishesDispositions() {
+  const root = sandbox();
+  try {
+    const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+    sprint.debt = [{ id: 'debt-1', title: 'Deferred demo work', origin: 1, priority: 'medium', status: 'open', targetSprint: 2, note: 'Carry forward.' }];
+    sprint.activeSprint.phases[0].tasks[0].status = 'pending';
+    sprint.activeSprint.phases[0].tasks[0].disposition = { kind: 'deferred', reason: 'Deferred to debt.', by: 'maker', recordedAt: '2026-07-15T00:00:00.000Z', target: { kind: 'debt', id: 'debt-1' } };
+    sprint.activeSprint.phases[0].tasks.push({
+      id: 'T1.2',
+      title: 'Done demo',
+      description: 'Done.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Done.'],
+      depends_on: [],
+      status: 'done',
+      evidence: { summary: 'done', validation: 'ok', files_changed: [], notes: '', by: 'maker', recordedAt: '2026-07-15T00:00:00.000Z' },
+      verdict: { result: 'pass', checked_criteria: ['Done.'], findings: [], by: 'checker', reviewedAt: '2026-07-15T00:00:01.000Z' },
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const full = run(['status', 'full', '--kyro-scope', 'demo', '--json'], root);
+    assert(full.status === 0, `kyro status full --json should succeed: ${full.stderr || full.stdout}`);
+    const report = JSON.parse(full.stdout);
+    assert(report.taskSummary.verified === 1, `verified should count done+pass+no disposition (1), got ${JSON.stringify(report.taskSummary)}`);
+    assert(report.taskSummary.dispositions.deferred === 1, `deferred disposition should be reported, got ${JSON.stringify(report.taskSummary.dispositions)}`);
+    assert(report.taskSummary.dispositions.cancelled === 0, `cancelled disposition should be 0, got ${JSON.stringify(report.taskSummary.dispositions)}`);
+
+    const text = run(['status', 'full', '--kyro-scope', 'demo'], root);
+    assert(text.stdout.includes('Dispositions: deferred=1'), `full text output should list dispositions: ${text.stdout}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 function main() {
   assertStatusCoreIsPure();
   assertAnalyzeReportsActiveSprintStatusDrift();
@@ -272,6 +350,8 @@ function main() {
   assertStatusRouterDocumentsReviewDebt();
   assertCliStatusCommand();
   assertDescribeWriteFailureClassifiesErrno();
+  assertDeriveScopeStatusMutationGuard();
+  assertStatusTaskSummaryDistinguishesDispositions();
   console.log('check:status — status coherence invariants passed');
 }
 

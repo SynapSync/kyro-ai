@@ -39,12 +39,15 @@ Use `--dry-run` first if you want to review the plan. Do not replicate this by h
 
 ## Hand off for a fresh session
 
-After the CLI reports `Next action: plan_sprint` (sprints remain), the next sprint must start
-in a **fresh session** — continuing here carries the whole session's context, the biggest cost
-driver across a multi-sprint run. Do NOT auto-start the next sprint now. Generate the
+After the CLI reports `Next action: plan_sprint`, the scope stays **open for planning** — even when
+every originally planned roadmap sprint has been closed. A roadmap is an estimate, not a completion
+contract; scope completion is an explicit decision, not a side effect of exhausting it. The next
+sprint must start in a **fresh session** — continuing here carries the whole session's context, the
+biggest cost driver across a multi-sprint run. Do NOT auto-start the next sprint now. Generate the
 continuation prompt via the task-context capability (`/kyro:task-context`, or the
 `kyro-task-context` skill) and present it in a fenced block for the user to paste into a new
-session. When the CLI reports `Next action: done`, the scope is complete — no more sprints to plan.
+session. When the CLI reports `Next action: done`, the scope is terminal (historical completion or
+retirement companion) — no more sprints to plan; only that explicit signal completes a scope.
 
 ## Rules
 

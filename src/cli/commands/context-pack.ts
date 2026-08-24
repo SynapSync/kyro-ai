@@ -6,6 +6,7 @@ import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
 import { listScopeNames } from '../artifacts/scopes';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
+import { deriveScopeStatus } from '../core/status';
 import { emitTraceEvent } from '../core/trace';
 import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
@@ -89,7 +90,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     packMode,
     verbosity,
     scope,
-    status: sprint.status,
+    status: deriveScopeStatus(sprint, Boolean(sprint.activeSprint)),
     objective: sprint.objective,
     retirement: sprint.retirement ?? null,
     nextAction: sprint.handoff.nextAction,
