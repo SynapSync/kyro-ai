@@ -32,7 +32,7 @@ Usage:
   kyro eval [options]          Run deterministic behavioral eval cases
   kyro mcp <subcommand>        Run or inspect the Kyro MCP server
   kyro trace [options]          Read or clear the append-only scope trace
-  kyro scope <subcommand>      List, inspect, activate, or retire Kyro scopes
+  kyro scope <subcommand>      List, inspect, activate, retire, or complete Kyro scopes
   kyro sync [options]          Refresh managed workspace assets
   kyro uninstall [options]     Remove managed workspace assets
 
@@ -137,7 +137,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'trace') {
     console.log('Usage: kyro trace [scope|--kyro-scope <scope>] [--json] [--tail N] [--type <event>] [--clear <scope>]');
   } else if (command === 'scope') {
-    console.log('Usage: kyro scope list | inspect <scope> | set-active <scope>');
+    console.log('Usage: kyro scope list | inspect <scope> | set-active <scope> | complete --kyro-scope <scope> [--summary <text>] [--yes] | retire --kyro-scope <scope> --reason <reason> [--digest <sha256> --yes]');
   } else if (command === 'sync') {
     console.log('Usage: kyro sync [--agent standard|opencode|codex] [--prune] [--dry-run]');
   } else if (command === 'uninstall') {

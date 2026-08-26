@@ -541,6 +541,7 @@ function cloneScopeEntry(entry: KyroScopeEntry): KyroScopeEntry {
     title: entry.title ?? readAlias(source, 'name', 'scopeName') ?? '',
     status: entry.status,
     ...(entry.retirement ? { retirement: { ...entry.retirement } } : {}),
+    ...(entry.completion ? { completion: { ...entry.completion } } : {}),
   };
 }
 

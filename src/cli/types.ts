@@ -31,6 +31,8 @@ export interface KyroScopeEntry {
   status: KyroScopeEntryStatus;
   /** Tool-owned terminal transition metadata. Absent on scopes that remain in the work lifecycle. */
   retirement?: ScopeRetirement;
+  /** Tool-owned explicit completion metadata. Distinct from retirement and mutually exclusive with it. */
+  completion?: ScopeCompletion;
 }
 
 /** Human-authorized, state-bound reason a scope left the active work lifecycle. */
@@ -39,6 +41,25 @@ export interface ScopeRetirement {
   retiredAt: string;
   supersededBy?: string;
   planDigest: string;
+}
+
+/** Explicit, confirmed statement that an open scope's work is complete. Not a retirement and never automatic. */
+export interface ScopeCompletion {
+  completedAt: string;
+  by: string;
+  summary?: string;
+  /**
+   * sha256({kind:'scope-completion', schemaVersion, part:'request', scope, summary}). Present on
+   * completions written by the locked transactional apply; absent on legacy pre-fix records, which
+   * remain readable but are not resumable/idempotent.
+   */
+  requestDigest?: string;
+  /**
+   * sha256 of the registry KyroScopeEntry exactly as it stood immediately before this completion was
+   * applied. Present iff requestDigest is present; lets an interrupted apply resume by writing only
+   * the registry once it verifies the registry hasn't drifted since sprint.json was completed.
+   */
+  beforeEntryDigest?: string;
 }
 
 /** Built-in, machine-checkable predicates a principle can bind to (enforced by `kyro analyze`). */
@@ -660,6 +681,8 @@ export interface SprintFile {
   certifications?: CertificationAnchor[];
   /** Present only after `kyro scope retire` applies its human-approved terminal transition. */
   retirement?: ScopeRetirement;
+  /** Present only after `kyro scope complete` records an explicit, confirmed completion. Distinct from retirement. */
+  completion?: ScopeCompletion;
   handoff: Handoff;
 }
 
@@ -731,7 +754,7 @@ export interface OperationPlan {
 
 // --- portable guardrail policy ---
 
-export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'scope_retire' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
+export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'scope_retire' | 'scope_complete' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
 export type GuardLevel = 'tool_owned' | 'confirm' | 'blocked';
 export type GuardDecisionKind = 'allow' | 'confirmation_required' | 'blocked';
 export type EnforcementTier = 'enforced' | 'advisory';

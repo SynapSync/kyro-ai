@@ -34,8 +34,10 @@ export function deriveActiveSprintStatus(active: ActiveSprint): DerivedSprintSta
 
 /**
  * With an active sprint: any blocked task OR non-empty handoff.blockers → blocked; else active.
- * Without one: `handoff.nextAction === 'done'` (historical completion or retirement companion)
- * → completed; else planning. Roadmap exhaustion is not completion.
+ * Without one: an explicit `completion` or `retirement` record → completed/retired respectively;
+ * `handoff.nextAction === 'done'` (legacy terminal read) → completed; else planning. Roadmap
+ * exhaustion is not completion, and a plain `done` handoff without an explicit record remains
+ * readable as completed for historical compatibility.
  */
 export function deriveScopeStatus(sprint: SprintFile, hasActiveSprint: boolean): KyroScopeStatus {
   if (sprint.retirement) return 'retired';
@@ -44,7 +46,7 @@ export function deriveScopeStatus(sprint: SprintFile, hasActiveSprint: boolean):
     const blocked = tasks.some((t) => t.status === 'blocked') || (sprint.handoff.blockers ?? []).length > 0;
     return blocked ? 'blocked' : 'active';
   }
-  if (sprint.handoff?.nextAction === 'done') return 'completed';
+  if (sprint.completion || sprint.handoff?.nextAction === 'done') return 'completed';
   return 'planning';
 }
 

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { ARTIFACT_ROOT, KYRO_PROJECT_ROOT } from '../constants';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile } from '../artifacts/schema';
+import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { formatScopeAuthor } from '../core/actor';
 import { resolveManagedPath } from '../fs';
 import { readProjectState, updateProjectStateLayers } from '../state';
@@ -10,15 +10,22 @@ import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved } from '../core/trace';
 import { emitToolCommandRun } from '../core/trace';
+import { collectFindings } from '../core/analysis';
 import { inspectScope, inspectSprintCloseCheckpoints } from './artifact-doctor';
 import { listScopeNames } from '../artifacts/scopes';
-import type { KyroProjectState } from '../types';
+import type { KyroProjectState, SprintFile, Task } from '../types';
 import {
   applyScopeRetirement,
   buildScopeRetirementPreparation,
   readScopeRetirementCheckpoint,
   type ScopeRetirementRequest,
 } from '../checkpoints/scope-retirement';
+import {
+  applyScopeCompletion,
+  buildScopeCompletionPreparation,
+  type ScopeCompletionPreparation,
+  type ScopeCompletionRequest,
+} from '../checkpoints/scope-completion';
 
 interface ScopeRetireArgs extends ScopeRetirementRequest {
   digest: string | null;
@@ -55,6 +62,15 @@ export function runScopeCommand(args: string[]): void {
       return;
     }
     runScopeRetire(parsed);
+    return;
+  }
+  if (subcommand === 'complete') {
+    const parsed = parseCompleteArgs(args.slice(1));
+    if (parsed.help) {
+      printScopeCompleteHelp();
+      return;
+    }
+    runScopeComplete(parsed);
     return;
   }
   throw new KyroCoreError('UNKNOWN_SUBCOMMAND', `Unknown scope subcommand: ${subcommand}.`, 'Run kyro scope --help.');
@@ -267,11 +283,128 @@ The first form is read-only preparation. The second applies only the exact revie
 explicit one-use human confirmation. Any state change requires a new preparation and approval.`);
 }
 
+interface ScopeCompleteArgs {
+  scope: string;
+  summary: string | null;
+  yes: boolean;
+  dryRun: boolean;
+  help: boolean;
+}
+
+/**
+ * Explicit, tool-owned scope completion (T2.2). Distinct from retirement: completion is not a
+ * human-gated terminal retire — it is a confirmed statement that an open scope's work is done and
+ * the scope stays structurally non-retired. It writes only sprint.json completion metadata plus the
+ * project-state scope entry, under one locked, revalidated, idempotent transaction (see
+ * checkpoints/scope-completion.ts); it never touches archive/ or mints a retirement checkpoint.
+ */
+function runScopeComplete(args: ScopeCompleteArgs): void {
+  if (args.dryRun && args.yes) {
+    throw new KyroCoreError('INVALID_INPUT', '--dry-run and --yes are mutually exclusive.', 'Use --dry-run to preview, or --yes to confirm the write — not both.');
+  }
+  const request: ScopeCompletionRequest = { scope: args.scope, summary: args.summary };
+  const preparation = buildScopeCompletionPreparation(request, assertScopeHealthyForCompletion);
+  printCompletionPlan(preparation);
+  if (args.dryRun) {
+    console.log('Dry run complete. No files changed.');
+    return;
+  }
+  const guard = evaluateGuard('scope_complete', { surface: 'cli', scope: args.scope, confirmed: args.yes });
+  if (guard.kind !== 'allow') {
+    emitBlockedReason(args.scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
+  }
+  emitGateApproved(args.scope, 'scope_complete');
+  emitToolCommandRun(args.scope, 'cli', 'scope complete', {});
+  const result = applyScopeCompletion(request, assertScopeHealthyForCompletion);
+  console.log(`\nScope "${args.scope}" completed. nextAction=done; resumed=${result.resumed}; retirement metadata untouched.`);
+}
+
+function printCompletionPlan(preparation: ScopeCompletionPreparation): void {
+  console.log(`Scope completion plan: ${preparation.request.scope}`);
+  console.log(`Current status: ${preparation.currentStatus}`);
+  console.log(`Summary: ${preparation.normalizedSummary ?? 'none'}`);
+  console.log('Files affected:');
+  for (const file of preparation.affectedFiles) console.log(`- ${file}`);
+  console.log('Validations:');
+  for (const validation of preparation.validations) console.log(`- ${validation}`);
+  console.log(`Request digest: ${preparation.requestDigest}`);
+  console.log('\nCompletion is a confirmed statement that the scope work is done. It does NOT retire the scope and never rewrites archive/.');
+  if (preparation.state === 'already-applied') console.log('State: already applied; an identical apply is a safe no-op.');
+  else if (preparation.state === 'resumable') console.log('State: partially applied; an identical apply will resume and finish the registry update.');
+}
+
+function assertScopeHealthyForCompletion(scope: string): void {
+  const read = readJsonSafely(sprintJsonPath(scope));
+  if (read.error || !read.exists) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error ?? 'missing'}).`, 'Fix invalid JSON or restore from an archive snapshot.');
+  const sprint = asSprintFile(read.value);
+  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" does not match the v4 schema.`, 'Run kyro doctor --artifacts --kyro-scope ${scope}.');
+  const active = sprint.activeSprint;
+  if (active) {
+    throw new KyroCoreError('NOT_READY_TO_COMPLETE', `Cannot complete scope "${scope}": sprint ${active.n} (${active.slug}) is active.`, 'Close the active sprint first, or defer completion until no sprint is in progress.');
+  }
+  if (sprint.debt.some((d) => d.status === 'open' || d.status === 'in_progress')) {
+    throw new KyroCoreError('NOT_READY_TO_COMPLETE', `Cannot complete scope "${scope}": open debt remains.`, 'Resolve or explicitly defer all debt before completing the scope.');
+  }
+  // Review debt: any done task without a pass verdict (read-only projection, same as status).
+  for (const task of activeTasks(sprint)) {
+    if (task.status === 'done' && asTaskVerdict(task.verdict)?.result !== 'pass') {
+      throw new KyroCoreError('NOT_READY_TO_COMPLETE', `Cannot complete scope "${scope}": task ${task.id} is done without a pass verdict.`, 'Run kyro review for the pending task before completing the scope.');
+    }
+  }
+  const principles = readProjectState()?.principles ?? [];
+  const blocking = collectFindings(sprint, principles).filter((finding) => finding.severity === 'CRITICAL' || finding.severity === 'HIGH');
+  if (blocking.length > 0) {
+    const detail = blocking.map((finding) => finding.detail).join('; ');
+    throw new KyroCoreError('BLOCKING_FINDINGS', `Cannot complete scope "${scope}": ${blocking.length} blocking analyze finding(s) remain — ${detail}`, 'Run kyro analyze, resolve CRITICAL/HIGH findings, then complete the scope.');
+  }
+  const unhealthy = inspectSprintCloseCheckpoints(scope).filter((check) => check.status !== 'pass');
+  if (unhealthy.length > 0) {
+    const detail = unhealthy.map((check) => `${check.name}: ${check.detail}`).join('; ');
+    throw new KyroCoreError('DIVERGED', `Cannot complete scope "${scope}": artifact validation failed — ${detail}`, unhealthy[0]?.remedy ?? 'Run kyro doctor --artifacts for the scope and reconcile the divergence before completing.');
+  }
+}
+
+function activeTasks(sprint: SprintFile): Task[] {
+  const active = sprint.activeSprint;
+  if (!active) return [];
+  return active.phases.flatMap((phase) => phase.tasks).concat(active.emergentTasks);
+}
+
+function parseCompleteArgs(args: string[]): ScopeCompleteArgs {
+  let scope = '';
+  let summary: string | null = null;
+  let yes = false;
+  let dryRun = false;
+  let help = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--help' || arg === '-h') help = true;
+    else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
+    else if (arg === '--dry-run') dryRun = true;
+    else if (arg === '--kyro-scope') scope = requiredValue(args, ++index, arg);
+    else if (arg === '--summary') summary = requiredValue(args, ++index, arg);
+    else throw new KyroCoreError('INVALID_INPUT', `Unknown scope complete option: ${arg}`, 'Run kyro scope complete --help.');
+  }
+  if (!help && !scope) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes].');
+  return { scope, summary, yes, dryRun, help };
+}
+
+function printScopeCompleteHelp(): void {
+  console.log(`Usage:
+  kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes]
+
+Records explicit scope completion as a lifecycle fact distinct from retirement. Refuses active
+sprints, open debt, pending review, blocking findings, and artifact divergence without writing.
+Completion never creates a retirement checkpoint and never rewrites archive/.`);
+}
+
 function printScopeHelp(): void {
   console.log(`Usage:
   kyro scope list
   kyro scope inspect <scope>
   kyro scope set-active <scope> --yes|--confirm
+  kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes]
   kyro scope retire --kyro-scope <scope> --reason <reason> [--superseded-by <scope>]
 `);
 }

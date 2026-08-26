@@ -30,6 +30,10 @@ export type KyroErrorCode =
   | 'NOT_READY_TO_CLARIFY'
   | 'CLARIFICATION_NOT_FOUND'
   | 'WRITE_NOT_PERMITTED'
+  /** Completion refused because the scope still has active work, open debt, review debt, or a live sprint. */
+  | 'NOT_READY_TO_COMPLETE'
+  /** Completion refused because the scope already carries completion or retirement metadata. */
+  | 'COMPLETION_CONFLICT'
   /** A task with a disposition is terminal for execution; no checker review path may reopen it. */
   | 'DISPOSED_TASK_NOT_REVIEWABLE'
   /** Close refused because an unfinished task has no typed disposition. */

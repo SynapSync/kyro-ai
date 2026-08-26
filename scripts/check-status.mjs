@@ -341,6 +341,71 @@ function assertStatusTaskSummaryDistinguishesDispositions() {
   }
 }
 
+// 10. Explicit scope completion model (T2.1): deriveScopeStatus reads a `completion` record as
+//     completed and retirement as retired, while a legacy `done` handoff stays readable; the
+//     validator rejects contradictory/malformed completion metadata.
+function assertScopeCompletionModel() {
+  const { deriveScopeStatus } = require(resolve(repo, 'dist/cli/core/status.js'));
+  const { validateSprintFile } = require(resolve(repo, 'dist/cli/artifacts/schema.js'));
+  const base = {
+    schemaVersion: 4,
+    scope: 'demo',
+    title: 'Demo',
+    status: 'completed',
+    objective: 'Demo objective',
+    successCriteria: ['Demo works.'],
+    clarifications: [],
+    conventions: [],
+    roadmap: { plannedSprintCount: 1, sizingRationale: 'x', sprints: [{ n: 1, slug: 's', title: 'S', state: 'closed' }] },
+    ledger: [],
+    previousSprint: null,
+    activeSprint: null,
+    debt: [],
+    handoff: { nextAction: 'done', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-02' },
+  };
+
+  // Explicit completion -> completed, distinct from retirement.
+  const completed = deriveScopeStatus({ ...base, completion: { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker', summary: 'All done.' } }, false);
+  assert(completed === 'completed', `explicit completion must derive completed, got ${completed}`);
+
+  // Retirement wins over completion/legacy-done.
+  const retired = deriveScopeStatus({ ...base, retirement: { reason: 'Replaced.', retiredAt: '2026-07-02T00:00:00.000Z', planDigest: 'a'.repeat(64) } }, false);
+  assert(retired === 'retired', `retirement must derive retired, got ${retired}`);
+
+  // Legacy terminal read: done handoff without an explicit record stays readable as completed.
+  const legacy = deriveScopeStatus(base, false);
+  assert(legacy === 'completed', `legacy done handoff must stay readable as completed, got ${legacy}`);
+
+  // Open scope with no terminal signal -> planning (roadmap exhaustion is not completion).
+  const open = deriveScopeStatus({ ...base, status: 'planning', handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-02' } }, false);
+  assert(open === 'planning', `open scope must derive planning, got ${open}`);
+
+  // Malformed completion metadata is rejected without any write.
+  const malformed = validateSprintFile({ ...base, completion: { completedAt: 'not-a-date', by: '' } }, 'demo/sprint.json');
+  assert(malformed.some((issue) => issue.field === 'completion.completedAt'), 'malformed completedAt must be rejected');
+  assert(malformed.some((issue) => issue.field === 'completion.by'), 'empty completion.by must be rejected');
+
+  // Contradictory completion+retirement is rejected.
+  const both = validateSprintFile(
+    { ...base, completion: { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker' }, retirement: { reason: 'r', retiredAt: '2026-07-02T00:00:00.000Z', planDigest: 'a'.repeat(64) } },
+    'demo/sprint.json',
+  );
+  assert(both.some((issue) => issue.field === 'completion' && issue.message.includes('retirement')), 'completion+retirement coexistence must be rejected');
+
+  // A scope entry with completion metadata validates in project state.
+  const { validateProjectStateShape } = require(resolve(repo, 'dist/cli/artifacts/schema.js'));
+  const state = {
+    schemaVersion: 4,
+    artifactRoot: '.agents/kyro/scopes',
+    scopes: [{ id: 'demo', title: 'Demo', status: 'completed', completion: { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker' } }],
+    activeScope: null,
+    runtimePath: '~/.agents/kyro/current',
+    installedAdapters: [],
+  };
+  const stateIssues = validateProjectStateShape(state, '.agents/kyro/kyro.json');
+  assert(stateIssues.length === 0, `scope entry with completion must validate, got ${JSON.stringify(stateIssues)}`);
+}
+
 function main() {
   assertStatusCoreIsPure();
   assertAnalyzeReportsActiveSprintStatusDrift();
@@ -352,6 +417,7 @@ function main() {
   assertDescribeWriteFailureClassifiesErrno();
   assertDeriveScopeStatusMutationGuard();
   assertStatusTaskSummaryDistinguishesDispositions();
+  assertScopeCompletionModel();
   console.log('check:status — status coherence invariants passed');
 }
 

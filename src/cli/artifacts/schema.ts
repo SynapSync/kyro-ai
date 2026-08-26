@@ -311,6 +311,7 @@ function validateScopeEntry(value: unknown, path: string, prefix: string, issues
   requireString(value, 'title', path, issues, `${prefix}.title`);
   requireLiteralSet(value, 'status', SCOPE_STATUS_VALUES, path, issues, `${prefix}.status`);
   validateRetirementInvariant(value, path, prefix, issues);
+  validateCompletionInvariant(value, path, prefix, issues);
 }
 
 export interface SprintFileValidationOptions {
@@ -328,6 +329,7 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
   requireString(value, 'status', path, issues);
   requireString(value, 'objective', path, issues);
   validateRetirementInvariant(value, path, '', issues);
+  validateCompletionInvariant(value, path, '', issues);
 
   // author is optional (captured at init from git when available). Present-only so pre-feature
   // scopes and sandboxes without git identity still validate.
@@ -423,6 +425,9 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
     if (value.retirement !== undefined && value.handoff.nextAction !== 'done') {
       issues.push({ path, field: 'handoff.nextAction', message: 'must be done when retirement is present' });
     }
+    if (value.completion !== undefined && value.handoff.nextAction !== 'done') {
+      issues.push({ path, field: 'handoff.nextAction', message: 'must be done when completion is present' });
+    }
   }
   if (value.retirement !== undefined && value.activeSprint !== null) {
     issues.push({ path, field: 'activeSprint', message: 'must be null when retirement is present' });
@@ -451,6 +456,38 @@ function validateRetirementInvariant(value: Record<string, unknown>, path: strin
     issues.push({ path, field: field('retirement.planDigest'), message: 'must be a lowercase SHA-256 digest' });
   }
   if ('supersededBy' in retirement) requireNonEmptyString(retirement, 'supersededBy', path, issues, field('retirement.supersededBy'));
+}
+
+function validateCompletionInvariant(value: Record<string, unknown>, path: string, prefix: string, issues: ValidationIssue[]): void {
+  const field = (name: string): string => prefix ? `${prefix}.${name}` : name;
+  const completion = value.completion;
+  if (completion === undefined) return;
+  // Completion and retirement are distinct lifecycle facts; both present is contradictory.
+  if (value.retirement !== undefined) {
+    issues.push({ path, field: field('completion'), message: 'must not coexist with retirement (a scope cannot be both completed and retired)' });
+  }
+  if (value.status !== 'completed') {
+    issues.push({ path, field: field('status'), message: 'must be completed when completion is present' });
+  }
+  if ('activeSprint' in value && value.activeSprint !== null) {
+    issues.push({ path, field: field('activeSprint'), message: 'must be null when completion is present' });
+  }
+  if (!isRecord(completion)) {
+    issues.push({ path, field: field('completion'), message: 'must be an object' });
+    return;
+  }
+  requireIsoString(completion, 'completedAt', path, issues, field('completion.completedAt'));
+  requireNonEmptyString(completion, 'by', path, issues, field('completion.by'));
+  if ('summary' in completion) requireNonEmptyString(completion, 'summary', path, issues, field('completion.summary'));
+  if ('requestDigest' in completion && (typeof completion.requestDigest !== 'string' || !SHA256_HEX_PATTERN.test(completion.requestDigest))) {
+    issues.push({ path, field: field('completion.requestDigest'), message: 'must be a lowercase SHA-256 digest' });
+  }
+  if ('beforeEntryDigest' in completion && (typeof completion.beforeEntryDigest !== 'string' || !SHA256_HEX_PATTERN.test(completion.beforeEntryDigest))) {
+    issues.push({ path, field: field('completion.beforeEntryDigest'), message: 'must be a lowercase SHA-256 digest' });
+  }
+  if (('requestDigest' in completion) !== ('beforeEntryDigest' in completion)) {
+    issues.push({ path, field: field('completion'), message: 'requestDigest and beforeEntryDigest must be present together or both absent' });
+  }
 }
 
 function validateClarification(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
