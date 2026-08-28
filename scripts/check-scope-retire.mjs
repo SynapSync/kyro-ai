@@ -3,6 +3,7 @@
 // Every mutation runs in an isolated temporary workspace; this script never targets repository scopes.
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import {
   cpSync,
   existsSync,
@@ -22,6 +23,8 @@ const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const cli = resolve(repo, 'dist/cli.js');
 const fixture = resolve(repo, 'fixtures/evals/close-sprint-happy/state');
 const temporaryRoots = [];
+const require = createRequire(import.meta.url);
+const { scopeCompletionRequestDigest } = require(join(repo, 'dist/cli/checkpoints/lifecycle-state.js'));
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -851,7 +854,8 @@ try {
     completeAndReopen(lawful);
     const healthy = run(lawful, ['scope', 'inspect', 'demo']);
     assert(healthy.status === 0, `a lawfully reopened scope must stay healthy: ${output(healthy)}`);
-    assert(output(healthy).includes('explicit lifecycle transition'), `checkpoint must name the lawful transition: ${output(healthy)}`);
+    assert(output(healthy).includes('actor identity unverified'),
+      `checkpoint and verification lenses must disclose the structural trust boundary: ${output(healthy)}`);
     const lawfulIntegrity = integrityPrepare(lawful);
     assert(lawfulIntegrity.result.status === 0, `Integrity must accept an exactly replayable lifecycle: ${output(lawfulIntegrity.result)}`);
     assert(lawfulIntegrity.plan?.blockers?.length === 0 && lawfulIntegrity.plan?.findings?.length === 0,
@@ -914,6 +918,199 @@ try {
       `the failure must name the corrupt immutable artifact: ${output(corrupted)}`,
     );
   }
+
+  // S5 — multi-cycle lifecycle and the structural bindings a replayed record must carry.
+  //
+  // A scope that completes, reopens, runs another sprint to close, and completes again is lawful.
+  // The later checkpoint already seals the earlier completion history inside its after-image, so a
+  // replay may only apply the suffix the live state adds on top of that image. Re-applying the
+  // sealed prefix doubles every earlier transition and reports a lawful scope as DIVERGED — the
+  // failure this block exists to catch. The mirror property is that the suffix must be structurally
+  // bound: a record whose public digests are missing or do not re-derive from its own content cannot
+  // replay. Those public digests do not authenticate the writer, a boundary proved below.
+  {
+    const planAndClose = (root, n, slug) => {
+      const planFile = join(root, `${slug}.json`);
+      writeJson(planFile, {
+        sprint: { n, slug, title: `Cycle ${n}`, objective: `Deliver cycle ${n}.` },
+        phases: [{
+          id: 'P1', title: `Cycle ${n}`, objective: `Complete cycle ${n}.`, tasks: [{
+            id: `T${n}.1`, title: `Cycle ${n} work`, description: `Carry out cycle ${n}.`,
+            files_to_touch: [`src/cycle-${n}.ts`], context: 'Ordinary post-reopen planning.',
+            acceptance_criteria: [`Cycle ${n} is complete.`], depends_on: [], scenario_refs: [],
+          }],
+        }],
+        definitionOfDone: [`Cycle ${n} is complete.`], scenarios: [],
+      });
+      const planned = run(root, ['plan', '--from', planFile, '--kyro-scope', 'demo']);
+      assert(planned.status === 0, `a reopened scope must plan the next sprint normally: ${output(planned)}`);
+      const evidence = run(root, [
+        'record-evidence', `T${n}.1`, '--kyro-scope', 'demo', '--summary', `Cycle ${n} completed.`,
+        '--validation', 'multi-cycle proof', '--file', `src/cycle-${n}.ts`,
+      ]);
+      assert(evidence.status === 0, `cycle ${n} evidence must be recorded through the CLI: ${output(evidence)}`);
+      const reviewed = run(root, ['review', `T${n}.1`, '--kyro-scope', 'demo', '--verdict', 'pass', '--yes']);
+      assert(reviewed.status === 0, `cycle ${n} must be reviewed through the CLI: ${output(reviewed)}`);
+      const closed = run(root, ['close-sprint', '--kyro-scope', 'demo', '--outcome', 'shipped', '--yes']);
+      assert(closed.status === 0, `cycle ${n} must close: ${output(closed)}`);
+    };
+    const completeScope = (root, summary) => {
+      const result = run(root, ['scope', 'complete', '--kyro-scope', 'demo', '--summary', summary, '--yes']);
+      assert(result.status === 0, `completion must succeed: ${output(result)}`);
+    };
+    const reopenScope = (root, reason) => {
+      const result = run(root, ['scope', 'reopen', '--kyro-scope', 'demo', '--reason', reason, '--yes']);
+      assert(result.status === 0, `reopen must succeed: ${output(result)}`);
+    };
+    const readRegistry = (root) => {
+      const shared = projectPaths(root).shared;
+      const project = json(shared);
+      const entry = project.scopes.find((candidate) => candidate.id === 'demo');
+      assert(entry, 'the registry must carry the demo scope');
+      return { shared, project, entry };
+    };
+    const assertDiverged = (root, what) => {
+      const inspected = run(root, ['scope', 'inspect', 'demo']);
+      assert(inspected.status !== 0, `${what} must fail closed: ${output(inspected)}`);
+      assert(output(inspected).includes('DIVERGED'), `${what} must be reported as DIVERGED: ${output(inspected)}`);
+      const integrity = integrityPrepare(root);
+      assert(integrity.result.status !== 0 || integrity.plan?.blockers?.length > 0,
+        `Integrity must reject ${what}: ${output(integrity.result)}`);
+      assert(integrity.plan?.operations?.length === 0,
+        `Integrity must never propose repair that would legitimise ${what}: ${output(integrity.result)}`);
+    };
+
+    // A full second cycle: complete → reopen → plan → close → complete. The close in the middle is
+    // what makes this a regression rather than a restatement of S4 — it seals the first reopen into
+    // the checkpoint the next replay starts from.
+    const cycles = workspace();
+    completeScope(cycles, 'First objective met.');
+    reopenScope(cycles, 'Follow-up work found after completion.');
+    planAndClose(cycles, 2, 'second-cycle');
+    const sealedHistoryIntegrity = integrityPrepare(cycles);
+    assert(sealedHistoryIntegrity.result.status === 0,
+      `Integrity must accept a checkpoint-exact scope whose after-image seals lifecycle history: ${output(sealedHistoryIntegrity.result)}`);
+    assert(sealedHistoryIntegrity.plan?.blockers?.length === 0 && sealedHistoryIntegrity.plan?.operations?.length === 0,
+      `sealed lifecycle history needs neither replay nor repair: ${output(sealedHistoryIntegrity.result)}`);
+    completeScope(cycles, 'Second objective met.');
+    const secondCycle = run(cycles, ['scope', 'inspect', 'demo']);
+    assert(secondCycle.status === 0,
+      `a completed → reopened → closed → completed scope must stay healthy: ${output(secondCycle)}`);
+    assert(output(secondCycle).includes('actor identity unverified'),
+      `the multi-cycle checkpoint must disclose the structural trust boundary: ${output(secondCycle)}`);
+
+    // A third cycle proves prefix exactness holds past the first sealed record, not just at n=1.
+    reopenScope(cycles, 'A second follow-up is warranted.');
+    planAndClose(cycles, 3, 'third-cycle');
+    completeScope(cycles, 'Third objective met.');
+    const thirdCycle = run(cycles, ['scope', 'inspect', 'demo']);
+    assert(thirdCycle.status === 0, `a scope on its third lifecycle cycle must stay healthy: ${output(thirdCycle)}`);
+    const cycledSprint = json(scopePath(cycles));
+    assert(cycledSprint.completionHistory?.length === 2,
+      'both superseded completions must survive in append-only history');
+    assert(cycledSprint.completion?.summary === 'Third objective met.', 'the newest completion must be live');
+    const cyclesIntegrity = integrityPrepare(cycles);
+    assert(cyclesIntegrity.result.status === 0,
+      `Integrity must accept a multi-cycle lifecycle: ${output(cyclesIntegrity.result)}`);
+    assert(cyclesIntegrity.plan?.blockers?.length === 0 && cyclesIntegrity.plan?.findings?.length === 0,
+      `a multi-cycle lifecycle must not propose repair: ${output(cyclesIntegrity.result)}`);
+
+    // The sealed prefix is not editable after the fact: rewriting an already-checkpointed record is
+    // not an append, so the live history stops being an extension of the image and nothing replays.
+    const rewrittenPrefix = workspace();
+    completeScope(rewrittenPrefix, 'First objective met.');
+    reopenScope(rewrittenPrefix, 'Follow-up work found after completion.');
+    planAndClose(rewrittenPrefix, 2, 'second-cycle');
+    completeScope(rewrittenPrefix, 'Second objective met.');
+    const rewrittenSprint = json(scopePath(rewrittenPrefix));
+    rewrittenSprint.completionHistory[0].reason = 'A reason that was never the sealed one.';
+    writeJson(scopePath(rewrittenPrefix), rewrittenSprint);
+    assertDiverged(rewrittenPrefix, 'a rewritten sealed lifecycle prefix');
+
+    // Truncation is the other way to break the prefix: dropping sealed history claims transitions
+    // never happened, which the checkpoint already proves they did.
+    const truncated = workspace();
+    completeScope(truncated, 'First objective met.');
+    reopenScope(truncated, 'Follow-up work found after completion.');
+    planAndClose(truncated, 2, 'second-cycle');
+    const truncatedSprint = json(scopePath(truncated));
+    truncatedSprint.completionHistory = [];
+    writeJson(scopePath(truncated), truncatedSprint);
+    assertDiverged(truncated, 'a truncated lifecycle history');
+
+    // Structural binding, case 1: a completion with no digests at all. The current writer always
+    // emits the pair, so a new unbound suffix cannot replay into a lawful position.
+    const unsigned = workspace();
+    completeScope(unsigned, 'Objective met.');
+    const unsignedSprint = json(scopePath(unsigned));
+    delete unsignedSprint.completion.requestDigest;
+    delete unsignedSprint.completion.beforeEntryDigest;
+    writeJson(scopePath(unsigned), unsignedSprint);
+    const unsignedRegistry = readRegistry(unsigned);
+    delete unsignedRegistry.entry.completion.requestDigest;
+    delete unsignedRegistry.entry.completion.beforeEntryDigest;
+    writeJson(unsignedRegistry.shared, unsignedRegistry.project);
+    assertDiverged(unsigned, 'a completion with no structural binding');
+
+    // Structural binding, case 2: the digests are present but the record's own content was restated
+    // underneath them. Everything a shape check can see still agrees — including the handoff note a
+    // lawful completion would have derived — so only re-deriving the request digest catches it.
+    const restated = workspace();
+    completeScope(restated, 'Objective met.');
+    const restatedSprint = json(scopePath(restated));
+    restatedSprint.completion.summary = 'A summary nobody ever approved.';
+    restatedSprint.handoff.note = `Scope explicitly completed: ${restatedSprint.completion.summary}`;
+    writeJson(scopePath(restated), restatedSprint);
+    const restatedRegistry = readRegistry(restated);
+    restatedRegistry.entry.completion.summary = restatedSprint.completion.summary;
+    writeJson(restatedRegistry.shared, restatedRegistry.project);
+    assertDiverged(restated, 'a completion restated underneath its request digest');
+
+    // Structural binding, case 3: the request digest re-derives, but the record claims a registry state it
+    // never started from. The sprint half of the replay succeeds and only the entry step can refuse,
+    // so this exercises the registry commitment specifically.
+    const misbound = workspace();
+    completeScope(misbound, 'Objective met.');
+    const foreignDigest = createHash('sha256').update('a registry entry this completion never saw').digest('hex');
+    const misboundSprint = json(scopePath(misbound));
+    misboundSprint.completion.beforeEntryDigest = foreignDigest;
+    writeJson(scopePath(misbound), misboundSprint);
+    const misboundRegistry = readRegistry(misbound);
+    misboundRegistry.entry.completion.beforeEntryDigest = foreignDigest;
+    writeJson(misboundRegistry.shared, misboundRegistry.project);
+    assertDiverged(misbound, 'a completion bound to a registry state it never started from');
+
+    // Trust-boundary case: both digests are public and deterministic. An editor with write access to
+    // both durable layers can restate a completion and recompute the same request binding the CLI
+    // uses. The state is structurally indistinguishable from the writer's projection, so readers may
+    // accept the replay but must say explicitly that actor identity is unverified. Calling this
+    // provenance or authentication would promise a guarantee the repository cannot provide.
+    const recomputed = workspace();
+    completeScope(recomputed, 'Objective met.');
+    const recomputedSprint = json(scopePath(recomputed));
+    recomputedSprint.completion.summary = 'A fully recomputed public binding.';
+    recomputedSprint.completion.requestDigest = scopeCompletionRequestDigest(
+      'demo',
+      recomputedSprint.completion.summary,
+    );
+    recomputedSprint.handoff.note = `Scope explicitly completed: ${recomputedSprint.completion.summary}`;
+    writeJson(scopePath(recomputed), recomputedSprint);
+    const recomputedRegistry = readRegistry(recomputed);
+    recomputedRegistry.entry.completion = structuredClone(recomputedSprint.completion);
+    writeJson(recomputedRegistry.shared, recomputedRegistry.project);
+
+    const recomputedInspect = run(recomputed, ['scope', 'inspect', 'demo']);
+    assert(recomputedInspect.status === 0,
+      `a fully recomputed public binding is structurally replayable: ${output(recomputedInspect)}`);
+    assert(output(recomputedInspect).includes('actor identity unverified'),
+      `a structurally replayed lifecycle must disclose its trust boundary: ${output(recomputedInspect)}`);
+    const recomputedIntegrity = integrityPrepare(recomputed);
+    assert(recomputedIntegrity.result.status === 0,
+      `Integrity must accept the structurally coherent replay: ${output(recomputedIntegrity.result)}`);
+    assert(recomputedIntegrity.plan?.blockers?.length === 0 && recomputedIntegrity.plan?.operations?.length === 0,
+      `a structurally coherent replay must need neither repair nor false provenance: ${output(recomputedIntegrity.result)}`);
+  }
+
 
   console.log('check:scope-retire — lifecycle, approval, digest, reopen, recovery, consumers, and router isolation passed');
 } finally {

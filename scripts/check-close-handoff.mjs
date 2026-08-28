@@ -152,4 +152,55 @@ function run(root, extra = []) {
   }
 }
 
+// Case 5 — the trace must record the outcome that was actually persisted. `--outcome` defaults to
+// "shipped", so emitting the raw argument reports a disposed sprint as shipped while the ledger and
+// the checkpoint both say partial. The trace is the audit surface; it may not disagree with them.
+{
+  const root = sandbox();
+  try {
+    const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+    sprint.activeSprint.phases[0].tasks.push({
+      id: 'T1.2',
+      title: 'Deferred demo work',
+      description: 'Carried work.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Deferred.'],
+      depends_on: [],
+      status: 'pending',
+      evidence: { summary: 'Deferred.', validation: 'user decision', files_changed: [], notes: '', by: 'maker', recordedAt: '2026-07-02T00:02:00.000Z' },
+      verdict: null,
+      disposition: { kind: 'cancelled', reason: 'Dropped before close.', by: 'maker', recordedAt: '2026-07-02T00:02:00.000Z' },
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    // No --outcome: the close derives "partial" from the disposed task while the argument default
+    // still reads "shipped". This is the exact gap the trace used to report.
+    const res = spawnSync(process.execPath, [cli, 'close-sprint', '--kyro-scope', 'demo', '--yes'], {
+      cwd: root,
+      env: { ...process.env, HOME: join(root, '.home'), KYRO_TRACE: '1' },
+      encoding: 'utf-8',
+    });
+    const out = res.stdout + res.stderr;
+    assert(res.status === 0, `a disposed sprint must close without an explicit outcome: ${out}`);
+
+    const closed = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+    assert(closed.ledger.at(-1)?.outcome === 'partial', `ledger must persist partial, got ${closed.ledger.at(-1)?.outcome}`);
+
+    const events = readFileSync(join(root, '.agents/kyro/trace/demo/events.ndjson'), 'utf-8')
+      .split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    const closeEvent = events.find((event) => event.type === 'close_snapshot');
+    assert(closeEvent, `the close must emit a close_snapshot trace event: ${JSON.stringify(events)}`);
+    assert(closeEvent.outcome === 'partial',
+      `close_snapshot must record the persisted outcome, not the raw --outcome default: got ${closeEvent.outcome}`);
+    const commandEvent = events.find((event) => event.type === 'tool_command_run' && event.command === 'close-sprint');
+    if (commandEvent) {
+      assert(commandEvent.args?.outcome === 'partial',
+        `the command trace must record the persisted outcome too: ${JSON.stringify(commandEvent)}`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 console.log('check:close-handoff — close-sprint handoff guidance cases passed');

@@ -117,7 +117,7 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
     throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
   }
   emitGateApproved(scope, 'close_sprint');
-  emitToolCommandRun(scope, 'mcp', 'close_sprint', { outcome: closeArgs.outcome });
+  emitToolCommandRun(scope, 'mcp', 'close_sprint', { outcome: transaction.checkpoint.close.outcome });
   const applied = applySprintCloseTransaction(transaction);
   assertValidSprint(scope, snapshotPath);
   emitTraceEvent({
@@ -127,7 +127,7 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
     type: 'close_snapshot',
     sprintN: transaction.checkpoint.identity.sprintN,
     snapshotId: traceSnapshotId(snapshotPath),
-    outcome: normalizeTraceCloseOutcome(closeArgs.outcome),
+    outcome: normalizeTraceCloseOutcome(transaction.checkpoint.close.outcome),
   });
   return { phase: 'applied', scope, snapshotPath, checkpointPath, checkpointId: applied.checkpointId, resumed: applied.resumed, plan };
 }

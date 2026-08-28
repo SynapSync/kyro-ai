@@ -1,0 +1,737 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "1231cd16661f05fff1990c67027315e8e58afd13ca1802a723cd1e71de2dbae6",
+  "createdAt": "2026-08-26T02:28:56.577Z",
+  "identity": {
+    "scope": "adaptive-sprint-lifecycle",
+    "sprintN": 2,
+    "sprintSlug": "truthful-sprint-close"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": "Scope stays open. Sprint 2 delivered the completion/reopen lifecycle and its adversarial gates; decide explicitly whether the scope objective is met before completing it.",
+    "summary": "Explicit scope completion and reopen replace inferred terminal states; verification replays lifecycle transitions instead of trusting records.",
+    "recommendations": [
+      "Before completing this scope, verify each success criterion against evidence rather than treating all-tasks-done as proof the objective was met.",
+      "If further lifecycle transitions are added (e.g. suspend/resume), extend checkpoints/lifecycle-state.ts and its replay first, then the command surface."
+    ],
+    "learnings": [
+      "Adding a lawful post-close state transition is incomplete until the integrity lens learns to replay it — completion (T2.2) silently left every completed scope reading as DIVERGED until reopen forced the checkpoint verifier to be taught the transition.",
+      "Sharing one set of after-state builders between the writers and the verifier removes a whole class of drift: the verifier cannot disagree with the writer about what a lawful transition produces."
+    ]
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/adaptive-sprint-lifecycle/archive/sprint-002-truthful-sprint-close.json",
+    "narrative": ".agents/kyro/scopes/adaptive-sprint-lifecycle/archive/sprint-002-truthful-sprint-close.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "adaptive-sprint-lifecycle",
+    "title": "Adaptive sprint lifecycle",
+    "status": "planning",
+    "objective": "Make Kyro record changing work truthfully without treating a partial sprint or exhausted roadmap as a terminal scope failure.",
+    "successCriteria": [
+      "Every unfinished task has a typed, reasoned disposition before sprint closure.",
+      "Closing any sprint preserves immutable evidence while keeping the scope open for explicit next planning.",
+      "Scope completion and retirement remain explicit, distinct decisions.",
+      "Doctor and Integrity distinguish lawful lifecycle evolution from immutable-artifact corruption.",
+      "Legacy checkpoints remain readable without retroactive semantic claims."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Kyro SHALL require an explicit validated disposition for every unfinished task before closing a sprint.",
+          "priority": "must",
+          "rationale": "Unfinished work must remain discoverable and attributable instead of being represented as success or silently discarded."
+        },
+        {
+          "id": "R2",
+          "statement": "Kyro SHALL close a sprint without automatically completing its scope merely because all originally planned roadmap entries are closed.",
+          "priority": "must",
+          "rationale": "A roadmap is an estimate; scope completion requires an explicit decision and evidence."
+        },
+        {
+          "id": "R3",
+          "statement": "Kyro SHALL allow an open scope with no active sprint to plan a subsequent sprint through the normal tool-owned flow.",
+          "priority": "must",
+          "rationale": "Legitimate reprioritization must not require a recovery or manual state edit."
+        },
+        {
+          "id": "R4",
+          "statement": "Kyro SHALL preserve fail-closed validation for immutable checkpoints, unsafe paths, identity conflicts, and stale approvals while accepting lawful lifecycle evolution.",
+          "priority": "must",
+          "rationale": "Simplification must not weaken artifact integrity or recovery safety."
+        },
+        {
+          "id": "R5",
+          "statement": "Kyro SHALL keep retirement distinct from scope completion and preserve readable historical checkpoint semantics.",
+          "priority": "must",
+          "rationale": "Terminal retirement has explicit human approval semantics, and immutable historical bytes cannot be rewritten."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "an active sprint has unfinished tasks",
+          "when": "a user closes the sprint",
+          "then": "each unfinished task must carry a valid explicit disposition with its reason and any required continuation reference"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "the final originally planned sprint has a mixture of completed and disposed tasks",
+          "when": "close-sprint applies its transaction",
+          "then": "the immutable close record reports a truthful partial outcome and the scope is not automatically completed"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "an open scope has closed all originally listed roadmap sprints",
+          "when": "the user supplies a later sprint plan",
+          "then": "kyro plan materializes it through the normal tool-owned route without recovery"
+        },
+        {
+          "id": "S4",
+          "requirement": "R4",
+          "given": "a scope contains either lawful lifecycle evolution or an unsafe/corrupt immutable artifact",
+          "when": "Doctor and Integrity inspect it",
+          "then": "lawful evolution is distinguishable from scoped fail-closed artifact corruption"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "a historical or retired scope is inspected",
+          "when": "Kyro reads its lifecycle state",
+          "then": "historical records remain readable and retirement remains explicitly terminal and human-gated"
+        },
+        {
+          "id": "S6",
+          "requirement": "R5",
+          "given": "an open scope has no active sprint, no unresolved debt or review, and healthy artifacts",
+          "when": "the user explicitly confirms scope completion",
+          "then": "Kyro records completion as a distinct lifecycle fact without retiring the scope or rewriting its archive"
+        },
+        {
+          "id": "S7",
+          "requirement": "R3",
+          "given": "a completed but non-retired scope needs later work",
+          "when": "the user explicitly reopens it with a reason",
+          "then": "Kyro preserves completion history and routes the scope to plan_sprint without recovery or manual edits"
+        }
+      ],
+      "nonGoals": [
+        "Maker/checker provenance policy changes.",
+        "Startup-contract consolidation or unrelated global preflight redesign.",
+        "NutriLens or Kyro Lens implementation changes.",
+        "Manual editing mode for Kyro-managed state.",
+        "Archive rewriting, release, installation, publication, or version bump."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [
+      {
+        "id": "process-1",
+        "rule": "A post-close live-state transition is valid only if it replays exactly from the checkpoint after-image through the same builders the writer uses; lifecycle records are evidence, never authority.",
+        "tags": [
+          "process"
+        ],
+        "addedSprint": 2
+      }
+    ],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 3,
+      "sizingRationale": "The work is sequenced by semantic dependency: define the lifecycle contract first, implement the core transitions second, then reconcile integrity and certify the complete path.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "lifecycle-contract",
+          "title": "Lifecycle contract and dispositions",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "truthful-sprint-close",
+          "title": "Truthful sprint close and open-scope routing",
+          "state": "active"
+        },
+        {
+          "n": 3,
+          "slug": "integrity-certification",
+          "title": "Integrity recalibration and lifecycle certification",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "lifecycle-contract",
+        "outcome": "shipped",
+        "closedAt": "2026-08-24",
+        "archive": "archive/sprint-001-lifecycle-contract.md",
+        "snapshot": "archive/sprint-001-lifecycle-contract.json",
+        "checkpoint": "archive/sprint-001-lifecycle-contract.checkpoint.json",
+        "checkpointSha256": "7998a166250a32249bc5884f8993b8a735cd51a4069c9ef9beb4257e380a89a6"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "lifecycle-contract",
+      "outcome": "shipped",
+      "summary": "Establish the minimal typed lifecycle contract that makes partial sprint outcomes truthful and keeps scopes open for subsequent planning."
+    },
+    "activeSprint": {
+      "n": 2,
+      "slug": "truthful-sprint-close",
+      "title": "Truthful sprint close and open-scope routing",
+      "objective": "Make scope completion and later continuation explicit, auditable lifecycle decisions without turning ordinary sprint closure into a terminal block.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Explicit scope-completion contract",
+          "objective": "Define and implement a minimal tool-owned completion statement distinct from retirement.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.1",
+              "title": "Model explicit scope completion and historical compatibility",
+              "description": "Add the smallest typed completion record and derived-status rules so completed, retired, and still-open scopes have distinct, truthful meanings without rewriting legacy checkpoints.",
+              "files_to_touch": [
+                "src/cli/types.ts",
+                "src/cli/artifacts/schema.ts",
+                "src/cli/core/status.ts",
+                "src/cli/core/errors.ts"
+              ],
+              "context": "Completion must be a positive tool-owned statement. Roadmap exhaustion and a closed sprint are insufficient. Preserve legacy nextAction=done reads without retroactively inventing completion metadata.",
+              "acceptance_criteria": [
+                "A new scope-completion record is validated and distinguishable from retirement.",
+                "Derived status marks a new scope completed only from explicit completion or retirement, while legacy terminal records remain readable.",
+                "Malformed or contradictory completion metadata is rejected without writes."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S5",
+                "S6"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Modeled explicit scope completion as a typed, tool-owned record distinct from retirement: added ScopeCompletion and SprintFile.completion / KyroScopeEntry.completion; schema validation rejects malformed completion and completion+retirement coexistence (both on sprint.json and project-state scope entries) and requires status=completed, activeSprint=null, nextAction=done; deriveScopeStatus now marks completed only from explicit completion, retirement, or a legacy done handoff (readable), never from roadmap exhaustion; added COMPLETION_CONFLICT error code; added T2.1 regression coverage in check-status.mjs (derivation, validation, legacy read, entry validation).",
+                "validation": [
+                  "npm run typecheck",
+                  "npm run check",
+                  "node scripts/check-status.mjs"
+                ],
+                "files_changed": [
+                  "src/cli/types.ts",
+                  "src/cli/artifacts/schema.ts",
+                  "src/cli/core/status.ts",
+                  "src/cli/core/errors.ts",
+                  "scripts/check-status.mjs"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-25T16:56:19.897Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "A new scope-completion record is validated and distinguishable from retirement.",
+                  "Derived status marks a new scope completed only from explicit completion or retirement, while legacy terminal records remain readable.",
+                  "Malformed or contradictory completion metadata is rejected without writes."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-25T16:56:22.590Z"
+              }
+            },
+            {
+              "id": "T2.2",
+              "title": "Implement guarded scope completion",
+              "description": "Extend the existing scope command with an explicit completion transition that validates readiness, writes only tool-owned lifecycle state, and requires deliberate confirmation.",
+              "files_to_touch": [
+                "src/cli/commands/scope.ts",
+                "src/cli/app.ts",
+                "src/cli/core/policy.ts",
+                "src/cli/help.ts"
+              ],
+              "context": "Use a scope subcommand, not a new root verb. Refuse active work, debt, pending review, artifact divergence, and stale confirmation. Completion must not create or masquerade as a retirement checkpoint.",
+              "acceptance_criteria": [
+                "An eligible open scope can be explicitly completed only through the dedicated tool-owned scope transition with confirmation.",
+                "The transition refuses non-ready or divergent scopes with no state write.",
+                "Completion is visible in status and context-pack and remains structurally distinct from retirement."
+              ],
+              "depends_on": [
+                "T2.1"
+              ],
+              "scenario_refs": [
+                "S5",
+                "S6"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Implemented guarded scope completion via a new 'kyro scope complete' subcommand (distinct from retirement): validates readiness (no active sprint, no open debt, no review debt, no blocking findings, healthy close checkpoints), requires deliberate confirmation (scope_complete policy guard at confirm level), writes only tool-owned lifecycle state (sprint.json completion record + project-state scope entry status/completion), and never creates a retirement checkpoint or rewrites archive/. Added COMPLETION_CONFLICT and NOT_READY_TO_COMPLETE error codes, scope_complete to GuardedOperation/default policy, mutating-invocation wiring in app.ts, help documentation, cloneScopeEntry completion preservation in state.ts, and end-to-end regression coverage in check-scope-retire.mjs (refuses active sprint/debt, dry-run, unconfirmed, happy apply, double-complete conflict, status/context-pack visibility).",
+                "validation": [
+                  "npm run typecheck",
+                  "npm run check",
+                  "node scripts/check-scope-retire.mjs",
+                  "node scripts/check-status.mjs"
+                ],
+                "files_changed": [
+                  "src/cli/commands/scope.ts",
+                  "src/cli/app.ts",
+                  "src/cli/core/policy.ts",
+                  "src/cli/help.ts",
+                  "src/cli/state.ts",
+                  "src/cli/core/errors.ts",
+                  "src/cli/types.ts",
+                  "scripts/check-scope-retire.mjs"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-25T17:18:33.474Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "An eligible open scope can be explicitly completed only through the dedicated tool-owned scope transition with confirmation.",
+                  "The transition refuses non-ready or divergent scopes with no state write.",
+                  "Completion is visible in status and context-pack and remains structurally distinct from retirement."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-25T17:18:37.225Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Deliberate continuation and certification",
+          "objective": "Allow a completed-but-not-retired scope to resume planning explicitly, then prove the lifecycle boundaries end to end.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.3",
+              "title": "Implement explicit scope reopen for later planning",
+              "description": "Add an auditable reopen transition for a completed, non-retired scope so new work can return to plan_sprint without manual state edits or recovery.",
+              "files_to_touch": [
+                "src/cli/commands/scope.ts",
+                "src/cli/core/status.ts",
+                "src/cli/commands/plan.ts",
+                "src/cli/commands/context-pack.ts"
+              ],
+              "context": "Reopen is not retirement reversal and cannot modify immutable close archives. Preserve completion history and require a non-empty reason. A retired scope remains terminal and is never reopened by this path.",
+              "acceptance_criteria": [
+                "A completed non-retired scope can be explicitly reopened with an auditable reason and then plan a later sprint normally.",
+                "Reopen refuses retired, active, malformed, or already-open scopes without writes.",
+                "Completion history remains visible after reopening and all existing archives keep identical bytes."
+              ],
+              "depends_on": [
+                "T2.2"
+              ],
+              "scenario_refs": [
+                "S3",
+                "S5",
+                "S7"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Added tool-owned 'kyro scope reopen': an explicitly completed, non-retired scope returns to plan_sprint under one locked, digest-bound, resumable transaction that clears the live completion and preserves it in append-only completionHistory (sprint.json + registry). Shared after-state builders (checkpoints/lifecycle-state.ts) are now the single source of truth for both writers and for checkpoint verification, which replays recorded lifecycle transitions from the close after-image instead of trusting the records — closing the divergence hole that made a completed or reopened scope read as tampered.",
+                "validation": [
+                  "npm run check (full suite, exit 0) including typecheck, dist freshness, and every contract script",
+                  "node scripts/check-scope-retire.mjs: new reopen contract — happy path, plan-after-reopen (S3/S7), refusals for open/retired/malformed/unknown/second-reopen without writes, dry-run and CONFIRMATION_REQUIRED, fault-injected resume (KYRO_TEST_REOPEN_FAIL_AFTER=sprint) and DIVERGED on concurrent registry edit",
+                  "archive/ byte digest asserted identical across completion, reopen, planning, resume, and every refusal path"
+                ],
+                "files_changed": [
+                  "src/cli/checkpoints/scope-reopen.ts",
+                  "src/cli/checkpoints/lifecycle-state.ts",
+                  "src/cli/checkpoints/scope-completion.ts",
+                  "src/cli/commands/scope.ts",
+                  "src/cli/commands/plan.ts",
+                  "src/cli/commands/context-pack.ts",
+                  "src/cli/commands/artifact-doctor.ts",
+                  "src/cli/core/status.ts",
+                  "src/cli/core/policy.ts",
+                  "src/cli/core/errors.ts",
+                  "src/cli/artifacts/schema.ts",
+                  "src/cli/remediation/plan.ts",
+                  "src/cli/types.ts",
+                  "src/cli/state.ts",
+                  "src/cli/app.ts",
+                  "src/cli/help.ts",
+                  "scripts/check-scope-retire.mjs"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-26T02:13:34.431Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "A completed non-retired scope can be explicitly reopened with an auditable reason and then plan a later sprint normally.",
+                  "Reopen refuses retired, active, malformed, or already-open scopes without writes.",
+                  "Completion history remains visible after reopening and all existing archives keep identical bytes."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-26T02:13:53.886Z"
+              }
+            },
+            {
+              "id": "T2.4",
+              "title": "Certify completion, reopen, and integrity boundaries",
+              "description": "Extend existing lifecycle and integrity gates with end-to-end adversarial cases and update only the user-facing guidance required by the final contract.",
+              "files_to_touch": [
+                "scripts/check-scope-retirement.mjs",
+                "scripts/check-close-handoff.mjs",
+                "scripts/check-plan.mjs",
+                "scripts/check-status.mjs",
+                "docs/cli.md",
+                "docs/status-coherence.md"
+              ],
+              "context": "Do not create a new test harness. Prove explicit completion differs from retirement, explicit reopen permits planning, and unsafe artifacts or stale requests stay fail-closed for the affected scope.",
+              "acceptance_criteria": [
+                "Focused end-to-end gates fail when completion is inferred from roadmap exhaustion or when reopen silently bypasses its preconditions.",
+                "Retirement remains human-gated and terminal while completion and reopening are independently observable.",
+                "npm run check, Doctor, analyze, Integrity prepare, and package dry-run pass after the changes."
+              ],
+              "depends_on": [
+                "T2.3"
+              ],
+              "scenario_refs": [
+                "S3",
+                "S4",
+                "S5",
+                "S6",
+                "S7"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Extended the existing gates (no new harness) with adversarial S4 coverage and updated the user-facing contract. check-scope-retire now proves lawful lifecycle evolution stays healthy and is labelled 'explicit lifecycle transition', that completing again after a reopen replays correctly, and that state edited beyond a transition, a rewritten lifecycle record, or a corrupt immutable narrative each still fail closed as DIVERGED. check-status adds the reopen derivation model plus malformed/empty/out-of-order history rejection; check-plan adds the refusal that stops planning from bypassing completion (remedy names reopen; a retired scope is never offered it); check-close-handoff asserts close never mints completion, history, or retirement. docs/cli.md and docs/status-coherence.md document the three distinct lifecycle facts and the replay-based verification.",
+                "validation": [
+                  "npm run check: exit 0 (full suite, including typecheck, dist freshness, and all contract scripts)",
+                  "node dist/cli.js doctor --artifacts --kyro-scope adaptive-sprint-lifecycle: all PASS, exit 0",
+                  "node dist/cli.js analyze --kyro-scope adaptive-sprint-lifecycle: no semantic issues, exit 0",
+                  "node dist/cli.js repair integrity prepare --json: no findings, no blockers, exit 0",
+                  "npm pack --dry-run: tarball builds, 713 files"
+                ],
+                "files_changed": [
+                  "scripts/check-scope-retire.mjs",
+                  "scripts/check-status.mjs",
+                  "scripts/check-plan.mjs",
+                  "scripts/check-close-handoff.mjs",
+                  "docs/cli.md",
+                  "docs/status-coherence.md"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-26T02:21:17.405Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Focused end-to-end gates fail when completion is inferred from roadmap exhaustion or when reopen silently bypasses its preconditions.",
+                  "Retirement remains human-gated and terminal while completion and reopening are independently observable.",
+                  "npm run check, Doctor, analyze, Integrity prepare, and package dry-run pass after the changes."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-26T02:21:21.564Z"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [
+        {
+          "id": "E1",
+          "title": "Make scope completion atomic and recoverable",
+          "description": "Repair the scope-complete writer so all preconditions and both state updates share one writer lease, failed intermediate application resumes safely, and conflicting state fails closed.",
+          "files_to_touch": [
+            "src/cli/commands/scope.ts",
+            "src/cli/types.ts",
+            "src/cli/artifacts/schema.ts",
+            "scripts/check-scope-retire.mjs"
+          ],
+          "context": "Corrective work for QA Major: scope completion must match Kyro's lock/CAS recovery guarantees without a new root verb or retirement checkpoint.",
+          "acceptance_criteria": [
+            "Completion revalidates sprint and project state inside one state-writer lock before any write.",
+            "A failure after sprint write resumes the exact same completion request without overwriting divergent state.",
+            "Conflicting request or concurrent state mutation fails closed and no archive bytes change."
+          ],
+          "depends_on": [
+            "T2.2"
+          ],
+          "scenario_refs": [
+            "S4",
+            "S5"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Made scope completion a locked, recoverable transition and reject digest-only false success.",
+            "validation": [
+              "npm run build",
+              "npm run typecheck",
+              "npm run check:scope-retire",
+              "npm run check:status",
+              "npm run check (non-TTY)",
+              "git diff --check",
+              "npm pack --dry-run --json",
+              "Doctor, analyze, and scoped integrity prepare"
+            ],
+            "files_changed": [
+              "src/cli/checkpoints/scope-completion.ts",
+              "src/cli/commands/scope.ts",
+              "src/cli/types.ts",
+              "src/cli/artifacts/schema.ts",
+              "scripts/check-scope-retire.mjs"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-08-26T01:40:50.076Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Completion revalidates sprint and project state inside one state-writer lock before any write.",
+              "A failure after sprint write resumes the exact same completion request without overwriting divergent state.",
+              "Conflicting request or concurrent state mutation fails closed and no archive bytes change."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-26T01:40:50.208Z"
+          }
+        }
+      ],
+      "definitionOfDone": [
+        "Scope completion, reopening, and retirement have distinct typed transitions and rendered states.",
+        "No ordinary sprint close infers completion or blocks lawful future planning.",
+        "All new lifecycle transitions are tool-owned, fail closed on invalid state, and preserve immutable archives.",
+        "Focused lifecycle regressions and the full project validation suite pass."
+      ]
+    },
+    "debt": [],
+    "handoff": {
+      "nextAction": "close_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task T2.4 passed checker review.",
+      "lastUpdated": "2026-08-26T02:21:21.564Z"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-23T18:22:46.918Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "adaptive-sprint-lifecycle",
+    "title": "Adaptive sprint lifecycle",
+    "status": "planning",
+    "objective": "Make Kyro record changing work truthfully without treating a partial sprint or exhausted roadmap as a terminal scope failure.",
+    "successCriteria": [
+      "Every unfinished task has a typed, reasoned disposition before sprint closure.",
+      "Closing any sprint preserves immutable evidence while keeping the scope open for explicit next planning.",
+      "Scope completion and retirement remain explicit, distinct decisions.",
+      "Doctor and Integrity distinguish lawful lifecycle evolution from immutable-artifact corruption.",
+      "Legacy checkpoints remain readable without retroactive semantic claims."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Kyro SHALL require an explicit validated disposition for every unfinished task before closing a sprint.",
+          "priority": "must",
+          "rationale": "Unfinished work must remain discoverable and attributable instead of being represented as success or silently discarded."
+        },
+        {
+          "id": "R2",
+          "statement": "Kyro SHALL close a sprint without automatically completing its scope merely because all originally planned roadmap entries are closed.",
+          "priority": "must",
+          "rationale": "A roadmap is an estimate; scope completion requires an explicit decision and evidence."
+        },
+        {
+          "id": "R3",
+          "statement": "Kyro SHALL allow an open scope with no active sprint to plan a subsequent sprint through the normal tool-owned flow.",
+          "priority": "must",
+          "rationale": "Legitimate reprioritization must not require a recovery or manual state edit."
+        },
+        {
+          "id": "R4",
+          "statement": "Kyro SHALL preserve fail-closed validation for immutable checkpoints, unsafe paths, identity conflicts, and stale approvals while accepting lawful lifecycle evolution.",
+          "priority": "must",
+          "rationale": "Simplification must not weaken artifact integrity or recovery safety."
+        },
+        {
+          "id": "R5",
+          "statement": "Kyro SHALL keep retirement distinct from scope completion and preserve readable historical checkpoint semantics.",
+          "priority": "must",
+          "rationale": "Terminal retirement has explicit human approval semantics, and immutable historical bytes cannot be rewritten."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "an active sprint has unfinished tasks",
+          "when": "a user closes the sprint",
+          "then": "each unfinished task must carry a valid explicit disposition with its reason and any required continuation reference"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "the final originally planned sprint has a mixture of completed and disposed tasks",
+          "when": "close-sprint applies its transaction",
+          "then": "the immutable close record reports a truthful partial outcome and the scope is not automatically completed"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "an open scope has closed all originally listed roadmap sprints",
+          "when": "the user supplies a later sprint plan",
+          "then": "kyro plan materializes it through the normal tool-owned route without recovery"
+        },
+        {
+          "id": "S4",
+          "requirement": "R4",
+          "given": "a scope contains either lawful lifecycle evolution or an unsafe/corrupt immutable artifact",
+          "when": "Doctor and Integrity inspect it",
+          "then": "lawful evolution is distinguishable from scoped fail-closed artifact corruption"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "a historical or retired scope is inspected",
+          "when": "Kyro reads its lifecycle state",
+          "then": "historical records remain readable and retirement remains explicitly terminal and human-gated"
+        },
+        {
+          "id": "S6",
+          "requirement": "R5",
+          "given": "an open scope has no active sprint, no unresolved debt or review, and healthy artifacts",
+          "when": "the user explicitly confirms scope completion",
+          "then": "Kyro records completion as a distinct lifecycle fact without retiring the scope or rewriting its archive"
+        },
+        {
+          "id": "S7",
+          "requirement": "R3",
+          "given": "a completed but non-retired scope needs later work",
+          "when": "the user explicitly reopens it with a reason",
+          "then": "Kyro preserves completion history and routes the scope to plan_sprint without recovery or manual edits"
+        }
+      ],
+      "nonGoals": [
+        "Maker/checker provenance policy changes.",
+        "Startup-contract consolidation or unrelated global preflight redesign.",
+        "NutriLens or Kyro Lens implementation changes.",
+        "Manual editing mode for Kyro-managed state.",
+        "Archive rewriting, release, installation, publication, or version bump."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [
+      {
+        "id": "process-1",
+        "rule": "A post-close live-state transition is valid only if it replays exactly from the checkpoint after-image through the same builders the writer uses; lifecycle records are evidence, never authority.",
+        "tags": [
+          "process"
+        ],
+        "addedSprint": 2
+      }
+    ],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 3,
+      "sizingRationale": "The work is sequenced by semantic dependency: define the lifecycle contract first, implement the core transitions second, then reconcile integrity and certify the complete path.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "lifecycle-contract",
+          "title": "Lifecycle contract and dispositions",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "truthful-sprint-close",
+          "title": "Truthful sprint close and open-scope routing",
+          "state": "closed"
+        },
+        {
+          "n": 3,
+          "slug": "integrity-certification",
+          "title": "Integrity recalibration and lifecycle certification",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "lifecycle-contract",
+        "outcome": "shipped",
+        "closedAt": "2026-08-24",
+        "archive": "archive/sprint-001-lifecycle-contract.md",
+        "snapshot": "archive/sprint-001-lifecycle-contract.json",
+        "checkpoint": "archive/sprint-001-lifecycle-contract.checkpoint.json",
+        "checkpointSha256": "7998a166250a32249bc5884f8993b8a735cd51a4069c9ef9beb4257e380a89a6"
+      },
+      {
+        "n": 2,
+        "slug": "truthful-sprint-close",
+        "outcome": "shipped",
+        "closedAt": "2026-08-26",
+        "archive": "archive/sprint-002-truthful-sprint-close.md",
+        "snapshot": "archive/sprint-002-truthful-sprint-close.json",
+        "checkpoint": "archive/sprint-002-truthful-sprint-close.checkpoint.json",
+        "recommendations": [
+          "Before completing this scope, verify each success criterion against evidence rather than treating all-tasks-done as proof the objective was met.",
+          "If further lifecycle transitions are added (e.g. suspend/resume), extend checkpoints/lifecycle-state.ts and its replay first, then the command surface."
+        ],
+        "checkpointSha256": "7c88a2298a0bc8ad38e2471d2fc7fcd2097e8dc5480c11b8876f01c437f6af55"
+      }
+    ],
+    "previousSprint": {
+      "n": 2,
+      "slug": "truthful-sprint-close",
+      "outcome": "shipped",
+      "summary": "Explicit scope completion and reopen replace inferred terminal states; verification replays lifecycle transitions instead of trusting records."
+    },
+    "activeSprint": null,
+    "debt": [],
+    "handoff": {
+      "nextAction": "plan_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Scope stays open. Sprint 2 delivered the completion/reopen lifecycle and its adversarial gates; decide explicitly whether the scope objective is met before completing it.",
+      "lastUpdated": "2026-08-26"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-23T18:22:46.918Z"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "adaptive-sprint-lifecycle",
+    "title": "Adaptive sprint lifecycle",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "adaptive-sprint-lifecycle",
+    "title": "Adaptive sprint lifecycle",
+    "status": "planning"
+  },
+  "digests": {
+    "beforeClose": "6555deea30a64363967f3dd50ba77f829a38d5b9f8592d6aa403e1a6461ffc7b",
+    "intendedAfterClose": "4385043e036ec677926987c12baa18f3c744c66ea56710baf7d756231202c56a",
+    "projectScopeBefore": "ced136cbecfadd666cc014055954680ebce9505edb63fdacea5190d4648fac9e",
+    "projectScopeAfter": "704ae386c7319926b8824c7d3bb2ca69f5abe1b85ddf814861d31f7851f64f1c",
+    "legacySnapshot": "1d72e29ee9cd40438f3fdc68b377f6e10e5e7887a9e3362f5f7f3d823c9905c3",
+    "narrative": "cd47b62b467664639238933d5a3041386da31e935ebe69e03a54e30f94b2ac9d"
+  }
+}

@@ -1,0 +1,1187 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "77cbbd846b3b888f148090e20db54101a11e62ea19be0bf33442e7e4152f3d9f",
+  "createdAt": "2026-08-10T19:25:59.941Z",
+  "identity": {
+    "scope": "canonical-debt-contract-and-legacy-remediation",
+    "sprintN": 4,
+    "sprintSlug": "lens-contract-parity"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": "Sprint 4 closed after independent Lens certification; Sprint 5 is the original-incident release gate.",
+    "summary": "Sprint 4 made Lens an independent v1/v2/v3 provenance verifier with fail-closed unanchored-record diagnostics.",
+    "recommendations": [
+      "Sprint 5 must resolve the deferred Lens assistant draft-store isolation failure under a pinned supported Node runtime before claiming a green release suite.",
+      "Sprint 5 must run the faithful original incident only in a temporary copy through source, isolated package, installed or projected runtime, Doctor, recertification, and Lens without touching Aliva.",
+      "Sprint 5 must publish R9 operator documentation with the 4.43.5 origin-only limitation, upgrade order, and exact evidence boundary."
+    ],
+    "learnings": [
+      "An artifact can be resumable only after its filename identity, declared scope, witness, continuity, and commitment evidence agree; continuity alone is not operator-safe.",
+      "Test evidence must name the Node runtime: Node v25 native localStorage changed the baseline, while supported Node v22 isolates the real assistant-chat ordering flake."
+    ]
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/canonical-debt-contract-and-legacy-remediation/archive/sprint-004-lens-contract-parity.json",
+    "narrative": ".agents/kyro/scopes/canonical-debt-contract-and-legacy-remediation/archive/sprint-004-lens-contract-parity.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "canonical-debt-contract-and-legacy-remediation",
+    "title": "Canonical Debt Contract and Legacy Remediation",
+    "status": "planning",
+    "objective": "Reconcile Kyro and Lens debt input semantics and deliver a typed append-only canonicalization path that repairs and recertifies closed legacy scopes without changing immutable history.",
+    "successCriteria": [
+      "Kyro and Lens classify every canonical, legacy-compatible, remediation-required, and unsupported debt fixture identically.",
+      "An operator can prepare, preview, and atomically canonicalize the motivating legacy debt without manually calculating digests or editing managed files.",
+      "A successful repair changes only the targeted live debt and appended provenance while every historical artifact and commitment remains byte-identical.",
+      "Doctor, status, recertification, and Lens independently agree that a valid corrected scope is remediated or recertified and reject every forged, stale, partial, or unsupported variant.",
+      "The faithful original-incident scenario passes through the isolated package and projected runtime before publication."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Kyro and Lens must distinguish canonical, legacy-compatible, remediation-required, and unsupported raw debts using the same observable contract.",
+          "priority": "must",
+          "rationale": "Raw compatibility and canonical output are different responsibilities. Shared golden vectors, including the original D1 variants, must prove identical classification and canonical projection so the output interface is never again mistaken for the input schema."
+        },
+        {
+          "id": "R2",
+          "statement": "All new debt writes and successful remediations must emit exactly the seven-field canonical debt representation.",
+          "priority": "must",
+          "rationale": "The canonical key set is id, title, origin, priority, status, targetSprint, and note. Exact output prevents hybrid legacy shapes while compatibility readers remain able to diagnose old input."
+        },
+        {
+          "id": "R3",
+          "statement": "A new versioned debt canonicalization operation must bind the complete observed debt and produce an explicit exact canonical after-image.",
+          "priority": "must",
+          "rationale": "The existing origin-only operation cannot repair the motivating scope. A closed debt.canonicalize operation must preserve identity fields, require explicit canonical values, retire legacy-only keys, use a whole-debt SHA-256 precondition, and resolve multiple field issues atomically without becoming a generic patch."
+        },
+        {
+          "id": "R4",
+          "statement": "Preparation and preview must be read-only, derive all technical digests, expose evidence and unresolved decisions, and never treat suggested values as operator authorization.",
+          "priority": "must",
+          "rationale": "Origin has strong addedSprint evidence, while priority and target sprint remain business judgments. INPUT_REQUIRED must name every unresolved value, and a complete manifest must be producible without hand-editing managed state or manually calculating hashes."
+        },
+        {
+          "id": "R5",
+          "statement": "Canonicalization apply and resume must remain atomic, append-only, idempotent, and history-preserving under the state-writer lock.",
+          "priority": "must",
+          "rationale": "Checkpoint, snapshot, narrative, ledger commitment, task, verdict, unrelated debt, and existing provenance bytes are immutable. Stale full-debt state, interruption, or post-write mismatch must produce no competing applied record and must preserve deterministic PREPARED resume."
+        },
+        {
+          "id": "R6",
+          "statement": "Doctor, status, replay, and recertification must support existing and new remediation versions without weakening historical integrity or tamper detection.",
+          "priority": "must",
+          "rationale": "The new operation requires an explicit protocol revision so old readers fail closed as unsupported. New readers must replay v1, v2, new, and mixed chains; historical schema notes must never short-circuit artifact digest checks; C-NNN must bind the current head."
+        },
+        {
+          "id": "R7",
+          "statement": "Lens must independently verify and render legacy classification, canonicalization provenance, remediation state, and recertification state.",
+          "priority": "must",
+          "rationale": "Lens is a read-only verifier, not a consumer of Kyro's claimed label. It must recompute commitments and result state, render selected values and retired legacy keys, and show actionable diagnostics with no stale-state fallback."
+        },
+        {
+          "id": "R8",
+          "statement": "A faithful original-incident fixture and a temporary-copy probe of the actual local scope must gate the packaged and installed release.",
+          "priority": "must",
+          "rationale": "Synthetic canonical fixtures missed the contradiction. Sentinel assertions must preserve the string origin and missing-field shapes; the full before, prepare, preview, apply, Doctor, recertify, and Lens flow must pass with unchanged historical hashes through an isolated package and projected runtime."
+        },
+        {
+          "id": "R9",
+          "statement": "Release documentation must state the Kyro 4.43.5 limitation, compatible upgrade order, operator workflow, and exact certification boundary.",
+          "priority": "must",
+          "rationale": "Users must not be told that origin-only remediation repairs record-level legacy drift. Documentation must separate local/source success from package, installed-runtime, Lens, and publication evidence."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "A raw debt containing exactly the seven canonical keys with valid values",
+          "when": "Kyro and Lens evaluate the debt contract",
+          "then": "Both accept it and produce the same canonical values without a legacy diagnostic"
+        },
+        {
+          "id": "S2",
+          "requirement": "R1",
+          "given": "A readable legacy debt with numeric origin and absent priority, targetSprint, or note",
+          "when": "Kyro and Lens evaluate the debt contract",
+          "then": "Both treat it as readable legacy input and derive the same explicit canonical projection without calling the raw object canonical"
+        },
+        {
+          "id": "S3",
+          "requirement": "R1",
+          "given": "The motivating legacy D1 shape with a present string origin",
+          "when": "Kyro and Lens evaluate the debt contract",
+          "then": "Both reject the present invalid origin and Kyro classifies the object as remediation-required with the exact field path"
+        },
+        {
+          "id": "S4",
+          "requirement": "R1",
+          "given": "A debt with malformed identity, status, or an unsupported raw structure",
+          "when": "Kyro and Lens evaluate the debt contract",
+          "then": "Both fail closed without fabricating a trusted canonical projection"
+        },
+        {
+          "id": "S5",
+          "requirement": "R2",
+          "given": "A Kyro command creates or validates new debt state",
+          "when": "The write is accepted",
+          "then": "The persisted debt contains exactly id, title, origin, priority, status, targetSprint, and note with valid values"
+        },
+        {
+          "id": "S6",
+          "requirement": "R8",
+          "given": "The minimized live D1 and its two historical checkpoint variants",
+          "when": "The faithful fixture and Doctor gates run",
+          "then": "The decisive legacy shapes remain present, historical hashes remain untouched, and any fixture cleanup or artifact tampering fails certification"
+        },
+        {
+          "id": "S7",
+          "requirement": "R3",
+          "given": "a readable but remediation-required D1-shaped debt collection and explicit canonical operator values",
+          "when": "the typed canonicalization planner constructs an operation",
+          "then": "it binds the complete observed debt digest and emits exactly one record-level debt.canonicalize plan with an exact seven-key after-image."
+        },
+        {
+          "id": "S8",
+          "requirement": "R4",
+          "given": "a D1-shaped debt whose origin has addedSprint evidence but priority and targetSprint are unresolved",
+          "when": "an operator runs preparation or preview without every explicit value",
+          "then": "the result is read-only INPUT_REQUIRED diagnostics that distinguish evidence from authorization and no manifest or artifact mutation is produced."
+        },
+        {
+          "id": "S9",
+          "requirement": "R3",
+          "given": "a complete manifest with a stale whole-debt digest, an unknown operation key, or a hybrid legacy after-image",
+          "when": "the canonicalization plan is validated",
+          "then": "it fails closed before any write and existing v1/v2 remediation records remain parseable under their original revisions."
+        },
+        {
+          "id": "S10",
+          "requirement": "R5",
+          "given": "a complete v3 debt.canonicalize manifest for the faithful D1-shaped debt and an intact closed-scope checkpoint chain",
+          "when": "kyro remediate apply runs and is retried across success, stale state, and an interrupted publication",
+          "then": "it either publishes exactly one deterministic append-only R-NNN with the exact seven-key after-image or leaves live state, anchors, immutable history, and commitments unchanged."
+        },
+        {
+          "id": "S11",
+          "requirement": "R6",
+          "given": "valid v1, v2, v3, and mixed remediation chains plus variants with forged anchors, changed record bytes, wrong results, unsupported versions, or altered checkpoint artifacts",
+          "when": "Doctor, status, and replay evaluate the scope",
+          "then": "they preserve historical checkpoint verification, report the correct historical or remediated state for a valid chain, and fail closed with actionable diagnostics for every invalid chain."
+        },
+        {
+          "id": "S12",
+          "requirement": "R6",
+          "given": "a verified v3 remediation head and independently reproducible checker evidence",
+          "when": "kyro recertify applies, resumes, or observes stale head/evidence after another remediation",
+          "then": "only the current verified head receives one append-only C-NNN, while stale, forged, incomplete, or superseded certification claims cannot appear as recertified."
+        },
+        {
+          "id": "S13",
+          "requirement": "R7",
+          "given": "Kyro-emitted valid v1, v2, v3, and mixed remediation chains, including a v3 debt.canonicalize record with its exact seven-key after-image and a current chain-head-bound C-NNN",
+          "when": "Lens reads the artifacts and recomputes protocol commitments, version-specific result binding, chain continuity, evidence, and certification binding",
+          "then": "Lens derives remediated or recertified independently and renders the canonicalization provenance, selected canonical values, retired legacy keys, and certification state without mutating any artifact"
+        },
+        {
+          "id": "S14",
+          "requirement": "R7",
+          "given": "A Kyro remediation or certification chain with an unsupported version, mismatched operation, bad commitment or anchor, stale result, forged evidence, planted unanchored record, or persisted PREPARED record without its anchor",
+          "when": "Lens verifies the scope with directory listing when available and without it when unavailable",
+          "then": "Lens emits an actionable diverged, unsupported, or existence-check-unavailable diagnostic, never a stale healthy provenance state; a later active sprint suspends only live drift and not integrity checks"
+        }
+      ],
+      "nonGoals": [
+        "Rewrite or replace historical checkpoint, snapshot, narrative, or ledger evidence.",
+        "Introduce generic JSON Patch or arbitrary path mutation.",
+        "Infer priority, target sprint, origin, or note semantics without explicit operator authorization.",
+        "Recover missing or corrupted checkpoint bytes from backup or Git.",
+        "Canonicalize tasks, verdicts, ADRs, conventions, or non-debt SprintFile structures.",
+        "Mutate every legacy scope automatically during installation or Doctor.",
+        "Retain legacy-only debt keys in the corrected live canonical object.",
+        "Break or rewrite existing v1 or v2 remediation and certification records.",
+        "Modify, stage, or commit files in the original Aliva checkout during release validation.",
+        "Claim production readiness beyond the covered debt compatibility and append-only remediation contract."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [
+      {
+        "id": "history-immutability",
+        "rule": "Never rewrite committed checkpoints, snapshots, narratives, or ledger commitments; remediation may only append provenance and replace the live canonical projection.",
+        "tags": [
+          "integrity",
+          "remediation"
+        ],
+        "addedSprint": 0
+      },
+      {
+        "id": "explicit-operator-authority",
+        "rule": "Treat inferred legacy values as suggestions only; apply requires explicit operator-supplied canonical values in the manifest.",
+        "tags": [
+          "provenance",
+          "process"
+        ],
+        "addedSprint": 0
+      },
+      {
+        "id": "shared-debt-vectors",
+        "rule": "Every raw-debt classification or canonical projection change must update and pass the shared Kyro and Lens golden vectors.",
+        "tags": [
+          "contract",
+          "testing"
+        ],
+        "addedSprint": 0
+      },
+      {
+        "id": "original-incident-gate",
+        "rule": "Do not claim the incident fixed until the faithful legacy fixture passes source, isolated package, projected runtime, Doctor, recertification, and Lens gates.",
+        "tags": [
+          "release",
+          "testing"
+        ],
+        "addedSprint": 0
+      },
+      {
+        "id": "aliva-readonly-probe",
+        "rule": "Probe the actual Aliva scope only through read-only inspection and a temporary copy; never mutate, stage, or commit its checkout during Kyro release validation.",
+        "tags": [
+          "safety",
+          "release"
+        ],
+        "addedSprint": 0
+      }
+    ],
+    "adrs": [
+      {
+        "id": "ADR-0001",
+        "title": "Separate raw debt compatibility from canonical debt output",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "The incident recurred because Kyro treated the strict Debt output interface as the raw input contract while Lens intentionally normalizes legacy input.",
+        "decision": "Classify raw debt as canonical, legacy-compatible, remediation-required, or unsupported, and preserve an exact seven-field canonical output contract for all new writes.",
+        "consequences": [
+          "Doctor and Lens can understand legacy data without calling it canonical, and writers remain strict.",
+          "Shared behavior vectors become a compatibility contract across repositories."
+        ],
+        "alternatives": [
+          "Use one strict schema for both input and output.",
+          "Allow Lens-only defaults without a Kyro classification."
+        ]
+      },
+      {
+        "id": "ADR-0002",
+        "title": "Canonicalize legacy debt as one typed record-level operation",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "The existing debt.origin.set operation cannot add missing canonical fields or retire legacy-only keys, so strict post-state validation makes the motivating scope unrecoverable.",
+        "decision": "Introduce a closed debt.canonicalize operation with a whole-debt digest precondition, preserved identity fields, explicit canonical values, and an exact seven-key after-image.",
+        "consequences": [
+          "One atomic R-NNN resolves all related field issues without intermediate hybrid states.",
+          "Routine isolated edits remain owned by normal debt commands rather than remediation."
+        ],
+        "alternatives": [
+          "Add independent setters for every debt field.",
+          "Expose generic JSON Patch or JSON Pointer mutations."
+        ]
+      },
+      {
+        "id": "ADR-0003",
+        "title": "Version the canonicalization operation as a new protocol revision",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "Existing Kyro and Lens readers know only the current remediation versions and debt.origin.set semantics.",
+        "decision": "Publish debt.canonicalize in a new explicit remediation protocol revision with version-aware replay and mixed-chain coverage.",
+        "consequences": [
+          "Older readers fail closed as unsupported instead of interpreting a known version differently.",
+          "New readers must preserve byte-compatible verification of every existing v1 and v2 chain."
+        ],
+        "alternatives": [
+          "Add the new operation silently to an existing schema version.",
+          "Drop replay support for older remediation records."
+        ]
+      },
+      {
+        "id": "ADR-0004",
+        "title": "Require explicit semantic authority and retire live legacy keys",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "AddedSprint supports an origin suggestion, but priority and target sprint are business decisions; retaining detail, resolution, or addedSprint would leave a hybrid live contract.",
+        "decision": "Preparation may suggest values with evidence, but apply requires explicit operator values and emits exactly the seven canonical debt keys while preserving old bytes only through immutable history and remediation provenance.",
+        "consequences": [
+          "The record distinguishes observed evidence from operator judgment.",
+          "Legacy-only keys disappear from live state without erasing historical proof."
+        ],
+        "alternatives": [
+          "Silently adopt Lens defaults as historical truth.",
+          "Keep legacy-only keys alongside canonical fields."
+        ]
+      },
+      {
+        "id": "ADR-0005",
+        "title": "Gate release on the motivating artifact shape",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "Synthetic fixtures with otherwise canonical debt allowed the previous implementation to pass while the real model-catalog-and-routing scope remained impossible to remediate.",
+        "decision": "Require a faithful minimized fixture plus a temporary-copy probe of the actual scope through source, isolated package, projected runtime, Doctor, recertification, and Lens before publication.",
+        "consequences": [
+          "Fixture sentinel assertions prevent future cleanup from deleting the failure shape.",
+          "The original Aliva checkout remains read-only throughout certification."
+        ],
+        "alternatives": [
+          "Certify only generated canonical fixtures.",
+          "Apply the candidate directly to the original project checkout."
+        ]
+      }
+    ],
+    "roadmap": {
+      "plannedSprintCount": 5,
+      "sizingRationale": "Five sprints follow the dependency chain and isolate independent failure domains. Sprint 1 freezes the raw/canonical contract and faithful reproduction before writers depend on it. Sprint 2 adds the versioned typed operation and operator preparation under the existing transaction model. Sprint 3 proves replay, Doctor, status, and recertification integrity across old, new, and mixed chains. Sprint 4 updates Lens as an independent cross-repository verifier only after Kyro's protocol stabilizes. Sprint 5 certifies the faithful original incident through packaging, projected runtime, Lens, and documentation. Fewer sprints would let writer, verifier, consumer, or release evidence falsely certify one another; more would split cohesive gates without reducing risk. The plan's acceptance matrix is allocated to the relevant sprint as Given/When/Then scenarios during per-sprint planning.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "debt-contract-and-faithful-fixtures",
+          "title": "Debt contract reconciliation and faithful fixtures",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "typed-debt-canonicalization",
+          "title": "Typed debt canonicalization and operator preparation",
+          "state": "closed"
+        },
+        {
+          "n": 3,
+          "slug": "chain-verification-and-recertification",
+          "title": "Chain verification and recertification integrity",
+          "state": "closed"
+        },
+        {
+          "n": 4,
+          "slug": "lens-contract-parity",
+          "title": "Lens contract parity and provenance",
+          "state": "active"
+        },
+        {
+          "n": 5,
+          "slug": "original-incident-release-gate",
+          "title": "Original incident and release certification",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "debt-contract-and-faithful-fixtures",
+        "outcome": "shipped",
+        "closedAt": "2026-08-10",
+        "archive": "archive/sprint-001-debt-contract-and-faithful-fixtures.md",
+        "snapshot": "archive/sprint-001-debt-contract-and-faithful-fixtures.json",
+        "checkpoint": "archive/sprint-001-debt-contract-and-faithful-fixtures.checkpoint.json",
+        "recommendations": [
+          "Keep Sprint 2 limited to the typed operation schema and read-only preparation; do not introduce apply or mutate immutable history before the transaction and replay gates in Sprint 3."
+        ],
+        "checkpointSha256": "dd3a5d09231232e2fc680dd7f9cb7127959751810253311ecfe6bfe650f6820c"
+      },
+      {
+        "n": 2,
+        "slug": "typed-debt-canonicalization",
+        "outcome": "shipped",
+        "closedAt": "2026-08-10",
+        "archive": "archive/sprint-002-typed-debt-canonicalization.md",
+        "snapshot": "archive/sprint-002-typed-debt-canonicalization.json",
+        "checkpoint": "archive/sprint-002-typed-debt-canonicalization.checkpoint.json",
+        "recommendations": [
+          "Sprint 3 must implement atomic apply, resume, replay, and recertification under the state-writer lock without weakening historical integrity.",
+          "Lens contract parity in Sprint 4 requires independent verification of the new canonicalization provenance and remediation state."
+        ],
+        "checkpointSha256": "c74e8d9a96149a4489b4ad52e79801a195dc3c15179dffee7f5a9995e94482ef"
+      },
+      {
+        "n": 3,
+        "slug": "chain-verification-and-recertification",
+        "outcome": "shipped",
+        "closedAt": "2026-08-10",
+        "archive": "archive/sprint-003-chain-verification-and-recertification.md",
+        "snapshot": "archive/sprint-003-chain-verification-and-recertification.json",
+        "checkpoint": "archive/sprint-003-chain-verification-and-recertification.checkpoint.json",
+        "recommendations": [
+          "Sprint 4 must independently verify v3 canonicalization provenance, unanchored or PREPARED records, and chain-head-bound recertification in Lens.",
+          "Keep Lens read-only and mirror Kyro fail-closed chain semantics without trusting Kyro status labels."
+        ],
+        "checkpointSha256": "72fbf19ad066a61da3e2f09a58f67fbeea2ed5b57a9511188479f6bdc63462e5"
+      }
+    ],
+    "previousSprint": {
+      "n": 3,
+      "slug": "chain-verification-and-recertification",
+      "outcome": "shipped",
+      "summary": "Sprint 3 delivered atomic v3 canonicalization, version-aware chain verification, and chain-head-bound recertification."
+    },
+    "activeSprint": {
+      "n": 4,
+      "slug": "lens-contract-parity",
+      "title": "Lens contract parity and provenance",
+      "objective": "Make Kyro Lens an independent, read-only verifier and renderer of v1, v2, v3, and mixed remediation chains, including canonicalization provenance, interrupted publication, and chain-head-bound recertification.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Versioned Lens protocol ingestion",
+          "objective": "Replace Lens's v1-only remediation model with an explicit, fail-closed reader for every Kyro remediation revision already emitted.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T4.1",
+              "title": "Model and parse versioned remediation records",
+              "description": "Extend Lens domain types and parsing so remediation records are a discriminated union for v1 snapshot records and v2/v3 compact-witness records. Bind debt.origin.set to revisions 1/2/3 and debt.canonicalize only to v3; validate its complete debt-collection precondition, exact seven-key after-image, retired legacy keys, and closed key sets. Preserve strict parsing of C-NNN records and reject unknown versions, version-operation mismatches, malformed commitments, or extra keys as unsupported rather than coercing them.",
+              "files_to_touch": [
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/domain/types.ts",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.ts",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.test.ts"
+              ],
+              "context": "Lens is an independent read-only consumer: it must accept only the serialized protocol actually emitted by Kyro, never invoke Kyro writers, and never reinterpret an old record under v3. The seven-key canonical after-image and retired keys are provenance, not permission to mutate live state. This incorporates Sprint 3's recommendation to verify v3 canonicalization without trusting Kyro labels.",
+              "acceptance_criteria": [
+                "Lens parses valid v1, v2, v3, and mixed anchored R-NNN chains using revision-specific discriminated types, while a v1/v2 debt.canonicalize record and every unknown schema or operation fail closed as unsupported.",
+                "A v3 debt.canonicalize operation accepts only its closed key set, a whole debt-collection SHA-256 precondition, an exact seven-key canonical after-image, named retired keys, and valid issue resolution references; malformed or hybrid variants identify their failing field.",
+                "C-NNN parsing preserves the certification id, identity, evidence, verdict, and chain-head commitment as commitment-bound data; malformed ids, commitments, evidence, or unknown keys cannot be normalized into a healthy result.",
+                "Existing v1 remediation and recertification parsing tests remain valid, and the Lens checkout has no write path for remediation or certification artifacts."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S13",
+                "S14"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Lens now models remediation records as a discriminated union over schemaVersion 1/2/3 and parses them fail-closed with field-level refusals. types.ts adds REMEDIATION_SCHEMA_VERSIONS, the closed operation registry bound per revision (debt.origin.set at 1/2/3, debt.canonicalize only at 3), CanonicalizeDebtOperation with its seven-key CanonicalDebtAfterImage and retiredKeys, the compact operations-replay witness, CompactScopeRemediation and the ScopeRemediation union. parse.ts replaces the boolean v1 predicate with issue-collecting validators: each revision is held to its own replay witness (v1 snapshot, v2/v3 witness), an operation kind outside the revision registry is refused rather than reinterpreted, an unknown schemaVersion is refused outright, and a canonicalization must present a whole-debt-collection SHA-256 precondition, an exact seven-key after-image, named retired keys that are never canonical keys, and resolves entries referencing declared issue ids. C-NNN parsing gained the same field-level strictness over id, commitments, evidence sources, verdict outcome and unknown keys. The resolver was widened to the union so the checkout still typechecks; its semantics remain T4.2 work.",
+                "validation": [
+                  "pnpm run typecheck (tsc -b): exit 0",
+                  "vitest src/data/parse.test.ts + validate.test.ts + remediation-summary.test.ts + remediation-real-contract.test.ts: 122 passed, 0 failed",
+                  "Full Lens suite: 843 passed, 9 failed — all 9 in assistant-model-select.test.tsx (localStorage.clear is not a function), reproduced identically on the stashed pre-change baseline, unrelated to remediation parsing",
+                  "Write-path audit: grep for writeFile/createWritable/removeEntry across src finds no production write path; the only hit is checkpoint-summary.test.ts"
+                ],
+                "files_changed": [
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/domain/types.ts",
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.ts",
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.test.ts",
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts"
+                ],
+                "notes": "Existing v1 remediation/recertification tests in validate.test.ts and the real-contract fixture test still pass unchanged. The 9 pre-existing Lens failures are recorded as discovered debt, not introduced here.",
+                "by": "maker",
+                "recordedAt": "2026-08-10T18:30:07.907Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Lens parses valid v1, v2, v3, and mixed anchored R-NNN chains using revision-specific discriminated types, while a v1/v2 debt.canonicalize record and every unknown schema or operation fail closed as unsupported.",
+                  "A v3 debt.canonicalize operation accepts only its closed key set, a whole debt-collection SHA-256 precondition, an exact seven-key canonical after-image, named retired keys, and valid issue resolution references; malformed or hybrid variants identify their failing field.",
+                  "C-NNN parsing preserves the certification id, identity, evidence, verdict, and chain-head commitment as commitment-bound data; malformed ids, commitments, evidence, or unknown keys cannot be normalized into a healthy result.",
+                  "Existing v1 remediation and recertification parsing tests remain valid, and the Lens checkout has no write path for remediation or certification artifacts."
+                ],
+                "findings": [],
+                "by": "sprint-executor-checker",
+                "reviewedAt": "2026-08-10T18:30:14.840Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Independent provenance verification",
+          "objective": "Derive Lens provenance state from bytes, anchors, and replay semantics rather than from Kyro's presentation labels.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T4.2",
+              "title": "Verify versioned chains, interrupted records, and certificates",
+              "description": "Refactor the Lens provenance resolver into a shared semantic evaluator for versioned remediation chains. It must recompute canonical commitments, validate canonical paths and anchor ordering, verify the declared result against the live business-state projection and version-specific replay witness, and bind C-NNN to the current remediation head and evidence. When directory listing is available, compare archive/remediations and archive/certifications to live anchors so an unanchored R-NNN or C-NNN is detected; when listing is unavailable, report that the existence check is unavailable rather than claiming it passed. A valid PREPARED record (record persisted but anchor absent) and a planted record both fail closed as diverged, with actionable detail.",
+              "files_to_touch": [
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-real-contract.test.ts",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/resolve-scopes.ts"
+              ],
+              "context": "Mirror Kyro's semantic rule: a later active sprint suspends only live-drift comparison, never record integrity, anchor continuity, commitment validation, or prepared/unanchored detection. Do not introduce a Lens-only verification vocabulary; use existing remediated, recertified, diverged, and unsupported states with precise detail. This directly incorporates both Sprint 3 recommendations and preserves immutable history.",
+              "acceptance_criteria": [
+                "Lens independently recomputes every R-NNN and C-NNN commitment, validates canonical anchor paths, chain continuity, declared revision operation set, business-state/result binding, certification evidence, and current chain-head binding for valid v1, v2, v3, and mixed chains.",
+                "A valid v3 canonicalization followed by a valid C-NNN resolves as recertified; a later remediation invalidates that certificate until a new one binds the new head, without altering historical checkpoint interpretation.",
+                "A forged record, changed record bytes, stale state/result, malformed or unknown version, bad anchor, unanchored planted record, or genuine PREPARED publication yields an actionable diverged or unsupported result and never falls back to remediated or recertified.",
+                "While a later sprint is active, only live drift is suspended; all provenance integrity checks still run. If directory listing is unavailable, Lens exposes the limitation instead of asserting that no unanchored artifact exists."
+              ],
+              "depends_on": [
+                "T4.1"
+              ],
+              "scenario_refs": [
+                "S13",
+                "S14"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Review fix: the unanchored-artifact classifier now establishes identity before continuity. Calling a record PREPARED is an instruction to an operator to resume it, and the previous version derived that label from base continuity alone — so a structurally valid R-999 from another scope, dropped in as remediation-002.json, could be labelled resumable whenever its base happened to match this chain. classifyUnanchoredRemediation now requires the record's own id to equal the filename-derived id (mismatch: CORRUPT, the filename and contents disagree), its scope to equal the live scope (mismatch: DIVERGED, naming the foreign scope), and its version-specific replay witness to verify, before continuity is even considered. classifyUnanchoredCertification enforces the same rule over certificationId and identity.scope. Both paths keep failing closed inside the existing vocabulary; only the reason changes, and no case that previously reported PREPARED on genuine bytes changed its answer.",
+                "validation": [
+                  "Node v22.22.1 (within engines >=20): pnpm run typecheck exit 0; pnpm run build built in 2.18s",
+                  "node scripts/check-guard-mutations.mjs: exit 0 — 16 assertions over 4 guards; a new 'unanchored artifact identity' guard disables the id check and requires the probe to flip from CORRUPT to PREPARED",
+                  "Focused suites (remediation-real-contract, remediation-summary, parse, overview): 83 passed, 0 failed",
+                  "Three new negative cases over the real Kyro-emitted PREPARED bytes: a record that DOES continue the live chain but declares id R-999 -> CORRUPT and never PREPARED; the same bytes declaring another scope -> DIVERGED naming it; a planted certificate whose id disagrees with its filename, and one declaring a foreign scope -> CORRUPT/DIVERGED, never PREPARED",
+                  "git diff --check: clean"
+                ],
+                "files_changed": [
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts",
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-real-contract.test.ts",
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/scripts/check-guard-mutations.mjs"
+                ],
+                "notes": "The certificate case initially passed for the wrong reason: emptying certifications[] made the real C-001 unanchored too, and it was classified first. The fixture now keeps C-001 anchored so the planted file is the only artifact under test.",
+                "by": "maker",
+                "recordedAt": "2026-08-10T19:00:11.421Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Lens independently recomputes every R-NNN and C-NNN commitment, validates canonical anchor paths, chain continuity, declared revision operation set, business-state/result binding, certification evidence, and current chain-head binding for valid v1, v2, v3, and mixed chains.",
+                  "A valid v3 canonicalization followed by a valid C-NNN resolves as recertified; a later remediation invalidates that certificate until a new one binds the new head, without altering historical checkpoint interpretation.",
+                  "A forged record, changed record bytes, stale state/result, malformed or unknown version, bad anchor, unanchored planted record, or genuine PREPARED publication yields an actionable diverged or unsupported result and never falls back to remediated or recertified.",
+                  "While a later sprint is active, only live drift is suspended; all provenance integrity checks still run. If directory listing is unavailable, Lens exposes the limitation instead of asserting that no unanchored artifact exists."
+                ],
+                "findings": [],
+                "by": "sprint-executor-checker",
+                "reviewedAt": "2026-08-10T19:00:14.955Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P3",
+          "title": "Provenance visibility and cross-repository gate",
+          "objective": "Expose the independently derived state and make Kyro-generated artifact fixtures the executable contract between repositories.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T4.3",
+              "title": "Render canonicalization provenance without stale fallback",
+              "description": "Update the Lens Overview provenance card and its shell data flow to pass the available directory lister into the resolver. Render the derived remediation/recertification state, record and certificate ids, reasons, issue codes, operation kind, exact canonicalization after-image, and retired legacy keys. Render diverged, unsupported, or unavailable verification as an explicit warning with the evaluator's detail; do not display a healthy remediation badge or hide the card because an anchor is missing.",
+              "files_to_touch": [
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/kyro-lens.tsx",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.tsx",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.test.tsx"
+              ],
+              "context": "Lens remains read-only. The UI must display the independently derived evaluator output, not Kyro's claimed status or a parsed artifact fallback. Preserve accessible text and current v1 provenance rendering while adding v3 canonicalization detail.",
+              "acceptance_criteria": [
+                "The overview displays valid remediated or recertified v3 provenance with record and certificate identifiers, reason, issues, operations, exact seven-key canonical after-image, and retired-key list.",
+                "Diverged, unsupported, PREPARED, unanchored, and listing-unavailable cases show an explicit non-healthy diagnostic and cannot render a stale healthy provenance summary.",
+                "The component forwards the workspace directory-listing capability when present and degrades honestly when it is absent; it never writes remediation, certification, checkpoint, or scope files.",
+                "Existing overview and accessibility behavior for scopes without remediation anchors remains intact."
+              ],
+              "depends_on": [
+                "T4.2"
+              ],
+              "scenario_refs": [
+                "S13",
+                "S14"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "The Overview provenance card now renders the evaluator's independent result and the shell feeds it the directory lister. listDirectory already flowed from the readers through ingestion into KyroLens; it is now forwarded to OverviewView and into the resolver's reader, so the unanchored scan actually runs in the app. The card was restructured around three defects: it no longer skips verification when sprint.remediations is empty (which is exactly how an unanchored record used to stay invisible), it no longer treats a derived remediated/recertified state as healthy unless the existence scan was also verified, and it renders an explicit amber warning carrying the evaluator's own detail when the scan could not run. It is hidden only when the scope has no provenance at all and Lens proved there is none. Rendering adds the record id and protocol revision, the reason, issue codes, operation kinds, a dedicated canonicalization block with the exact seven-key after-image and the named retired legacy keys, and the certificate id, checker and outcome. data-provenance-state and the new data-existence-check expose both dimensions.",
+                "validation": [
+                  "pnpm run typecheck (tsc -b): exit 0",
+                  "pnpm run build (tsc -b && vite build): built successfully",
+                  "vitest overview.test.tsx: 21 passed, 0 failed (4 new canonicalization-provenance cases)",
+                  "vitest src/data + src/components: 747 passed, 9 failed — all 9 are the pre-existing localStorage environment failures in assistant-model-select.test.tsx and sprint-board.test.tsx, reproduced on the unmodified baseline and untouched by this task",
+                  "UI assertions: after-image and retired keys rendered with protocol v3; planted unanchored R-002 renders diverged and drops the canonicalization block; a record with no anchor keeps the card visible instead of hiding it; a reader without listDirectory yields data-existence-check=unavailable, the amber border, and the scan-unavailable warning"
+                ],
+                "files_changed": [
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.tsx",
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.test.tsx",
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/kyro-lens.tsx"
+                ],
+                "notes": "Lens stays read-only: the card only reads and renders, and offers no apply, repair or resume control for a PREPARED record — it names the condition and says Kyro must resolve it.",
+                "by": "maker",
+                "recordedAt": "2026-08-10T18:40:14.179Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "The overview displays valid remediated or recertified v3 provenance with record and certificate identifiers, reason, issues, operations, exact seven-key canonical after-image, and retired-key list.",
+                  "Diverged, unsupported, PREPARED, unanchored, and listing-unavailable cases show an explicit non-healthy diagnostic and cannot render a stale healthy provenance summary.",
+                  "The component forwards the workspace directory-listing capability when present and degrades honestly when it is absent; it never writes remediation, certification, checkpoint, or scope files.",
+                  "Existing overview and accessibility behavior for scopes without remediation anchors remains intact."
+                ],
+                "findings": [],
+                "by": "sprint-executor-checker",
+                "reviewedAt": "2026-08-10T18:40:19.428Z"
+              }
+            },
+            {
+              "id": "T4.4",
+              "title": "Gate Lens against Kyro-emitted v3 provenance fixtures",
+              "description": "Extend the checked-in real-contract fixture and Lens tests with Kyro-emitted v3 canonicalization and recertification bytes plus targeted immutable mutations. Run the Lens parser, independent resolver, and Overview tests against the same fixture surface; prove the tests bind by changing one version guard, one chain-head binding, and one unanchored/PREPARED guard in a temporary mutation run. Do not modify the original Aliva checkout or claim package, installed-runtime, documentation, or publication certification; those remain Sprint 5 work.",
+              "files_to_touch": [
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/test/fixtures/remediation-v1",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-real-contract.test.ts",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+                "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.test.tsx"
+              ],
+              "context": "The fixture must be produced from Kyro's real protocol and preserved as immutable test input; Lens must not reimplement Kyro's writer or self-certify through expected labels. Follow the original-incident and Aliva-readonly conventions: this is a Lens parity gate, not the final original-scope/package release gate.",
+              "acceptance_criteria": [
+                "The Lens suite passes valid Kyro-emitted v1, v2, v3, and mixed provenance fixtures, including v3 debt.canonicalize and chain-head-bound recertification, without mutating fixture bytes or any external checkout.",
+                "Targeted fixture mutations for canonicalization payload, version-operation binding, anchor or commitment, certificate head/evidence, planted unanchored record, and PREPARED publication fail with the expected non-healthy state and actionable detail.",
+                "Temporary mutation of the version, chain-head, and unanchored/PREPARED guards makes a specific Lens test fail, demonstrating that the assertions bind to the intended behavior.",
+                "Lens build, unit tests, contract fixture tests, and relevant UI tests pass; the final evidence explicitly limits the claim to Lens parity and leaves R8/R9 release work for Sprint 5."
+              ],
+              "depends_on": [
+                "T4.3"
+              ],
+              "scenario_refs": [
+                "S13",
+                "S14"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Gate extended for the review fix and re-measured on a supported Node. The mutation gate gained a fourth guard, 'unanchored artifact identity', which disables the filename-vs-record id comparison and requires the probe to stop reporting CORRUPT: 16 assertions over 4 guards, every source verified restored. remediation-real-contract.test.ts is now 12 cases, three of them the new identity/scope negatives built on the real Kyro-emitted PREPARED bytes rather than on synthetic imitations. The previously reported test instability was re-measured and re-attributed: it was a Node version artifact, not a Lens defect.",
+                "validation": [
+                  "Node v22.22.1: pnpm run typecheck exit 0; pnpm run build built; check:guard-mutations exit 0 (16 assertions / 4 guards); focused suites 83 passed / 0 failed",
+                  "Full suite on Node v22.22.1: pre-change baseline 844 passed / 0 failed; with Sprint 4, three consecutive runs gave 878 passed, then 877 passed / 1 failed twice — always assistant-chat 'clears only the active chat draft', which passes in isolation (102/102)",
+                  "The earlier report of 9-10 deterministic failures was an artifact of running on Node v25.2.1, whose native localStorage shadows the jsdom global and breaks localStorage.clear. debt-1 was resolved as misdiagnosed; debt-2 was deferred to sprint 5 with the measured intermittency, matching the reviewer's clean run"
+                ],
+                "files_changed": [
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/scripts/check-guard-mutations.mjs",
+                  "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-real-contract.test.ts"
+                ],
+                "notes": "Claim remains Lens parity only. R8/R9 — packaged install, projected runtime, the original-scope probe, release documentation and publication — remain Sprint 5. The original Aliva checkout was never read or written.",
+                "by": "maker",
+                "recordedAt": "2026-08-10T19:00:28.832Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "The Lens suite passes valid Kyro-emitted v1, v2, v3, and mixed provenance fixtures, including v3 debt.canonicalize and chain-head-bound recertification, without mutating fixture bytes or any external checkout.",
+                  "Targeted fixture mutations for canonicalization payload, version-operation binding, anchor or commitment, certificate head/evidence, planted unanchored record, and PREPARED publication fail with the expected non-healthy state and actionable detail.",
+                  "Temporary mutation of the version, chain-head, and unanchored/PREPARED guards makes a specific Lens test fail, demonstrating that the assertions bind to the intended behavior.",
+                  "Lens build, unit tests, contract fixture tests, and relevant UI tests pass; the final evidence explicitly limits the claim to Lens parity and leaves R8/R9 release work for Sprint 5."
+                ],
+                "findings": [],
+                "by": "sprint-executor-checker",
+                "reviewedAt": "2026-08-10T19:00:28.927Z"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [],
+      "definitionOfDone": [
+        "All Sprint 4 tasks have CLI-recorded evidence and independent pass verdicts.",
+        "Lens independently derives v1, v2, v3, and mixed remediation and recertification state from artifact bytes, anchors, and bounded read-only discovery.",
+        "Valid v3 canonicalization provenance is visible, while forged, unknown, PREPARED, and unanchored variants fail closed without stale-state fallback.",
+        "Lens build and scoped contract, resolver, and Overview tests pass with mutation evidence for the new guards.",
+        "No Kyro writer, immutable historical artifact, original Aliva checkout, package release, or documentation claim is changed by this sprint."
+      ]
+    },
+    "debt": [
+      {
+        "id": "debt-1",
+        "title": "Lens assistant-model-select suite fails on localStorage.clear in the current vitest/jsdom environment",
+        "origin": 4,
+        "priority": "low",
+        "status": "resolved",
+        "targetSprint": null,
+        "note": "Misdiagnosed as a Lens defect. Reproduced only on Node v25.2.1, whose native localStorage (--localstorage-file) shadows the jsdom global and breaks localStorage.clear. On Node v22.22.1, within the engines range >=20, the pre-change baseline is 844 passed / 0 failed and assistant-model-select and sprint-board are green. No Lens change is warranted."
+      },
+      {
+        "id": "debt-2",
+        "title": "Lens assistant chat-draft store leaks across test files, so an added test file changes assistant-chat.test.tsx's result",
+        "origin": 4,
+        "priority": "medium",
+        "status": "deferred",
+        "targetSprint": 5,
+        "note": "Confirmed real but intermittent, not deterministic. On Node v22.22.1 the pre-change baseline is 844 passed / 0 failed; with Sprint 4's added test files, three consecutive full runs gave 878 passed, then 1 failed twice — always assistant-chat 'clears only the active chat draft', which passes in isolation (102/102). It is an ordering-dependent draft-store leak between test files that Sprint 4 surfaces by changing worker scheduling, not a defect in the provenance code. An independent reviewer's run was clean, consistent with the intermittency. Belongs to Lens test isolation, not to this scope's contract."
+      }
+    ],
+    "handoff": {
+      "nextAction": "close_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task T4.4 passed checker review.",
+      "lastUpdated": "2026-08-10T19:00:28.927Z"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-10T00:44:14.431Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "canonical-debt-contract-and-legacy-remediation",
+    "title": "Canonical Debt Contract and Legacy Remediation",
+    "status": "planning",
+    "objective": "Reconcile Kyro and Lens debt input semantics and deliver a typed append-only canonicalization path that repairs and recertifies closed legacy scopes without changing immutable history.",
+    "successCriteria": [
+      "Kyro and Lens classify every canonical, legacy-compatible, remediation-required, and unsupported debt fixture identically.",
+      "An operator can prepare, preview, and atomically canonicalize the motivating legacy debt without manually calculating digests or editing managed files.",
+      "A successful repair changes only the targeted live debt and appended provenance while every historical artifact and commitment remains byte-identical.",
+      "Doctor, status, recertification, and Lens independently agree that a valid corrected scope is remediated or recertified and reject every forged, stale, partial, or unsupported variant.",
+      "The faithful original-incident scenario passes through the isolated package and projected runtime before publication."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Kyro and Lens must distinguish canonical, legacy-compatible, remediation-required, and unsupported raw debts using the same observable contract.",
+          "priority": "must",
+          "rationale": "Raw compatibility and canonical output are different responsibilities. Shared golden vectors, including the original D1 variants, must prove identical classification and canonical projection so the output interface is never again mistaken for the input schema."
+        },
+        {
+          "id": "R2",
+          "statement": "All new debt writes and successful remediations must emit exactly the seven-field canonical debt representation.",
+          "priority": "must",
+          "rationale": "The canonical key set is id, title, origin, priority, status, targetSprint, and note. Exact output prevents hybrid legacy shapes while compatibility readers remain able to diagnose old input."
+        },
+        {
+          "id": "R3",
+          "statement": "A new versioned debt canonicalization operation must bind the complete observed debt and produce an explicit exact canonical after-image.",
+          "priority": "must",
+          "rationale": "The existing origin-only operation cannot repair the motivating scope. A closed debt.canonicalize operation must preserve identity fields, require explicit canonical values, retire legacy-only keys, use a whole-debt SHA-256 precondition, and resolve multiple field issues atomically without becoming a generic patch."
+        },
+        {
+          "id": "R4",
+          "statement": "Preparation and preview must be read-only, derive all technical digests, expose evidence and unresolved decisions, and never treat suggested values as operator authorization.",
+          "priority": "must",
+          "rationale": "Origin has strong addedSprint evidence, while priority and target sprint remain business judgments. INPUT_REQUIRED must name every unresolved value, and a complete manifest must be producible without hand-editing managed state or manually calculating hashes."
+        },
+        {
+          "id": "R5",
+          "statement": "Canonicalization apply and resume must remain atomic, append-only, idempotent, and history-preserving under the state-writer lock.",
+          "priority": "must",
+          "rationale": "Checkpoint, snapshot, narrative, ledger commitment, task, verdict, unrelated debt, and existing provenance bytes are immutable. Stale full-debt state, interruption, or post-write mismatch must produce no competing applied record and must preserve deterministic PREPARED resume."
+        },
+        {
+          "id": "R6",
+          "statement": "Doctor, status, replay, and recertification must support existing and new remediation versions without weakening historical integrity or tamper detection.",
+          "priority": "must",
+          "rationale": "The new operation requires an explicit protocol revision so old readers fail closed as unsupported. New readers must replay v1, v2, new, and mixed chains; historical schema notes must never short-circuit artifact digest checks; C-NNN must bind the current head."
+        },
+        {
+          "id": "R7",
+          "statement": "Lens must independently verify and render legacy classification, canonicalization provenance, remediation state, and recertification state.",
+          "priority": "must",
+          "rationale": "Lens is a read-only verifier, not a consumer of Kyro's claimed label. It must recompute commitments and result state, render selected values and retired legacy keys, and show actionable diagnostics with no stale-state fallback."
+        },
+        {
+          "id": "R8",
+          "statement": "A faithful original-incident fixture and a temporary-copy probe of the actual local scope must gate the packaged and installed release.",
+          "priority": "must",
+          "rationale": "Synthetic canonical fixtures missed the contradiction. Sentinel assertions must preserve the string origin and missing-field shapes; the full before, prepare, preview, apply, Doctor, recertify, and Lens flow must pass with unchanged historical hashes through an isolated package and projected runtime."
+        },
+        {
+          "id": "R9",
+          "statement": "Release documentation must state the Kyro 4.43.5 limitation, compatible upgrade order, operator workflow, and exact certification boundary.",
+          "priority": "must",
+          "rationale": "Users must not be told that origin-only remediation repairs record-level legacy drift. Documentation must separate local/source success from package, installed-runtime, Lens, and publication evidence."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "A raw debt containing exactly the seven canonical keys with valid values",
+          "when": "Kyro and Lens evaluate the debt contract",
+          "then": "Both accept it and produce the same canonical values without a legacy diagnostic"
+        },
+        {
+          "id": "S2",
+          "requirement": "R1",
+          "given": "A readable legacy debt with numeric origin and absent priority, targetSprint, or note",
+          "when": "Kyro and Lens evaluate the debt contract",
+          "then": "Both treat it as readable legacy input and derive the same explicit canonical projection without calling the raw object canonical"
+        },
+        {
+          "id": "S3",
+          "requirement": "R1",
+          "given": "The motivating legacy D1 shape with a present string origin",
+          "when": "Kyro and Lens evaluate the debt contract",
+          "then": "Both reject the present invalid origin and Kyro classifies the object as remediation-required with the exact field path"
+        },
+        {
+          "id": "S4",
+          "requirement": "R1",
+          "given": "A debt with malformed identity, status, or an unsupported raw structure",
+          "when": "Kyro and Lens evaluate the debt contract",
+          "then": "Both fail closed without fabricating a trusted canonical projection"
+        },
+        {
+          "id": "S5",
+          "requirement": "R2",
+          "given": "A Kyro command creates or validates new debt state",
+          "when": "The write is accepted",
+          "then": "The persisted debt contains exactly id, title, origin, priority, status, targetSprint, and note with valid values"
+        },
+        {
+          "id": "S6",
+          "requirement": "R8",
+          "given": "The minimized live D1 and its two historical checkpoint variants",
+          "when": "The faithful fixture and Doctor gates run",
+          "then": "The decisive legacy shapes remain present, historical hashes remain untouched, and any fixture cleanup or artifact tampering fails certification"
+        },
+        {
+          "id": "S7",
+          "requirement": "R3",
+          "given": "a readable but remediation-required D1-shaped debt collection and explicit canonical operator values",
+          "when": "the typed canonicalization planner constructs an operation",
+          "then": "it binds the complete observed debt digest and emits exactly one record-level debt.canonicalize plan with an exact seven-key after-image."
+        },
+        {
+          "id": "S8",
+          "requirement": "R4",
+          "given": "a D1-shaped debt whose origin has addedSprint evidence but priority and targetSprint are unresolved",
+          "when": "an operator runs preparation or preview without every explicit value",
+          "then": "the result is read-only INPUT_REQUIRED diagnostics that distinguish evidence from authorization and no manifest or artifact mutation is produced."
+        },
+        {
+          "id": "S9",
+          "requirement": "R3",
+          "given": "a complete manifest with a stale whole-debt digest, an unknown operation key, or a hybrid legacy after-image",
+          "when": "the canonicalization plan is validated",
+          "then": "it fails closed before any write and existing v1/v2 remediation records remain parseable under their original revisions."
+        },
+        {
+          "id": "S10",
+          "requirement": "R5",
+          "given": "a complete v3 debt.canonicalize manifest for the faithful D1-shaped debt and an intact closed-scope checkpoint chain",
+          "when": "kyro remediate apply runs and is retried across success, stale state, and an interrupted publication",
+          "then": "it either publishes exactly one deterministic append-only R-NNN with the exact seven-key after-image or leaves live state, anchors, immutable history, and commitments unchanged."
+        },
+        {
+          "id": "S11",
+          "requirement": "R6",
+          "given": "valid v1, v2, v3, and mixed remediation chains plus variants with forged anchors, changed record bytes, wrong results, unsupported versions, or altered checkpoint artifacts",
+          "when": "Doctor, status, and replay evaluate the scope",
+          "then": "they preserve historical checkpoint verification, report the correct historical or remediated state for a valid chain, and fail closed with actionable diagnostics for every invalid chain."
+        },
+        {
+          "id": "S12",
+          "requirement": "R6",
+          "given": "a verified v3 remediation head and independently reproducible checker evidence",
+          "when": "kyro recertify applies, resumes, or observes stale head/evidence after another remediation",
+          "then": "only the current verified head receives one append-only C-NNN, while stale, forged, incomplete, or superseded certification claims cannot appear as recertified."
+        },
+        {
+          "id": "S13",
+          "requirement": "R7",
+          "given": "Kyro-emitted valid v1, v2, v3, and mixed remediation chains, including a v3 debt.canonicalize record with its exact seven-key after-image and a current chain-head-bound C-NNN",
+          "when": "Lens reads the artifacts and recomputes protocol commitments, version-specific result binding, chain continuity, evidence, and certification binding",
+          "then": "Lens derives remediated or recertified independently and renders the canonicalization provenance, selected canonical values, retired legacy keys, and certification state without mutating any artifact"
+        },
+        {
+          "id": "S14",
+          "requirement": "R7",
+          "given": "A Kyro remediation or certification chain with an unsupported version, mismatched operation, bad commitment or anchor, stale result, forged evidence, planted unanchored record, or persisted PREPARED record without its anchor",
+          "when": "Lens verifies the scope with directory listing when available and without it when unavailable",
+          "then": "Lens emits an actionable diverged, unsupported, or existence-check-unavailable diagnostic, never a stale healthy provenance state; a later active sprint suspends only live drift and not integrity checks"
+        }
+      ],
+      "nonGoals": [
+        "Rewrite or replace historical checkpoint, snapshot, narrative, or ledger evidence.",
+        "Introduce generic JSON Patch or arbitrary path mutation.",
+        "Infer priority, target sprint, origin, or note semantics without explicit operator authorization.",
+        "Recover missing or corrupted checkpoint bytes from backup or Git.",
+        "Canonicalize tasks, verdicts, ADRs, conventions, or non-debt SprintFile structures.",
+        "Mutate every legacy scope automatically during installation or Doctor.",
+        "Retain legacy-only debt keys in the corrected live canonical object.",
+        "Break or rewrite existing v1 or v2 remediation and certification records.",
+        "Modify, stage, or commit files in the original Aliva checkout during release validation.",
+        "Claim production readiness beyond the covered debt compatibility and append-only remediation contract."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [
+      {
+        "id": "history-immutability",
+        "rule": "Never rewrite committed checkpoints, snapshots, narratives, or ledger commitments; remediation may only append provenance and replace the live canonical projection.",
+        "tags": [
+          "integrity",
+          "remediation"
+        ],
+        "addedSprint": 0
+      },
+      {
+        "id": "explicit-operator-authority",
+        "rule": "Treat inferred legacy values as suggestions only; apply requires explicit operator-supplied canonical values in the manifest.",
+        "tags": [
+          "provenance",
+          "process"
+        ],
+        "addedSprint": 0
+      },
+      {
+        "id": "shared-debt-vectors",
+        "rule": "Every raw-debt classification or canonical projection change must update and pass the shared Kyro and Lens golden vectors.",
+        "tags": [
+          "contract",
+          "testing"
+        ],
+        "addedSprint": 0
+      },
+      {
+        "id": "original-incident-gate",
+        "rule": "Do not claim the incident fixed until the faithful legacy fixture passes source, isolated package, projected runtime, Doctor, recertification, and Lens gates.",
+        "tags": [
+          "release",
+          "testing"
+        ],
+        "addedSprint": 0
+      },
+      {
+        "id": "aliva-readonly-probe",
+        "rule": "Probe the actual Aliva scope only through read-only inspection and a temporary copy; never mutate, stage, or commit its checkout during Kyro release validation.",
+        "tags": [
+          "safety",
+          "release"
+        ],
+        "addedSprint": 0
+      }
+    ],
+    "adrs": [
+      {
+        "id": "ADR-0001",
+        "title": "Separate raw debt compatibility from canonical debt output",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "The incident recurred because Kyro treated the strict Debt output interface as the raw input contract while Lens intentionally normalizes legacy input.",
+        "decision": "Classify raw debt as canonical, legacy-compatible, remediation-required, or unsupported, and preserve an exact seven-field canonical output contract for all new writes.",
+        "consequences": [
+          "Doctor and Lens can understand legacy data without calling it canonical, and writers remain strict.",
+          "Shared behavior vectors become a compatibility contract across repositories."
+        ],
+        "alternatives": [
+          "Use one strict schema for both input and output.",
+          "Allow Lens-only defaults without a Kyro classification."
+        ]
+      },
+      {
+        "id": "ADR-0002",
+        "title": "Canonicalize legacy debt as one typed record-level operation",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "The existing debt.origin.set operation cannot add missing canonical fields or retire legacy-only keys, so strict post-state validation makes the motivating scope unrecoverable.",
+        "decision": "Introduce a closed debt.canonicalize operation with a whole-debt digest precondition, preserved identity fields, explicit canonical values, and an exact seven-key after-image.",
+        "consequences": [
+          "One atomic R-NNN resolves all related field issues without intermediate hybrid states.",
+          "Routine isolated edits remain owned by normal debt commands rather than remediation."
+        ],
+        "alternatives": [
+          "Add independent setters for every debt field.",
+          "Expose generic JSON Patch or JSON Pointer mutations."
+        ]
+      },
+      {
+        "id": "ADR-0003",
+        "title": "Version the canonicalization operation as a new protocol revision",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "Existing Kyro and Lens readers know only the current remediation versions and debt.origin.set semantics.",
+        "decision": "Publish debt.canonicalize in a new explicit remediation protocol revision with version-aware replay and mixed-chain coverage.",
+        "consequences": [
+          "Older readers fail closed as unsupported instead of interpreting a known version differently.",
+          "New readers must preserve byte-compatible verification of every existing v1 and v2 chain."
+        ],
+        "alternatives": [
+          "Add the new operation silently to an existing schema version.",
+          "Drop replay support for older remediation records."
+        ]
+      },
+      {
+        "id": "ADR-0004",
+        "title": "Require explicit semantic authority and retire live legacy keys",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "AddedSprint supports an origin suggestion, but priority and target sprint are business decisions; retaining detail, resolution, or addedSprint would leave a hybrid live contract.",
+        "decision": "Preparation may suggest values with evidence, but apply requires explicit operator values and emits exactly the seven canonical debt keys while preserving old bytes only through immutable history and remediation provenance.",
+        "consequences": [
+          "The record distinguishes observed evidence from operator judgment.",
+          "Legacy-only keys disappear from live state without erasing historical proof."
+        ],
+        "alternatives": [
+          "Silently adopt Lens defaults as historical truth.",
+          "Keep legacy-only keys alongside canonical fields."
+        ]
+      },
+      {
+        "id": "ADR-0005",
+        "title": "Gate release on the motivating artifact shape",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "Synthetic fixtures with otherwise canonical debt allowed the previous implementation to pass while the real model-catalog-and-routing scope remained impossible to remediate.",
+        "decision": "Require a faithful minimized fixture plus a temporary-copy probe of the actual scope through source, isolated package, projected runtime, Doctor, recertification, and Lens before publication.",
+        "consequences": [
+          "Fixture sentinel assertions prevent future cleanup from deleting the failure shape.",
+          "The original Aliva checkout remains read-only throughout certification."
+        ],
+        "alternatives": [
+          "Certify only generated canonical fixtures.",
+          "Apply the candidate directly to the original project checkout."
+        ]
+      }
+    ],
+    "roadmap": {
+      "plannedSprintCount": 5,
+      "sizingRationale": "Five sprints follow the dependency chain and isolate independent failure domains. Sprint 1 freezes the raw/canonical contract and faithful reproduction before writers depend on it. Sprint 2 adds the versioned typed operation and operator preparation under the existing transaction model. Sprint 3 proves replay, Doctor, status, and recertification integrity across old, new, and mixed chains. Sprint 4 updates Lens as an independent cross-repository verifier only after Kyro's protocol stabilizes. Sprint 5 certifies the faithful original incident through packaging, projected runtime, Lens, and documentation. Fewer sprints would let writer, verifier, consumer, or release evidence falsely certify one another; more would split cohesive gates without reducing risk. The plan's acceptance matrix is allocated to the relevant sprint as Given/When/Then scenarios during per-sprint planning.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "debt-contract-and-faithful-fixtures",
+          "title": "Debt contract reconciliation and faithful fixtures",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "typed-debt-canonicalization",
+          "title": "Typed debt canonicalization and operator preparation",
+          "state": "closed"
+        },
+        {
+          "n": 3,
+          "slug": "chain-verification-and-recertification",
+          "title": "Chain verification and recertification integrity",
+          "state": "closed"
+        },
+        {
+          "n": 4,
+          "slug": "lens-contract-parity",
+          "title": "Lens contract parity and provenance",
+          "state": "closed"
+        },
+        {
+          "n": 5,
+          "slug": "original-incident-release-gate",
+          "title": "Original incident and release certification",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "debt-contract-and-faithful-fixtures",
+        "outcome": "shipped",
+        "closedAt": "2026-08-10",
+        "archive": "archive/sprint-001-debt-contract-and-faithful-fixtures.md",
+        "snapshot": "archive/sprint-001-debt-contract-and-faithful-fixtures.json",
+        "checkpoint": "archive/sprint-001-debt-contract-and-faithful-fixtures.checkpoint.json",
+        "recommendations": [
+          "Keep Sprint 2 limited to the typed operation schema and read-only preparation; do not introduce apply or mutate immutable history before the transaction and replay gates in Sprint 3."
+        ],
+        "checkpointSha256": "dd3a5d09231232e2fc680dd7f9cb7127959751810253311ecfe6bfe650f6820c"
+      },
+      {
+        "n": 2,
+        "slug": "typed-debt-canonicalization",
+        "outcome": "shipped",
+        "closedAt": "2026-08-10",
+        "archive": "archive/sprint-002-typed-debt-canonicalization.md",
+        "snapshot": "archive/sprint-002-typed-debt-canonicalization.json",
+        "checkpoint": "archive/sprint-002-typed-debt-canonicalization.checkpoint.json",
+        "recommendations": [
+          "Sprint 3 must implement atomic apply, resume, replay, and recertification under the state-writer lock without weakening historical integrity.",
+          "Lens contract parity in Sprint 4 requires independent verification of the new canonicalization provenance and remediation state."
+        ],
+        "checkpointSha256": "c74e8d9a96149a4489b4ad52e79801a195dc3c15179dffee7f5a9995e94482ef"
+      },
+      {
+        "n": 3,
+        "slug": "chain-verification-and-recertification",
+        "outcome": "shipped",
+        "closedAt": "2026-08-10",
+        "archive": "archive/sprint-003-chain-verification-and-recertification.md",
+        "snapshot": "archive/sprint-003-chain-verification-and-recertification.json",
+        "checkpoint": "archive/sprint-003-chain-verification-and-recertification.checkpoint.json",
+        "recommendations": [
+          "Sprint 4 must independently verify v3 canonicalization provenance, unanchored or PREPARED records, and chain-head-bound recertification in Lens.",
+          "Keep Lens read-only and mirror Kyro fail-closed chain semantics without trusting Kyro status labels."
+        ],
+        "checkpointSha256": "72fbf19ad066a61da3e2f09a58f67fbeea2ed5b57a9511188479f6bdc63462e5"
+      },
+      {
+        "n": 4,
+        "slug": "lens-contract-parity",
+        "outcome": "shipped",
+        "closedAt": "2026-08-10",
+        "archive": "archive/sprint-004-lens-contract-parity.md",
+        "snapshot": "archive/sprint-004-lens-contract-parity.json",
+        "checkpoint": "archive/sprint-004-lens-contract-parity.checkpoint.json",
+        "recommendations": [
+          "Sprint 5 must resolve the deferred Lens assistant draft-store isolation failure under a pinned supported Node runtime before claiming a green release suite.",
+          "Sprint 5 must run the faithful original incident only in a temporary copy through source, isolated package, installed or projected runtime, Doctor, recertification, and Lens without touching Aliva.",
+          "Sprint 5 must publish R9 operator documentation with the 4.43.5 origin-only limitation, upgrade order, and exact evidence boundary."
+        ],
+        "checkpointSha256": "02a4ff93b77b577c674d526928749d3e085058bc1530be78762bfe77a5c76f8f"
+      }
+    ],
+    "previousSprint": {
+      "n": 4,
+      "slug": "lens-contract-parity",
+      "outcome": "shipped",
+      "summary": "Sprint 4 made Lens an independent v1/v2/v3 provenance verifier with fail-closed unanchored-record diagnostics."
+    },
+    "activeSprint": null,
+    "debt": [
+      {
+        "id": "debt-1",
+        "title": "Lens assistant-model-select suite fails on localStorage.clear in the current vitest/jsdom environment",
+        "origin": 4,
+        "priority": "low",
+        "status": "resolved",
+        "targetSprint": null,
+        "note": "Misdiagnosed as a Lens defect. Reproduced only on Node v25.2.1, whose native localStorage (--localstorage-file) shadows the jsdom global and breaks localStorage.clear. On Node v22.22.1, within the engines range >=20, the pre-change baseline is 844 passed / 0 failed and assistant-model-select and sprint-board are green. No Lens change is warranted."
+      },
+      {
+        "id": "debt-2",
+        "title": "Lens assistant chat-draft store leaks across test files, so an added test file changes assistant-chat.test.tsx's result",
+        "origin": 4,
+        "priority": "medium",
+        "status": "deferred",
+        "targetSprint": 5,
+        "note": "Confirmed real but intermittent, not deterministic. On Node v22.22.1 the pre-change baseline is 844 passed / 0 failed; with Sprint 4's added test files, three consecutive full runs gave 878 passed, then 1 failed twice — always assistant-chat 'clears only the active chat draft', which passes in isolation (102/102). It is an ordering-dependent draft-store leak between test files that Sprint 4 surfaces by changing worker scheduling, not a defect in the provenance code. An independent reviewer's run was clean, consistent with the intermittency. Belongs to Lens test isolation, not to this scope's contract."
+      }
+    ],
+    "handoff": {
+      "nextAction": "plan_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Sprint 4 closed after independent Lens certification; Sprint 5 is the original-incident release gate.",
+      "lastUpdated": "2026-08-10"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-10T00:44:14.431Z"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "canonical-debt-contract-and-legacy-remediation",
+    "title": "Canonical Debt Contract and Legacy Remediation",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "canonical-debt-contract-and-legacy-remediation",
+    "title": "Canonical Debt Contract and Legacy Remediation",
+    "status": "planning"
+  },
+  "digests": {
+    "beforeClose": "3b0cd98d5c0643507661ce8f05792ca44d63fc1f03129dda81ab11b0913dde19",
+    "intendedAfterClose": "f88634c92560cd15f0eee6d98088d3aef0d102a6eb7d85454b6c293437287058",
+    "projectScopeBefore": "f6d2a5441214714ea23d4a4639c14f656441d132f928827c68ff6b62777b34c0",
+    "projectScopeAfter": "4aecbf106fa5af4d6a4ef416e62140d6b2e6805ead6638508fa4f6758cceb829",
+    "legacySnapshot": "e6c0230c1c0b78894e6f364860be8a3a017fc3810dec49acca7871c12229cd0a",
+    "narrative": "d6c34120b7576fe6e50375618aabef43730e8feca36ade66c04a67667353ad9a"
+  }
+}

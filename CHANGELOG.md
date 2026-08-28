@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.47.3] - 2026-08-20
+
+### Fixed
+
+- **Adaptive lifecycle replay hardening.** Consolidated digest derivation for scope completion and
+  reopen into shared `lifecycle-state.ts`, so the verifier and every writer use the exact same
+  formula. Added typed verification status constants (`CHECKPOINT_EXACT`, `LIFECYCLE_REPLAYED`,
+  `DIVERGED`, `UNSUPPORTED`) with fail-closed replay validation for post-close scope transitions.
+  Close-sprint now reads the normalized outcome from the sealed transaction checkpoint rather than
+  the CLI argument object, preventing stale outcome propagation through trace events.
+- **Artifact doctor lifecycle verification** now replays recorded transitions and matches both
+  `sprint.json` and the project registry together against a shared projection.
+- **MCP handler** lifecycle state routing fix.
+
+### Changed
+
+- **Documentation** updates for lifecycle verification trust boundary, selective `.agents/`
+  gitignore patterns (shared `project.json` and `scopes/` tracked; `trace/` and `local.json`
+  ignored), and status coherence contracts.
+- **Verification scripts** `check:close-handoff` and `check:scope-retire` expanded to enforce
+  lifecycle and retirement handoff contracts.
+- **Remediation and repair integrity** plan modules updated for lifecycle-aware drift detection
+  and recovery path selection.
+
 ## [4.47.2] - 2026-08-18
 
 ### Fixed

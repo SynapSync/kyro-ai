@@ -6,7 +6,10 @@ import { archiveDir } from '../artifacts/paths';
 import { listScopeFolders, readScopeSprint } from '../artifacts/scopes';
 import { assertNotForeignDirectory } from '../core/scope-resolution';
 import { CHECKPOINT_DISCOVERY_STATUS, surveyScopeCheckpoints } from '../checkpoints/discovery';
-import { replayScopeLifecycle } from '../checkpoints/lifecycle-state';
+import {
+  SCOPE_LIFECYCLE_VERIFICATION_STATUS,
+  verifyScopeLifecycleEvolution,
+} from '../checkpoints/lifecycle-state';
 import { canonicalJson, sha256 } from '../checkpoints/sprint-close';
 import { rebuildCanonicalCheckpointFromDisk } from '../checkpoints/canonicalize';
 import { EFFECTIVE_CHECKPOINT_STATUS, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
@@ -333,25 +336,25 @@ export function prepareIntegrityPlan(options: {
     const physicalAfter = physicalRead.exists && !physicalRead.error
       ? (physicalRead.value as { intendedAfterClose?: SprintFile }).intendedAfterClose
       : null;
-    // Lifecycle records are not authority by themselves. Completion/reopen is lawful only when
-    // replaying its records through the shared writer builders reproduces *both* durable layers.
-    // Without this check Integrity could claim a forged lifecycle edit was clean simply because
-    // it has no conventional live-evolution operation to propose.
+    // Lifecycle records are not authority by themselves. Completion/reopen is structurally coherent
+    // only when one verifier reproduces both durable layers from the same checkpoint after-image.
     if (hasLifecycleEvidence(live)) {
       const lifecycleBase = physicalAfter ?? after;
-      const lifecycleReplay = replayScopeLifecycle(lifecycleBase, live);
       const lifecycleEntryBase = resolved.checkpoint?.projectScopeAfter ?? rebuilt?.projection.projectScopeAfter;
       const liveEntry = readProjectState()?.scopes.find((entry) => entry.id === scope);
-      const lifecycleMatches = lifecycleReplay !== null
-        && sha256(lifecycleReplay.sprint) === sha256(live)
-        && lifecycleEntryBase !== undefined
-        && liveEntry !== undefined
-        && sha256(lifecycleReplay.entryOf(lifecycleEntryBase)) === sha256(liveEntry);
-      if (!lifecycleMatches) {
+      const lifecycleVerification = verifyScopeLifecycleEvolution(
+        lifecycleBase,
+        lifecycleEntryBase,
+        live,
+        liveEntry,
+      );
+      const lifecycleClean = lifecycleVerification.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.CHECKPOINT_EXACT
+        || lifecycleVerification.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED;
+      if (!lifecycleClean) {
         const blocker: IntegrityFinding = {
           class: 'blocker',
           code: 'diverged',
-          summary: `${scope}: completion/reopen records do not exactly replay from the close checkpoint into sprint and registry state`,
+          summary: `${scope}: completion/reopen records do not exactly replay from the close checkpoint into sprint and registry state (${lifecycleVerification.reason})`,
         };
         blockers.push(blocker);
         findings.push(blocker);

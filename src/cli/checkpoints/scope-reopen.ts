@@ -4,12 +4,18 @@ import { asSprintFile } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
 import { readProjectState, updateProjectStateLayersUnlocked } from '../state';
 import { withStateWriterLock } from '../pipeline/state-writer-lock';
-import { reopenedScopeEntry, reopenedSprintState } from './lifecycle-state';
+import {
+  SCOPE_REOPEN_KIND,
+  SCOPE_REOPEN_SCHEMA_VERSION,
+  reopenRegistryEntryDigest,
+  reopenedScopeEntry,
+  reopenedSprintState,
+  scopeReopenRequestDigest,
+} from './lifecycle-state';
 import type { KyroProjectState, KyroScopeEntry, ScopeCompletion, ScopeReopenRecord, SprintFile } from '../types';
-import { atomicReplace, canonicalJson, sha256 } from './sprint-close';
+import { atomicReplace, canonicalJson } from './sprint-close';
 
-export const SCOPE_REOPEN_KIND = 'scope-reopen' as const;
-export const SCOPE_REOPEN_SCHEMA_VERSION = 1 as const;
+export { SCOPE_REOPEN_KIND, SCOPE_REOPEN_SCHEMA_VERSION };
 
 export interface ScopeReopenRequest {
   scope: string;
@@ -41,31 +47,6 @@ function normalizeReason(raw: string): string {
     throw new KyroCoreError('INVALID_INPUT', 'Reopening a scope requires a non-empty --reason.', 'State why the completed scope needs further work; the reason is recorded permanently.');
   }
   return trimmed;
-}
-
-/**
- * Bound to the exact completion being reversed, not just to the scope and reason. A scope that is
- * completed again later and reopened again with the identical reason yields a different digest, so
- * no reopen can ever be confused with an earlier one.
- */
-function scopeReopenRequestDigest(scope: string, reason: string, completion: ScopeCompletion): string {
-  return sha256({
-    kind: SCOPE_REOPEN_KIND,
-    schemaVersion: SCOPE_REOPEN_SCHEMA_VERSION,
-    part: 'request',
-    scope,
-    reason,
-    completion,
-  });
-}
-
-function scopeRegistryEntryDigest(entry: KyroScopeEntry): string {
-  return sha256({
-    kind: SCOPE_REOPEN_KIND,
-    schemaVersion: SCOPE_REOPEN_SCHEMA_VERSION,
-    part: 'registryEntry',
-    entry,
-  });
 }
 
 function readValidSprint(scope: string): SprintFile {
@@ -191,7 +172,7 @@ export function applyScopeReopen(request: ScopeReopenRequest): ScopeReopenApplyR
       if (entry.completion === undefined && lastReopen(entry.completionHistory)?.requestDigest !== requestDigest) {
         throw new KyroCoreError('REOPEN_CONFLICT', `Scope "${request.scope}" registry entry is already open but carries no matching reopen record.`, 'Inspect the registry and sprint lifecycle records with kyro scope inspect before retrying.');
       }
-      if (!record.beforeEntryDigest || scopeRegistryEntryDigest(entry) !== record.beforeEntryDigest) {
+      if (!record.beforeEntryDigest || reopenRegistryEntryDigest(entry) !== record.beforeEntryDigest) {
         throw diverged('the project registry entry differs from the state recorded when sprint.json was reopened; cannot resume safely');
       }
       updateProjectStateLayersUnlocked({ scopes: project.scopes.map((candidate) => candidate.id === request.scope ? reopenedScopeEntry(entry, record, sprint) : candidate) });
@@ -208,7 +189,7 @@ export function applyScopeReopen(request: ScopeReopenRequest): ScopeReopenApplyR
       );
     }
 
-    const beforeEntryDigest = scopeRegistryEntryDigest(entry);
+    const beforeEntryDigest = reopenRegistryEntryDigest(entry);
     const reopenedAt = new Date().toISOString();
     const record: ScopeReopenRecord = {
       reopenedAt,

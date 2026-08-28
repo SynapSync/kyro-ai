@@ -1,0 +1,840 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "cf7fc5032c8ac7aa67a309627cc4c46bd79de6f2b95f9eb7cf610bd24f4faaf6",
+  "createdAt": "2026-08-24T01:30:52.451Z",
+  "identity": {
+    "scope": "adaptive-sprint-lifecycle",
+    "sprintN": 1,
+    "sprintSlug": "lifecycle-contract"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": null,
+    "summary": null,
+    "recommendations": [],
+    "learnings": []
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/adaptive-sprint-lifecycle/archive/sprint-001-lifecycle-contract.json",
+    "narrative": ".agents/kyro/scopes/adaptive-sprint-lifecycle/archive/sprint-001-lifecycle-contract.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "adaptive-sprint-lifecycle",
+    "title": "Adaptive sprint lifecycle",
+    "status": "planning",
+    "objective": "Make Kyro record changing work truthfully without treating a partial sprint or exhausted roadmap as a terminal scope failure.",
+    "successCriteria": [
+      "Every unfinished task has a typed, reasoned disposition before sprint closure.",
+      "Closing any sprint preserves immutable evidence while keeping the scope open for explicit next planning.",
+      "Scope completion and retirement remain explicit, distinct decisions.",
+      "Doctor and Integrity distinguish lawful lifecycle evolution from immutable-artifact corruption.",
+      "Legacy checkpoints remain readable without retroactive semantic claims."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Kyro SHALL require an explicit validated disposition for every unfinished task before closing a sprint.",
+          "priority": "must",
+          "rationale": "Unfinished work must remain discoverable and attributable instead of being represented as success or silently discarded."
+        },
+        {
+          "id": "R2",
+          "statement": "Kyro SHALL close a sprint without automatically completing its scope merely because all originally planned roadmap entries are closed.",
+          "priority": "must",
+          "rationale": "A roadmap is an estimate; scope completion requires an explicit decision and evidence."
+        },
+        {
+          "id": "R3",
+          "statement": "Kyro SHALL allow an open scope with no active sprint to plan a subsequent sprint through the normal tool-owned flow.",
+          "priority": "must",
+          "rationale": "Legitimate reprioritization must not require a recovery or manual state edit."
+        },
+        {
+          "id": "R4",
+          "statement": "Kyro SHALL preserve fail-closed validation for immutable checkpoints, unsafe paths, identity conflicts, and stale approvals while accepting lawful lifecycle evolution.",
+          "priority": "must",
+          "rationale": "Simplification must not weaken artifact integrity or recovery safety."
+        },
+        {
+          "id": "R5",
+          "statement": "Kyro SHALL keep retirement distinct from scope completion and preserve readable historical checkpoint semantics.",
+          "priority": "must",
+          "rationale": "Terminal retirement has explicit human approval semantics, and immutable historical bytes cannot be rewritten."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "an active sprint has unfinished tasks",
+          "when": "a user closes the sprint",
+          "then": "each unfinished task must carry a valid explicit disposition with its reason and any required continuation reference"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "the final originally planned sprint has a mixture of completed and disposed tasks",
+          "when": "close-sprint applies its transaction",
+          "then": "the immutable close record reports a truthful partial outcome and the scope is not automatically completed"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "an open scope has closed all originally listed roadmap sprints",
+          "when": "the user supplies a later sprint plan",
+          "then": "kyro plan materializes it through the normal tool-owned route without recovery"
+        },
+        {
+          "id": "S4",
+          "requirement": "R4",
+          "given": "a scope contains either lawful lifecycle evolution or an unsafe/corrupt immutable artifact",
+          "when": "Doctor and Integrity inspect it",
+          "then": "lawful evolution is distinguishable from scoped fail-closed artifact corruption"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "a historical or retired scope is inspected",
+          "when": "Kyro reads its lifecycle state",
+          "then": "historical records remain readable and retirement remains explicitly terminal and human-gated"
+        }
+      ],
+      "nonGoals": [
+        "Maker/checker provenance policy changes.",
+        "Startup-contract consolidation or unrelated global preflight redesign.",
+        "NutriLens or Kyro Lens implementation changes.",
+        "Manual editing mode for Kyro-managed state.",
+        "Archive rewriting, release, installation, publication, or version bump."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 3,
+      "sizingRationale": "The work is sequenced by semantic dependency: define the lifecycle contract first, implement the core transitions second, then reconcile integrity and certify the complete path.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "lifecycle-contract",
+          "title": "Lifecycle contract and dispositions",
+          "state": "active"
+        },
+        {
+          "n": 2,
+          "slug": "truthful-sprint-close",
+          "title": "Truthful sprint close and open-scope routing",
+          "state": "planned"
+        },
+        {
+          "n": 3,
+          "slug": "integrity-certification",
+          "title": "Integrity recalibration and lifecycle certification",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [],
+    "previousSprint": null,
+    "activeSprint": {
+      "n": 1,
+      "slug": "lifecycle-contract",
+      "title": "Lifecycle contract and task dispositions",
+      "objective": "Establish the minimal typed lifecycle contract that makes partial sprint outcomes truthful and keeps scopes open for subsequent planning.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Contract characterization",
+          "objective": "Turn the current implicit lifecycle behavior into a compatibility-aware contract.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.1",
+              "title": "Map lifecycle owners and compatibility boundaries",
+              "description": "Inventory every reader and writer affected by task state, close checkpoints, handoff routing, scope status, Doctor, Integrity, adapters, and fixtures; record the smallest compatible contract change.",
+              "files_to_touch": [
+                "src/cli/types.ts",
+                "src/cli/artifacts/schema.ts",
+                "src/cli/core/status.ts",
+                "docs/"
+              ],
+              "context": "The current state conflates closing the final roadmap sprint with completing a scope. This task must produce a source-grounded compatibility map before schema changes.",
+              "acceptance_criteria": [
+                "Every lifecycle field changed by this scope has one identified writer and all identified readers.",
+                "Historical checkpoint and retirement compatibility behavior is explicit and does not require rewriting immutable bytes.",
+                "The selected disposition representation does not add a new CLI root unless existing writers are proven insufficient."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S1",
+                "S5"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Mapped every lifecycle field this scope may change to a single writer and its readers, and recorded the additive task.disposition contract (extend record-evidence; no new CLI root).",
+                "validation": [
+                  "rg -n 'Lifecycle field owners' docs/plans/adr-adaptive-sprint-lifecycle.md",
+                  "rg -n 'One writer: extend .kyro record-evidence' docs/plans/adr-adaptive-sprint-lifecycle.md",
+                  "rg -n 'Historical bytes are not rewritten' docs/plans/adr-adaptive-sprint-lifecycle.md"
+                ],
+                "files_changed": [
+                  "docs/plans/adr-adaptive-sprint-lifecycle.md",
+                  "docs/status-coherence.md"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-23T18:38:01.638Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Every lifecycle field changed by this scope has one identified writer and all identified readers.",
+                  "Historical checkpoint and retirement compatibility behavior is explicit and does not require rewriting immutable bytes.",
+                  "The selected disposition representation does not add a new CLI root unless existing writers are proven insufficient."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-23T18:38:10.050Z"
+              }
+            },
+            {
+              "id": "T1.2",
+              "title": "Add the typed task-disposition contract",
+              "description": "Implement and validate the minimal disposition structure for unfinished tasks, including reason, actor, time, and required continuation references for deferred or superseded work.",
+              "files_to_touch": [
+                "src/cli/types.ts",
+                "src/cli/artifacts/schema.ts",
+                "src/cli/commands/record-evidence.ts"
+              ],
+              "context": "A disposition is not a success verdict. The schema must preserve done+pass as verified completion and reject unknown, incomplete, or contradictory terminal records.",
+              "acceptance_criteria": [
+                "Deferred, blocked, superseded, and cancelled work can be represented without changing it to done or pass.",
+                "Invalid disposition kinds, blank reasons, and invalid continuation targets fail without writes.",
+                "Existing valid v4 state remains readable under an explicit compatibility policy."
+              ],
+              "depends_on": [
+                "T1.1"
+              ],
+              "scenario_refs": [
+                "S1",
+                "S2"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Added optional task.disposition (deferred|blocked|superseded|cancelled) with schema validation and record-evidence --disposition/--reason/--target. Invalid kinds, blank reasons, and bad continuation targets fail without writes. Existing v4 tasks remain valid when the field is omitted.",
+                "validation": [
+                  "npx tsc --noEmit",
+                  "node scripts/check-record-evidence.mjs",
+                  "node scripts/check-status.mjs"
+                ],
+                "files_changed": [
+                  "src/cli/types.ts",
+                  "src/cli/artifacts/schema.ts",
+                  "src/cli/commands/record-evidence.ts"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-23T18:42:58.408Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Deferred, blocked, superseded, and cancelled work can be represented without changing it to done or pass.",
+                  "Invalid disposition kinds, blank reasons, and invalid continuation targets fail without writes.",
+                  "Existing valid v4 state remains readable under an explicit compatibility policy."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-23T18:43:05.223Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Truthful close semantics",
+          "objective": "Make close-sprint capture partial work truthfully without terminalizing the scope.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.3",
+              "title": "Make close-sprint derive truthful outcomes",
+              "description": "Require every unfinished task to have a valid disposition, derive and persist the sprint outcome, and include dispositions in dry-run, checkpoint, ledger, snapshot, and narrative output.",
+              "files_to_touch": [
+                "src/cli/commands/close-sprint.ts",
+                "src/cli/checkpoints/sprint-close.ts",
+                "src/cli/types.ts"
+              ],
+              "context": "The close transaction remains lossless and idempotent. It must never claim shipped from incomplete or disposed work.",
+              "acceptance_criteria": [
+                "A partial close cannot proceed until every unfinished task has an explicit disposition.",
+                "The close dry-run and immutable checkpoint expose each unfinished task and its disposition.",
+                "A completed outcome remains available only when all tasks are done with passing verdicts."
+              ],
+              "depends_on": [
+                "T1.2"
+              ],
+              "scenario_refs": [
+                "S1",
+                "S2"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Made close-sprint reject undisposed unfinished work, derive a truthful partial/shipped outcome, preserve dispositions in close artifacts, and keep retries bound to the exact frozen semantic inputs.",
+                "validation": [
+                  "npm run build",
+                  "npm run typecheck",
+                  "npm run check:lossless-checkpoints"
+                ],
+                "files_changed": [
+                  "src/cli/commands/close-sprint.ts",
+                  "src/cli/checkpoints/sprint-close.ts",
+                  "src/cli/core/status.ts",
+                  "scripts/check-lossless-checkpoints.mjs"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-23T20:16:58.318Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "A partial close cannot proceed until every unfinished task has an explicit disposition.",
+                  "The close dry-run and immutable checkpoint expose each unfinished task and its disposition.",
+                  "A completed outcome remains available only when all tasks are done with passing verdicts."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-23T20:16:58.424Z"
+              }
+            },
+            {
+              "id": "T1.4",
+              "title": "Decouple final sprint close from scope completion",
+              "description": "Change status and handoff derivation so every non-retired scope remains open and routable after sprint close, including when the original roadmap has no remaining entries.",
+              "files_to_touch": [
+                "src/cli/checkpoints/sprint-close.ts",
+                "src/cli/core/status.ts",
+                "src/cli/commands/plan.ts",
+                "src/cli/commands/context-pack.ts"
+              ],
+              "context": "Retirement stays human-gated and terminal. Scope completion is intentionally not inferred in this increment.",
+              "acceptance_criteria": [
+                "Closing the last originally planned sprint does not set nextAction to done or scope status to completed.",
+                "The normal plan command can materialize a later sprint without recovery or manual state editing.",
+                "Retirement remains the only existing terminal path and retains its current approval behavior."
+              ],
+              "depends_on": [
+                "T1.1",
+                "T1.3"
+              ],
+              "scenario_refs": [
+                "S2",
+                "S3",
+                "S5"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Final P2 certification: every non-retired close remains routable to planning; close handoff and Integrity fixtures now assert the same post-close planning status.",
+                "validation": [
+                  "npm run build",
+                  "npm run typecheck",
+                  "npm run check:close-handoff",
+                  "npm run check:lossless-checkpoints",
+                  "npm run check:repair-integrity",
+                  "npm run check (non-TTY, exit 0)",
+                  "git diff --check"
+                ],
+                "files_changed": [
+                  "src/cli/checkpoints/sprint-close.ts",
+                  "src/cli/core/status.ts",
+                  "src/cli/commands/plan.ts",
+                  "src/cli/commands/close-sprint.ts",
+                  "scripts/check-close-handoff.mjs",
+                  "scripts/check-repair-integrity.mjs",
+                  "docs/cost-model.md"
+                ],
+                "by": "codex",
+                "recordedAt": "2026-08-23T20:29:52.260Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Closing the last originally planned sprint does not set nextAction to done or scope status to completed.",
+                  "The normal plan command can materialize a later sprint without recovery or manual state editing.",
+                  "Retirement remains the only existing terminal path and retains its current approval behavior."
+                ],
+                "findings": [],
+                "by": "reviewer",
+                "reviewedAt": "2026-08-23T20:29:52.360Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P3",
+          "title": "Observability and regression contract",
+          "objective": "Align reports and focused tests with the new lawful lifecycle.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.5",
+              "title": "Expose dispositions in status and fresh-context routing",
+              "description": "Report unresolved disposed work and the open-scope planning route without hiding independent ready work or presenting a false completion state.",
+              "files_to_touch": [
+                "src/cli/commands/status.ts",
+                "src/cli/commands/context-pack.ts",
+                "internal/skills/sprint-forge/assets/modes/close-sprint.md"
+              ],
+              "context": "The CLI and instruction layer must agree; no agent should be told to stop because a roadmap estimate ended.",
+              "acceptance_criteria": [
+                "Status distinguishes verified completion from deferred, blocked, superseded, and cancelled work.",
+                "Context-pack routes an open post-close scope to planning.",
+                "Close guidance no longer equates a final roadmap sprint with a completed scope."
+              ],
+              "depends_on": [
+                "T1.4"
+              ],
+              "scenario_refs": [
+                "S2",
+                "S3"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Status and fresh-context routing expose dispositions and keep open post-close scopes routed to planning: TaskSummary now reports verified completion separately from deferred/blocked/superseded/cancelled dispositions; context-pack derives scope status via deriveScopeStatus (matching kyro status) so an open post-close scope reads planning instead of a stale stored field; close-sprint.md guidance no longer equates exhausting the original roadmap with a completed scope.",
+                "validation": [
+                  "npm run typecheck",
+                  "npm run check",
+                  "node scripts/check-status.mjs",
+                  "node scripts/check-close-handoff.mjs",
+                  "node scripts/check-record-evidence.mjs",
+                  "node scripts/check-repair-integrity.mjs",
+                  "node scripts/check-lossless-checkpoints.mjs"
+                ],
+                "files_changed": [
+                  "src/cli/commands/status.ts",
+                  "src/cli/commands/context-pack.ts",
+                  "internal/skills/sprint-forge/assets/modes/close-sprint.md"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-23T23:49:11.360Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Status distinguishes verified completion from deferred, blocked, superseded, and cancelled work.",
+                  "Context-pack routes an open post-close scope to planning.",
+                  "Close guidance no longer equates a final roadmap sprint with a completed scope."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-23T23:49:14.188Z"
+              }
+            },
+            {
+              "id": "T1.6",
+              "title": "Add load-bearing lifecycle regressions",
+              "description": "Extend existing lifecycle gates with adversarial partial-close, final-roadmap, invalid-disposition, historical, and retirement cases; avoid creating a duplicate test harness.",
+              "files_to_touch": [
+                "scripts/check-close-handoff.mjs",
+                "scripts/check-record-evidence.mjs",
+                "scripts/check-status.mjs",
+                "scripts/check-plan.mjs"
+              ],
+              "context": "The tests must falsify the prior automatic-done behavior and prove archives remain immutable and retirement distinct.",
+              "acceptance_criteria": [
+                "Reverting the no-auto-complete derivation breaks a focused regression.",
+                "Invalid or missing dispositions break a focused regression without writes.",
+                "A partial final-roadmap close can plan another sprint while retirement remains terminal."
+              ],
+              "depends_on": [
+                "T1.3",
+                "T1.4",
+                "T1.5"
+              ],
+              "scenario_refs": [
+                "S1",
+                "S2",
+                "S3",
+                "S5",
+                "S4"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Extended existing lifecycle gates with adversarial load-bearing regressions: check-close-handoff adds partial final-roadmap close (persists partial outcome, scope stays planning/plan_sprint, never done) and undisposed-task close refusal without writes; check-status adds deriveScopeStatus mutation guard (roadmap exhaustion without done handoff must derive planning, not completed) and CLI task-summary disposition/verified distinction; check-plan adds S3 (plan materializes a later sprint after an exhausted roadmap close through the normal route).",
+                "validation": [
+                  "npm run typecheck",
+                  "npm run check",
+                  "node scripts/check-close-handoff.mjs",
+                  "node scripts/check-status.mjs",
+                  "node scripts/check-record-evidence.mjs",
+                  "node scripts/check-plan.mjs"
+                ],
+                "files_changed": [
+                  "scripts/check-close-handoff.mjs",
+                  "scripts/check-status.mjs",
+                  "scripts/check-plan.mjs"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-24T01:07:12.674Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Reverting the no-auto-complete derivation breaks a focused regression.",
+                  "Invalid or missing dispositions break a focused regression without writes.",
+                  "A partial final-roadmap close can plan another sprint while retirement remains terminal."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-08-24T01:07:15.912Z"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [
+        {
+          "id": "E1",
+          "title": "Unify next-executable-task routing to exclude disposed tasks",
+          "description": "Fix the T1.2 disposition regression: a disposed task (deferred/superseded/cancelled, which keep status pending) was re-selected by review's status-only next-task picker and reappeared in the executable routes. Extract one shared pure nextExecutableTaskId selector (pending|in_progress, no disposition of any kind, blocked excluded) and use it in BOTH record-evidence and review so the two writers cannot drift. Closing semantics unchanged: a disposed task never becomes done and never enables close_sprint by itself; when no executable task remains the handoff stays execute_task with nextTaskId null.",
+          "files_to_touch": [
+            "src/cli/core/status.ts",
+            "src/cli/commands/record-evidence.ts",
+            "src/cli/commands/review.ts",
+            "scripts/check-record-evidence.mjs"
+          ],
+          "context": "QA flagged a Major failure of T1.2: record-evidence excluded dispositions but review.ts did not, so review re-selected a disposed pending task. The corrective task is tracked additively; T1.2's recorded evidence and review stay historical.",
+          "acceptance_criteria": [
+            "A shared nextExecutableTaskId selector lives in core/status.ts and is used by both record-evidence and review.",
+            "Disposing T1.1 (deferred/superseded/cancelled), approving T1.2, never routes the handoff back to T1.1.",
+            "A pending task without disposition is still selected; a disposed emergent task is not.",
+            "A no-disposition sprint keeps prior routing and a blocked task without disposition still routes to review_task.",
+            "check-record-evidence.mjs covers these cases end-to-end and npm run check passes."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S1"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Unified the next-executable-task routing on a single pure selector in core/status.ts (nextExecutableTaskId) that considers only pending|in_progress, excludes every disposition kind, and keeps blocking excluded. record-evidence and review now share it, removing the two divergent criteria that let review re-select a disposed pending task. Additionally, review now rejects ANY disposed task up front (DISPOSED_TASK_NOT_REVIEWABLE) for both pass and fail, before plan construction, so no review path can reopen disposed work. Closing semantics preserved: a disposed task never becomes done, never enables close_sprint by itself, and with no executable tasks left the handoff stays execute_task with nextTaskId null.",
+            "validation": [
+              "npm run typecheck",
+              "node scripts/check-record-evidence.mjs",
+              "node scripts/check-status.mjs",
+              "node scripts/check-routing-contract.mjs",
+              "node scripts/check-close-handoff.mjs",
+              "node scripts/check-verification-states.mjs",
+              "npm run check"
+            ],
+            "files_changed": [
+              "src/cli/core/status.ts",
+              "src/cli/core/errors.ts",
+              "src/cli/commands/record-evidence.ts",
+              "src/cli/commands/review.ts",
+              "scripts/check-record-evidence.mjs"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-08-23T19:27:54.154Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A shared nextExecutableTaskId selector lives in core/status.ts and is used by both record-evidence and review.",
+              "Disposing T1.1 (deferred/superseded/cancelled), approving T1.2, never routes the handoff back to T1.1.",
+              "A pending task without disposition is still selected; a disposed emergent task is not.",
+              "A no-disposition sprint keeps prior routing and a blocked task without disposition still routes to review_task.",
+              "check-record-evidence.mjs covers these cases end-to-end and npm run check passes."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-23T19:27:56.384Z"
+          }
+        },
+        {
+          "id": "E2",
+          "title": "Correct disposed-task review remedy",
+          "description": "Replace the inaccurate clarify instruction in DISPOSED_TASK_NOT_REVIEWABLE with only currently legal continuation paths, so an agent is not sent to a command that cannot reopen disposed work.",
+          "files_to_touch": [
+            "src/cli/commands/review.ts"
+          ],
+          "context": "",
+          "acceptance_criteria": [
+            "The disposed-task review remedy does not present clarify as a re-open path.",
+            "The remedy directs active-sprint work to kyro add-emergent and labels any true reopen operation as future/explicit."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S1"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Corrected the disposed-task review remedy so it names only an active-sprint replacement path and a future explicit reopen operation.",
+            "validation": [
+              "npm run build",
+              "npm run typecheck",
+              "npm run check:record-evidence"
+            ],
+            "files_changed": [
+              "src/cli/commands/review.ts",
+              "scripts/check-record-evidence.mjs"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-08-23T19:31:49.600Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "The disposed-task review remedy does not present clarify as a re-open path.",
+              "The remedy directs active-sprint work to kyro add-emergent and labels any true reopen operation as future/explicit."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-23T19:31:49.707Z"
+          }
+        },
+        {
+          "id": "E3",
+          "title": "Add post-close context-pack E2E regression",
+          "description": "Prove through the compiled CLI that a scope whose final roadmap sprint closes partially is still reported as planning by context-pack and routes to plan_sprint.",
+          "files_to_touch": [
+            "src/cli/commands/context-pack.ts",
+            "scripts/check-plan.mjs"
+          ],
+          "context": "Close derives planning; context-pack must expose the same canonical lifecycle state.",
+          "acceptance_criteria": [
+            "A partial final-roadmap close followed by context-pack --json reports status planning and nextAction plan_sprint.",
+            "The regression fails if context-pack reads a stale stored completed status instead of deriveScopeStatus."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S3"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added an end-to-end post-close context-pack regression that injects a stale completed field after a partial final-roadmap close and requires canonical planning/plan_sprint output.",
+            "validation": [
+              "npm run build",
+              "npm run typecheck",
+              "npm run check:plan",
+              "npm run check:status",
+              "git diff --check",
+              "kyro doctor --artifacts --kyro-scope adaptive-sprint-lifecycle",
+              "kyro analyze --kyro-scope adaptive-sprint-lifecycle"
+            ],
+            "files_changed": [
+              "scripts/check-plan.mjs",
+              "src/cli/commands/context-pack.ts"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-08-24T01:25:36.437Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A partial final-roadmap close followed by context-pack --json reports status planning and nextAction plan_sprint.",
+              "The regression fails if context-pack reads a stale stored completed status instead of deriveScopeStatus."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-24T01:25:36.563Z"
+          }
+        }
+      ],
+      "definitionOfDone": [
+        "The lifecycle contract has source-grounded compatibility evidence.",
+        "All Sprint 1 tasks have passing reviewed evidence.",
+        "Focused lifecycle regressions and npm run check pass.",
+        "Doctor scoped to adaptive-sprint-lifecycle passes after the implementation."
+      ]
+    },
+    "debt": [],
+    "handoff": {
+      "nextAction": "close_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task E3 passed checker review.",
+      "lastUpdated": "2026-08-24T01:25:36.563Z"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-23T18:22:46.918Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "adaptive-sprint-lifecycle",
+    "title": "Adaptive sprint lifecycle",
+    "status": "planning",
+    "objective": "Make Kyro record changing work truthfully without treating a partial sprint or exhausted roadmap as a terminal scope failure.",
+    "successCriteria": [
+      "Every unfinished task has a typed, reasoned disposition before sprint closure.",
+      "Closing any sprint preserves immutable evidence while keeping the scope open for explicit next planning.",
+      "Scope completion and retirement remain explicit, distinct decisions.",
+      "Doctor and Integrity distinguish lawful lifecycle evolution from immutable-artifact corruption.",
+      "Legacy checkpoints remain readable without retroactive semantic claims."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Kyro SHALL require an explicit validated disposition for every unfinished task before closing a sprint.",
+          "priority": "must",
+          "rationale": "Unfinished work must remain discoverable and attributable instead of being represented as success or silently discarded."
+        },
+        {
+          "id": "R2",
+          "statement": "Kyro SHALL close a sprint without automatically completing its scope merely because all originally planned roadmap entries are closed.",
+          "priority": "must",
+          "rationale": "A roadmap is an estimate; scope completion requires an explicit decision and evidence."
+        },
+        {
+          "id": "R3",
+          "statement": "Kyro SHALL allow an open scope with no active sprint to plan a subsequent sprint through the normal tool-owned flow.",
+          "priority": "must",
+          "rationale": "Legitimate reprioritization must not require a recovery or manual state edit."
+        },
+        {
+          "id": "R4",
+          "statement": "Kyro SHALL preserve fail-closed validation for immutable checkpoints, unsafe paths, identity conflicts, and stale approvals while accepting lawful lifecycle evolution.",
+          "priority": "must",
+          "rationale": "Simplification must not weaken artifact integrity or recovery safety."
+        },
+        {
+          "id": "R5",
+          "statement": "Kyro SHALL keep retirement distinct from scope completion and preserve readable historical checkpoint semantics.",
+          "priority": "must",
+          "rationale": "Terminal retirement has explicit human approval semantics, and immutable historical bytes cannot be rewritten."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "an active sprint has unfinished tasks",
+          "when": "a user closes the sprint",
+          "then": "each unfinished task must carry a valid explicit disposition with its reason and any required continuation reference"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "the final originally planned sprint has a mixture of completed and disposed tasks",
+          "when": "close-sprint applies its transaction",
+          "then": "the immutable close record reports a truthful partial outcome and the scope is not automatically completed"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "an open scope has closed all originally listed roadmap sprints",
+          "when": "the user supplies a later sprint plan",
+          "then": "kyro plan materializes it through the normal tool-owned route without recovery"
+        },
+        {
+          "id": "S4",
+          "requirement": "R4",
+          "given": "a scope contains either lawful lifecycle evolution or an unsafe/corrupt immutable artifact",
+          "when": "Doctor and Integrity inspect it",
+          "then": "lawful evolution is distinguishable from scoped fail-closed artifact corruption"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "a historical or retired scope is inspected",
+          "when": "Kyro reads its lifecycle state",
+          "then": "historical records remain readable and retirement remains explicitly terminal and human-gated"
+        }
+      ],
+      "nonGoals": [
+        "Maker/checker provenance policy changes.",
+        "Startup-contract consolidation or unrelated global preflight redesign.",
+        "NutriLens or Kyro Lens implementation changes.",
+        "Manual editing mode for Kyro-managed state.",
+        "Archive rewriting, release, installation, publication, or version bump."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 3,
+      "sizingRationale": "The work is sequenced by semantic dependency: define the lifecycle contract first, implement the core transitions second, then reconcile integrity and certify the complete path.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "lifecycle-contract",
+          "title": "Lifecycle contract and dispositions",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "truthful-sprint-close",
+          "title": "Truthful sprint close and open-scope routing",
+          "state": "planned"
+        },
+        {
+          "n": 3,
+          "slug": "integrity-certification",
+          "title": "Integrity recalibration and lifecycle certification",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "lifecycle-contract",
+        "outcome": "shipped",
+        "closedAt": "2026-08-24",
+        "archive": "archive/sprint-001-lifecycle-contract.md",
+        "snapshot": "archive/sprint-001-lifecycle-contract.json",
+        "checkpoint": "archive/sprint-001-lifecycle-contract.checkpoint.json",
+        "checkpointSha256": "7998a166250a32249bc5884f8993b8a735cd51a4069c9ef9beb4257e380a89a6"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "lifecycle-contract",
+      "outcome": "shipped",
+      "summary": "Establish the minimal typed lifecycle contract that makes partial sprint outcomes truthful and keeps scopes open for subsequent planning."
+    },
+    "activeSprint": null,
+    "debt": [],
+    "handoff": {
+      "nextAction": "plan_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Sprint 1 (lifecycle-contract) closed as shipped. 2 sprint(s) remain.",
+      "lastUpdated": "2026-08-24"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-23T18:22:46.918Z"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "adaptive-sprint-lifecycle",
+    "title": "Adaptive sprint lifecycle",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "adaptive-sprint-lifecycle",
+    "title": "Adaptive sprint lifecycle",
+    "status": "planning"
+  },
+  "digests": {
+    "beforeClose": "a76f784e1c001184ee226c54d4a338c1e4fbbc305ba7dec97f3498077b9c817e",
+    "intendedAfterClose": "07b8e4aa305116d08411eb19ba75dcf7d14c3280c1f364183ba561ceebbf173a",
+    "projectScopeBefore": "ced136cbecfadd666cc014055954680ebce9505edb63fdacea5190d4648fac9e",
+    "projectScopeAfter": "704ae386c7319926b8824c7d3bb2ca69f5abe1b85ddf814861d31f7851f64f1c",
+    "legacySnapshot": "5474153b0bb7ff4f31bc39410255407d6c6c85eba4d9863a6e534566c215ce60",
+    "narrative": "c79e925d095783a489dd5a82a462754d4eef47d63b0a2d63d327eb2805b750b6"
+  }
+}

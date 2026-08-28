@@ -34,7 +34,10 @@ import {
 } from '../checkpoints/discovery';
 import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
 import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase } from '../remediation/plan';
-import { replayScopeLifecycle } from '../checkpoints/lifecycle-state';
+import {
+  SCOPE_LIFECYCLE_VERIFICATION_STATUS,
+  verifyScopeLifecycleEvolution,
+} from '../checkpoints/lifecycle-state';
 import { inspectScopeRetirement, retirementCheckpointIsApplied } from '../checkpoints/scope-retirement';
 import {
   formatBootstrapRemedy,
@@ -412,17 +415,21 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   // two narrow allowances keep an audited correction from reading as tampering. Neither may ever be
   // reachable by drift that Kyro did not itself produce.
   let remediationLabel: string | null = null;
-  // An explicit `scope complete` / `scope reopen` also moves live state off the after-image. Neither
-  // is trusted on the strength of its own record: the recorded transitions are replayed from the
-  // after-image through the same builders the writers use, and only an exact reproduction of the
-  // live state counts. Anything a lifecycle transition could not have produced still diverges.
-  const lifecycleReplay = sprintPosition === 'other'
-    ? replayScopeLifecycle(canonicalized ? asRecord(read.value)?.intendedAfterClose : checkpoint.intendedAfterClose, sprintRead.value)
+  // An explicit `scope complete` / `scope reopen` also moves both durable layers off the after-image.
+  // Verify them atomically: accepting a sprint projection before the registry is proven would let the
+  // two readers disagree about the same lifecycle transition.
+  const lifecycleVerification = sprintPosition === 'other' && projectEntry
+    ? verifyScopeLifecycleEvolution(
+      canonicalized ? asRecord(read.value)?.intendedAfterClose : checkpoint.intendedAfterClose,
+      checkpoint.projectScopeAfter,
+      sprintRead.value,
+      projectEntry,
+    )
     : null;
   let lifecycleLabel: string | null = null;
-  if (lifecycleReplay && sha256(lifecycleReplay.sprint) === sprintDigest) {
+  if (lifecycleVerification?.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED) {
     sprintPosition = 'after';
-    lifecycleLabel = 'after (explicit lifecycle transition)';
+    lifecycleLabel = 'after (structurally replayed lifecycle; actor identity unverified)';
   }
   if (sprintPosition === 'other') {
     // 1. Anchor-only difference: the business state (remediations[] excluded) still matches an image
@@ -449,9 +456,11 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
     }
   }
   let scopePosition = digestPosition(projectDigest, checkpoint.digests.projectScopeBefore, checkpoint.digests.projectScopeAfter);
-  if (scopePosition === 'other' && lifecycleLabel && projectEntry) {
-    const replayedEntry = lifecycleReplay?.entryOf(checkpoint.projectScopeAfter ?? projectEntry);
-    if (replayedEntry && sha256(replayedEntry) === projectDigest) scopePosition = 'after';
+  if (
+    scopePosition === 'other'
+    && lifecycleVerification?.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED
+  ) {
+    scopePosition = 'after';
   }
   let legacyScopeNormalized = false;
   // Historical intermediate v1 residual: checkpoint stores projectScopeAfter.status=active while

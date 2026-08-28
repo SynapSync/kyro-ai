@@ -1,0 +1,475 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "32e6ad911e30611270819a999de74b764b7a8b27db160f88330939714a6ffad0",
+  "createdAt": "2026-08-09T16:56:25.291Z",
+  "identity": {
+    "scope": "remediation-protocol-hardening",
+    "sprintN": 1,
+    "sprintSlug": "versioned-replay-foundation"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": null,
+    "summary": null,
+    "recommendations": [],
+    "learnings": []
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/remediation-protocol-hardening/archive/sprint-001-versioned-replay-foundation.json",
+    "narrative": ".agents/kyro/scopes/remediation-protocol-hardening/archive/sprint-001-versioned-replay-foundation.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "remediation-protocol-hardening",
+    "title": "Remediation protocol hardening",
+    "status": "planning",
+    "objective": "Eliminate quadratic remediation archive growth while preserving strict replay verification across protocol and SprintFile versions.",
+    "successCriteria": [
+      "New remediation records no longer embed a full SprintFile snapshot for every transaction.",
+      "Replay verification remains fail-closed and can validate historical v1 records alongside the current compact protocol.",
+      "No immutable remediation, certification, checkpoint, snapshot, or narrative is rewritten."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "The system must replace the unbounded full SprintFile result snapshot in newly emitted remediation records with a versioned, strongly typed replay witness sufficient for deterministic verification.",
+          "priority": "must",
+          "rationale": "Embedding the full state in every record grows the archive quadratically and leaves an unknown-shaped payload in a typed protocol."
+        },
+        {
+          "id": "R2",
+          "statement": "The system must select replay validation by the immutable record and snapshot protocol versions, preserving verification of existing v1 records without silently coercing historical data.",
+          "priority": "must",
+          "rationale": "Using only the current SprintFile parser can falsely diverge valid historical remediation chains after a schema evolution."
+        },
+        {
+          "id": "R3",
+          "statement": "The system must reject unsupported witness or snapshot versions with an actionable fail-closed diagnostic.",
+          "priority": "must",
+          "rationale": "Protocol evolution cannot turn unknown historical evidence into trusted state."
+        },
+        {
+          "id": "R4",
+          "statement": "The system must demonstrate bounded archive growth and replay integrity with real multi-record remediation vectors.",
+          "priority": "must",
+          "rationale": "The debt is both a storage-growth and evidence-integrity concern."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R2",
+          "given": "an immutable valid v1 remediation chain created before a later SprintFile schema change",
+          "when": "doctor or status verifies the chain",
+          "then": "it selects the v1 replay validator and reports the chain truthfully without rewriting historical bytes"
+        },
+        {
+          "id": "S2",
+          "requirement": "R3",
+          "given": "a remediation record or replay witness with an unknown version",
+          "when": "the verifier reads its anchor",
+          "then": "it fails closed with an actionable unsupported diagnostic and never reports remediated or recertified"
+        },
+        {
+          "id": "S3",
+          "requirement": "R4",
+          "given": "a genuine multi-record remediation chain and its close checkpoint",
+          "when": "version-aware replay validation runs",
+          "then": "each chain link verifies while the checkpoint, snapshot, narrative, and ledger commitments remain byte-identical"
+        }
+      ],
+      "nonGoals": [
+        "Rewriting v1 remediation or recertification records.",
+        "Changing immutable close checkpoints, snapshots, narratives, or ledger commitments.",
+        "Accepting arbitrary patches or untyped state payloads.",
+        "Claiming a data migration for historical records."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [
+      {
+        "id": "ADR-0001",
+        "title": "Dispatch replay witnesses by immutable record version",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "Replay previously parsed every archived result snapshot with the ambient current SprintFile schema, so a future schema change could falsely diverge valid v1 evidence.",
+        "decision": "Route each replay witness through an explicit parser keyed by its immutable remediation record version. v1 remains supported through a typed parser; unknown versions fail closed and are never coerced through the current parser.",
+        "consequences": [
+          "Historical v1 records remain readable without mutation.",
+          "Future compact witnesses require an explicit parser and conformance vectors before they can be trusted."
+        ],
+        "alternatives": [
+          "Continue parsing every witness with the current SprintFile validator.",
+          "Silently coerce unsupported witness versions into the newest representation."
+        ]
+      }
+    ],
+    "roadmap": {
+      "plannedSprintCount": 2,
+      "sizingRationale": "Compatibility and fail-closed version dispatch establish the safe foundation before changing the emitted remediation representation.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "versioned-replay-foundation",
+          "title": "Versioned replay foundation",
+          "state": "active"
+        },
+        {
+          "n": 2,
+          "slug": "compact-remediation-witness",
+          "title": "Compact remediation witness",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [],
+    "previousSprint": null,
+    "activeSprint": {
+      "n": 1,
+      "slug": "versioned-replay-foundation",
+      "title": "Versioned replay foundation",
+      "objective": "Make replay dispatch explicit and fail-closed for immutable remediation evidence before introducing a compact record representation.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Versioned replay contract",
+          "objective": "Define the typed version-dispatch boundary from evidence parsing through replay validation.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.1",
+              "title": "Model versioned replay witnesses",
+              "description": "Introduce closed, strongly typed protocol/version discriminants for remediation results and replay witnesses; document the compatibility policy for v1 records and unknown future versions.",
+              "files_to_touch": [
+                "src/cli/remediation",
+                "src/cli/artifacts/schema.ts",
+                "src/cli/types.ts"
+              ],
+              "context": "Debt-4 requires version-aware validation without coercing immutable evidence. This task establishes the contract and explicit unsupported path only.",
+              "acceptance_criteria": [
+                "Known v1 evidence routes through an explicit v1 validator rather than the ambient current SprintFile parser.",
+                "Unknown record or witness versions produce an actionable fail-closed diagnostic.",
+                "The version model contains no arbitrary JSON or generic patch escape hatch."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S1",
+                "S2"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Added explicit version-dispatched replay witness parsing with typed v1 output and fail-closed unsupported handling.",
+                "validation": [
+                  "OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm run build (passed)",
+                  "npm run check:replay-witness (5 assertions passed)",
+                  "npm run check:scope-remediation (292 assertions passed)",
+                  "npm run check:verification-states (143 assertions passed)"
+                ],
+                "files_changed": [
+                  "src/cli/remediation/replay-witness.ts",
+                  "src/cli/remediation/plan.ts",
+                  "scripts/check-replay-witness.mjs",
+                  "package.json"
+                ],
+                "notes": "ADR-0001 records the v1 compatibility and future-version fail-closed policy.",
+                "by": "maker",
+                "recordedAt": "2026-08-09T16:49:21.624Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Known v1 evidence routes through an explicit v1 validator rather than the ambient current SprintFile parser.",
+                  "Unknown record or witness versions produce an actionable fail-closed diagnostic.",
+                  "The version model contains no arbitrary JSON or generic patch escape hatch."
+                ],
+                "findings": [],
+                "by": "codex-checker",
+                "reviewedAt": "2026-08-09T16:49:21.755Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Historical compatibility vectors",
+          "objective": "Prove that the new dispatch preserves historical integrity and rejects unsupported evidence.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.2",
+              "title": "Certify version-aware replay vectors",
+              "description": "Extend the real remediation and verification harnesses with v1 compatibility, unsupported-version, and multi-record chain cases.",
+              "files_to_touch": [
+                "scripts/check-scope-remediation.mjs",
+                "scripts/check-verification-states.mjs",
+                "src/cli/remediation"
+              ],
+              "context": "Validation must cover real close/remediate flows and ensure historic checkpoints remain byte-identical.",
+              "acceptance_criteria": [
+                "Existing v1 remediation chains remain verified without rewriting their records.",
+                "Unsupported version vectors fail closed in both doctor and status.",
+                "The regression harness proves checkpoint, snapshot, narrative, and ledger bytes remain unchanged."
+              ],
+              "depends_on": [
+                "T1.1"
+              ],
+              "scenario_refs": [
+                "S1",
+                "S2",
+                "S3"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Certified explicit replay-witness dispatch with real v1 multi-record replay and unknown-version fail-closed vectors.",
+                "validation": "OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm run build; npm run check:replay-witness (5 assertions); npm run check:scope-remediation (295 assertions); npm run check:verification-states (152 assertions)",
+                "files_changed": [
+                  "src/cli/remediation/replay-witness.ts",
+                  "src/cli/remediation/plan.ts",
+                  "scripts/check-replay-witness.mjs",
+                  "scripts/check-scope-remediation.mjs",
+                  "scripts/check-verification-states.mjs",
+                  "package.json"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-09T16:52:10.819Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Existing v1 remediation chains remain verified without rewriting their records.",
+                  "Unsupported version vectors fail closed in both doctor and status.",
+                  "The regression harness proves checkpoint, snapshot, narrative, and ledger bytes remain unchanged."
+                ],
+                "findings": [],
+                "by": "codex-checker",
+                "reviewedAt": "2026-08-09T16:52:19.451Z"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [],
+      "definitionOfDone": [
+        "Version-aware replay dispatch is typed, fail-closed, and covered by real artifact vectors.",
+        "Historical v1 remediation chains remain valid without mutation.",
+        "npm run build, npm run check:scope-remediation, npm run check:verification-states, and npm run check pass."
+      ]
+    },
+    "debt": [
+      {
+        "id": "debt-1",
+        "title": "Eliminate quadratic remediation result snapshots",
+        "origin": 1,
+        "priority": "low",
+        "status": "open",
+        "targetSprint": null,
+        "note": "Derived from append-only-scope-remediation/debt-3. Resolve through the compact remediation witness protocol without rewriting historical records."
+      },
+      {
+        "id": "debt-2",
+        "title": "Make replay validation version-aware",
+        "origin": 1,
+        "priority": "low",
+        "status": "open",
+        "targetSprint": null,
+        "note": "Derived from append-only-scope-remediation/debt-4. Preserve historical v1 verification and fail closed for unsupported versions."
+      }
+    ],
+    "handoff": {
+      "nextAction": "close_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task T1.2 passed checker review.",
+      "lastUpdated": "2026-08-09T16:52:19.451Z"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-09T16:33:25.238Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "remediation-protocol-hardening",
+    "title": "Remediation protocol hardening",
+    "status": "planning",
+    "objective": "Eliminate quadratic remediation archive growth while preserving strict replay verification across protocol and SprintFile versions.",
+    "successCriteria": [
+      "New remediation records no longer embed a full SprintFile snapshot for every transaction.",
+      "Replay verification remains fail-closed and can validate historical v1 records alongside the current compact protocol.",
+      "No immutable remediation, certification, checkpoint, snapshot, or narrative is rewritten."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "The system must replace the unbounded full SprintFile result snapshot in newly emitted remediation records with a versioned, strongly typed replay witness sufficient for deterministic verification.",
+          "priority": "must",
+          "rationale": "Embedding the full state in every record grows the archive quadratically and leaves an unknown-shaped payload in a typed protocol."
+        },
+        {
+          "id": "R2",
+          "statement": "The system must select replay validation by the immutable record and snapshot protocol versions, preserving verification of existing v1 records without silently coercing historical data.",
+          "priority": "must",
+          "rationale": "Using only the current SprintFile parser can falsely diverge valid historical remediation chains after a schema evolution."
+        },
+        {
+          "id": "R3",
+          "statement": "The system must reject unsupported witness or snapshot versions with an actionable fail-closed diagnostic.",
+          "priority": "must",
+          "rationale": "Protocol evolution cannot turn unknown historical evidence into trusted state."
+        },
+        {
+          "id": "R4",
+          "statement": "The system must demonstrate bounded archive growth and replay integrity with real multi-record remediation vectors.",
+          "priority": "must",
+          "rationale": "The debt is both a storage-growth and evidence-integrity concern."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R2",
+          "given": "an immutable valid v1 remediation chain created before a later SprintFile schema change",
+          "when": "doctor or status verifies the chain",
+          "then": "it selects the v1 replay validator and reports the chain truthfully without rewriting historical bytes"
+        },
+        {
+          "id": "S2",
+          "requirement": "R3",
+          "given": "a remediation record or replay witness with an unknown version",
+          "when": "the verifier reads its anchor",
+          "then": "it fails closed with an actionable unsupported diagnostic and never reports remediated or recertified"
+        },
+        {
+          "id": "S3",
+          "requirement": "R4",
+          "given": "a genuine multi-record remediation chain and its close checkpoint",
+          "when": "version-aware replay validation runs",
+          "then": "each chain link verifies while the checkpoint, snapshot, narrative, and ledger commitments remain byte-identical"
+        }
+      ],
+      "nonGoals": [
+        "Rewriting v1 remediation or recertification records.",
+        "Changing immutable close checkpoints, snapshots, narratives, or ledger commitments.",
+        "Accepting arbitrary patches or untyped state payloads.",
+        "Claiming a data migration for historical records."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [
+      {
+        "id": "ADR-0001",
+        "title": "Dispatch replay witnesses by immutable record version",
+        "status": "accepted",
+        "date": "2026-08-09",
+        "context": "Replay previously parsed every archived result snapshot with the ambient current SprintFile schema, so a future schema change could falsely diverge valid v1 evidence.",
+        "decision": "Route each replay witness through an explicit parser keyed by its immutable remediation record version. v1 remains supported through a typed parser; unknown versions fail closed and are never coerced through the current parser.",
+        "consequences": [
+          "Historical v1 records remain readable without mutation.",
+          "Future compact witnesses require an explicit parser and conformance vectors before they can be trusted."
+        ],
+        "alternatives": [
+          "Continue parsing every witness with the current SprintFile validator.",
+          "Silently coerce unsupported witness versions into the newest representation."
+        ]
+      }
+    ],
+    "roadmap": {
+      "plannedSprintCount": 2,
+      "sizingRationale": "Compatibility and fail-closed version dispatch establish the safe foundation before changing the emitted remediation representation.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "versioned-replay-foundation",
+          "title": "Versioned replay foundation",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "compact-remediation-witness",
+          "title": "Compact remediation witness",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "versioned-replay-foundation",
+        "outcome": "shipped",
+        "closedAt": "2026-08-09",
+        "archive": "archive/sprint-001-versioned-replay-foundation.md",
+        "snapshot": "archive/sprint-001-versioned-replay-foundation.json",
+        "checkpoint": "archive/sprint-001-versioned-replay-foundation.checkpoint.json",
+        "checkpointSha256": "a32c712366c624ba8c2713c759bec6f224d954b3b1a376adb2965bfd90c4e09f"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "versioned-replay-foundation",
+      "outcome": "shipped",
+      "summary": "Make replay dispatch explicit and fail-closed for immutable remediation evidence before introducing a compact record representation."
+    },
+    "activeSprint": null,
+    "debt": [
+      {
+        "id": "debt-1",
+        "title": "Eliminate quadratic remediation result snapshots",
+        "origin": 1,
+        "priority": "low",
+        "status": "open",
+        "targetSprint": null,
+        "note": "Derived from append-only-scope-remediation/debt-3. Resolve through the compact remediation witness protocol without rewriting historical records."
+      },
+      {
+        "id": "debt-2",
+        "title": "Make replay validation version-aware",
+        "origin": 1,
+        "priority": "low",
+        "status": "open",
+        "targetSprint": null,
+        "note": "Derived from append-only-scope-remediation/debt-4. Preserve historical v1 verification and fail closed for unsupported versions."
+      }
+    ],
+    "handoff": {
+      "nextAction": "plan_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Sprint 1 (versioned-replay-foundation) closed as shipped. 1 sprint(s) remain.",
+      "lastUpdated": "2026-08-09"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-09T16:33:25.238Z"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "remediation-protocol-hardening",
+    "title": "Remediation protocol hardening",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "remediation-protocol-hardening",
+    "title": "Remediation protocol hardening",
+    "status": "planning"
+  },
+  "digests": {
+    "beforeClose": "878bcb8ca66a3e733f4861720a4ede72b848a67e5c65397491e264c4fcb62a98",
+    "intendedAfterClose": "a9c3ff298df421b0ec4a9506686ebe9571d6cc3612ae9e02a268f8b91681c8fd",
+    "projectScopeBefore": "bf7a6e96cb40c55e0cd70a648ab92762dd1f54d80739bd1df760c5b7dcb42b47",
+    "projectScopeAfter": "053efe8204c6d3062603ce834d60dc8b08aed4bc3caff1b54abca608a4cf9bb4",
+    "legacySnapshot": "b294804cd9b1f0e5b3ff90b66c9f3bf5386ce2878ca02a934a39506fa0bb4970",
+    "narrative": "31c3dda28db03f3709b999a78f4680741e0524e6dec809a7b6eaa1317cfba8e6"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 4,
+  "artifactRoot": ".agents/kyro/scopes",
+  "scopes": [
+    {
+      "id": "append-only-scope-remediation",
+      "title": "Append-only scope remediation and recertification",
+      "status": "completed"
+    },
+    {
+      "id": "canonical-debt-contract-and-legacy-remediation",
+      "title": "Canonical Debt Contract and Legacy Remediation",
+      "status": "completed"
+    },
+    {
+      "id": "integrity-recovery",
+      "title": "Integrity recovery without a new public surface",
+      "status": "completed"
+    },
+    {
+      "id": "remediation-protocol-hardening",
+      "title": "Remediation protocol hardening",
+      "status": "completed"
+    },
+    {
+      "id": "scoped-integrity-preflight",
+      "title": "Scoped integrity preflight and trace relocation",
+      "status": "completed"
+    },
+    {
+      "id": "scope-candidate-discovery",
+      "title": "Scope identity from evidence, not from a directory existing",
+      "status": "completed"
+    },
+    {
+      "id": "managed-checkpoint-path-safety",
+      "title": "Managed checkpoint path safety",
+      "status": "completed"
+    },
+    {
+      "id": "adaptive-sprint-lifecycle",
+      "title": "Adaptive sprint lifecycle",
+      "status": "planning"
+    }
+  ],
+  "conventions": [
+    {
+      "id": "process-1",
+      "rule": "A post-close live-state transition is valid only if it replays exactly from the checkpoint after-image through the same builders the writer uses; lifecycle records are evidence, never authority.",
+      "tags": [
+        "process"
+      ],
+      "addedSprint": 2
+    }
+  ]
+}

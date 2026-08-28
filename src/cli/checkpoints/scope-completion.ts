@@ -4,12 +4,18 @@ import { asSprintFile } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
 import { readProjectState, updateProjectStateLayersUnlocked } from '../state';
 import { withStateWriterLock } from '../pipeline/state-writer-lock';
-import { completedScopeEntry, completedSprintState } from './lifecycle-state';
+import {
+  SCOPE_COMPLETION_KIND,
+  SCOPE_COMPLETION_SCHEMA_VERSION,
+  completedScopeEntry,
+  completedSprintState,
+  completionRegistryEntryDigest,
+  scopeCompletionRequestDigest,
+} from './lifecycle-state';
 import type { KyroProjectState, KyroScopeEntry, ScopeCompletion, SprintFile } from '../types';
-import { atomicReplace, canonicalJson, sha256 } from './sprint-close';
+import { atomicReplace, canonicalJson } from './sprint-close';
 
-export const SCOPE_COMPLETION_KIND = 'scope-completion' as const;
-export const SCOPE_COMPLETION_SCHEMA_VERSION = 1 as const;
+export { SCOPE_COMPLETION_KIND, SCOPE_COMPLETION_SCHEMA_VERSION };
 
 export interface ScopeCompletionRequest {
   scope: string;
@@ -46,25 +52,6 @@ function normalizeCompletionSummary(raw: string | null | undefined): string | nu
   if (raw == null) return null;
   const trimmed = raw.trim();
   return trimmed === '' ? null : trimmed;
-}
-
-function scopeCompletionRequestDigest(scope: string, normalizedSummary: string | null): string {
-  return sha256({
-    kind: SCOPE_COMPLETION_KIND,
-    schemaVersion: SCOPE_COMPLETION_SCHEMA_VERSION,
-    part: 'request',
-    scope,
-    summary: normalizedSummary,
-  });
-}
-
-function scopeRegistryEntryDigest(entry: KyroScopeEntry): string {
-  return sha256({
-    kind: SCOPE_COMPLETION_KIND,
-    schemaVersion: SCOPE_COMPLETION_SCHEMA_VERSION,
-    part: 'registryEntry',
-    entry,
-  });
 }
 
 function readValidSprint(scope: string): SprintFile {
@@ -163,7 +150,7 @@ export function applyScopeCompletion(
       }
       const beforeEntryDigest = sprint.completion!.beforeEntryDigest;
       assertAuthorizedSprintAfterState(request.scope, sprint, requestDigest);
-      if (!beforeEntryDigest || scopeRegistryEntryDigest(entry) !== beforeEntryDigest) {
+      if (!beforeEntryDigest || completionRegistryEntryDigest(entry) !== beforeEntryDigest) {
         throw diverged('the project registry entry differs from the state recorded when sprint.json was completed; cannot resume safely');
       }
       const nextEntry: KyroScopeEntry = completedScopeEntry(entry, sprint.completion!);
@@ -184,7 +171,7 @@ export function applyScopeCompletion(
     // Fresh scenario: re-run real preconditions now, under the lock, against state read this instant.
     assertHealthy(request.scope);
 
-    const beforeEntryDigest = scopeRegistryEntryDigest(entry);
+    const beforeEntryDigest = completionRegistryEntryDigest(entry);
     const completedAt = new Date().toISOString();
     const completion: ScopeCompletion = {
       completedAt,

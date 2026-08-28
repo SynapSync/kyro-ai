@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 4,
+  "scope": "scope-candidate-discovery",
+  "title": "Scope identity from evidence, not from a directory existing",
+  "status": "completed",
+  "objective": "Stop an arbitrary directory under scopes/ from becoming a scope, without hiding a scope that lost its sprint.json but can still be recovered.",
+  "successCriteria": [
+    "A directory with no Kyro artifacts never blocks integrity, never resolves as a scope, and is never registered.",
+    "A scope that lost sprint.json but keeps a usable close checkpoint stays visible and is reported as recoverable.",
+    "Kyro artifacts without a usable recovery path are reported as damaged without promising a resume.",
+    "A registry entry pointing at a foreign directory can be cleaned without touching a byte of that directory.",
+    "An explicit --kyro-scope naming a foreign directory fails as a wrong name, not as a damaged scope."
+  ],
+  "spec": {
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "Directory classification must be derived from evidence on disk and crossed with registry membership, not inferred from the directory existing.",
+        "priority": "must",
+        "rationale": "Treating every directory as a scope made a stray folder a hard integrity blocker across the whole project."
+      },
+      {
+        "id": "R2",
+        "statement": "A directory holding no recognizable Kyro artifacts must be ignored by discovery, resolution and integrity, and surfaced only as non-blocking advice.",
+        "priority": "must",
+        "rationale": "Silence would leave the user unable to learn why their folder never appears as a scope."
+      },
+      {
+        "id": "R3",
+        "statement": "A scope that lost sprint.json but retains at least one usable close checkpoint must remain discoverable and be reported as recoverable.",
+        "priority": "must",
+        "rationale": "Refusing to call it a scope would hide exactly the case recover mode exists to rescue."
+      },
+      {
+        "id": "R4",
+        "statement": "Kyro artifacts without a usable close checkpoint must be reported as damaged, never as recoverable.",
+        "priority": "must",
+        "rationale": "A remediation record or a corrupt checkpoint is evidence of ownership, not a recovery path; promising a resume that cannot happen is worse than reporting damage."
+      },
+      {
+        "id": "R5",
+        "statement": "Only directories Kyro can describe truthfully may be written into the project registry.",
+        "priority": "must",
+        "rationale": "Rehydrate invented a planning status for unreadable directories, turning a filesystem accident into persisted project state."
+      },
+      {
+        "id": "R6",
+        "statement": "A registry entry whose directory is foreign must be cleanable, removing only the entry and preserving the directory byte for byte.",
+        "priority": "must",
+        "rationale": "Unregister refused whenever the path existed, so installs already contaminated by an earlier rehydrate had no repair path at all."
+      },
+      {
+        "id": "R7",
+        "statement": "An explicit scope argument naming a foreign directory must fail as a missing scope on every entry point that accepts one.",
+        "priority": "must",
+        "rationale": "An explicit flag must not be a way around discovery, and a wrong name is not an integrity problem."
+      },
+      {
+        "id": "R8",
+        "statement": "A registered scope whose sprint.json is invalid must classify as corrupt.",
+        "priority": "must",
+        "rationale": "Identity derivation returned null and nothing checked, so a corrupt registered scope was reported as healthy."
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "S1",
+        "requirement": "R2",
+        "given": "a directory under scopes/ holding only unrelated files",
+        "when": "integrity prepare, scope list and doctor run",
+        "then": "nothing blocks, the directory is absent from the scope list, and only a global doctor reports it as a warning"
+      },
+      {
+        "id": "S2",
+        "requirement": "R5",
+        "given": "a workspace containing a foreign directory under scopes/",
+        "when": "install or sync rehydrates the registry",
+        "then": "project.json does not contain an entry for it"
+      },
+      {
+        "id": "S3",
+        "requirement": "R3",
+        "given": "a scope whose sprint.json was removed but whose archive keeps a checkpoint naming that scope",
+        "when": "integrity prepare runs",
+        "then": "it is reported as recoverable-no-sprint and remains visible to doctor --artifacts"
+      },
+      {
+        "id": "S4",
+        "requirement": "R4",
+        "given": "a directory with Kyro artifacts whose only checkpoint is unreadable",
+        "when": "integrity prepare runs",
+        "then": "it is reported as owned-damaged and never as recoverable"
+      },
+      {
+        "id": "S5",
+        "requirement": "R6",
+        "given": "a registry entry written by an earlier rehydrate whose directory is foreign",
+        "when": "integrity prepare and apply run",
+        "then": "the entry is removed and the directory is byte-identical afterwards"
+      },
+      {
+        "id": "S6",
+        "requirement": "R7",
+        "given": "an explicit scope argument naming a foreign directory",
+        "when": "status, context-pack, integrity prepare or doctor --artifacts run",
+        "then": "each fails with SCOPE_NOT_FOUND rather than an integrity classification"
+      },
+      {
+        "id": "S7",
+        "requirement": "R1",
+        "given": "a leftover directory containing only a legacy trace folder",
+        "when": "scope discovery runs after the special case is deleted",
+        "then": "it is still never treated as a scope"
+      },
+      {
+        "id": "S8",
+        "requirement": "R8",
+        "given": "a scope registered in project.json whose sprint.json is invalid",
+        "when": "registry classification runs",
+        "then": "it classifies as corrupt rather than present-and-registered"
+      }
+    ],
+    "nonGoals": [
+      "Reconstructing sprint.json from a checkpoint after-image; this scope diagnoses, it does not repair.",
+      "Adding states to the scope entry status vocabulary, which would force a schema migration.",
+      "Adding a public command.",
+      "Changing the 4.47.1 release or its scopes.",
+      "Provenance for maker/checker approvals, tracked separately."
+    ],
+    "openQuestions": []
+  },
+  "clarifications": [],
+  "conventions": [
+    {
+      "id": "architecture-1",
+      "rule": "Identity comes from evidence on disk, never from a path existing. A namespace directory anyone can create must not confer meaning.",
+      "tags": [
+        "architecture"
+      ],
+      "addedSprint": 1
+    },
+    {
+      "id": "architecture-2",
+      "rule": "Finding artifacts proves ownership, not recoverability. Never report a repair path the tool cannot actually execute.",
+      "tags": [
+        "architecture"
+      ],
+      "addedSprint": 1
+    },
+    {
+      "id": "architecture-3",
+      "rule": "Any rule that narrows what the tool accepts must ship with the repair path for state the old rule already wrote.",
+      "tags": [
+        "architecture"
+      ],
+      "addedSprint": 1
+    }
+  ],
+  "adrs": [],
+  "roadmap": {
+    "plannedSprintCount": 1,
+    "sizingRationale": "One sprint: a single classification primitive plus the consumers that must respect it, all provable through the existing blast-radius gate.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "evidence-based-scope-classification",
+        "title": "Evidence-based scope classification",
+        "state": "closed"
+      }
+    ]
+  },
+  "ledger": [
+    {
+      "n": 1,
+      "slug": "evidence-based-scope-classification",
+      "outcome": "shipped",
+      "closedAt": "2026-08-16",
+      "archive": "archive/sprint-001-evidence-based-scope-classification.md",
+      "snapshot": "archive/sprint-001-evidence-based-scope-classification.json",
+      "checkpoint": "archive/sprint-001-evidence-based-scope-classification.checkpoint.json",
+      "recommendations": [
+        "Move the Unreleased entry into a version before publishing; 4.47.1 is already on npm.",
+        "Consider promoting the evidence-over-path rule to a global convention with kyro rule add --global.",
+        "Next line: honest provenance for maker/checker and approvals, then startup consolidation."
+      ],
+      "checkpointSha256": "e3c42ec55caba593e9b648d0bf14cc3df7a7e75f4bdf65cabce1c5844e567742"
+    }
+  ],
+  "previousSprint": {
+    "n": 1,
+    "slug": "evidence-based-scope-classification",
+    "outcome": "shipped",
+    "summary": "Scope identity derived from evidence, with the contamination repair path it required."
+  },
+  "activeSprint": null,
+  "debt": [],
+  "handoff": {
+    "nextAction": "done",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "Follow-up to scoped-integrity-preflight. Diagnoses recoverable scopes; does not reconstruct sprint.json. CHANGELOG entry sits under Unreleased; no release decision taken.",
+    "lastUpdated": "2026-08-16"
+  },
+  "author": {
+    "name": "Roimer Peraza",
+    "email": "joisephdev@gmail.com",
+    "source": "git",
+    "capturedAt": "2026-08-16T20:35:12.333Z"
+  }
+}

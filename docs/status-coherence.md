@@ -48,8 +48,22 @@ scope is never offered it.
 Because completion and reopen legitimately move live state off the close checkpoint's after-image,
 `kyro doctor --artifacts` replays the recorded transitions from that image through the same builders
 the writers use (`src/cli/checkpoints/lifecycle-state.ts`) and accepts live state only when the
-replay reproduces it exactly. Records are evidence, never authority: a rewritten lifecycle record, a
-hand-edited field, or a corrupt immutable artifact still fails closed as `DIVERGED`.
+replay reproduces it exactly. Records are evidence, never authority: a rewritten lifecycle record,
+an inconsistent hand edit, or a corrupt immutable artifact still fails closed as `DIVERGED`.
+
+Only the suffix a checkpoint has not already sealed is replayed, and only when its public structural
+bindings re-derive from its content and prior registry state. Missing, stale, or partially rewritten
+bindings fail closed; sprint and registry receive one atomic verdict. These hashes establish
+consistency, not provenance: an editor controlling both layers can recompute them. `by` is
+self-asserted, and no separation between the agent that completed a scope and the one that verified
+it is enforced here. See
+[CLI](cli.md#explicit-scope-completion-and-reopen-kyro-scope-complete--kyro-scope-reopen).
+
+A lifecycle transition that replays cleanly reports `historical` with the detail *"live business
+state is structurally replayed from the checkpoint by explicit lifecycle transitions; actor identity
+unverified"*, distinguishing it from live state that never moved. It stays `historical` rather than
+gaining a state of its own because the lattice measures unexplained state divergence, not actor
+authentication. The detail carries the assurance boundary; the ordering does not change.
 
 ## Who maintains it
 
