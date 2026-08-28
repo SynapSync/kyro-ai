@@ -18,6 +18,8 @@ kyro capabilities       # List supported tool-owned verbs + version (runtime han
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
 kyro scope set-active <scope> --yes  # Change active scope with guardrail confirmation
+kyro scope complete --kyro-scope <scope> [--summary "..."] --yes  # Explicit scope completion
+kyro scope reopen --kyro-scope <scope> --reason "..." --yes       # Return a completed scope to planning
 kyro scope retire --kyro-scope <scope> --reason "..."  # Read-only retirement preparation
 kyro repair integrity prepare --json                   # Read-only integrity diagnosis
 kyro repair integrity apply --digest <sha256> --yes    # Digest-bound integrity apply
@@ -436,7 +438,7 @@ Trace files are audit data only. They are never read for routing or workflow dec
 
 ## Portable guardrails
 
-Kyro evaluates dangerous operations through a shared policy core. `scope set-active` requires `--yes`. `scope retire` is stricter: preparation is read-only, then apply requires the reviewed state-bound digest plus `--yes`; stale state returns `DIVERGED`, and missing confirmation returns `HUMAN_APPROVAL_REQUIRED`. MCP mutating tools use their existing two-phase `confirm: true` protocol. Use `kyro doctor --adapters` to see whether each adapter is `enforced` or `advisory` for guarded operations. See [guardrails.md](guardrails.md).
+Kyro evaluates dangerous operations through a shared policy core. `scope set-active`, `scope complete` and `scope reopen` require `--yes`. `scope retire` is stricter: preparation is read-only, then apply requires the reviewed state-bound digest plus `--yes`; stale state returns `DIVERGED`, and missing confirmation returns `HUMAN_APPROVAL_REQUIRED`. MCP mutating tools use their existing two-phase `confirm: true` protocol. Use `kyro doctor --adapters` to see whether each adapter is `enforced` or `advisory` for guarded operations. See [guardrails.md](guardrails.md).
 
 ## Maker/checker review
 
@@ -451,6 +453,40 @@ Close requires every unfinished task to have a typed `task.disposition`. The per
 `kyro capabilities [--json]` lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start: a missing verb — or an `UNKNOWN_COMMAND` failure on the command itself — means the installed runtime predates the skill assets and the forge must abort with an upgrade request instead of improvising hand-edits. `kyro doctor` probes the installed runtime with the same handshake (`CLI capabilities` check).
 
 The payload covers the sprint-lifecycle verbs plus the tool-owned state writers agents reach for (`clarify`, `scenario`, `adr`, `scope`, `status`). It excludes operator surface (`install`, `sync`, `uninstall`, `detect`, `eval`, `tui`, `mcp`, `trace`) and `capabilities` itself — the handshake cannot verify itself, since its absence is the staleness signal. `npm run check:capabilities` enforces both directions: every `{{KYRO_CLI}} <verb>` the shipped assets invoke must be advertised, and every advertised verb must be dispatchable.
+
+## Explicit scope completion and reopen (`kyro scope complete` / `kyro scope reopen`)
+
+A roadmap is an estimate, so closing its last sprint never completes a scope: a scope stays open for
+planning until someone says otherwise. Completion is that explicit statement, and it is not
+retirement — the scope stays in the work lifecycle and can be reopened later.
+
+```bash
+kyro scope complete --kyro-scope billing-api --summary "Objective met; nothing outstanding." --yes
+kyro scope reopen   --kyro-scope billing-api --reason "Rounding regression found in production." --yes
+```
+
+Both are single locked transactions over `sprint.json` and the project registry, bound to a request
+digest, idempotent and resumable (an identical retry after an interrupted apply finishes the
+registry write instead of rewriting anything). Neither reads or rewrites `archive/`. Drop `--yes` to
+see the plan and fail closed with `CONFIRMATION_REQUIRED`, or pass `--dry-run` to preview only.
+
+`complete` refuses an active sprint, open debt, a done task without a pass verdict, blocking analyze
+findings, and artifact divergence (`NOT_READY_TO_COMPLETE`, `BLOCKING_FINDINGS`, `DIVERGED`), then
+records `completion` plus `status: completed` and `handoff.nextAction: done`.
+
+`reopen` requires a non-empty `--reason`, refuses retired (`SCOPE_RETIRED`), already-open and
+never-completed scopes (`SCOPE_ALREADY_OPEN`) and malformed state — each without writing. It clears
+the live `completion`, appends it to append-only `completionHistory` together with the reason, and
+returns the scope to `status: planning` / `handoff.nextAction: plan_sprint`, so the next sprint is
+planned through the ordinary `kyro plan` route with no recovery or hand-edit. Completion history is
+never pruned: `kyro scope inspect` prints it and `kyro context-pack` exposes it as `reopenHistory`.
+
+Because both transitions move live state off the close checkpoint's after-image, `kyro doctor
+--artifacts` does not trust the records it finds. It replays the recorded transitions from the
+after-image through the same builders the writers use and accepts the live state only if the replay
+reproduces it exactly — reported as `sprint=after (explicit lifecycle transition)`. Any edit a
+lifecycle transition could not have produced, and any corrupt immutable artifact, still fails closed
+as `DIVERGED`.
 
 ## Human-gated scope retirement (`kyro scope retire`)
 

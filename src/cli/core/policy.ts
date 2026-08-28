@@ -3,7 +3,7 @@ import { KYRO_PROJECT_ROOT } from '../constants';
 import type { GuardContext, GuardDecision, GuardLevel, GuardedOperation, MakerCheckerPolicy, PolicyDefinition, PolicyIssue } from '../types';
 
 export const POLICY_PATH = `${KYRO_PROJECT_ROOT}/policy.json`;
-export const GUARDED_OPERATIONS: readonly GuardedOperation[] = ['close_sprint', 'repair_scope', 'scope_set_active', 'scope_retire', 'scope_complete', 'clear_active_sprint', 'delete_archive', 'review_task'];
+export const GUARDED_OPERATIONS: readonly GuardedOperation[] = ['close_sprint', 'repair_scope', 'scope_set_active', 'scope_retire', 'scope_complete', 'scope_reopen', 'clear_active_sprint', 'delete_archive', 'review_task'];
 export const GUARD_LEVELS: readonly GuardLevel[] = ['tool_owned', 'confirm', 'blocked'];
 
 export const DEFAULT_POLICY: PolicyDefinition = {
@@ -14,6 +14,7 @@ export const DEFAULT_POLICY: PolicyDefinition = {
     scope_set_active: { level: 'confirm' },
     scope_retire: { level: 'confirm' },
     scope_complete: { level: 'confirm' },
+    scope_reopen: { level: 'confirm' },
     clear_active_sprint: { level: 'blocked' },
     delete_archive: { level: 'blocked' },
     review_task: { level: 'tool_owned' },

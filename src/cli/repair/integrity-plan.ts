@@ -6,6 +6,7 @@ import { archiveDir } from '../artifacts/paths';
 import { listScopeFolders, readScopeSprint } from '../artifacts/scopes';
 import { assertNotForeignDirectory } from '../core/scope-resolution';
 import { CHECKPOINT_DISCOVERY_STATUS, surveyScopeCheckpoints } from '../checkpoints/discovery';
+import { replayScopeLifecycle } from '../checkpoints/lifecycle-state';
 import { canonicalJson, sha256 } from '../checkpoints/sprint-close';
 import { rebuildCanonicalCheckpointFromDisk } from '../checkpoints/canonicalize';
 import { EFFECTIVE_CHECKPOINT_STATUS, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
@@ -332,6 +333,31 @@ export function prepareIntegrityPlan(options: {
     const physicalAfter = physicalRead.exists && !physicalRead.error
       ? (physicalRead.value as { intendedAfterClose?: SprintFile }).intendedAfterClose
       : null;
+    // Lifecycle records are not authority by themselves. Completion/reopen is lawful only when
+    // replaying its records through the shared writer builders reproduces *both* durable layers.
+    // Without this check Integrity could claim a forged lifecycle edit was clean simply because
+    // it has no conventional live-evolution operation to propose.
+    if (hasLifecycleEvidence(live)) {
+      const lifecycleBase = physicalAfter ?? after;
+      const lifecycleReplay = replayScopeLifecycle(lifecycleBase, live);
+      const lifecycleEntryBase = resolved.checkpoint?.projectScopeAfter ?? rebuilt?.projection.projectScopeAfter;
+      const liveEntry = readProjectState()?.scopes.find((entry) => entry.id === scope);
+      const lifecycleMatches = lifecycleReplay !== null
+        && sha256(lifecycleReplay.sprint) === sha256(live)
+        && lifecycleEntryBase !== undefined
+        && liveEntry !== undefined
+        && sha256(lifecycleReplay.entryOf(lifecycleEntryBase)) === sha256(liveEntry);
+      if (!lifecycleMatches) {
+        const blocker: IntegrityFinding = {
+          class: 'blocker',
+          code: 'diverged',
+          summary: `${scope}: completion/reopen records do not exactly replay from the close checkpoint into sprint and registry state`,
+        };
+        blockers.push(blocker);
+        findings.push(blocker);
+        continue;
+      }
+    }
     const replay = resolveRemediationReplayState(scope, physicalAfter ?? after);
     if (replay.kind === 'broken') {
       const blocker: IntegrityFinding = {
@@ -603,6 +629,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+function hasLifecycleEvidence(sprint: SprintFile): boolean {
+  return sprint.completion !== undefined || (sprint.completionHistory?.length ?? 0) > 0;
 }
 
 function planLiveEvolution(scope: string, live: SprintFile, after: SprintFile, options: { includeReanchor: boolean }): IntegrityOperation[] {

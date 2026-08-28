@@ -34,6 +34,7 @@ import {
 } from '../checkpoints/discovery';
 import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
 import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase } from '../remediation/plan';
+import { replayScopeLifecycle } from '../checkpoints/lifecycle-state';
 import { inspectScopeRetirement, retirementCheckpointIsApplied } from '../checkpoints/scope-retirement';
 import {
   formatBootstrapRemedy,
@@ -411,6 +412,18 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   // two narrow allowances keep an audited correction from reading as tampering. Neither may ever be
   // reachable by drift that Kyro did not itself produce.
   let remediationLabel: string | null = null;
+  // An explicit `scope complete` / `scope reopen` also moves live state off the after-image. Neither
+  // is trusted on the strength of its own record: the recorded transitions are replayed from the
+  // after-image through the same builders the writers use, and only an exact reproduction of the
+  // live state counts. Anything a lifecycle transition could not have produced still diverges.
+  const lifecycleReplay = sprintPosition === 'other'
+    ? replayScopeLifecycle(canonicalized ? asRecord(read.value)?.intendedAfterClose : checkpoint.intendedAfterClose, sprintRead.value)
+    : null;
+  let lifecycleLabel: string | null = null;
+  if (lifecycleReplay && sha256(lifecycleReplay.sprint) === sprintDigest) {
+    sprintPosition = 'after';
+    lifecycleLabel = 'after (explicit lifecycle transition)';
+  }
   if (sprintPosition === 'other') {
     // 1. Anchor-only difference: the business state (remediations[] excluded) still matches an image
     //    of the checkpoint. Trusts nothing about the chain — the states are simply identical.
@@ -436,6 +449,10 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
     }
   }
   let scopePosition = digestPosition(projectDigest, checkpoint.digests.projectScopeBefore, checkpoint.digests.projectScopeAfter);
+  if (scopePosition === 'other' && lifecycleLabel && projectEntry) {
+    const replayedEntry = lifecycleReplay?.entryOf(checkpoint.projectScopeAfter ?? projectEntry);
+    if (replayedEntry && sha256(replayedEntry) === projectDigest) scopePosition = 'after';
+  }
   let legacyScopeNormalized = false;
   // Historical intermediate v1 residual: checkpoint stores projectScopeAfter.status=active while
   // the canonical live after-image (and repair) use planning. Treat exact normalized live match as after.
@@ -459,7 +476,7 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const scopeLabel = legacyScopeNormalized
     ? 'after (legacy v1 intermediate scope status active→planning)'
     : scopePosition;
-  const sprintLabel = remediationLabel ?? sprintPosition;
+  const sprintLabel = remediationLabel ?? lifecycleLabel ?? sprintPosition;
   return checkpointResult(scope, path, status, withHistoricalNote(`sprint=${sprintLabel}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`));
 }
 

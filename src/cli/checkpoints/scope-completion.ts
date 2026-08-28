@@ -4,6 +4,7 @@ import { asSprintFile } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
 import { readProjectState, updateProjectStateLayersUnlocked } from '../state';
 import { withStateWriterLock } from '../pipeline/state-writer-lock';
+import { completedScopeEntry, completedSprintState } from './lifecycle-state';
 import type { KyroProjectState, KyroScopeEntry, ScopeCompletion, SprintFile } from '../types';
 import { atomicReplace, canonicalJson, sha256 } from './sprint-close';
 
@@ -165,7 +166,7 @@ export function applyScopeCompletion(
       if (!beforeEntryDigest || scopeRegistryEntryDigest(entry) !== beforeEntryDigest) {
         throw diverged('the project registry entry differs from the state recorded when sprint.json was completed; cannot resume safely');
       }
-      const nextEntry: KyroScopeEntry = { ...entry, status: 'completed', completion: sprint.completion! };
+      const nextEntry: KyroScopeEntry = completedScopeEntry(entry, sprint.completion!);
       updateProjectStateLayersUnlocked({ scopes: project.scopes.map((candidate) => candidate.id === request.scope ? nextEntry : candidate) });
       failAfter('registry');
       verifyApplied(request.scope, requestDigest);
@@ -192,22 +193,10 @@ export function applyScopeCompletion(
       requestDigest,
       beforeEntryDigest,
     };
-    const nextSprint: SprintFile = {
-      ...sprint,
-      status: 'completed',
-      completion,
-      handoff: {
-        ...sprint.handoff,
-        nextAction: 'done',
-        nextTaskId: null,
-        blockers: [],
-        note: normalizedSummary ? `Scope explicitly completed: ${normalizedSummary}` : 'Scope explicitly completed.',
-        lastUpdated: completedAt.slice(0, 10),
-      },
-    };
+    const nextSprint: SprintFile = completedSprintState(sprint, completion);
     atomicReplace(sprintJsonPath(request.scope), `${JSON.stringify(nextSprint, null, 2)}\n`);
     failAfter('sprint');
-    const nextEntry: KyroScopeEntry = { ...entry, status: 'completed', completion };
+    const nextEntry: KyroScopeEntry = completedScopeEntry(entry, completion);
     updateProjectStateLayersUnlocked({ scopes: project.scopes.map((candidate) => candidate.id === request.scope ? nextEntry : candidate) });
     failAfter('registry');
     verifyApplied(request.scope, requestDigest);

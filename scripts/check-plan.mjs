@@ -799,4 +799,44 @@ function initScope(root, scope = 'demo-scope') {
   }
 }
 
+// 15) S7 — an explicitly completed scope cannot be planned into silently. Planning refuses it
+//     without writing and the remedy names the lawful route (reopen), so completion can never be
+//     bypassed by simply supplying a later plan.
+{
+  const root = sandbox();
+  try {
+    const leanPath = writeLeanPlan(root, validLeanPlan());
+    assert(run(['plan', '--from', leanPath], root).status === 0, 'init should succeed');
+
+    // Mark the scope explicitly completed exactly as `kyro scope complete` does.
+    const sprint = readSprint(root, 'demo-scope');
+    sprint.status = 'completed';
+    sprint.completion = { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker', summary: 'Initial goal met.' };
+    sprint.handoff = { nextAction: 'done', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-02' };
+    writeFileSync(sprintPath(root, 'demo-scope'), `${JSON.stringify(sprint, null, 2)}\n`);
+    const before = readFileSync(sprintPath(root, 'demo-scope'), 'utf-8');
+
+    const sprintLean = writeLeanSprintPlan(root, validLeanSprintPlan());
+    const refused = run(['plan', '--from', sprintLean, '--kyro-scope', 'demo-scope'], root);
+    const text = `${refused.stdout}${refused.stderr}`;
+    assert(refused.status !== 0, `planning a completed scope must fail: ${text}`);
+    assert(text.includes('NOT_READY_TO_PLAN'), `expected NOT_READY_TO_PLAN, got: ${text}`);
+    assert(text.includes('scope reopen'), `the remedy must name the lawful reopen route, got: ${text}`);
+    assert(readFileSync(sprintPath(root, 'demo-scope'), 'utf-8') === before, 'a refused plan must not write');
+
+    // A retired scope is terminal: the remedy must never offer reopen for it.
+    const retiredSprint = JSON.parse(before);
+    delete retiredSprint.completion;
+    retiredSprint.status = 'retired';
+    retiredSprint.retirement = { reason: 'Superseded.', retiredAt: '2026-07-02T00:00:00.000Z', planDigest: 'a'.repeat(64) };
+    writeFileSync(sprintPath(root, 'demo-scope'), `${JSON.stringify(retiredSprint, null, 2)}\n`);
+    const retiredResult = run(['plan', '--from', sprintLean, '--kyro-scope', 'demo-scope'], root);
+    const retiredText = `${retiredResult.stdout}${retiredResult.stderr}`;
+    assert(retiredResult.status !== 0, `planning a retired scope must fail: ${retiredText}`);
+    assert(!retiredText.includes('scope reopen'), `a retired scope must never be offered reopen: ${retiredText}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 console.log('check:plan — tool-owned scope bootstrap (init) and sprint materialization (sprint) verified end-to-end');

@@ -38,6 +38,10 @@ export function deriveActiveSprintStatus(active: ActiveSprint): DerivedSprintSta
  * `handoff.nextAction === 'done'` (legacy terminal read) → completed; else planning. Roadmap
  * exhaustion is not completion, and a plain `done` handoff without an explicit record remains
  * readable as completed for historical compatibility.
+ *
+ * A reopened scope reads as open again — `kyro scope reopen` clears `completion` and hands off to
+ * `plan_sprint` — while `completionHistory` keeps the superseded completions. History is audit
+ * evidence, never a status signal, so it deliberately takes no part in this derivation.
  */
 export function deriveScopeStatus(sprint: SprintFile, hasActiveSprint: boolean): KyroScopeStatus {
   if (sprint.retirement) return 'retired';

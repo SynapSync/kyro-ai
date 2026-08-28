@@ -110,6 +110,11 @@ function run(root, extra = []) {
     assert(closed.status === 'planning', `scope must remain planning after partial final close, got ${closed.status}`);
     assert(closed.activeSprint === null, 'activeSprint must be cleared by close');
     assert(closed.ledger.length === 1 && closed.ledger[0].outcome === 'partial', 'ledger must record the partial outcome');
+    // Completion is an explicit, separately confirmed lifecycle decision: close must never infer or
+    // mint one, and it must never fabricate reopen history for a scope that was never completed.
+    assert(closed.completion === undefined, 'close must never mint an explicit completion record');
+    assert(closed.completionHistory === undefined, 'close must never write completion history');
+    assert(closed.retirement === undefined, 'close must never mint retirement metadata');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

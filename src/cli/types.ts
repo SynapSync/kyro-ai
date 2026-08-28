@@ -33,6 +33,8 @@ export interface KyroScopeEntry {
   retirement?: ScopeRetirement;
   /** Tool-owned explicit completion metadata. Distinct from retirement and mutually exclusive with it. */
   completion?: ScopeCompletion;
+  /** Append-only record of completions that were explicitly reopened. Never rewritten or pruned. */
+  completionHistory?: ScopeReopenRecord[];
 }
 
 /** Human-authorized, state-bound reason a scope left the active work lifecycle. */
@@ -58,6 +60,32 @@ export interface ScopeCompletion {
    * sha256 of the registry KyroScopeEntry exactly as it stood immediately before this completion was
    * applied. Present iff requestDigest is present; lets an interrupted apply resume by writing only
    * the registry once it verifies the registry hasn't drifted since sprint.json was completed.
+   */
+  beforeEntryDigest?: string;
+}
+
+/**
+ * Append-only evidence that a completed, non-retired scope was explicitly reopened for later work.
+ * Reopening clears the live `completion` (the scope is no longer complete) but never erases it: the
+ * superseded record is preserved here with the reason it was reopened. Reopen is not a retirement
+ * reversal — a retired scope is terminal and this path never applies to it.
+ */
+export interface ScopeReopenRecord {
+  reopenedAt: string;
+  by: string;
+  reason: string;
+  /** The completion record this reopen superseded, preserved verbatim. */
+  completion: ScopeCompletion;
+  /**
+   * sha256({kind:'scope-reopen', schemaVersion, part:'request', scope, reason, completion}). Binds the
+   * reopen to the exact completion it reverses, so a retry is idempotent and a later, different
+   * reopen can never be mistaken for this one.
+   */
+  requestDigest?: string;
+  /**
+   * sha256 of the registry KyroScopeEntry exactly as it stood immediately before this reopen was
+   * applied. Present iff requestDigest is present; lets an interrupted apply resume by writing only
+   * the registry once it verifies the registry has not drifted since sprint.json was reopened.
    */
   beforeEntryDigest?: string;
 }
@@ -683,6 +711,11 @@ export interface SprintFile {
   retirement?: ScopeRetirement;
   /** Present only after `kyro scope complete` records an explicit, confirmed completion. Distinct from retirement. */
   completion?: ScopeCompletion;
+  /**
+   * Append-only history of completions superseded by `kyro scope reopen`. Absent on scopes that were
+   * never reopened. Completion history is preserved for audit even while the scope is open again.
+   */
+  completionHistory?: ScopeReopenRecord[];
   handoff: Handoff;
 }
 
@@ -754,7 +787,7 @@ export interface OperationPlan {
 
 // --- portable guardrail policy ---
 
-export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'scope_retire' | 'scope_complete' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
+export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'scope_retire' | 'scope_complete' | 'scope_reopen' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
 export type GuardLevel = 'tool_owned' | 'confirm' | 'blocked';
 export type GuardDecisionKind = 'allow' | 'confirmation_required' | 'blocked';
 export type EnforcementTier = 'enforced' | 'advisory';
@@ -889,6 +922,13 @@ export interface ContextPackCliRecipe {
   command: string;
 }
 
+/** Compact reopen evidence for the pack: enough to see the scope was completed and why it reopened. */
+export interface ContextPackReopen {
+  reopenedAt: string;
+  completedAt: string;
+  reason: string;
+}
+
 export interface ContextPackOutput {
   schemaVersion: 4;
   packMode: ContextPackMode;
@@ -897,6 +937,10 @@ export interface ContextPackOutput {
   status: string | null;
   objective: string | null;
   retirement: ScopeRetirement | null;
+  /** Live explicit completion, if the scope is currently completed. Never implied by roadmap state. */
+  completion: ScopeCompletion | null;
+  /** Compact, append-only record of completions that were reopened. Empty on scopes never reopened. */
+  reopenHistory: ContextPackReopen[];
   nextAction: string | null;
   nextTaskId: string | null;
   activeSprintSlug: string | null;

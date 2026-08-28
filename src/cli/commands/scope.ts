@@ -21,6 +21,12 @@ import {
   type ScopeRetirementRequest,
 } from '../checkpoints/scope-retirement';
 import {
+  applyScopeReopen,
+  buildScopeReopenPreparation,
+  type ScopeReopenPreparation,
+  type ScopeReopenRequest,
+} from '../checkpoints/scope-reopen';
+import {
   applyScopeCompletion,
   buildScopeCompletionPreparation,
   type ScopeCompletionPreparation,
@@ -73,6 +79,15 @@ export function runScopeCommand(args: string[]): void {
     runScopeComplete(parsed);
     return;
   }
+  if (subcommand === 'reopen') {
+    const parsed = parseReopenArgs(args.slice(1));
+    if (parsed.help) {
+      printScopeReopenHelp();
+      return;
+    }
+    runScopeReopen(parsed);
+    return;
+  }
   throw new KyroCoreError('UNKNOWN_SUBCOMMAND', `Unknown scope subcommand: ${subcommand}.`, 'Run kyro scope --help.');
 }
 
@@ -116,6 +131,7 @@ function printScopeSummary(scope: string): void {
     console.log(`Next action: ${sprint.handoff.nextAction}`);
     console.log(`Next task: ${sprint.handoff.nextTaskId ?? 'none'}`);
     console.log(`Open debt: ${sprint.debt.filter((d) => d.status === 'open' || d.status === 'in_progress').length}`);
+    printLifecycleHistory(sprint);
   } else {
     console.log('sprint.json: missing or invalid (run /kyro:forge INIT to create it)');
   }
@@ -399,12 +415,102 @@ sprints, open debt, pending review, blocking findings, and artifact divergence w
 Completion never creates a retirement checkpoint and never rewrites archive/.`);
 }
 
+interface ScopeReopenArgs {
+  scope: string;
+  reason: string;
+  yes: boolean;
+  dryRun: boolean;
+  help: boolean;
+}
+
+/**
+ * Explicit, tool-owned scope reopen (T2.3). The lawful route from an explicitly completed scope back
+ * into planning: it supersedes the live completion, preserves it in append-only history with the
+ * reason, and hands off to `plan_sprint` so a later sprint needs no recovery or manual state edit.
+ * Retirement stays terminal — this path refuses retired scopes and never touches archive/.
+ */
+function runScopeReopen(args: ScopeReopenArgs): void {
+  if (args.dryRun && args.yes) {
+    throw new KyroCoreError('INVALID_INPUT', '--dry-run and --yes are mutually exclusive.', 'Use --dry-run to preview, or --yes to confirm the write — not both.');
+  }
+  const request: ScopeReopenRequest = { scope: args.scope, reason: args.reason };
+  const preparation = buildScopeReopenPreparation(request);
+  printReopenPlan(preparation);
+  if (args.dryRun) {
+    console.log('Dry run complete. No files changed.');
+    return;
+  }
+  const guard = evaluateGuard('scope_reopen', { surface: 'cli', scope: args.scope, confirmed: args.yes });
+  if (guard.kind !== 'allow') {
+    emitBlockedReason(args.scope, guard.message, guard.code);
+    throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
+  }
+  emitGateApproved(args.scope, 'scope_reopen');
+  emitToolCommandRun(args.scope, 'cli', 'scope reopen', {});
+  const result = applyScopeReopen(request);
+  console.log(`\nScope "${args.scope}" reopened. nextAction=plan_sprint; resumed=${result.resumed}; completion history preserved.`);
+}
+
+function printReopenPlan(preparation: ScopeReopenPreparation): void {
+  console.log(`Scope reopen plan: ${preparation.request.scope}`);
+  console.log(`Current status: ${preparation.currentStatus}`);
+  console.log(`Reason: ${preparation.request.reason}`);
+  console.log(`Superseding completion from: ${preparation.supersededCompletion.completedAt}`);
+  console.log('Files affected:');
+  for (const file of preparation.affectedFiles) console.log(`- ${file}`);
+  console.log('Validations:');
+  for (const validation of preparation.validations) console.log(`- ${validation}`);
+  console.log(`Request digest: ${preparation.requestDigest}`);
+  console.log('\nReopen returns the scope to planning. It is NOT a retirement reversal and never rewrites archive/.');
+  if (preparation.state === 'already-applied') console.log('State: already applied; an identical apply is a safe no-op.');
+  else if (preparation.state === 'resumable') console.log('State: partially applied; an identical apply will resume and finish the registry update.');
+}
+
+/** Completion and reopen are lifecycle facts a reader must still see after the scope is open again. */
+function printLifecycleHistory(sprint: SprintFile): void {
+  if (sprint.completion) {
+    console.log(`Completed at: ${sprint.completion.completedAt}${sprint.completion.summary ? ` — ${sprint.completion.summary}` : ''}`);
+  }
+  for (const record of sprint.completionHistory ?? []) {
+    console.log(`Reopened at: ${record.reopenedAt} (completed ${record.completion.completedAt}) — ${record.reason}`);
+  }
+}
+
+function parseReopenArgs(args: string[]): ScopeReopenArgs {
+  let scope = '';
+  let reason = '';
+  let yes = false;
+  let dryRun = false;
+  let help = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--help' || arg === '-h') help = true;
+    else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
+    else if (arg === '--dry-run') dryRun = true;
+    else if (arg === '--kyro-scope') scope = requiredValue(args, ++index, arg);
+    else if (arg === '--reason') reason = requiredValue(args, ++index, arg);
+    else throw new KyroCoreError('INVALID_INPUT', `Unknown scope reopen option: ${arg}`, 'Run kyro scope reopen --help.');
+  }
+  if (!help && (!scope || !reason)) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope reopen --kyro-scope <scope> --reason <reason> [--yes].');
+  return { scope, reason, yes, dryRun, help };
+}
+
+function printScopeReopenHelp(): void {
+  console.log(`Usage:
+  kyro scope reopen --kyro-scope <scope> --reason <reason> [--yes]
+
+Returns an explicitly completed, non-retired scope to planning so a later sprint can be planned
+normally. The superseded completion is preserved in append-only history with this reason. Refuses
+retired, active, malformed, and already-open scopes without writing, and never rewrites archive/.`);
+}
+
 function printScopeHelp(): void {
   console.log(`Usage:
   kyro scope list
   kyro scope inspect <scope>
   kyro scope set-active <scope> --yes|--confirm
   kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes]
+  kyro scope reopen --kyro-scope <scope> --reason <reason> [--yes]
   kyro scope retire --kyro-scope <scope> --reason <reason> [--superseded-by <scope>]
 `);
 }

@@ -542,6 +542,7 @@ function cloneScopeEntry(entry: KyroScopeEntry): KyroScopeEntry {
     status: entry.status,
     ...(entry.retirement ? { retirement: { ...entry.retirement } } : {}),
     ...(entry.completion ? { completion: { ...entry.completion } } : {}),
+    ...(entry.completionHistory ? { completionHistory: entry.completionHistory.map((record) => ({ ...record, completion: { ...record.completion } })) } : {}),
   };
 }
 

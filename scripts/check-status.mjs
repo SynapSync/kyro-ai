@@ -406,6 +406,74 @@ function assertScopeCompletionModel() {
   assert(stateIssues.length === 0, `scope entry with completion must validate, got ${JSON.stringify(stateIssues)}`);
 }
 
+// 11. Explicit scope reopen model (T2.3): a reopened scope reads as open again while its superseded
+//     completions stay readable as append-only history; history is audit evidence, never a status
+//     signal, and malformed or reordered history is rejected without any write.
+function assertScopeReopenModel() {
+  const { deriveScopeStatus } = require(resolve(repo, 'dist/cli/core/status.js'));
+  const { validateSprintFile, validateProjectStateShape } = require(resolve(repo, 'dist/cli/artifacts/schema.js'));
+  const completion = { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker', summary: 'First pass done.' };
+  const record = { reopenedAt: '2026-07-03T00:00:00.000Z', by: 'maker', reason: 'A regression appeared.', completion };
+  const base = {
+    schemaVersion: 4,
+    scope: 'demo',
+    title: 'Demo',
+    status: 'planning',
+    objective: 'Demo objective',
+    successCriteria: ['Demo works.'],
+    clarifications: [],
+    conventions: [],
+    roadmap: { plannedSprintCount: 1, sizingRationale: 'x', sprints: [{ n: 1, slug: 's', title: 'S', state: 'closed' }] },
+    ledger: [],
+    previousSprint: null,
+    activeSprint: null,
+    debt: [],
+    completionHistory: [record],
+    handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: 'reopened', lastUpdated: '2026-07-03' },
+  };
+
+  // Reopened: open again for planning, never read as completed on the strength of its history.
+  const reopened = deriveScopeStatus(base, false);
+  assert(reopened === 'planning', `a reopened scope must derive planning, got ${reopened}`);
+  assert(validateSprintFile(base, 'demo/sprint.json').length === 0, 'a reopened scope with history must validate');
+
+  // History survives a later completion and stays independent of the live lifecycle state.
+  const completedAgain = {
+    ...base,
+    status: 'completed',
+    completion: { completedAt: '2026-07-05T00:00:00.000Z', by: 'maker' },
+    handoff: { nextAction: 'done', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-05' },
+  };
+  assert(deriveScopeStatus(completedAgain, false) === 'completed', 'a re-completed scope must derive completed');
+  assert(validateSprintFile(completedAgain, 'demo/sprint.json').length === 0, 'completion may coexist with history');
+
+  // Malformed, empty, and out-of-order history is rejected without any write.
+  const emptyHistory = validateSprintFile({ ...base, completionHistory: [] }, 'demo/sprint.json');
+  assert(emptyHistory.some((issue) => issue.field === 'completionHistory'), 'empty history must be rejected');
+  const noReason = validateSprintFile({ ...base, completionHistory: [{ ...record, reason: '' }] }, 'demo/sprint.json');
+  assert(noReason.some((issue) => issue.field === 'completionHistory[0].reason'), 'a history record without a reason must be rejected');
+  const badCompletion = validateSprintFile({ ...base, completionHistory: [{ ...record, completion: { completedAt: 'nope', by: '' } }] }, 'demo/sprint.json');
+  assert(badCompletion.some((issue) => issue.field === 'completionHistory[0].completion.completedAt'), 'a malformed superseded completion must be rejected');
+  const unpaired = validateSprintFile({ ...base, completionHistory: [{ ...record, requestDigest: 'a'.repeat(64) }] }, 'demo/sprint.json');
+  assert(unpaired.some((issue) => issue.field === 'completionHistory[0]'), 'unpaired reopen digests must be rejected');
+  const outOfOrder = validateSprintFile(
+    { ...base, completionHistory: [record, { ...record, reopenedAt: '2026-07-01T00:00:00.000Z' }] },
+    'demo/sprint.json',
+  );
+  assert(outOfOrder.some((issue) => issue.field === 'completionHistory[1].reopenedAt'), 'append-only ordering must be enforced');
+
+  // The registry carries the same append-only history for a reopened scope.
+  const stateIssues = validateProjectStateShape({
+    schemaVersion: 4,
+    artifactRoot: '.agents/kyro/scopes',
+    scopes: [{ id: 'demo', title: 'Demo', status: 'planning', completionHistory: [record] }],
+    activeScope: null,
+    runtimePath: '~/.agents/kyro/current',
+    installedAdapters: [],
+  }, '.agents/kyro/kyro.json');
+  assert(stateIssues.length === 0, `a reopened scope entry must validate, got ${JSON.stringify(stateIssues)}`);
+}
+
 function main() {
   assertStatusCoreIsPure();
   assertAnalyzeReportsActiveSprintStatusDrift();
@@ -418,6 +486,7 @@ function main() {
   assertDeriveScopeStatusMutationGuard();
   assertStatusTaskSummaryDistinguishesDispositions();
   assertScopeCompletionModel();
+  assertScopeReopenModel();
   console.log('check:status — status coherence invariants passed');
 }
 

@@ -14,7 +14,7 @@ enforced by `check:status`.
 |---|---|
 | `derivePhaseStatus(phase)` | no tasks → `pending`; any task `blocked` → `blocked`; all `done` → `done`; any `in_progress` or a done/pending mix → `active`; else `pending` |
 | `deriveActiveSprintStatus(active)` | no tasks → `planned`; all tasks still `pending` → `planned`; all `done` → `complete`; else `executing` |
-| `deriveScopeStatus(sprint, hasActiveSprint)` | active sprint with a blocked task or `handoff.blockers` → `blocked`; active sprint → `active`; `handoff.nextAction === 'done'` (historical completion or retirement companion) → `completed`; else `planning`. Exhausting the original roadmap does not complete a scope. |
+| `deriveScopeStatus(sprint, hasActiveSprint)` | `retirement` → `retired`; active sprint with a blocked task or `handoff.blockers` → `blocked`; active sprint → `active`; an explicit `completion` record, or `handoff.nextAction === 'done'` (legacy terminal read) → `completed`; else `planning`. Exhausting the original roadmap does not complete a scope. |
 
 These three signals answer different questions:
 
@@ -28,6 +28,28 @@ So `activeSprint.status: planned` with `nextAction: execute_task` is **coherent*
 
 `normalizeStoredPhaseStatus` maps historical vocabulary (`executing`/`in_progress` → `active`,
 `complete`/`completed` → `done`) so vocabulary drift is not mistaken for real drift.
+
+## Scope lifecycle: completion, reopen, retirement
+
+Three distinct facts, never inferred from each other and never inferred from the roadmap:
+
+| Fact | Written by | Effect |
+|---|---|---|
+| **Completion** — the work is done | `kyro scope complete` (confirmed) | `completion` record, `status: completed`, `nextAction: done`. Reversible by reopening. |
+| **Reopen** — more work is needed | `kyro scope reopen` (confirmed) | clears `completion`, appends it to append-only `completionHistory` with the reason, `status: planning`, `nextAction: plan_sprint`. |
+| **Retirement** — the scope leaves the lifecycle | `kyro scope retire` (human-approved, digest-bound) | `retirement` record, `status: retired`, terminal. Never reopened. |
+
+`completionHistory` is audit evidence, not a status signal: a reopened scope derives `planning`
+however many completions it has behind it, and the history stays readable through `kyro scope
+inspect` and the context pack's `reopenHistory`. A completed scope refuses `kyro plan` with
+`NOT_READY_TO_PLAN` and a remedy naming reopen, so the lawful route is the only route — a retired
+scope is never offered it.
+
+Because completion and reopen legitimately move live state off the close checkpoint's after-image,
+`kyro doctor --artifacts` replays the recorded transitions from that image through the same builders
+the writers use (`src/cli/checkpoints/lifecycle-state.ts`) and accepts live state only when the
+replay reproduces it exactly. Records are evidence, never authority: a rewritten lifecycle record, a
+hand-edited field, or a corrupt immutable artifact still fails closed as `DIVERGED`.
 
 ## Who maintains it
 

@@ -7,6 +7,7 @@ import { canonicalJson, checkpointCommitmentOfRecord, sha256 } from '../checkpoi
 import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
 import { EFFECTIVE_CHECKPOINT_STATUS, effectiveCommitment, resolveEffectiveCheckpoint, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
 import { surveyScopeCheckpoints } from '../checkpoints/discovery';
+import { replayScopeLifecycle } from '../checkpoints/lifecycle-state';
 import { inspectScopeRetirement } from '../checkpoints/scope-retirement';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
@@ -865,16 +866,25 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
   }
 
   const liveBusiness = businessStateDigest(live);
-  const afterBusiness = businessStateDigest(checkpoint.intendedAfterClose);
   const physicalRead = readJsonSafely(listValidCloseCheckpoints(scope)[0]?.path ?? '');
   const physicalAfter = physicalRead.exists && !physicalRead.error
     ? (physicalRead.value as { intendedAfterClose?: unknown }).intendedAfterClose
     : null;
-  const physicalAfterBusiness = physicalAfter ? businessStateDigest(physicalAfter) : null;
-  const atAfterImage = liveBusiness !== null && (
-    (afterBusiness !== null && liveBusiness === afterBusiness)
-    || (physicalAfterBusiness !== null && liveBusiness === physicalAfterBusiness)
-  );
+  // An explicit `scope complete` / `scope reopen` legitimately moves live state off the close
+  // after-image. Like a remediation chain, the transition is replayed rather than trusted: the
+  // recorded lifecycle records are re-applied to the after-image and only an exact reproduction of
+  // the live business state is accepted, so drift a lifecycle transition could not produce still
+  // reads as divergence.
+  const acceptedAfterDigests = new Set<string>();
+  for (const image of [checkpoint.intendedAfterClose, physicalAfter]) {
+    if (image === null || image === undefined) continue;
+    const digest = businessStateDigest(image);
+    if (digest) acceptedAfterDigests.add(digest);
+    const replayed = replayScopeLifecycle(image, live)?.sprint;
+    const replayedDigest = replayed ? businessStateDigest(replayed) : null;
+    if (replayedDigest) acceptedAfterDigests.add(replayedDigest);
+  }
+  const atAfterImage = liveBusiness !== null && acceptedAfterDigests.has(liveBusiness);
 
   // A present chain must be replayed even when it net-restored the after-image. The head digest
   // only binds the claimed result to live state; without replaying operations, a re-anchored record

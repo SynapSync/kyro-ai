@@ -93,6 +93,12 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     status: deriveScopeStatus(sprint, Boolean(sprint.activeSprint)),
     objective: sprint.objective,
     retirement: sprint.retirement ?? null,
+    completion: sprint.completion ?? null,
+    reopenHistory: (sprint.completionHistory ?? []).map((record) => ({
+      reopenedAt: record.reopenedAt,
+      completedAt: record.completion.completedAt,
+      reason: record.reason,
+    })),
     nextAction: sprint.handoff.nextAction,
     nextTaskId: sprint.handoff.nextTaskId,
     activeSprintSlug: sprint.activeSprint?.slug ?? null,

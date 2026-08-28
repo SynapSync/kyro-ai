@@ -312,6 +312,7 @@ function validateScopeEntry(value: unknown, path: string, prefix: string, issues
   requireLiteralSet(value, 'status', SCOPE_STATUS_VALUES, path, issues, `${prefix}.status`);
   validateRetirementInvariant(value, path, prefix, issues);
   validateCompletionInvariant(value, path, prefix, issues);
+  validateCompletionHistoryInvariant(value, path, prefix, issues);
 }
 
 export interface SprintFileValidationOptions {
@@ -330,6 +331,7 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
   requireString(value, 'objective', path, issues);
   validateRetirementInvariant(value, path, '', issues);
   validateCompletionInvariant(value, path, '', issues);
+  validateCompletionHistoryInvariant(value, path, '', issues);
 
   // author is optional (captured at init from git when available). Present-only so pre-feature
   // scopes and sandboxes without git identity still validate.
@@ -472,22 +474,74 @@ function validateCompletionInvariant(value: Record<string, unknown>, path: strin
   if ('activeSprint' in value && value.activeSprint !== null) {
     issues.push({ path, field: field('activeSprint'), message: 'must be null when completion is present' });
   }
+  validateCompletionRecord(completion, path, field('completion'), issues);
+}
+
+/** Shape of a single completion record, wherever it lives: live `completion` or preserved history. */
+function validateCompletionRecord(completion: unknown, path: string, field: string, issues: ValidationIssue[]): void {
   if (!isRecord(completion)) {
-    issues.push({ path, field: field('completion'), message: 'must be an object' });
+    issues.push({ path, field, message: 'must be an object' });
     return;
   }
-  requireIsoString(completion, 'completedAt', path, issues, field('completion.completedAt'));
-  requireNonEmptyString(completion, 'by', path, issues, field('completion.by'));
-  if ('summary' in completion) requireNonEmptyString(completion, 'summary', path, issues, field('completion.summary'));
-  if ('requestDigest' in completion && (typeof completion.requestDigest !== 'string' || !SHA256_HEX_PATTERN.test(completion.requestDigest))) {
-    issues.push({ path, field: field('completion.requestDigest'), message: 'must be a lowercase SHA-256 digest' });
+  requireIsoString(completion, 'completedAt', path, issues, `${field}.completedAt`);
+  requireNonEmptyString(completion, 'by', path, issues, `${field}.by`);
+  if ('summary' in completion) requireNonEmptyString(completion, 'summary', path, issues, `${field}.summary`);
+  validatePairedDigests(completion, path, field, issues);
+}
+
+/**
+ * `requestDigest`/`beforeEntryDigest` are written together by the locked transactional applies and
+ * absent together on legacy records. One without the other is drift, not a legacy shape.
+ */
+function validatePairedDigests(record: Record<string, unknown>, path: string, field: string, issues: ValidationIssue[]): void {
+  if ('requestDigest' in record && (typeof record.requestDigest !== 'string' || !SHA256_HEX_PATTERN.test(record.requestDigest))) {
+    issues.push({ path, field: `${field}.requestDigest`, message: 'must be a lowercase SHA-256 digest' });
   }
-  if ('beforeEntryDigest' in completion && (typeof completion.beforeEntryDigest !== 'string' || !SHA256_HEX_PATTERN.test(completion.beforeEntryDigest))) {
-    issues.push({ path, field: field('completion.beforeEntryDigest'), message: 'must be a lowercase SHA-256 digest' });
+  if ('beforeEntryDigest' in record && (typeof record.beforeEntryDigest !== 'string' || !SHA256_HEX_PATTERN.test(record.beforeEntryDigest))) {
+    issues.push({ path, field: `${field}.beforeEntryDigest`, message: 'must be a lowercase SHA-256 digest' });
   }
-  if (('requestDigest' in completion) !== ('beforeEntryDigest' in completion)) {
-    issues.push({ path, field: field('completion'), message: 'requestDigest and beforeEntryDigest must be present together or both absent' });
+  if (('requestDigest' in record) !== ('beforeEntryDigest' in record)) {
+    issues.push({ path, field, message: 'requestDigest and beforeEntryDigest must be present together or both absent' });
   }
+}
+
+/**
+ * `completionHistory` is append-only audit evidence of completions that `kyro scope reopen`
+ * superseded. It is independent of the live lifecycle state: a reopened scope is open again and
+ * carries no `completion`, yet must still show that it was once completed and why it was reopened.
+ * It may therefore coexist with any status, including a later completion or a retirement.
+ */
+function validateCompletionHistoryInvariant(value: Record<string, unknown>, path: string, prefix: string, issues: ValidationIssue[]): void {
+  const name = prefix ? `${prefix}.completionHistory` : 'completionHistory';
+  const history = value.completionHistory;
+  if (history === undefined) return;
+  if (!Array.isArray(history)) {
+    issues.push({ path, field: name, message: 'must be an array of reopen records' });
+    return;
+  }
+  if (history.length === 0) {
+    issues.push({ path, field: name, message: 'must be absent rather than empty' });
+    return;
+  }
+  let previousReopenedAt = '';
+  history.forEach((entry, index) => {
+    const field = `${name}[${index}]`;
+    if (!isRecord(entry)) {
+      issues.push({ path, field, message: 'must be an object { reopenedAt, by, reason, completion }' });
+      return;
+    }
+    requireIsoString(entry, 'reopenedAt', path, issues, `${field}.reopenedAt`);
+    requireNonEmptyString(entry, 'by', path, issues, `${field}.by`);
+    requireNonEmptyString(entry, 'reason', path, issues, `${field}.reason`);
+    validateCompletionRecord(entry.completion, path, `${field}.completion`, issues);
+    validatePairedDigests(entry, path, field, issues);
+    if (typeof entry.reopenedAt === 'string') {
+      if (entry.reopenedAt < previousReopenedAt) {
+        issues.push({ path, field: `${field}.reopenedAt`, message: 'must not precede the previous entry (history is append-only)' });
+      }
+      previousReopenedAt = entry.reopenedAt;
+    }
+  });
 }
 
 function validateClarification(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
