@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 4,
+  "scope": "managed-checkpoint-path-safety",
+  "title": "Managed checkpoint path safety",
+  "status": "completed",
+  "objective": "Make checkpoint path safety authoritative across discovery and every consumer without reintroducing global blast radius.",
+  "successCriteria": [
+    "Only regular checkpoints on fully safe managed paths are advertised as recoverable.",
+    "Registered or independently owned unsafe paths fail closed as owned-damaged in both Integrity and Doctor.",
+    "Unregistered unsafe entries without Kyro evidence remain FOREIGN and produce only a global Doctor warning.",
+    "No target reached through a symlink can influence discovery, blockers, commitments or resume.",
+    "Safe foreign registry contamination remains cleanable and apply diverges if its path becomes unsafe."
+  ],
+  "spec": {
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "Scope and checkpoint discovery must never dereference a symlink at the scope root, sprint, archive, record directory or checkpoint level.",
+        "priority": "must",
+        "rationale": "An unsafe ancestor currently lets external names influence ownership and makes Integrity disagree with Doctor."
+      },
+      {
+        "id": "R2",
+        "statement": "Unsafe and unreadable managed paths must remain explicit internal facts rather than collapsing to absent or empty state.",
+        "priority": "must",
+        "rationale": "Fail-open catch-to-empty behavior hides damage and produces false clean plans."
+      },
+      {
+        "id": "R3",
+        "statement": "An unregistered unsafe entry with no independent Kyro evidence must remain FOREIGN and only warn globally, while registered or evidenced unsafe state must be owned-damaged.",
+        "priority": "must",
+        "rationale": "The registry and filesystem-evidence axes must protect owned state without restoring global blast radius."
+      },
+      {
+        "id": "R4",
+        "statement": "Integrity, Doctor, canonicalization, latest-checkpoint selection, retirement and close-sprint must consume one canonical checkpoint safety survey.",
+        "priority": "must",
+        "rationale": "Parallel interpretations allowed Integrity to report clean while Doctor failed."
+      },
+      {
+        "id": "R5",
+        "statement": "No unsafe path may produce an integrity operation, before-commitment, canonicalization target or recovery promise.",
+        "priority": "must",
+        "rationale": "Approval and replay must authenticate only executable safe inputs."
+      },
+      {
+        "id": "R6",
+        "statement": "Unregister-orphan must remain available for safe foreign contamination and must diverge if the directory becomes unsafe or gains Kyro evidence before apply.",
+        "priority": "must",
+        "rationale": "Existing contaminated registries need cleanup without allowing a prepared plan to erase newly meaningful state."
+      },
+      {
+        "id": "R7",
+        "statement": "The existing blast-radius gate must prove the type, path and container guards are load-bearing through adversarial fixtures and mutation falsification.",
+        "priority": "must",
+        "rationale": "A green suite that still passes after removing a safety guard does not certify that guard."
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "S1",
+        "requirement": "R4",
+        "given": "a regular valid identity-matching checkpoint on a safe managed path and no sprint.json",
+        "when": "Integrity prepares and close-sprint retries",
+        "then": "Integrity reports recoverable-no-sprint and the real retry succeeds"
+      },
+      {
+        "id": "S2",
+        "requirement": "R1",
+        "given": "a checkpoint filename that is an internal, external, dangling or corrupt-target symlink",
+        "when": "discovery, Integrity and Doctor inspect it",
+        "then": "the link is never dereferenced, Integrity reports owned-damaged, Doctor fails and no operation is produced"
+      },
+      {
+        "id": "S3",
+        "requirement": "R2",
+        "given": "a directory named like a checkpoint file",
+        "when": "the canonical survey enumerates archive entries",
+        "then": "it is an unsafe non-regular candidate and never usable"
+      },
+      {
+        "id": "S4",
+        "requirement": "R4",
+        "given": "a registered valid scope whose root, sprint or archive path is symlinked",
+        "when": "Integrity and Doctor run",
+        "then": "both fail closed on the same unsafe path and Integrity never reports a clean plan"
+      },
+      {
+        "id": "S5",
+        "requirement": "R3",
+        "given": "an unregistered unsafe namespace entry with no independent regular Kyro evidence",
+        "when": "scope list, global Integrity and global Doctor run",
+        "then": "it is absent from scope list and Integrity and appears only as a Doctor warning"
+      },
+      {
+        "id": "S6",
+        "requirement": "R1",
+        "given": "an unsafe link whose target contents gain or lose Kyro-shaped names",
+        "when": "discovery runs before and after the target mutation",
+        "then": "classification, blockers and warnings remain identical"
+      },
+      {
+        "id": "S7",
+        "requirement": "R5",
+        "given": "a valid but unsafe unregistered scope",
+        "when": "install, sync and Integrity inspect it",
+        "then": "it is neither registered nor proposed for register-on-disk and no unsafe commitment is created"
+      },
+      {
+        "id": "S8",
+        "requirement": "R6",
+        "given": "a registered safe foreign directory from an older rehydrate",
+        "when": "unregister repair runs globally or scoped",
+        "then": "the registry entry is removed and the complete directory tree is unchanged"
+      },
+      {
+        "id": "S9",
+        "requirement": "R6",
+        "given": "a safe foreign unregister plan whose directory becomes unsafe or gains Kyro evidence",
+        "when": "apply executes the approved digest",
+        "then": "apply returns DIVERGED and neither project state nor the directory tree changes"
+      },
+      {
+        "id": "S10",
+        "requirement": "R7",
+        "given": "the type, path, container or catch-to-empty safety guard is independently removed in a temporary copy",
+        "when": "the blast-radius gate runs",
+        "then": "the corresponding adversarial assertion fails for the intended reason"
+      }
+    ],
+    "nonGoals": [
+      "Reconstructing sprint.json from checkpoint after-images.",
+      "Changing maker/checker provenance or approval identity.",
+      "Consolidating the startup contract.",
+      "Adding public commands, blocker codes or persistent schema states.",
+      "Touching NutriLens or another consumer repository.",
+      "Bumping version, installing, committing, pushing, releasing or publishing."
+    ],
+    "openQuestions": []
+  },
+  "clarifications": [],
+  "conventions": [],
+  "adrs": [],
+  "roadmap": {
+    "plannedSprintCount": 1,
+    "sizingRationale": "One focused sprint: establish the safe survey first, propagate it through existing consumers, then certify the full adversarial matrix.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "authoritative-managed-path-survey",
+        "title": "Authoritative managed path survey",
+        "state": "closed"
+      }
+    ]
+  },
+  "ledger": [
+    {
+      "n": 1,
+      "slug": "authoritative-managed-path-survey",
+      "outcome": "shipped",
+      "closedAt": "2026-08-18",
+      "archive": "archive/sprint-001-authoritative-managed-path-survey.md",
+      "snapshot": "archive/sprint-001-authoritative-managed-path-survey.json",
+      "checkpoint": "archive/sprint-001-authoritative-managed-path-survey.checkpoint.json",
+      "recommendations": [
+        "Decide the next patch version only when authorizing release; local metadata remains 4.47.1.",
+        "Continue maker/checker provenance and startup-contract consolidation as separate scopes."
+      ],
+      "checkpointSha256": "b51c1b3608758eb50eed3942f5b39a45bc2a87482dcebe775271016eb4933d54"
+    }
+  ],
+  "previousSprint": {
+    "n": 1,
+    "slug": "authoritative-managed-path-survey",
+    "outcome": "shipped",
+    "summary": "Made managed checkpoint path safety authoritative across discovery, Integrity, Doctor, canonicalization, retirement and close-sprint without restoring global blast radius."
+  },
+  "activeSprint": null,
+  "debt": [],
+  "handoff": {
+    "nextAction": "done",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "All package, adversarial, real-workspace and independent QA gates pass; no Critical or Major findings remain.",
+    "lastUpdated": "2026-08-18"
+  },
+  "author": {
+    "name": "Roimer Peraza",
+    "email": "joisephdev@gmail.com",
+    "source": "git",
+    "capturedAt": "2026-08-17T20:49:51.904Z"
+  }
+}

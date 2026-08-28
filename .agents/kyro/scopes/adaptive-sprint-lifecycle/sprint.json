@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 4,
+  "scope": "adaptive-sprint-lifecycle",
+  "title": "Adaptive sprint lifecycle",
+  "status": "planning",
+  "objective": "Make Kyro record changing work truthfully without treating a partial sprint or exhausted roadmap as a terminal scope failure.",
+  "successCriteria": [
+    "Every unfinished task has a typed, reasoned disposition before sprint closure.",
+    "Closing any sprint preserves immutable evidence while keeping the scope open for explicit next planning.",
+    "Scope completion and retirement remain explicit, distinct decisions.",
+    "Doctor and Integrity distinguish lawful lifecycle evolution from immutable-artifact corruption.",
+    "Legacy checkpoints remain readable without retroactive semantic claims."
+  ],
+  "spec": {
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "Kyro SHALL require an explicit validated disposition for every unfinished task before closing a sprint.",
+        "priority": "must",
+        "rationale": "Unfinished work must remain discoverable and attributable instead of being represented as success or silently discarded."
+      },
+      {
+        "id": "R2",
+        "statement": "Kyro SHALL close a sprint without automatically completing its scope merely because all originally planned roadmap entries are closed.",
+        "priority": "must",
+        "rationale": "A roadmap is an estimate; scope completion requires an explicit decision and evidence."
+      },
+      {
+        "id": "R3",
+        "statement": "Kyro SHALL allow an open scope with no active sprint to plan a subsequent sprint through the normal tool-owned flow.",
+        "priority": "must",
+        "rationale": "Legitimate reprioritization must not require a recovery or manual state edit."
+      },
+      {
+        "id": "R4",
+        "statement": "Kyro SHALL preserve fail-closed validation for immutable checkpoints, unsafe paths, identity conflicts, and stale approvals while accepting lawful lifecycle evolution.",
+        "priority": "must",
+        "rationale": "Simplification must not weaken artifact integrity or recovery safety."
+      },
+      {
+        "id": "R5",
+        "statement": "Kyro SHALL keep retirement distinct from scope completion and preserve readable historical checkpoint semantics.",
+        "priority": "must",
+        "rationale": "Terminal retirement has explicit human approval semantics, and immutable historical bytes cannot be rewritten."
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "S1",
+        "requirement": "R1",
+        "given": "an active sprint has unfinished tasks",
+        "when": "a user closes the sprint",
+        "then": "each unfinished task must carry a valid explicit disposition with its reason and any required continuation reference"
+      },
+      {
+        "id": "S2",
+        "requirement": "R2",
+        "given": "the final originally planned sprint has a mixture of completed and disposed tasks",
+        "when": "close-sprint applies its transaction",
+        "then": "the immutable close record reports a truthful partial outcome and the scope is not automatically completed"
+      },
+      {
+        "id": "S3",
+        "requirement": "R3",
+        "given": "an open scope has closed all originally listed roadmap sprints",
+        "when": "the user supplies a later sprint plan",
+        "then": "kyro plan materializes it through the normal tool-owned route without recovery"
+      },
+      {
+        "id": "S4",
+        "requirement": "R4",
+        "given": "a scope contains either lawful lifecycle evolution or an unsafe/corrupt immutable artifact",
+        "when": "Doctor and Integrity inspect it",
+        "then": "lawful evolution is distinguishable from scoped fail-closed artifact corruption"
+      },
+      {
+        "id": "S5",
+        "requirement": "R5",
+        "given": "a historical or retired scope is inspected",
+        "when": "Kyro reads its lifecycle state",
+        "then": "historical records remain readable and retirement remains explicitly terminal and human-gated"
+      },
+      {
+        "id": "S6",
+        "requirement": "R5",
+        "given": "an open scope has no active sprint, no unresolved debt or review, and healthy artifacts",
+        "when": "the user explicitly confirms scope completion",
+        "then": "Kyro records completion as a distinct lifecycle fact without retiring the scope or rewriting its archive"
+      },
+      {
+        "id": "S7",
+        "requirement": "R3",
+        "given": "a completed but non-retired scope needs later work",
+        "when": "the user explicitly reopens it with a reason",
+        "then": "Kyro preserves completion history and routes the scope to plan_sprint without recovery or manual edits"
+      }
+    ],
+    "nonGoals": [
+      "Maker/checker provenance policy changes.",
+      "Startup-contract consolidation or unrelated global preflight redesign.",
+      "NutriLens or Kyro Lens implementation changes.",
+      "Manual editing mode for Kyro-managed state.",
+      "Archive rewriting, release, installation, publication, or version bump."
+    ],
+    "openQuestions": []
+  },
+  "clarifications": [],
+  "conventions": [
+    {
+      "id": "process-1",
+      "rule": "A post-close live-state transition is valid only if it replays exactly from the checkpoint after-image through the same builders the writer uses; lifecycle records are evidence, never authority.",
+      "tags": [
+        "process"
+      ],
+      "addedSprint": 2
+    }
+  ],
+  "adrs": [],
+  "roadmap": {
+    "plannedSprintCount": 3,
+    "sizingRationale": "The work is sequenced by semantic dependency: define the lifecycle contract first, implement the core transitions second, then reconcile integrity and certify the complete path.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "lifecycle-contract",
+        "title": "Lifecycle contract and dispositions",
+        "state": "closed"
+      },
+      {
+        "n": 2,
+        "slug": "truthful-sprint-close",
+        "title": "Truthful sprint close and open-scope routing",
+        "state": "closed"
+      },
+      {
+        "n": 3,
+        "slug": "integrity-certification",
+        "title": "Integrity recalibration and lifecycle certification",
+        "state": "closed"
+      }
+    ]
+  },
+  "ledger": [
+    {
+      "n": 1,
+      "slug": "lifecycle-contract",
+      "outcome": "shipped",
+      "closedAt": "2026-08-24",
+      "archive": "archive/sprint-001-lifecycle-contract.md",
+      "snapshot": "archive/sprint-001-lifecycle-contract.json",
+      "checkpoint": "archive/sprint-001-lifecycle-contract.checkpoint.json",
+      "checkpointSha256": "7998a166250a32249bc5884f8993b8a735cd51a4069c9ef9beb4257e380a89a6"
+    },
+    {
+      "n": 2,
+      "slug": "truthful-sprint-close",
+      "outcome": "shipped",
+      "closedAt": "2026-08-26",
+      "archive": "archive/sprint-002-truthful-sprint-close.md",
+      "snapshot": "archive/sprint-002-truthful-sprint-close.json",
+      "checkpoint": "archive/sprint-002-truthful-sprint-close.checkpoint.json",
+      "recommendations": [
+        "Before completing this scope, verify each success criterion against evidence rather than treating all-tasks-done as proof the objective was met.",
+        "If further lifecycle transitions are added (e.g. suspend/resume), extend checkpoints/lifecycle-state.ts and its replay first, then the command surface."
+      ],
+      "checkpointSha256": "7c88a2298a0bc8ad38e2471d2fc7fcd2097e8dc5480c11b8876f01c437f6af55"
+    },
+    {
+      "n": 3,
+      "slug": "integrity-certification",
+      "outcome": "shipped",
+      "closedAt": "2026-08-26",
+      "archive": "archive/sprint-003-integrity-certification.md",
+      "snapshot": "archive/sprint-003-integrity-certification.json",
+      "checkpoint": "archive/sprint-003-integrity-certification.checkpoint.json",
+      "checkpointSha256": "e6bcc361f971b9d0c90cc10d8e15758cc5756ed203be68cde8fa23fd87451432"
+    }
+  ],
+  "previousSprint": {
+    "n": 3,
+    "slug": "integrity-certification",
+    "outcome": "shipped",
+    "summary": "Prove that dispositions, truthful closes, explicit completion, and reopen replay identically through Doctor and Integrity without weakening immutable-artifact safety."
+  },
+  "activeSprint": null,
+  "debt": [],
+  "handoff": {
+    "nextAction": "plan_sprint",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "Sprint 3 (integrity-certification) closed as shipped. Scope remains open for planning.",
+    "lastUpdated": "2026-08-26"
+  },
+  "author": {
+    "name": "Roimer Peraza",
+    "email": "joisephdev@gmail.com",
+    "source": "git",
+    "capturedAt": "2026-08-23T18:22:46.918Z"
+  }
+}

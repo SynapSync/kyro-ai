@@ -1,0 +1,196 @@
+{
+  "n": 1,
+  "slug": "fail-closed-integrity-recovery",
+  "title": "Fail-closed integrity recovery",
+  "objective": "Close the five blocking findings from the independent integrity-recovery review.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Transactional integrity hardening",
+      "objective": "Bind approval to executable bytes and make recovery replay idempotent and continuous.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "title": "Authenticate warrant payload",
+          "description": "Use one canonical approval payload for prepare, warrant validation, trace routing, and apply.",
+          "files_to_touch": [
+            "src/cli/repair/integrity-plan.ts",
+            "src/cli/repair/integrity-apply.ts",
+            "src/cli/commands/repair.ts"
+          ],
+          "context": "Stored operations could be changed without invalidating the approved digest.",
+          "acceptance_criteria": [
+            "A modified warrant fails DIVERGED and writes nothing.",
+            "Apply resolves a valid warrant before running prepare."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S1"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Bound the executable warrant payload to the approved digest and made trace routing warrant-first.",
+            "validation": "check-repair-integrity tampered-warrant and retry cases",
+            "files_changed": [
+              "src/cli/repair/integrity-plan.ts",
+              "src/cli/repair/integrity-apply.ts",
+              "src/cli/commands/repair.ts"
+            ],
+            "by": "codex-maker",
+            "recordedAt": "2026-08-15T02:02:02.765Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A modified warrant fails DIVERGED and writes nothing.",
+              "Apply resolves a valid warrant before running prepare."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-15T02:02:02.870Z"
+          }
+        },
+        {
+          "id": "T1.2",
+          "title": "Make remediation replay idempotent",
+          "description": "Replay the existing chain as the baseline, reuse applied or prepared records, and append later deltas continuously.",
+          "files_to_touch": [
+            "src/cli/remediation/plan.ts",
+            "src/cli/repair/integrity-plan.ts",
+            "src/cli/repair/integrity-apply.ts"
+          ],
+          "context": "Retry created R-002 based on the close image and made Doctor diverge.",
+          "acceptance_criteria": [
+            "Same-digest retry keeps exactly one record and Doctor PASS.",
+            "A later delta creates R-002 whose base equals R-001 result."
+          ],
+          "depends_on": [
+            "T1.1"
+          ],
+          "scenario_refs": [
+            "S2",
+            "S3"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Replayed anchored remediations into an effective baseline, reused applied/prepared batches, and continued later deltas from the previous result.",
+            "validation": "check-repair-integrity same-digest, prepared-resume, and R-002 continuity cases",
+            "files_changed": [
+              "src/cli/remediation/plan.ts",
+              "src/cli/repair/integrity-plan.ts",
+              "src/cli/repair/integrity-apply.ts"
+            ],
+            "by": "codex-maker",
+            "recordedAt": "2026-08-15T02:02:23.111Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Same-digest retry keeps exactly one record and Doctor PASS.",
+              "A later delta creates R-002 whose base equals R-001 result."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-15T02:02:23.207Z"
+          }
+        },
+        {
+          "id": "T1.3",
+          "title": "Reject invalid overlay chains",
+          "description": "Inspect raw overlay candidates and verify every newly published overlay before success.",
+          "files_to_touch": [
+            "src/cli/checkpoints/canonicalize.ts",
+            "src/cli/repair/integrity-apply.ts"
+          ],
+          "context": "A tampered overlay was treated as absent and replaced by another invalid record.",
+          "acceptance_criteria": [
+            "Apply refuses a tampered matching overlay.",
+            "No additional overlay is written after tampering."
+          ],
+          "depends_on": [
+            "T1.1"
+          ],
+          "scenario_refs": [
+            "S4"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Made canonicalization inspect raw candidates and the complete chain, then verify every published overlay before success.",
+            "validation": "check-repair-integrity apply-after-overlay-tamper case",
+            "files_changed": [
+              "src/cli/checkpoints/canonicalize.ts",
+              "src/cli/repair/integrity-apply.ts"
+            ],
+            "by": "codex-maker",
+            "recordedAt": "2026-08-15T02:02:31.838Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Apply refuses a tampered matching overlay.",
+              "No additional overlay is written after tampering."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-15T02:02:31.933Z"
+          }
+        },
+        {
+          "id": "T1.4",
+          "title": "Certify adversarial recovery",
+          "description": "Expand portable tests to assert record count, byte invariance, prepared resume, later deltas, and Doctor postconditions.",
+          "files_to_touch": [
+            "scripts/check-repair-integrity.mjs"
+          ],
+          "context": "The prior suite passed while the resulting chain was DIVERGED.",
+          "acceptance_criteria": [
+            "The dedicated integrity check covers all four scenarios.",
+            "The full npm check passes."
+          ],
+          "depends_on": [
+            "T1.2",
+            "T1.3"
+          ],
+          "scenario_refs": [
+            "S1",
+            "S2",
+            "S3",
+            "S4"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Expanded portable adversarial certification to cover warrant tampering, same-digest byte invariance, prepared resume, continuous R-002, overlay tampering, and Doctor postconditions.",
+            "validation": [
+              "check-repair-integrity: 90 assertions passed",
+              "npm run check: PASS",
+              "npm pack --dry-run: 695 entries"
+            ],
+            "files_changed": [
+              "scripts/check-repair-integrity.mjs"
+            ],
+            "by": "codex-maker",
+            "recordedAt": "2026-08-15T02:05:45.053Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "The dedicated integrity check covers all four scenarios.",
+              "The full npm check passes."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-15T02:05:45.148Z"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "All adversarial integrity assertions pass.",
+    "Doctor, status, and context-pack accept the reconstructed scope.",
+    "The complete npm check, diff check, and package dry-run pass."
+  ]
+}

@@ -9,7 +9,16 @@ dist/
 
 
 # AI runtime state
-/.agents/
+# Descend into .agents/ deliberately: the shared scope evidence is versioned (docs/cli.md), while
+# per-machine state and the append-only trace are not. A blanket `/.agents/` would also shadow the
+# nested .gitignore install/sync writes, since git never descends into an excluded directory.
+/.agents/*
+!/.agents/kyro/
+/.agents/kyro/*
+!/.agents/kyro/project.json
+!/.agents/kyro/scopes/
+/.agents/kyro/**/trace/
+/.agents/kyro/local.json
 .cursor/
 .commandcode/
 openspec/

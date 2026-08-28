@@ -1,0 +1,596 @@
+{
+  "n": 3,
+  "slug": "lens-remediation-ingestion",
+  "title": "Lens remediation ingestion",
+  "objective": "Make remediation and recertification provenance verifiable and actionable in Kyro Lens while closing the replay-integrity gap that Lens will consume.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Replay integrity",
+      "objective": "Close the unsafe snapshot handoff before a reader consumes the protocol.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.1",
+          "title": "Validate every replay snapshot before reuse",
+          "description": "Harden multi-record remediation replay so a non-final record.result.snapshot is never used as the next replay base unless its canonical business-state digest equals record.result.stateSha256.",
+          "files_to_touch": [
+            "src/cli/remediation/plan.ts",
+            "src/cli/remediation/protocol.ts",
+            "scripts/check-scope-remediation.mjs",
+            "scripts/check-verification-states.mjs"
+          ],
+          "context": "Resolves debt-2. Preserve ADR-0003: the first remediation may originate from a genuinely drifted live base, but a forged intermediate snapshot must still make doctor/status diverged. Keep debt-3 open: this task validates the current snapshot representation and must not redesign immutable record storage without a dedicated protocol decision.",
+          "acceptance_criteria": [
+            "Every non-final snapshot is structurally valid and its canonical business-state digest is verified before it becomes the replay base.",
+            "A valid multi-record chain from a genuinely drifted first base remains remediated or recertified as appropriate.",
+            "Tampering an intermediate snapshot or its declared digest yields diverged in doctor and status, with no historical artifact mutation.",
+            "Focused remediation and verification harnesses cover the regression and pass."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S5"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Validated every non-final remediation snapshot as a strict SprintFile and verified its canonical business-state digest before replay reuse.",
+            "validation": [
+              "npm run build (pass)",
+              "npm run check:scope-remediation (292 assertions passed)",
+              "npm run check:verification-states (143 assertions passed)",
+              "Independent certification: npm run check complete (pass)",
+              "doctor --artifacts --kyro-scope append-only-scope-remediation (pass)"
+            ],
+            "files_changed": [
+              "src/cli/remediation/plan.ts",
+              "src/cli/remediation/protocol.ts",
+              "scripts/check-scope-remediation.mjs",
+              "scripts/check-verification-states.mjs"
+            ],
+            "notes": "Independent certification verified the new regression fails without the replay guard. The protocol comment now points to that guardrail; the original contract intentionally preserves the snapshot as archival data.",
+            "by": "maker",
+            "recordedAt": "2026-08-09T00:12:26.288Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Every non-final snapshot is structurally valid and its canonical business-state digest is verified before it becomes the replay base.",
+              "A valid multi-record chain from a genuinely drifted first base remains remediated or recertified as appropriate.",
+              "Tampering an intermediate snapshot or its declared digest yields diverged in doctor and status, with no historical artifact mutation.",
+              "Focused remediation and verification harnesses cover the regression and pass."
+            ],
+            "findings": [],
+            "by": "independent-certifier",
+            "reviewedAt": "2026-08-09T00:12:46.205Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Lens protocol reader",
+      "objective": "Give Lens a strict, read-only interpretation of the versioned remediation and certification protocol.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.2",
+          "title": "Model and parse remediation protocol shapes in Lens",
+          "description": "Add strongly typed Lens representations and fail-closed parsing for remediation anchors, R-NNN records, certification anchors, and C-NNN records without weakening legacy sprint compatibility.",
+          "files_to_touch": [
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/domain/types.ts",
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.ts",
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/validate.test.ts"
+          ],
+          "context": "Lens is a read-only consumer. Support protocol version 1 only; unknown versions, unknown keys in closed records, malformed digests, invalid anchor identity/path shapes, and bare declared verdicts are parse failures, never permissive unknown payloads. Existing scopes without remediation fields must remain readable.",
+          "acceptance_criteria": [
+            "Lens has explicit discriminated types for v1 remediation and recertification structures rather than unknown or any payloads.",
+            "A legacy sprint without remediation data still parses exactly as before.",
+            "A well-formed v1 remediated or recertified sprint parses, while malformed, unknown-version, and unknown-key protocol records are rejected with field-specific diagnostics.",
+            "Lens parser tests cover valid and rejected protocol shapes."
+          ],
+          "depends_on": [
+            "T3.1"
+          ],
+          "scenario_refs": [
+            "S11",
+            "S12"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added strict v1 Lens types and parsers for remediation and recertification anchors and immutable records.",
+            "validation": [
+              "pnpm run typecheck (pass)",
+              "pnpm exec vitest run src/data/validate.test.ts (82 tests passed)"
+            ],
+            "files_changed": [
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/domain/types.ts",
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.ts",
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/validate.test.ts"
+            ],
+            "notes": "Legacy scopes remain compatible when optional provenance anchors are absent; malformed v1 anchors and records are rejected fail-closed.",
+            "by": "maker",
+            "recordedAt": "2026-08-09T00:32:40.489Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Lens has explicit discriminated types for v1 remediation and recertification structures rather than unknown or any payloads.",
+              "A legacy sprint without remediation data still parses exactly as before.",
+              "A well-formed v1 remediated or recertified sprint parses, while malformed, unknown-version, and unknown-key protocol records are rejected with field-specific diagnostics.",
+              "Lens parser tests cover valid and rejected protocol shapes."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-09T00:32:40.590Z"
+          }
+        },
+        {
+          "id": "T3.3",
+          "title": "Resolve and verify anchored provenance in Lens",
+          "description": "Implement the read-only resolver that follows each remediation anchor through remediations[].path and validates its identity, scope containment, commitment, ordering, certificate chain-head binding, and evidence references before producing a Lens provenance summary.",
+          "files_to_touch": [
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts",
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/ai-scope-corpus.ts",
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/ai-scope-corpus.test.ts"
+          ],
+          "context": "The remediation anchor path is authoritative only when it is scope-contained and names the same R-NNN id as the anchor; Lens must not discover alternate files or silently select a different record. Reuse Kyro AI's canonical commitment rules through shared contract fixtures, not a looser reader-only interpretation. Records and evidence are read only and are never applied, repaired, or rewritten by Lens.",
+          "acceptance_criteria": [
+            "A valid ordered chain resolves to a provenance summary containing the historical issue, remediation rationale, typed operations, current verification state, and optional certification.",
+            "Path traversal, anchor/id disagreement, content or commitment mismatch, broken chain order, stale certificate head, unreadable evidence, and unsupported version return an actionable integrity or unsupported result.",
+            "The Lens corpus includes validated remediation and certification artifacts when present and records a read failure instead of inventing content when they are not valid.",
+            "The resolver performs no workspace writes."
+          ],
+          "depends_on": [
+            "T3.2"
+          ],
+          "scenario_refs": [
+            "S11",
+            "S12"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Implemented Lens read-only v1 provenance verification with canonical SHA-256 commitments, ordered remediation chains, certification/evidence validation, and bounded derived corpus summaries.",
+            "validation": [
+              "pnpm exec tsc --noEmit (pass)",
+              "pnpm exec vitest run src/data/validate.test.ts src/data/remediation-summary.test.ts src/data/ai-scope-corpus.test.ts src/components/kyro/views/overview.test.tsx (121 tests passed)",
+              "pnpm build (pass)"
+            ],
+            "files_changed": [
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts",
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/ai-scope-corpus.ts"
+            ],
+            "notes": "Per approved E3/E4 correction, Lens never injects raw remediation/certification records, snapshots, or evidence bodies into the AI corpus; it emits only a bounded derived summary and failures for invalid provenance.",
+            "by": "maker",
+            "recordedAt": "2026-08-09T03:12:04.296Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A valid ordered chain resolves to a provenance summary containing the historical issue, remediation rationale, typed operations, current verification state, and optional certification.",
+              "Path traversal, anchor/id disagreement, content or commitment mismatch, broken chain order, stale certificate head, unreadable evidence, and unsupported version return an actionable integrity or unsupported result.",
+              "The resolver performs no workspace writes."
+            ],
+            "waived_criteria": [
+              {
+                "criterion": "The Lens corpus includes validated remediation and certification artifacts when present and records a read failure instead of inventing content when they are not valid.",
+                "reason": "Superseded by user-approved E3/E4: Lens emits only a bounded derived provenance summary and failures; raw immutable records and evidence bodies are excluded from AI corpus."
+              }
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-09T03:12:16.607Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Lens provenance presentation",
+      "objective": "Expose trustworthy remediation status without representing historical evidence as corrected state.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.4",
+          "title": "Render remediation and recertification provenance",
+          "description": "Add a read-only overview surface for valid remediation/recertification provenance and a distinct actionable failure state for diverged or unsupported chains.",
+          "files_to_touch": [
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.tsx",
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.test.tsx"
+          ],
+          "context": "Follow the existing checkpoint-summary pattern: Lens observes immutable history and never offers repair. A failing remediation chain must not disappear behind an apparently healthy checkpoint card or stale state. Keep diagnostic text concrete enough to identify the bad record/path without rendering untrusted payload as trusted provenance.",
+          "acceptance_criteria": [
+            "A valid remediated chain visibly names its R-NNN provenance, original issue, rationale, operations, and remediated state.",
+            "A valid recertified chain additionally names its C-NNN and the evidence/verdict provenance bound to the current head.",
+            "Diverged and unsupported inputs render a distinct diagnostic surface and never fall back to presenting the original close as valid current state.",
+            "Component tests cover loading, valid remediated, valid recertified, diverged, and unsupported states."
+          ],
+          "depends_on": [
+            "T3.3"
+          ],
+          "scenario_refs": [
+            "S11",
+            "S12"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added a read-only Overview provenance card for remediated, recertified, diverged, unsupported, loading, and unavailable states.",
+            "validation": [
+              "pnpm exec tsc --noEmit (pass)",
+              "pnpm exec vitest run src/components/kyro/views/overview.test.tsx src/data/remediation-summary.test.ts src/data/validate.test.ts (105 tests passed)",
+              "pnpm build (pass)"
+            ],
+            "files_changed": [
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.tsx",
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.test.tsx"
+            ],
+            "notes": "The surface is observational: diagnostics explicitly state that Lens neither applies nor repairs historical provenance.",
+            "by": "maker",
+            "recordedAt": "2026-08-09T03:13:11.564Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A valid remediated chain visibly names its R-NNN provenance, original issue, rationale, operations, and remediated state.",
+              "A valid recertified chain additionally names its C-NNN and the evidence/verdict provenance bound to the current head.",
+              "Diverged and unsupported inputs render a distinct diagnostic surface and never fall back to presenting the original close as valid current state.",
+              "Component tests cover loading, valid remediated, valid recertified, diverged, and unsupported states."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-09T03:13:11.695Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P4",
+      "title": "Cross-repository certification",
+      "objective": "Prove writer, installed runtime, and reader agree on the protocol without claiming publication readiness.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.5",
+          "title": "Exercise the Kyro AI to Lens contract end to end",
+          "description": "Create shared, deterministic contract fixtures from real Kyro remediation and recertification output and prove Lens loads valid data while rejecting representative invalid chains.",
+          "files_to_touch": [
+            "scripts/check-scope-remediation.mjs",
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+            "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.test.tsx"
+          ],
+          "context": "The fixture must travel through real Kyro CLI close/remediate/recertify behavior rather than a hand-written happy-path record. Cover remediated-without-certificate, recertified, unsupported schema, changed record bytes/commitment, anchor/path mismatch, and stale certification after a new remediation. No test may require Lens to mutate artifacts.",
+          "acceptance_criteria": [
+            "A real valid Kyro fixture is rendered by Lens as remediated and, after certification, recertified with matching provenance.",
+            "Every invalid fixture fails closed in Lens with a specific diagnostic and no stale-state fallback.",
+            "Kyro AI and Lens focused suites pass from their respective checkouts."
+          ],
+          "depends_on": [
+            "T3.1",
+            "T3.4"
+          ],
+          "scenario_refs": [
+            "S5",
+            "S11",
+            "S12"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added a real Kyro-to-Lens contract bridge: Kyro exports an actual close/remediate/recertify fixture, then Lens verifies it as recertified and rejects forged or unsupported variants.",
+            "validation": [
+              "KYRO_LENS_REAL_FIXTURE=/tmp/kyro-lens-contract-fxeJQ6 node scripts/check-verification-states.mjs (143 assertions passed; exported real fixture)",
+              "KYRO_LENS_REAL_FIXTURE=/tmp/kyro-lens-contract-fxeJQ6 pnpm --dir /Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens exec vitest run src/data/remediation-real-contract.test.ts (1 test passed)",
+              "pnpm exec vitest run src/data/remediation-summary.test.ts src/components/kyro/views/overview.test.tsx (23 tests passed)"
+            ],
+            "files_changed": [
+              "scripts/check-verification-states.mjs",
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-real-contract.test.ts",
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts"
+            ],
+            "notes": "The first real vector found Lens was hashing external evidence as JSON instead of Kyro raw UTF-8 file bytes. Fixed with a distinct raw-text SHA-256 path; real certification then passed.",
+            "by": "maker",
+            "recordedAt": "2026-08-09T03:16:51.048Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A real valid Kyro fixture is rendered by Lens as remediated and, after certification, recertified with matching provenance.",
+              "Every invalid fixture fails closed in Lens with a specific diagnostic and no stale-state fallback.",
+              "Kyro AI and Lens focused suites pass from their respective checkouts."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-09T03:16:51.164Z"
+          }
+        },
+        {
+          "id": "T3.6",
+          "title": "Certify projected runtime parity",
+          "description": "Extend the isolated installation harness so the runtime projected under .agents/kyro/current exposes the same remediation verification behavior as the local candidate, then run package and scope gates.",
+          "files_to_touch": [
+            "scripts/check-install-rehydrate.mjs",
+            "scripts/check-cli-bundle-assets.mjs",
+            "package.json"
+          ],
+          "context": "Incorporates Sprint 2's install recommendation without replacing the user's real global runtime during development: certify an isolated HOME projection and package contents. A real global sync/publication remains a separately authorized release action. This task intentionally has no scenario reference because it certifies delivery parity rather than implementing a spec requirement.",
+          "acceptance_criteria": [
+            "An isolated install from the candidate package exposes doctor/status verification output compatible with the local candidate for remediated, recertified, diverged, and unsupported fixtures.",
+            "Runtime projection tests, npm run build, npm run check, Lens typecheck/build/test, and package dry-run pass.",
+            "The final doctor/analyze results retain debt-3 as an explicit deferred protocol-storage decision and show R7 scenario coverage."
+          ],
+          "depends_on": [
+            "T3.5"
+          ],
+          "scenario_refs": [
+            "S16"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Extended isolated runtime projection certification so the copied runtime executes the full remediation verification-state harness, not merely an asset-presence check.",
+            "validation": [
+              "npm run check:cli-bundle-assets (pass; isolated projected runtime ran all 143 verification-state assertions)",
+              "npm run check (pass)",
+              "npm pack --dry-run (pass)",
+              "pnpm --dir /Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens exec vitest run (841 passed, 1 environment-gated real-contract test skipped)",
+              "pnpm --dir /Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens build (pass)",
+              "KYRO_LENS_REAL_FIXTURE=/tmp/kyro-lens-contract-fxeJQ6 pnpm --dir /Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens exec vitest run src/data/remediation-real-contract.test.ts (1 passed)"
+            ],
+            "files_changed": [
+              "scripts/check-cli-bundle-assets.mjs",
+              "scripts/check-verification-states.mjs",
+              "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-real-contract.test.ts"
+            ],
+            "notes": "doctor --artifacts is clean for the active scope; analyze retains open debt-3 (quadratic snapshot storage) and debt-4 (historic schema compatibility) as explicit deferred decisions.",
+            "by": "maker",
+            "recordedAt": "2026-08-09T03:20:22.359Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "An isolated install from the candidate package exposes doctor/status verification output compatible with the local candidate for remediated, recertified, diverged, and unsupported fixtures.",
+              "Runtime projection tests, npm run build, npm run check, Lens typecheck/build/test, and package dry-run pass.",
+              "The final doctor/analyze results retain debt-3 as an explicit deferred protocol-storage decision and show R7 scenario coverage."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-09T03:20:22.758Z"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [
+    {
+      "id": "E1",
+      "title": "Keep malformed provenance observable",
+      "description": "Supersede T3.2's global parser-failure interpretation: parse the compatible core sprint independently from optional v1 remediation metadata, then expose remediation and certification failures as typed diverged or unsupported provenance diagnostics on the visible scope.",
+      "files_to_touch": [
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/domain/types.ts",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.ts",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/docs/ARCHITECTURE.md",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/learn/FIELD-DICTIONARY.md"
+      ],
+      "context": "This amendment is required by S13. It narrows T3.2: closed v1 records are strict, but their failure is provenance state, not a reason to omit the entire scope from assembleWorkspace.",
+      "acceptance_criteria": [
+        "Legacy and valid scopes load unchanged; a malformed optional remediation or certification record does not remove the scope from Lens.",
+        "Protocol parsing returns explicit valid, diverged, or unsupported results with field or anchor diagnostics and never treats invalid provenance as current valid state.",
+        "Both File System Access and HTTP reader paths are covered through the shared reader contract, and no loader performs workspace writes.",
+        "Lens architecture and field-dictionary documentation describe the new optional provenance boundary."
+      ],
+      "depends_on": [
+        "T3.2"
+      ],
+      "scenario_refs": [
+        "S12",
+        "S13"
+      ],
+      "status": "done",
+      "evidence": {
+        "summary": "Made malformed optional remediation and certification metadata observable Lens provenance diagnostics without excluding an otherwise valid scope.",
+        "validation": [
+          "pnpm exec tsc --noEmit (pass)",
+          "pnpm exec vitest run src/data/validate.test.ts src/data/remediation-summary.test.ts src/data/ai-scope-corpus.test.ts src/components/kyro/views/overview.test.tsx src/data/docs-parity-contract.test.ts (125 tests passed)"
+        ],
+        "files_changed": [
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/domain/types.ts",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.ts",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/docs/ARCHITECTURE.md",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/learn/FIELD-DICTIONARY.md"
+        ],
+        "notes": "Both filesystem and HTTP ingestion consume the common WorkspaceFileReader resolver; Lens makes no workspace writes.",
+        "by": "maker",
+        "recordedAt": "2026-08-09T13:24:00.096Z"
+      },
+      "verdict": {
+        "result": "pass",
+        "checked_criteria": [
+          "Legacy and valid scopes load unchanged; a malformed optional remediation or certification record does not remove the scope from Lens.",
+          "Protocol parsing returns explicit valid, diverged, or unsupported results with field or anchor diagnostics and never treats invalid provenance as current valid state.",
+          "Both File System Access and HTTP reader paths are covered through the shared reader contract, and no loader performs workspace writes.",
+          "Lens architecture and field-dictionary documentation describe the new optional provenance boundary."
+        ],
+        "findings": [],
+        "by": "checker",
+        "reviewedAt": "2026-08-09T13:24:00.216Z"
+      }
+    },
+    {
+      "id": "E2",
+      "title": "Verify Lens v1 provenance against canonical vectors",
+      "description": "Correct T3.3 by implementing a strict, read-only v1 verifier instead of trusting an anchor-shaped record. It must use canonical JSON and SHA-256, exact closed-record validation, record and anchor containment rules, evidence semantics, and real Kyro conformance vectors before Lens may claim verified remediation or recertification provenance.",
+      "files_to_touch": [
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.ts"
+      ],
+      "context": "Implements ADR-0004 and S14. This replaces the loose reader-only interpretation implied by T3.3 with an explicitly conformant v1 verifier.",
+      "acceptance_criteria": [
+        "Lens accepts only v1 closed record shapes and lower-case 64-hex digests; unknown keys or versions, unavailable cryptography, bad commitment, broken record ordering, and stale certificate head are unsupported or diverged, never valid.",
+        "Remediation and certification records and their anchors are scope-contained archive references with matching identities; external artifact evidence is workspace-contained, while kyro-task-verdict evidence is re-derived from the current sprint state.",
+        "Canonical SHA-256 and state/chain evaluation match checked-in real Kyro conformance vectors including a genuine divergence and an active later sprint; Lens never labels a chain remediated or recertified based only on anchor shape.",
+        "The verifier and all readers remain read-only."
+      ],
+      "depends_on": [
+        "E1",
+        "T3.3"
+      ],
+      "scenario_refs": [
+        "S11",
+        "S12",
+        "S14"
+      ],
+      "status": "done",
+      "evidence": {
+        "summary": "Hardened Lens v1 verification with canonical commitments, raw-byte external evidence hashes, active-later-sprint drift semantics, and versioned real Kyro conformance vectors.",
+        "validation": [
+          "pnpm exec tsc --noEmit (pass)",
+          "pnpm exec vitest run src/data/remediation-real-contract.test.ts src/data/remediation-summary.test.ts (9 tests passed)",
+          "KYRO_LENS_REAL_FIXTURE=/tmp/kyro-lens-contract-fxeJQ6 pnpm --dir /Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens exec vitest run src/data/remediation-real-contract.test.ts (1 test passed against fresh generated fixture)"
+        ],
+        "files_changed": [
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.ts",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/parse.ts",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-real-contract.test.ts"
+        ],
+        "notes": "The checked-in fixture bytes are emitted by Kyro close-sprint/remediate/recertify; its default test covers real recertification plus forged and unsupported variants.",
+        "by": "maker",
+        "recordedAt": "2026-08-09T13:26:41.910Z"
+      },
+      "verdict": {
+        "result": "pass",
+        "checked_criteria": [
+          "Lens accepts only v1 closed record shapes and lower-case 64-hex digests; unknown keys or versions, unavailable cryptography, bad commitment, broken record ordering, and stale certificate head are unsupported or diverged, never valid.",
+          "Remediation and certification records and their anchors are scope-contained archive references with matching identities; external artifact evidence is workspace-contained, while kyro-task-verdict evidence is re-derived from the current sprint state.",
+          "Canonical SHA-256 and state/chain evaluation match checked-in real Kyro conformance vectors including a genuine divergence and an active later sprint; Lens never labels a chain remediated or recertified based only on anchor shape.",
+          "The verifier and all readers remain read-only."
+        ],
+        "findings": [],
+        "by": "checker",
+        "reviewedAt": "2026-08-09T13:26:42.012Z"
+      }
+    },
+    {
+      "id": "E3",
+      "title": "Constrain Lens provenance presentation and fixtures",
+      "description": "Correct T3.3 and T3.5 integration boundaries: render only verified derived provenance, retain actionable error states, keep raw remediation snapshots and evidence out of assistant context, and certify Lens with self-contained real-Kyro fixtures rather than a sibling checkout dependency.",
+      "files_to_touch": [
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.tsx",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/ai-scope-corpus.ts",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/docs/ARCHITECTURE.md",
+        "scripts/check-scope-remediation.mjs"
+      ],
+      "context": "Implements S15 and S16. It supersedes any requirement to ingest raw provenance records into the assistant corpus or depend on a sibling Kyro AI checkout in Lens CI.",
+      "acceptance_criteria": [
+        "Overview renders valid, diverged, and unsupported provenance distinctly with no historical-checkpoint fallback; it does not render untrusted raw record or evidence contents as trusted data.",
+        "Assistant corpus receives only a bounded derived provenance summary; it never receives raw R or C bytes, replay snapshots, or evidence content.",
+        "Lens repository contains provenance-tagged fixtures generated by an actual Kyro close, remediate, and recertify flow, and its isolated typecheck, build, and tests use only those fixtures.",
+        "A separate cross-repository gate regenerates and compares fixture provenance; it is not a Lens CI prerequisite. Final focused and full Kyro and Lens checks pass."
+      ],
+      "depends_on": [
+        "E2",
+        "T3.4",
+        "T3.5",
+        "T3.6"
+      ],
+      "scenario_refs": [
+        "S11",
+        "S12",
+        "S15",
+        "S16"
+      ],
+      "status": "done",
+      "evidence": {
+        "summary": "Constrained Lens to verified derived remediation provenance and added an explicit cross-repository regeneration gate.",
+        "validation": [
+          "KYRO_LENS_ROOT=/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens npm run check:lens-remediation-fixture (passed; regenerates real Kyro chain, compares profile, and runs Lens contract)",
+          "pnpm exec vitest run src/data/remediation-summary.test.ts src/data/remediation-real-contract.test.ts src/components/kyro/views/overview.test.tsx (26 passed)",
+          "pnpm run typecheck && pnpm build (passed)"
+        ],
+        "files_changed": [
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/ai-scope-corpus.ts",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/components/kyro/views/overview.tsx",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/test/fixtures/remediation-v1/sprint.json",
+          "scripts/check-lens-remediation-fixture.mjs"
+        ],
+        "notes": "Lens CI remains self-contained; the regeneration/comparison gate is opt-in through KYRO_LENS_ROOT and not part of Lens CI.",
+        "by": "maker",
+        "recordedAt": "2026-08-09T13:31:19.243Z"
+      },
+      "verdict": {
+        "result": "pass",
+        "checked_criteria": [
+          "Overview renders valid, diverged, and unsupported provenance distinctly with no historical-checkpoint fallback; it does not render untrusted raw record or evidence contents as trusted data.",
+          "Assistant corpus receives only a bounded derived provenance summary; it never receives raw R or C bytes, replay snapshots, or evidence content.",
+          "Lens repository contains provenance-tagged fixtures generated by an actual Kyro close, remediate, and recertify flow, and its isolated typecheck, build, and tests use only those fixtures.",
+          "A separate cross-repository gate regenerates and compares fixture provenance; it is not a Lens CI prerequisite. Final focused and full Kyro and Lens checks pass."
+        ],
+        "findings": [],
+        "by": "codex-checker",
+        "reviewedAt": "2026-08-09T13:31:19.378Z"
+      }
+    },
+    {
+      "id": "E4",
+      "title": "Generate self-contained v1 provenance fixtures before verification",
+      "description": "Move the fixture prerequisite ahead of the resolver: create provenance-tagged v1 fixtures from real Kyro close, remediate, and recertify output so Lens can validate canonical contract behavior without a sibling Kyro AI checkout.",
+      "files_to_touch": [
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/__fixtures__/remediation-v1.ts",
+        "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts"
+      ],
+      "context": "Approved sequencing correction for T3.3 and E3. This fixture work is a prerequisite for exact v1 verification, not a Lens CI dependency on the Kyro AI checkout.",
+      "acceptance_criteria": [
+        "Fixtures include valid remediated and recertified chains plus malformed and stale-chain cases, with generation provenance documented.",
+        "Lens typecheck, build, and tests consume checked-in fixtures without reading a sibling Kyro AI checkout.",
+        "The resolver uses only a bounded derived provenance projection for AI context; raw records, replay snapshots, and evidence bodies are excluded."
+      ],
+      "depends_on": [
+        "T3.2"
+      ],
+      "scenario_refs": [
+        "S14",
+        "S16"
+      ],
+      "status": "done",
+      "evidence": {
+        "summary": "Added self-contained real Kyro v1 provenance fixtures, versioned malformed and stale-certificate vectors, and an explicit regeneration comparison gate.",
+        "validation": [
+          "pnpm exec vitest run (844 passed)",
+          "pnpm run typecheck && pnpm build (passed)",
+          "KYRO_LENS_ROOT=/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens npm run check:lens-remediation-fixture (passed)"
+        ],
+        "files_changed": [
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/test/fixtures/remediation-v1/README.md",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-real-contract.test.ts",
+          "/Users/rperaza/joicodev/my-projects/kyro-ecosistem/kyro-lens/src/data/remediation-summary.test.ts",
+          "scripts/check-lens-remediation-fixture.mjs"
+        ],
+        "notes": "Fixture validity is isolated to Lens; cross-repository regeneration is opt-in and proves the fresh Kyro output is consumed by Lens.",
+        "by": "maker",
+        "recordedAt": "2026-08-09T13:35:49.697Z"
+      },
+      "verdict": {
+        "result": "pass",
+        "checked_criteria": [
+          "Fixtures include valid remediated and recertified chains plus malformed and stale-chain cases, with generation provenance documented.",
+          "Lens typecheck, build, and tests consume checked-in fixtures without reading a sibling Kyro AI checkout.",
+          "The resolver uses only a bounded derived provenance projection for AI context; raw records, replay snapshots, and evidence bodies are excluded."
+        ],
+        "findings": [],
+        "by": "codex-checker",
+        "reviewedAt": "2026-08-09T13:35:49.812Z"
+      }
+    }
+  ],
+  "definitionOfDone": [
+    "debt-2 is resolved with a replay-integrity regression that fails on a tampered intermediate snapshot.",
+    "Lens strictly parses, verifies, and presents v1 remediation and recertification provenance without applying or repairing artifacts.",
+    "A real Kyro AI fixture proves valid remediated and recertified states in Lens, while invalid and unsupported chains fail closed.",
+    "Isolated projected-runtime parity, Kyro AI checks, Lens checks, and artifact doctor pass; debt-3 remains explicitly deferred.",
+    "Every task has CLI-recorded evidence and an independent pass verdict."
+  ]
+}

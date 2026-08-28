@@ -1,0 +1,986 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "3dcbaddf2ca1b77f3c18606ab85408a855a9d09c3f631e8407430b575715930c",
+  "createdAt": "2026-08-08T21:37:01.455Z",
+  "identity": {
+    "scope": "append-only-scope-remediation",
+    "sprintN": 2,
+    "sprintSlug": "verification-and-recertification"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": "Sprint 2 closed after an independent QA certification and two rounds of code review. Open: debt-2 (unvalidated result.snapshot in resolveRemediationRebase) and debt-3 (snapshot size growth). S3/Lens remains before the scope as a whole can be certified.",
+    "summary": "Shipped the typed verification vocabulary and the recertification writer: five named scope states derived once and reported identically by doctor and status, kyro recertify preview/apply publishing immutable C-NNN certificates under the state-writer lock, and a regression harness that can actually fail.",
+    "recommendations": [
+      "Resolve debt-2 first: verify stateDigest(record.result.snapshot) === record.result.stateSha256 inside the replay loop, or drop snapshot and replay from the computed next state. It is not exploitable today only because chainContinuityIssue runs first.",
+      "Certify a global install, not just the local checkout. The installed runtime did not surface the verification state, which is what made the active-sprint false DIVERGED easy to miss.",
+      "Close S3/Lens and the R7 coverage that analyze still reports as pending before certifying the scope end to end."
+    ],
+    "learnings": [
+      "A harness that cannot exit non-zero certifies nothing. check-verification-states.mjs had zero asserts and printed 'All tests passed' unconditionally while four of five states were skipped; the suite was green throughout.",
+      "Mutation testing is the only proof a regression test binds. Four fixes were each verified by reverting them and confirming a specific failure — one such run exposed that the chain-head binding case was actually covered by the state-digest check, not by the binding it claimed to test.",
+      "A guard that exists in one lens must be shared, not reimplemented. artifact-doctor.ts already knew about supersededByActiveSprint; because the remediation and verification lenses did not, ordinary in-sprint work was reported as tampering."
+    ]
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/append-only-scope-remediation/archive/sprint-002-verification-and-recertification.json",
+    "narrative": ".agents/kyro/scopes/append-only-scope-remediation/archive/sprint-002-verification-and-recertification.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "append-only-scope-remediation",
+    "title": "Append-only scope remediation and recertification",
+    "status": "planning",
+    "objective": "Safely remediate and recertify closed Kyro scopes without changing immutable checkpoint history.",
+    "successCriteria": [
+      "An operator can preview and atomically apply a typed remediation to a closed scope without altering historical checkpoint bytes or commitments.",
+      "Every remediation records its affected issues, typed operations, source commitments, and corrected-state digest in an append-only chain.",
+      "Artifact Doctor distinguishes historical, remediated, recertified, diverged, and unsupported scope states.",
+      "A scope is not reported as recertified unless an immutable certification record validates the remediation and checker evidence.",
+      "Lens loads valid remediation chains with provenance and rejects invalid or unsupported chains without silently using stale state."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "The system must preserve every original checkpoint, snapshot, narrative, and ledger commitment while a closed scope is remediated.",
+          "priority": "must",
+          "rationale": "Historical evidence must remain tamper-evident; remediation cannot rewrite the event it corrects."
+        },
+        {
+          "id": "R2",
+          "statement": "The system must represent each remediation as a versioned record with base state digest, affected checkpoint commitments, issues, typed operations, provenance, and expected result digest.",
+          "priority": "must",
+          "rationale": "A remediation must be auditable and bound to the exact state it corrects."
+        },
+        {
+          "id": "R3",
+          "statement": "The system must accept only operations from a closed typed registry and reject arbitrary patch instructions.",
+          "priority": "must",
+          "rationale": "Strong typing prevents semantic rewriting of tasks, evidence, checkpoints, or credentials. The first operation is debt.origin.set."
+        },
+        {
+          "id": "R4",
+          "statement": "The system must preview and apply a remediation batch atomically, failing without writes when any digest, precondition, operation, schema, or post-write verification fails.",
+          "priority": "must",
+          "rationale": "A partially corrected closed scope is less trustworthy than an explicitly blocked one."
+        },
+        {
+          "id": "R5",
+          "statement": "The system must validate and expose the remediation chain independently from historical checkpoint integrity.",
+          "priority": "must",
+          "rationale": "Doctor and status must report remediated, recertified, diverged, and unsupported states truthfully."
+        },
+        {
+          "id": "R6",
+          "statement": "The system must create a separate immutable recertification record only when a valid remediation chain and checker validation evidence are present.",
+          "priority": "must",
+          "rationale": "Applying a correction is not equivalent to certifying the corrected scope."
+        },
+        {
+          "id": "R7",
+          "statement": "Kyro Lens must load and present valid remediation and recertification provenance while failing closed for invalid or unsupported protocol versions.",
+          "priority": "must",
+          "rationale": "The reader that exposed the original contract violation must consume the new protocol safely."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "a closed scope with a committed checkpoint, snapshot, narrative, and checkpointSha256 ledger anchor",
+          "when": "a valid remediation is previewed and applied",
+          "then": "the original archival artifacts and their commitments remain unchanged while the corrected live state is linked through a new append-only remediation record"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "a remediation manifest that identifies a closed scope and a concrete historical issue",
+          "when": "Kyro builds its preview",
+          "then": "the preview and persisted record bind the base state digest, affected checkpoint commitments, issues array, typed operations, provenance, and expected result digest"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "a manifest containing either debt.origin.set or an unknown patch-like operation",
+          "when": "Kyro validates the remediation",
+          "then": "only the explicitly typed debt.origin.set with a numeric replacement and matching precondition is accepted"
+        },
+        {
+          "id": "S4",
+          "requirement": "R4",
+          "given": "a remediation batch whose operations and preconditions are evaluated together",
+          "when": "one operation is invalid or persistence is interrupted",
+          "then": "Kyro exposes no applied remediation, leaves historical artifacts unchanged, and permits only deterministic recovery of a prepared transaction"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "a closed scope whose live state was corrected by a valid, replayable remediation chain but never certified",
+          "when": "doctor and status report on it",
+          "then": "both name the scope remediated, never recertified, and never diverged"
+        },
+        {
+          "id": "S6",
+          "requirement": "R5",
+          "given": "a legacy checkpoint whose commitment matches its ledger anchor but whose frozen images fail the current schema",
+          "when": "doctor validates the scope before and after a valid remediation",
+          "then": "the checkpoint is reported as historical with its stale field named rather than as corruption, while a checkpoint whose commitment does not match still fails"
+        },
+        {
+          "id": "S7",
+          "requirement": "R6",
+          "given": "a remediated scope whose chain replays to the live state, with named validation evidence and a passing checker verdict",
+          "when": "kyro recertify apply runs",
+          "then": "one immutable certification record and one matching live anchor are written, every historical artifact is unchanged, and the scope reports recertified"
+        },
+        {
+          "id": "S8",
+          "requirement": "R6",
+          "given": "a recertification attempt with missing evidence, a failing verdict, a stale chain head, or a forged record or anchor",
+          "when": "Kyro evaluates it",
+          "then": "no passing certificate exists, nothing is written, and the failure remains visible"
+        },
+        {
+          "id": "S9",
+          "requirement": "R6",
+          "given": "a recertification whose evidence cites a Kyro task verdict and an external artifact, alongside one whose evidence is only a manifest-declared pass string",
+          "when": "Kyro verifies the certification",
+          "then": "each cited verdict and artifact is re-read and re-hashed from the workspace and must reproduce its declared digest and current chain head, while the bare declared pass is rejected with nothing written"
+        },
+        {
+          "id": "S10",
+          "requirement": "R5",
+          "given": "a scope where several verification conditions apply at once, such as an unknown schemaVersion with an invalid digest, a valid certificate over a chain that later diverged, or an unreadable record behind a well-formed anchor",
+          "when": "doctor and status derive the scope state",
+          "then": "both report the identical worst applicable state by the precedence diverged > unsupported > remediated > recertified > historical, with the same detail naming the specific reason"
+        }
+      ],
+      "nonGoals": [
+        "Generic JSON Patch or arbitrary field mutation.",
+        "Automatic conversion of semantically ambiguous historical values.",
+        "Rewriting checkpoints, snapshots, narratives, ledger commitments, task evidence, or verdicts.",
+        "Restoring missing checkpoint bytes from Git or backup.",
+        "Claiming production readiness from local recertification."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [
+      {
+        "id": "ADR-0001",
+        "title": "Recertification evidence must have a verifiable trust root",
+        "status": "accepted",
+        "date": "2026-08-08",
+        "context": "The Sprint 2 plan let kyro recertify accept a passing checker verdict without defining where that verdict comes from. A verdict string supplied by the same manifest that requests the certificate is the requester certifying itself, which is exactly the class of unearned trust this scope exists to prevent. Sprint 1 already showed the cost: a hand-written remediation record with digests matching nothing flipped doctor from DIVERGED to certified until the chain was replayed rather than believed.",
+        "decision": "A certification records evidence as typed entries, each carrying a source, an identity, a content digest, and the chain head commitment it was produced against. Two sources are valid in v1: a Kyro task verdict, referenced by scope, task id and the digest of the recorded verdict object, which Kyro re-reads and re-verifies from sprint.json rather than trusting the manifest copy; and an external artifact, referenced by a path inside the workspace plus its sha256, which Kyro re-hashes at verification time. Any evidence entry whose digest does not reproduce, or whose chain head is not the current head, invalidates the whole certification. A bare pass string with no verifiable source is rejected.",
+        "consequences": [
+          "kyro recertify cannot be satisfied by manifest-declared assertions alone; every claim it certifies is independently re-derivable from artifacts Kyro can read.",
+          "A certificate is bound to one chain head, so remediating again after certification necessarily drops the scope out of recertified rather than silently carrying the old certificate forward.",
+          "External evidence must live inside the workspace so its digest can be re-verified; evidence outside it cannot be certified in v1."
+        ],
+        "alternatives": [
+          "Accept a manifest-supplied verdict string and rely on operator discipline — rejected, it certifies nothing and is indistinguishable from a forged claim.",
+          "Require a live re-run of the checker during recertify — rejected for v1, it couples certification to executable test infrastructure and makes the record non-reproducible."
+        ]
+      },
+      {
+        "id": "ADR-0002",
+        "title": "Composite verification states resolve by fail-closed precedence",
+        "status": "accepted",
+        "date": "2026-08-08",
+        "context": "The state vocabulary in T2.1 was specified as five names without saying what happens when several apply at once: an unsupported schemaVersion together with an invalid digest, a valid certificate over a chain that later diverged, an unreadable record behind a well-formed anchor. Left undefined, doctor and status can each pick a different answer for the same scope, and the more reassuring one tends to win. Sprint 1 produced exactly that failure twice, in both directions.",
+        "decision": "The five states are strictly ordered and the WORST applicable state always wins: diverged > unsupported > remediated > recertified > historical. Concretely, an unreadable or contract-invalid record behind a valid anchor is diverged, not unsupported, because unreadability cannot be distinguished from tampering; an unknown schemaVersion with otherwise intact digests is unsupported, because this runtime cannot judge it; a valid certificate whose chain head no longer matches the live chain is diverged, never recertified; and recertified requires remediated to hold first. Doctor and status derive the state from one shared function so they cannot disagree, and each reports the same detail string naming the specific reason.",
+        "consequences": [
+          "No combination of conditions can produce a more reassuring state than its worst component, which removes the whole class of defects where hardening one path let another path certify.",
+          "recertified is never reachable without a currently valid chain, so a certificate cannot outlive the state it certified.",
+          "Callers get one state and one reason rather than a set, which keeps status output and Lens ingestion simple in Sprint 3."
+        ],
+        "alternatives": [
+          "Report every applicable state as a set and let the reader decide — rejected, it pushes the trust decision onto the least informed layer.",
+          "Treat unreadable records as unsupported rather than diverged — rejected, it lets deleting or corrupting bytes downgrade a failure into a benign-looking one."
+        ]
+      },
+      {
+        "id": "ADR-0003",
+        "title": "Replay must start from the live base a remediation actually corrected",
+        "status": "accepted",
+        "date": "2026-08-08",
+        "context": "Sprint 2 QA reproduced a genuine two-record chain (R-001 prose->1 on a scope whose live debt origin was corrupted after close, then R-002 1->2) being reported diverged by both doctor and status. resolveRemediationRebase replays from checkpoint.intendedAfterClose, but the first record's base is the DRIFTED live state — the corruption is exactly the reason to remediate — so the replay can only close when the pre-remediation live state already equalled the after-image. Both records report APPLIED individually yet the whole scope is diverged. The Sprint 1 harness hides this because every multi-record case hand-resets debt[0].origin=1 before remediating, so the first base coincides with the after-image by construction.",
+        "decision": "The replay remains the trust root (T2.1 finding 1 is deliberately not fixed in T2.1), but a genuine chain whose first record's base is the drifted live state must still certify. Concretely: resolveRemediationRebase must prove the first record's base is consistent with the live state it was built against rather than demanding it equal the checkpoint after-image, while still failing closed on hand-written records whose digests correspond to no state Kyro can reproduce. The existing QA probes (forged chain, no-op remediation over tampered state) define the attack boundary that any fix must keep failing closed.",
+        "consequences": [
+          "A scope whose corruption predates its first remediation can present an honest multi-record chain as remediated instead of diverged.",
+          "The fix touches Sprint 1 replay code shared by doctor and the T2.1 derivation, so it must be validated with honest-path multi-record probes from a genuinely drifted base, not just the after-image-aligned fixtures."
+        ],
+        "alternatives": [
+          "Relax the derivation to accept any per-record-APPLIED chain without replay — rejected, it lets a hand-written record whose base digests match nothing certify a diverged scope, which is exactly the QA probe 2 defect from Sprint 1.",
+          "Keep the strict after-image replay and document that legitimate first-record drift is unrepresentable — rejected, it makes the motivating case (corrupt-after-close) permanently divergent and forces operators to fabricate an after-image-aligned base."
+        ]
+      }
+    ],
+    "roadmap": {
+      "plannedSprintCount": 3,
+      "sizingRationale": "Three sprints isolate the persistence/security foundation, the verification and certification semantics, and the cross-repository Lens reader contract. Fewer sprints would mix irreversible writer behavior with its auditor and reader; more would create artificial boundaries. Sprint 2 depends on Sprint 1's stable remediation schema, and Sprint 3 depends on the finalized Doctor/status protocol.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "typed-remediation-protocol",
+          "title": "Typed remediation protocol and atomic writer",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "verification-and-recertification",
+          "title": "Chain verification and recertification",
+          "state": "active"
+        },
+        {
+          "n": 3,
+          "slug": "lens-remediation-ingestion",
+          "title": "Lens remediation ingestion",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "typed-remediation-protocol",
+        "outcome": "shipped",
+        "closedAt": "2026-08-08",
+        "archive": "archive/sprint-001-typed-remediation-protocol.md",
+        "snapshot": "archive/sprint-001-typed-remediation-protocol.json",
+        "checkpoint": "archive/sprint-001-typed-remediation-protocol.checkpoint.json",
+        "recommendations": [
+          "Sprint 2 (R5) should replace the current binary checkpoint verdict with the real state vocabulary: historical, remediated, recertified, diverged, unsupported. Today a legacy checkpoint that embeds a value the current schema rejects stays permanently invalid to doctor even after its live state is correctly remediated.",
+          "kyro recertify (R6) closes debt-1: check:cli-verbs fails only on that unshipped verb referenced in docs/plans/append-only-scope-remediation.md.",
+          "Before Lens ingestion (R7), confirm Lens resolves remediation records through remediations[].path — E3 made that field authoritative by binding it to the anchor id, and the reader must agree with doctor about which file is the evidence.",
+          "Re-run an independent QA certification of this scope when budget allows; the closing audit was performed by the same session that wrote the code."
+        ],
+        "checkpointSha256": "df6789b49ceafaff6b5fb40cc40fb7f151d28c04ee8f1037d848cf3c3a2491ed"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "typed-remediation-protocol",
+      "outcome": "shipped",
+      "summary": "Delivered the v1 append-only remediation protocol: typed contract with a closed operation registry, a fail-closed planner, a durable locked apply path exposed as kyro remediate preview|apply on CLI and MCP, and a 286-assertion regression harness wired into npm run check. R1-R4 hold; R5-R7 remain for Sprints 2-3 as planned."
+    },
+    "activeSprint": {
+      "n": 2,
+      "slug": "verification-and-recertification",
+      "title": "Chain verification and recertification",
+      "objective": "Report the truth about a remediated scope through a typed state vocabulary, and let a corrected scope earn a separate immutable certificate only on real evidence.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Chain-aware verification",
+          "objective": "Replace the binary checkpoint verdict with states that distinguish intact history, an audited correction, a certified scope, tampering, and a protocol this runtime cannot evaluate.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.1",
+              "title": "Introduce the typed scope verification vocabulary",
+              "description": "Define historical, remediated, recertified, diverged and unsupported as an explicit exported union, derive it from the existing checkpoint position plus the replayed remediation chain, and surface it in doctor --artifacts and status. Sprint 1 collapsed all of this into pass/fail plus a free-text label, so a reader cannot distinguish an audited correction from tampering without parsing prose.",
+              "files_to_touch": [
+                "src/cli/types.ts",
+                "src/cli/remediation/plan.ts",
+                "src/cli/commands/artifact-doctor.ts",
+                "src/cli/commands/status.ts"
+              ],
+              "context": "resolveRemediationRebase already replays the chain from checkpoint.intendedAfterClose and returns none/remediated/broken; inspectRemediationChain already validates both the commitment link and the state link. This task turns those internal results into one named state per scope rather than adding new verification logic. Sprint 1 convention learned the hard way: every change here needs probes on the honest path as well as the attack path, because hardening in one direction produced false negatives in the other.",
+              "acceptance_criteria": [
+                "The vocabulary is an exported union with exactly historical, remediated, recertified, diverged and unsupported; doctor and status both report the same state for the same scope from the same derivation, with no second implementation.",
+                "A scope whose live state equals its checkpoint after-image reports historical; one explained by a replayed chain reports remediated; one whose drift does not replay reports diverged; one whose remediation or certification declares an unknown schemaVersion reports unsupported.",
+                "recertified is reported only when a valid certification record exists for the current chain head, never merely because a remediation was applied.",
+                "Every existing rejection from Sprint 1 still fails closed and the genuine single- and multi-record chains still certify, proven by the existing scope-remediation harness passing unchanged."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S5",
+                "S6",
+                "S10"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Fixed the active-sprint false DIVERGED found in code review. The verification derivation compared live state against the checkpoint after-image, and the chain walk compared the head record's result digest against live state, with no guard for a later sprint having started. Once sprint N+1 was under way its ordinary edits moved live state off both images by design, so doctor reported 'diverged' and exited 1 on normal in-sprint work — including on this very scope. artifact-doctor.ts already drew this line via supersededByActiveSprint; the remediation and verification lenses did not. Added the shared isSupersededByActiveSprint helper and applied it in inspectRemediationChain and deriveScopeVerificationState. Record integrity, commitments and chain continuity are still enforced while a sprint is active; only the drift comparison is suspended, and a scope with no chain reports no verification state at all rather than a misleading one.",
+                "validation": [
+                  "node dist/cli.js doctor --artifacts --kyro-scope append-only-scope-remediation — exit 0, no verification failure (was exit 1, 'diverged')",
+                  "node dist/cli.js doctor --artifacts (all scopes) — exit 0",
+                  "node scripts/check-verification-states.mjs — 137 assertions, including two new active-sprint regressions: closed sprint 1 + planned sprint 2 keeps doctor green with and without a remediation chain",
+                  "Mutation test: forcing isSupersededByActiveSprint to false fails the harness with 'active sprint: doctor must stay green while sprint 2 is active, got exit 1'",
+                  "Chain health still enforced under an active sprint: tampering with a published record still reports diverged and exits non-zero (asserted in case 15)",
+                  "npm run check — full suite green (NPM_CHECK_EXIT=0)"
+                ],
+                "files_changed": [
+                  "src/cli/remediation/plan.ts",
+                  "scripts/check-verification-states.mjs"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-08T21:18:54.752Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "The vocabulary is an exported union with exactly historical, remediated, recertified, diverged and unsupported; doctor and status both report the same state for the same scope from the same derivation, with no second implementation.",
+                  "A scope whose live state equals its checkpoint after-image reports historical; one explained by a replayed chain reports remediated; one whose drift does not replay reports diverged; one whose remediation or certification declares an unknown schemaVersion reports unsupported.",
+                  "recertified is reported only when a valid certification record exists for the current chain head, never merely because a remediation was applied.",
+                  "Every existing rejection from Sprint 1 still fails closed and the genuine single- and multi-record chains still certify, proven by the existing scope-remediation harness passing unchanged."
+                ],
+                "findings": [],
+                "by": "claude-checker",
+                "reviewedAt": "2026-08-08T21:19:00.291Z"
+              }
+            },
+            {
+              "id": "T2.2",
+              "title": "Report a legacy checkpoint as historical evidence, not as corruption",
+              "description": "A checkpoint that embeds a value today's stricter schema rejects is currently reported CORRUPT forever, even after its live state has been correctly remediated, because validateSprintCloseCheckpoint runs the current SprintFile validator over the frozen before/after images. Separate structural integrity, which is commitment-based and must stay strict, from schema currency, which is a statement about the runtime rather than about the artifact.",
+              "files_to_touch": [
+                "src/cli/checkpoints/sprint-close.ts",
+                "src/cli/commands/artifact-doctor.ts",
+                "src/cli/remediation/plan.ts"
+              ],
+              "context": "Found while closing Sprint 1: the real motivating scope has a string debt origin inside its immutable checkpoint, so it can never satisfy today's validator, and remediating the live state cannot change that. checkpointCommitmentOfRecord already verifies such a checkpoint without applying the current schema. Tamper detection must not weaken: a checkpoint whose commitment does not match its ledger anchor stays a failure regardless of schema currency.",
+              "acceptance_criteria": [
+                "A checkpoint whose commitment matches its ledger anchor but whose embedded images fail the current SprintFile schema is reported as historical with the specific stale field named, not as CORRUPT, and does not by itself fail doctor.",
+                "A checkpoint whose commitment does not match its ledger anchor, whose bytes are unreadable, or whose identity does not match its ledger entry still fails exactly as it does today.",
+                "After a valid remediation of such a legacy scope, doctor exits 0 and reports the scope remediated while still naming the historical checkpoint's stale field.",
+                "check:lossless-checkpoints and check:sprint-doctor-v4 pass unchanged, proving no close-path or schema-gate behaviour was relaxed."
+              ],
+              "depends_on": [
+                "T2.1"
+              ],
+              "scenario_refs": [
+                "S6"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Fixed the integrity regression the certification found. The T2.2 implementation returned APPLIED as soon as checkpointSchemaIssues() reported a stale field, and that early return skipped everything after it: inspectArtifact on the legacy snapshot and the narrative, plus the live-state and project-scope position comparisons. A stale-schema checkpoint therefore stopped verifying its own immutable artifacts, and tampering with the narrative or snapshot bytes produced a byte-identical [PASS] APPLIED line. The schema issues are now carried as a 'historical:' note prefixed onto whatever detail the full verification produces, so the stale fields are still named (AC1) while every digest check still runs and still fails closed (AC2).",
+                "validation": [
+                  "node scripts/check-verification-states.mjs — 121 assertions, including a stale-schema checkpoint re-anchored honestly: intact artifacts report 'historical: ... narrative=ok', tampering reports narrative=conflict and doctor exits non-zero",
+                  "Mutation test: restoring the early return fails the harness with 'stale-schema checkpoint: artifact integrity was not evaluated at all'",
+                  "npm run check:lossless-checkpoints and npm run check:sprint-doctor-v4 — both pass unchanged",
+                  "npm run check — full suite green (NPM_CHECK_EXIT=0)"
+                ],
+                "files_changed": [
+                  "src/cli/commands/artifact-doctor.ts"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-08T21:04:25.406Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "A checkpoint whose commitment matches its ledger anchor but whose embedded images fail the current SprintFile schema is reported as historical with the specific stale field named, not as CORRUPT, and does not by itself fail doctor.",
+                  "A checkpoint whose commitment does not match its ledger anchor, whose bytes are unreadable, or whose identity does not match its ledger entry still fails exactly as it does today.",
+                  "After a valid remediation of such a legacy scope, doctor exits 0 and reports the scope remediated while still naming the historical checkpoint's stale field.",
+                  "check:lossless-checkpoints and check:sprint-doctor-v4 pass unchanged, proving no close-path or schema-gate behaviour was relaxed."
+                ],
+                "findings": [],
+                "by": "claude-checker",
+                "reviewedAt": "2026-08-08T21:04:35.601Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Recertification",
+          "objective": "Let a corrected scope earn a separate immutable certificate, and only on a valid chain plus real checker evidence.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.3",
+              "title": "Define the versioned recertification contract",
+              "description": "Add ScopeRecertificationV1 with its own schemaVersion and kind, binding the certified chain head commitment, the certified state digest, the named validation evidence, the checker verdict and provenance, plus a live certifications[] anchor mirroring the remediation anchor. Reuse the remediation protocol's fail-closed validator style: explicit exported types, no unknown payload, field-specific rejection paths.",
+              "files_to_touch": [
+                "src/cli/remediation/certification.ts",
+                "src/cli/remediation/protocol.ts",
+                "src/cli/types.ts",
+                "src/cli/artifacts/schema.ts"
+              ],
+              "context": "Mirror the Sprint 1 contract deliberately: the canonical state projection must exclude certifications[] as well as remediations[] or the certified digest forms a hash cycle. E3's lesson applies directly — an anchor's id and path must be bound to each other, and a record's self-declared scope and id must match where it lives and how it is anchored, or the record can misreport its own provenance while passing every digest.",
+              "acceptance_criteria": [
+                "ScopeRecertificationV1, its evidence array, verdict and provenance are explicit exported types with no unknown or free-form payload, and unknown fields are rejected with field-specific paths.",
+                "The certified state digest and the canonical projection exclude both remediations[] and certifications[], and a regression proves adding either anchor does not change the business-state digest.",
+                "The runtime SprintFile schema accepts only well-formed certification anchors, rejecting a malformed commitment, an id that is not a certification id, a path that is not the path derived from that id, and a duplicate id.",
+                "A certification whose declared schemaVersion is unknown is rejected as unsupported rather than ignored."
+              ],
+              "depends_on": [
+                "T2.1"
+              ],
+              "scenario_refs": [
+                "S7",
+                "S9"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Completed the contract beyond the type declarations. canonical-state.ts now excludes certifications[] as well as remediations[] (AC2 — previously missing, which made certifying a healthy scope report it as diverged). schema.ts gained validateCertificationAnchors, rejecting a malformed commitment, an id that is not C-NNN, a path that is not the path derived from that id, a duplicate id and unknown keys (AC3 — schema.ts had zero mentions of certifications before). validateScopeRecertification was hardened: certifiedChainHeadCommitment and certifiedStateDigest must be 64-hex rather than merely non-empty, empty evidence is rejected, and unknown keys in identity/verdict/provenance are rejected. certificationCommitment now includes certificationId so two certificates with different ids cannot share a commitment (the E3 lesson).",
+                "validation": [
+                  "node scripts/check-verification-states.mjs — 121 assertions; a certification anchor appended to a healthy scope leaves the business digest unchanged and doctor stays green",
+                  "Mutation test: reverting REMEDIATION_EXCLUDED_STATE_KEYS to ['remediations'] fails the harness ('doctor reported diverged, expected remediated')",
+                  "Mutation test: removing the chain-head binding in resolveCertificationForChainHead fails the isolated 1->2->1 case, where the business digest returns to the certified value and only the binding can detect the moved head",
+                  "npm run check — full suite green (NPM_CHECK_EXIT=0)"
+                ],
+                "files_changed": [
+                  "src/cli/remediation/canonical-state.ts",
+                  "src/cli/remediation/certification.ts",
+                  "src/cli/artifacts/schema.ts"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-08T21:04:12.760Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "ScopeRecertificationV1, its evidence array, verdict and provenance are explicit exported types with no unknown or free-form payload, and unknown fields are rejected with field-specific paths.",
+                  "The certified state digest and the canonical projection exclude both remediations[] and certifications[], and a regression proves adding either anchor does not change the business-state digest.",
+                  "The runtime SprintFile schema accepts only well-formed certification anchors, rejecting a malformed commitment, an id that is not a certification id, a path that is not the path derived from that id, and a duplicate id.",
+                  "A certification whose declared schemaVersion is unknown is rejected as unsupported rather than ignored."
+                ],
+                "findings": [],
+                "by": "claude-checker",
+                "reviewedAt": "2026-08-08T21:04:35.723Z"
+              }
+            },
+            {
+              "id": "T2.4",
+              "title": "Ship kyro recertify through the locked writer",
+              "description": "Implement recertify preview/apply reusing the Sprint 1 transaction discipline: rebuild the plan inside the state-writer lock, verify the remediation chain replays to the live state, require named validation evidence and a passing checker verdict, publish one immutable C-NNN exclusively, append one live anchor, then read both back and verify their digests. Expose it on CLI and MCP consistently.",
+              "files_to_touch": [
+                "src/cli/commands/recertify.ts",
+                "src/cli/remediation/transaction.ts",
+                "src/cli/app.ts",
+                "src/cli/help.ts",
+                "src/cli/mcp/handlers.ts",
+                "src/cli/mcp/tool-catalog.ts"
+              ],
+              "context": "Sprint 1 conventions that must carry over: apply requires explicit confirmation; a failed validation writes nothing; an interrupted write reports PREPARED and is resumed, never duplicated, which required reusing the prepared record's createdAt so the retry produces the same commitment; and adding an MCP tool also means updating tool-catalog.ts, its golden fixture and the tool count in check-mcp.mjs. Do not reuse the remediation record type for certification — applying a correction and certifying it are different claims.",
+              "acceptance_criteria": [
+                "kyro recertify preview writes nothing and shows the chain head, certified digest, evidence and verdict; apply requires explicit confirmation and is exposed identically on CLI and MCP.",
+                "Recertification is refused, with nothing written, when the remediation chain does not replay to the live state, when the chain head has changed, when validation evidence is missing or empty, or when the checker verdict is a fail.",
+                "A successful apply publishes exactly one immutable C-NNN and one matching live anchor, leaves every checkpoint, snapshot, narrative, ledger commitment and remediation record byte-identical, and is verified by read-back.",
+                "An interrupted recertification reports PREPARED and is never presented as certified; the retry completes that same certificate and cannot create a second one."
+              ],
+              "depends_on": [
+                "T2.3"
+              ],
+              "scenario_refs": [
+                "S7",
+                "S8",
+                "S9"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Replaced the T2.4 stub with a real implementation. planCertification builds the warrant (chain must replay to live state, chain head must match, evidence non-empty and re-derived from the workspace, verdict must be pass); applyCertificationTransaction runs it under withStateWriterLock, rebuilding the plan inside the lock, publishing exactly one immutable C-NNN via publishExclusive, appending one live anchor via atomicReplace, then reading both back. An interrupted apply reports PREPARED and the retry reuses the prepared record's createdAt/recordedAt so it reproduces the same commitment instead of minting a second certificate. Exposed identically on CLI (recertify preview|apply) and MCP (recertify_scope), with tool-catalog, golden fixture and check-mcp tool count updated. All 'sha256-placeholder'/'placeholder'/'T2.4 stub' values are gone.",
+                "validation": [
+                  "npm run check — full suite green end to end (NPM_CHECK_EXIT=0), including check:cli-verbs which resolves 28 real verbs",
+                  "node scripts/check-verification-states.mjs — 121 assertions covering preview-writes-nothing, apply-refuses-without-yes, one-record-one-anchor with byte-identical history, PREPARED resume producing exactly 1 record and 1 anchor, and 6 refusal paths",
+                  "npm run check:mcp — MCP stdio conformance passed with 11 tools",
+                  "Mutation test: reverting resolveCertificationForHead to the stub fails the harness ('doctor reported remediated, expected recertified'), proving recertified is genuinely reachable and asserted"
+                ],
+                "files_changed": [
+                  "src/cli/commands/recertify.ts",
+                  "src/cli/remediation/certification-plan.ts",
+                  "src/cli/remediation/certification-transaction.ts",
+                  "src/cli/mcp/handlers.ts",
+                  "src/cli/mcp/tool-catalog.ts"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-08T21:03:55.916Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "kyro recertify preview writes nothing and shows the chain head, certified digest, evidence and verdict; apply requires explicit confirmation and is exposed identically on CLI and MCP.",
+                  "Recertification is refused, with nothing written, when the remediation chain does not replay to the live state, when the chain head has changed, when validation evidence is missing or empty, or when the checker verdict is a fail.",
+                  "A successful apply publishes exactly one immutable C-NNN and one matching live anchor, leaves every checkpoint, snapshot, narrative, ledger commitment and remediation record byte-identical, and is verified by read-back.",
+                  "An interrupted recertification reports PREPARED and is never presented as certified; the retry completes that same certificate and cannot create a second one."
+                ],
+                "findings": [],
+                "by": "claude-checker",
+                "reviewedAt": "2026-08-08T21:04:35.852Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P3",
+          "title": "Proof and debt closure",
+          "objective": "Prove the verification and certification semantics adversarially, and close the debt Sprint 1 could not.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.5",
+              "title": "Prove the verification states and certification failure paths",
+              "description": "Extend the regression harness with the full state matrix and the certification failure paths, then close debt-1 now that kyro recertify exists. Build fixtures from the real close and remediate paths, never from hand-assembled look-alikes.",
+              "files_to_touch": [
+                "scripts/check-scope-remediation.mjs",
+                "scripts/check-recertification.mjs",
+                "package.json",
+                "docs/plans/append-only-scope-remediation.md"
+              ],
+              "context": "The single most expensive Sprint 1 lesson: a synthetic checkpoint hid a critical defect through three tasks, and only closing a scope through the real close-sprint exposed it. The second: independent adversarial probing found what maker-checker passed, so this harness must attack the honest path as well as the forged one. debt-1 is check:cli-verbs failing solely on the unshipped kyro recertify reference in the plan doc.",
+              "acceptance_criteria": [
+                "Each of historical, remediated, recertified, diverged and unsupported is produced by a fixture built through the real close, remediate and recertify commands, and asserted by name.",
+                "Certification failure paths each leave no passing certificate and no disturbed history: missing evidence, empty evidence, a failing verdict, a stale chain head, a forged certification record, and a hand-written certification anchor.",
+                "A recertified scope that is then remediated again no longer reports recertified, proving a certificate covers one chain head rather than the scope forever.",
+                "npm run check passes in full, including check:cli-verbs, and debt-1 is resolved through the CLI with the actual outcome recorded."
+              ],
+              "depends_on": [
+                "T2.2",
+                "T2.4"
+              ],
+              "scenario_refs": [
+                "S5",
+                "S6",
+                "S7",
+                "S8",
+                "S9",
+                "S10"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Rewrote check-verification-states.mjs, which previously had zero asserts, a hardcoded absolute repo path, four of five states marked (Skipped), and printed 'All tests passed' unconditionally — it could not exit non-zero. The harness now builds every fixture through the real close-sprint, remediate and recertify commands and asserts 121 conditions: all five states by name in both doctor and status, the stale-schema checkpoint case that proves artifact digests are still verified, the certification failure paths (empty evidence, failing verdict, stale chain head, unknown manifest schemaVersion, missing evidence artifact, mismatched evidence digest, forged record, hand-written anchor), PREPARED resume, and the isolated chain-head binding case. Registered in package.json and in the npm run check chain. debt-1 resolved through the CLI.",
+                "validation": [
+                  "node scripts/check-verification-states.mjs — 121 assertions passed",
+                  "npm run check — full suite green end to end (NPM_CHECK_EXIT=0), including check:cli-verbs (AC4)",
+                  "Mutation testing proves the harness binds: restoring the T2.2 early return, reverting the certifications[] exclusion, stubbing resolveCertificationForHead, and removing the chain-head binding each fail it with a specific message"
+                ],
+                "files_changed": [
+                  "scripts/check-verification-states.mjs",
+                  "package.json"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-08-08T21:04:12.850Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Each of historical, remediated, recertified, diverged and unsupported is produced by a fixture built through the real close, remediate and recertify commands, and asserted by name.",
+                  "Certification failure paths each leave no passing certificate and no disturbed history: missing evidence, empty evidence, a failing verdict, a stale chain head, a forged certification record, and a hand-written certification anchor.",
+                  "A recertified scope that is then remediated again no longer reports recertified, proving a certificate covers one chain head rather than the scope forever.",
+                  "npm run check passes in full, including check:cli-verbs, and debt-1 is resolved through the CLI with the actual outcome recorded."
+                ],
+                "findings": [],
+                "by": "claude-checker",
+                "reviewedAt": "2026-08-08T21:04:35.973Z"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [
+        {
+          "id": "E1",
+          "title": "Make resolveRemediationRebase replay from the drifted live base of a genuine first record",
+          "description": "QA reproduced a genuine two-record chain (R-001 prose->1 after a post-close corruption, then R-002 1->2) reporting diverged in doctor and status even though both records report APPLIED individually. resolveRemediationRebase replays from checkpoint.intendedAfterClose, but the first record's base is the drifted live state — the corruption is the reason to remediate — so replay only closes when the pre-remediation live state already equalled the after-image. Per ADR-0003, the replay must prove the first record's base is consistent with the live state it was built against instead of demanding it equal the after-image, while still failing closed on forged records (probes: forged chain, no-op remediation over tampered state). Sprint 2 is blocked on this because T2.2 inherits the same replay.",
+          "files_to_touch": [
+            "src/cli/remediation/plan.ts"
+          ],
+          "context": "",
+          "acceptance_criteria": [
+            "A genuine multi-record chain whose first record base is a drifted live state reports remediated, not diverged, in both doctor and status.",
+            "The existing Sprint 1 rejections still fail closed: forged chain, no-op remediation over unrelated tampering, tampered anchor/ledger, unsupported schemaVersion.",
+            "Honest-path probes are built from a genuinely drifted base (corrupt after close), not from fixtures that hand-reset the base to the after-image — the Sprint 1 harness gap the QA identified."
+          ],
+          "depends_on": [
+            "T2.1"
+          ],
+          "scenario_refs": [],
+          "status": "done",
+          "evidence": {
+            "summary": "Allow a drifted-base first record to replay without preconditions, guarded by verifying the declared result digest, so a genuine multi-record chain over a truly drifted live state certifies instead of reporting diverged (ADR-0003). The rigged multi-record fixtures were also removed: both cases in check-scope-remediation.mjs previously reset closed.debt[0].origin = 1 before remediating, so the drifted-base path was never exercised; they now derive a genuine LEGACY_ORIGIN -> 1 -> 2 chain.",
+            "validation": [
+              "npm run check — full suite green end to end (NPM_CHECK_EXIT=0)",
+              "node scripts/check-scope-remediation.mjs — 286 assertions passed with the preemptive origin resets removed from both multi-record fixtures",
+              "node scripts/check-verification-states.mjs — 121 assertions; honest 2-record chain reports remediated in doctor and status, forged record reports diverged in both",
+              "Adversarial probe: forging record.result.snapshot to inject an objective change no operation can express is rejected (doctor exit 1, diverged) via chainContinuityIssue"
+            ],
+            "files_changed": [
+              "src/cli/remediation/plan.ts",
+              "scripts/check-scope-remediation.mjs"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-08-08T21:03:07.890Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A genuine multi-record chain whose first record base is a drifted live state reports remediated, not diverged, in both doctor and status.",
+              "The existing Sprint 1 rejections still fail closed: forged chain, no-op remediation over unrelated tampering, tampered anchor/ledger, unsupported schemaVersion.",
+              "Honest-path probes are built from a genuinely drifted base (corrupt after close), not from fixtures that hand-reset the base to the after-image — the Sprint 1 harness gap the QA identified."
+            ],
+            "findings": [
+              {
+                "severity": "warning",
+                "detail": "resolveRemediationRebase consumes record.result.snapshot without verifying stateDigest(snapshot) === record.result.stateSha256 (protocol.ts:148 declares it allowed but not validated). Not exploitable today because chainContinuityIssue enforces base/result linkage before the replay, but the function is unsafe in isolation and any future caller inherits the gap. Registered as debt rather than fixed here."
+              }
+            ],
+            "by": "claude-checker",
+            "reviewedAt": "2026-08-08T21:03:23.963Z"
+          }
+        }
+      ],
+      "definitionOfDone": [
+        "R5 and R6 are satisfied: the verification vocabulary is reported truthfully by doctor and status, and a certificate exists only on a valid chain plus real evidence.",
+        "npm run check passes in full, including check:cli-verbs, with debt-1 resolved.",
+        "Every historical artifact — checkpoints, snapshots, narratives, ledger commitments and Sprint 1 remediation records — remains byte-identical, asserted rather than assumed.",
+        "An INDEPENDENT QA certification passes before close. Sprint 1's closing audit was self-audited because both certifier agents died, and its recommendation to re-certify is carried into this sprint.",
+        "No task is closed on evidence that overstates what the code does; a fixture that cannot fail is not proof."
+      ]
+    },
+    "debt": [
+      {
+        "id": "debt-1",
+        "title": "npm run check fails while docs/plans/append-only-scope-remediation.md references unshipped verbs",
+        "origin": 1,
+        "priority": "medium",
+        "status": "resolved",
+        "targetSprint": null,
+        "note": "check:cli-verbs is green: kyro recertify now exists as a real CLI verb (preview/apply) wired into app.ts, help.ts, MCP handlers and tool-catalog, so the plan doc reference resolves. npm run check passes end to end (NPM_CHECK_EXIT=0)."
+      },
+      {
+        "id": "debt-2",
+        "title": "resolveRemediationRebase consumes record.result.snapshot without verifying its digest",
+        "origin": 2,
+        "priority": "medium",
+        "status": "open",
+        "targetSprint": null,
+        "note": "For non-final records the replay base becomes record.result.snapshot, but protocol.ts:148 declares snapshot allowed-but-not-validated and stateDigest(snapshot) === record.result.stateSha256 is never checked. Not exploitable today: chainContinuityIssue enforces base/result linkage before the replay, and an adversarial probe injecting an objective change was rejected. The function is unsafe in isolation and any future caller that uses it without the continuity loop inherits the gap. Fix: verify the snapshot digest inside the replay loop, or drop snapshot and replay from the computed next state."
+      },
+      {
+        "id": "debt-3",
+        "title": "record.result.snapshot duplicates the full sprint state in every immutable remediation record",
+        "origin": 2,
+        "priority": "low",
+        "status": "open",
+        "targetSprint": null,
+        "note": "plan.ts sets snapshot: projectedSprint, so each record embeds a complete copy of sprint.json (~46 KB here). Archive growth is quadratic in chain length, and it introduces an unknown-typed payload into a contract whose stated convention is no unknown payload. No ADR authorizes this contract change. Raised by the Sprint 2 QA certification (MAJOR 7)."
+      }
+    ],
+    "handoff": {
+      "nextAction": "close_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task T2.1 passed checker review.",
+      "lastUpdated": "2026-08-08T21:19:00.291Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "append-only-scope-remediation",
+    "title": "Append-only scope remediation and recertification",
+    "status": "planning",
+    "objective": "Safely remediate and recertify closed Kyro scopes without changing immutable checkpoint history.",
+    "successCriteria": [
+      "An operator can preview and atomically apply a typed remediation to a closed scope without altering historical checkpoint bytes or commitments.",
+      "Every remediation records its affected issues, typed operations, source commitments, and corrected-state digest in an append-only chain.",
+      "Artifact Doctor distinguishes historical, remediated, recertified, diverged, and unsupported scope states.",
+      "A scope is not reported as recertified unless an immutable certification record validates the remediation and checker evidence.",
+      "Lens loads valid remediation chains with provenance and rejects invalid or unsupported chains without silently using stale state."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "The system must preserve every original checkpoint, snapshot, narrative, and ledger commitment while a closed scope is remediated.",
+          "priority": "must",
+          "rationale": "Historical evidence must remain tamper-evident; remediation cannot rewrite the event it corrects."
+        },
+        {
+          "id": "R2",
+          "statement": "The system must represent each remediation as a versioned record with base state digest, affected checkpoint commitments, issues, typed operations, provenance, and expected result digest.",
+          "priority": "must",
+          "rationale": "A remediation must be auditable and bound to the exact state it corrects."
+        },
+        {
+          "id": "R3",
+          "statement": "The system must accept only operations from a closed typed registry and reject arbitrary patch instructions.",
+          "priority": "must",
+          "rationale": "Strong typing prevents semantic rewriting of tasks, evidence, checkpoints, or credentials. The first operation is debt.origin.set."
+        },
+        {
+          "id": "R4",
+          "statement": "The system must preview and apply a remediation batch atomically, failing without writes when any digest, precondition, operation, schema, or post-write verification fails.",
+          "priority": "must",
+          "rationale": "A partially corrected closed scope is less trustworthy than an explicitly blocked one."
+        },
+        {
+          "id": "R5",
+          "statement": "The system must validate and expose the remediation chain independently from historical checkpoint integrity.",
+          "priority": "must",
+          "rationale": "Doctor and status must report remediated, recertified, diverged, and unsupported states truthfully."
+        },
+        {
+          "id": "R6",
+          "statement": "The system must create a separate immutable recertification record only when a valid remediation chain and checker validation evidence are present.",
+          "priority": "must",
+          "rationale": "Applying a correction is not equivalent to certifying the corrected scope."
+        },
+        {
+          "id": "R7",
+          "statement": "Kyro Lens must load and present valid remediation and recertification provenance while failing closed for invalid or unsupported protocol versions.",
+          "priority": "must",
+          "rationale": "The reader that exposed the original contract violation must consume the new protocol safely."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "a closed scope with a committed checkpoint, snapshot, narrative, and checkpointSha256 ledger anchor",
+          "when": "a valid remediation is previewed and applied",
+          "then": "the original archival artifacts and their commitments remain unchanged while the corrected live state is linked through a new append-only remediation record"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "a remediation manifest that identifies a closed scope and a concrete historical issue",
+          "when": "Kyro builds its preview",
+          "then": "the preview and persisted record bind the base state digest, affected checkpoint commitments, issues array, typed operations, provenance, and expected result digest"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "a manifest containing either debt.origin.set or an unknown patch-like operation",
+          "when": "Kyro validates the remediation",
+          "then": "only the explicitly typed debt.origin.set with a numeric replacement and matching precondition is accepted"
+        },
+        {
+          "id": "S4",
+          "requirement": "R4",
+          "given": "a remediation batch whose operations and preconditions are evaluated together",
+          "when": "one operation is invalid or persistence is interrupted",
+          "then": "Kyro exposes no applied remediation, leaves historical artifacts unchanged, and permits only deterministic recovery of a prepared transaction"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "a closed scope whose live state was corrected by a valid, replayable remediation chain but never certified",
+          "when": "doctor and status report on it",
+          "then": "both name the scope remediated, never recertified, and never diverged"
+        },
+        {
+          "id": "S6",
+          "requirement": "R5",
+          "given": "a legacy checkpoint whose commitment matches its ledger anchor but whose frozen images fail the current schema",
+          "when": "doctor validates the scope before and after a valid remediation",
+          "then": "the checkpoint is reported as historical with its stale field named rather than as corruption, while a checkpoint whose commitment does not match still fails"
+        },
+        {
+          "id": "S7",
+          "requirement": "R6",
+          "given": "a remediated scope whose chain replays to the live state, with named validation evidence and a passing checker verdict",
+          "when": "kyro recertify apply runs",
+          "then": "one immutable certification record and one matching live anchor are written, every historical artifact is unchanged, and the scope reports recertified"
+        },
+        {
+          "id": "S8",
+          "requirement": "R6",
+          "given": "a recertification attempt with missing evidence, a failing verdict, a stale chain head, or a forged record or anchor",
+          "when": "Kyro evaluates it",
+          "then": "no passing certificate exists, nothing is written, and the failure remains visible"
+        },
+        {
+          "id": "S9",
+          "requirement": "R6",
+          "given": "a recertification whose evidence cites a Kyro task verdict and an external artifact, alongside one whose evidence is only a manifest-declared pass string",
+          "when": "Kyro verifies the certification",
+          "then": "each cited verdict and artifact is re-read and re-hashed from the workspace and must reproduce its declared digest and current chain head, while the bare declared pass is rejected with nothing written"
+        },
+        {
+          "id": "S10",
+          "requirement": "R5",
+          "given": "a scope where several verification conditions apply at once, such as an unknown schemaVersion with an invalid digest, a valid certificate over a chain that later diverged, or an unreadable record behind a well-formed anchor",
+          "when": "doctor and status derive the scope state",
+          "then": "both report the identical worst applicable state by the precedence diverged > unsupported > remediated > recertified > historical, with the same detail naming the specific reason"
+        }
+      ],
+      "nonGoals": [
+        "Generic JSON Patch or arbitrary field mutation.",
+        "Automatic conversion of semantically ambiguous historical values.",
+        "Rewriting checkpoints, snapshots, narratives, ledger commitments, task evidence, or verdicts.",
+        "Restoring missing checkpoint bytes from Git or backup.",
+        "Claiming production readiness from local recertification."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [
+      {
+        "id": "ADR-0001",
+        "title": "Recertification evidence must have a verifiable trust root",
+        "status": "accepted",
+        "date": "2026-08-08",
+        "context": "The Sprint 2 plan let kyro recertify accept a passing checker verdict without defining where that verdict comes from. A verdict string supplied by the same manifest that requests the certificate is the requester certifying itself, which is exactly the class of unearned trust this scope exists to prevent. Sprint 1 already showed the cost: a hand-written remediation record with digests matching nothing flipped doctor from DIVERGED to certified until the chain was replayed rather than believed.",
+        "decision": "A certification records evidence as typed entries, each carrying a source, an identity, a content digest, and the chain head commitment it was produced against. Two sources are valid in v1: a Kyro task verdict, referenced by scope, task id and the digest of the recorded verdict object, which Kyro re-reads and re-verifies from sprint.json rather than trusting the manifest copy; and an external artifact, referenced by a path inside the workspace plus its sha256, which Kyro re-hashes at verification time. Any evidence entry whose digest does not reproduce, or whose chain head is not the current head, invalidates the whole certification. A bare pass string with no verifiable source is rejected.",
+        "consequences": [
+          "kyro recertify cannot be satisfied by manifest-declared assertions alone; every claim it certifies is independently re-derivable from artifacts Kyro can read.",
+          "A certificate is bound to one chain head, so remediating again after certification necessarily drops the scope out of recertified rather than silently carrying the old certificate forward.",
+          "External evidence must live inside the workspace so its digest can be re-verified; evidence outside it cannot be certified in v1."
+        ],
+        "alternatives": [
+          "Accept a manifest-supplied verdict string and rely on operator discipline — rejected, it certifies nothing and is indistinguishable from a forged claim.",
+          "Require a live re-run of the checker during recertify — rejected for v1, it couples certification to executable test infrastructure and makes the record non-reproducible."
+        ]
+      },
+      {
+        "id": "ADR-0002",
+        "title": "Composite verification states resolve by fail-closed precedence",
+        "status": "accepted",
+        "date": "2026-08-08",
+        "context": "The state vocabulary in T2.1 was specified as five names without saying what happens when several apply at once: an unsupported schemaVersion together with an invalid digest, a valid certificate over a chain that later diverged, an unreadable record behind a well-formed anchor. Left undefined, doctor and status can each pick a different answer for the same scope, and the more reassuring one tends to win. Sprint 1 produced exactly that failure twice, in both directions.",
+        "decision": "The five states are strictly ordered and the WORST applicable state always wins: diverged > unsupported > remediated > recertified > historical. Concretely, an unreadable or contract-invalid record behind a valid anchor is diverged, not unsupported, because unreadability cannot be distinguished from tampering; an unknown schemaVersion with otherwise intact digests is unsupported, because this runtime cannot judge it; a valid certificate whose chain head no longer matches the live chain is diverged, never recertified; and recertified requires remediated to hold first. Doctor and status derive the state from one shared function so they cannot disagree, and each reports the same detail string naming the specific reason.",
+        "consequences": [
+          "No combination of conditions can produce a more reassuring state than its worst component, which removes the whole class of defects where hardening one path let another path certify.",
+          "recertified is never reachable without a currently valid chain, so a certificate cannot outlive the state it certified.",
+          "Callers get one state and one reason rather than a set, which keeps status output and Lens ingestion simple in Sprint 3."
+        ],
+        "alternatives": [
+          "Report every applicable state as a set and let the reader decide — rejected, it pushes the trust decision onto the least informed layer.",
+          "Treat unreadable records as unsupported rather than diverged — rejected, it lets deleting or corrupting bytes downgrade a failure into a benign-looking one."
+        ]
+      },
+      {
+        "id": "ADR-0003",
+        "title": "Replay must start from the live base a remediation actually corrected",
+        "status": "accepted",
+        "date": "2026-08-08",
+        "context": "Sprint 2 QA reproduced a genuine two-record chain (R-001 prose->1 on a scope whose live debt origin was corrupted after close, then R-002 1->2) being reported diverged by both doctor and status. resolveRemediationRebase replays from checkpoint.intendedAfterClose, but the first record's base is the DRIFTED live state — the corruption is exactly the reason to remediate — so the replay can only close when the pre-remediation live state already equalled the after-image. Both records report APPLIED individually yet the whole scope is diverged. The Sprint 1 harness hides this because every multi-record case hand-resets debt[0].origin=1 before remediating, so the first base coincides with the after-image by construction.",
+        "decision": "The replay remains the trust root (T2.1 finding 1 is deliberately not fixed in T2.1), but a genuine chain whose first record's base is the drifted live state must still certify. Concretely: resolveRemediationRebase must prove the first record's base is consistent with the live state it was built against rather than demanding it equal the checkpoint after-image, while still failing closed on hand-written records whose digests correspond to no state Kyro can reproduce. The existing QA probes (forged chain, no-op remediation over tampered state) define the attack boundary that any fix must keep failing closed.",
+        "consequences": [
+          "A scope whose corruption predates its first remediation can present an honest multi-record chain as remediated instead of diverged.",
+          "The fix touches Sprint 1 replay code shared by doctor and the T2.1 derivation, so it must be validated with honest-path multi-record probes from a genuinely drifted base, not just the after-image-aligned fixtures."
+        ],
+        "alternatives": [
+          "Relax the derivation to accept any per-record-APPLIED chain without replay — rejected, it lets a hand-written record whose base digests match nothing certify a diverged scope, which is exactly the QA probe 2 defect from Sprint 1.",
+          "Keep the strict after-image replay and document that legitimate first-record drift is unrepresentable — rejected, it makes the motivating case (corrupt-after-close) permanently divergent and forces operators to fabricate an after-image-aligned base."
+        ]
+      }
+    ],
+    "roadmap": {
+      "plannedSprintCount": 3,
+      "sizingRationale": "Three sprints isolate the persistence/security foundation, the verification and certification semantics, and the cross-repository Lens reader contract. Fewer sprints would mix irreversible writer behavior with its auditor and reader; more would create artificial boundaries. Sprint 2 depends on Sprint 1's stable remediation schema, and Sprint 3 depends on the finalized Doctor/status protocol.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "typed-remediation-protocol",
+          "title": "Typed remediation protocol and atomic writer",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "verification-and-recertification",
+          "title": "Chain verification and recertification",
+          "state": "closed"
+        },
+        {
+          "n": 3,
+          "slug": "lens-remediation-ingestion",
+          "title": "Lens remediation ingestion",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "typed-remediation-protocol",
+        "outcome": "shipped",
+        "closedAt": "2026-08-08",
+        "archive": "archive/sprint-001-typed-remediation-protocol.md",
+        "snapshot": "archive/sprint-001-typed-remediation-protocol.json",
+        "checkpoint": "archive/sprint-001-typed-remediation-protocol.checkpoint.json",
+        "recommendations": [
+          "Sprint 2 (R5) should replace the current binary checkpoint verdict with the real state vocabulary: historical, remediated, recertified, diverged, unsupported. Today a legacy checkpoint that embeds a value the current schema rejects stays permanently invalid to doctor even after its live state is correctly remediated.",
+          "kyro recertify (R6) closes debt-1: check:cli-verbs fails only on that unshipped verb referenced in docs/plans/append-only-scope-remediation.md.",
+          "Before Lens ingestion (R7), confirm Lens resolves remediation records through remediations[].path — E3 made that field authoritative by binding it to the anchor id, and the reader must agree with doctor about which file is the evidence.",
+          "Re-run an independent QA certification of this scope when budget allows; the closing audit was performed by the same session that wrote the code."
+        ],
+        "checkpointSha256": "df6789b49ceafaff6b5fb40cc40fb7f151d28c04ee8f1037d848cf3c3a2491ed"
+      },
+      {
+        "n": 2,
+        "slug": "verification-and-recertification",
+        "outcome": "shipped",
+        "closedAt": "2026-08-08",
+        "archive": "archive/sprint-002-verification-and-recertification.md",
+        "snapshot": "archive/sprint-002-verification-and-recertification.json",
+        "checkpoint": "archive/sprint-002-verification-and-recertification.checkpoint.json",
+        "recommendations": [
+          "Resolve debt-2 first: verify stateDigest(record.result.snapshot) === record.result.stateSha256 inside the replay loop, or drop snapshot and replay from the computed next state. It is not exploitable today only because chainContinuityIssue runs first.",
+          "Certify a global install, not just the local checkout. The installed runtime did not surface the verification state, which is what made the active-sprint false DIVERGED easy to miss.",
+          "Close S3/Lens and the R7 coverage that analyze still reports as pending before certifying the scope end to end."
+        ],
+        "checkpointSha256": "95ae7c629af911130775c3fee9f1ae5eca8c471a3a82f50d6ad018e7d3b6f897"
+      }
+    ],
+    "previousSprint": {
+      "n": 2,
+      "slug": "verification-and-recertification",
+      "outcome": "shipped",
+      "summary": "Shipped the typed verification vocabulary and the recertification writer: five named scope states derived once and reported identically by doctor and status, kyro recertify preview/apply publishing immutable C-NNN certificates under the state-writer lock, and a regression harness that can actually fail."
+    },
+    "activeSprint": null,
+    "debt": [
+      {
+        "id": "debt-1",
+        "title": "npm run check fails while docs/plans/append-only-scope-remediation.md references unshipped verbs",
+        "origin": 1,
+        "priority": "medium",
+        "status": "resolved",
+        "targetSprint": null,
+        "note": "check:cli-verbs is green: kyro recertify now exists as a real CLI verb (preview/apply) wired into app.ts, help.ts, MCP handlers and tool-catalog, so the plan doc reference resolves. npm run check passes end to end (NPM_CHECK_EXIT=0)."
+      },
+      {
+        "id": "debt-2",
+        "title": "resolveRemediationRebase consumes record.result.snapshot without verifying its digest",
+        "origin": 2,
+        "priority": "medium",
+        "status": "open",
+        "targetSprint": null,
+        "note": "For non-final records the replay base becomes record.result.snapshot, but protocol.ts:148 declares snapshot allowed-but-not-validated and stateDigest(snapshot) === record.result.stateSha256 is never checked. Not exploitable today: chainContinuityIssue enforces base/result linkage before the replay, and an adversarial probe injecting an objective change was rejected. The function is unsafe in isolation and any future caller that uses it without the continuity loop inherits the gap. Fix: verify the snapshot digest inside the replay loop, or drop snapshot and replay from the computed next state."
+      },
+      {
+        "id": "debt-3",
+        "title": "record.result.snapshot duplicates the full sprint state in every immutable remediation record",
+        "origin": 2,
+        "priority": "low",
+        "status": "open",
+        "targetSprint": null,
+        "note": "plan.ts sets snapshot: projectedSprint, so each record embeds a complete copy of sprint.json (~46 KB here). Archive growth is quadratic in chain length, and it introduces an unknown-typed payload into a contract whose stated convention is no unknown payload. No ADR authorizes this contract change. Raised by the Sprint 2 QA certification (MAJOR 7)."
+      }
+    ],
+    "handoff": {
+      "nextAction": "plan_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Sprint 2 closed after an independent QA certification and two rounds of code review. Open: debt-2 (unvalidated result.snapshot in resolveRemediationRebase) and debt-3 (snapshot size growth). S3/Lens remains before the scope as a whole can be certified.",
+      "lastUpdated": "2026-08-08"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "append-only-scope-remediation",
+    "title": "Append-only scope remediation and recertification",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "append-only-scope-remediation",
+    "title": "Append-only scope remediation and recertification",
+    "status": "planning"
+  },
+  "digests": {
+    "beforeClose": "a42f86826ccac927b04cfbc5ba9594b8905a60c602b4dfb25e1357f619bba299",
+    "intendedAfterClose": "6f3eddcc2634e0e4910c0d920997d3d2bec9f244e646e3f298f33d89eb30e287",
+    "projectScopeBefore": "c6214189ab65861ff03ccad70a89f490cb583c15e56fe4f52b636a7f0eb11f78",
+    "projectScopeAfter": "786cc4feeb247eef397142ce49ca4b501876d7de3338682182eadd8320d77c94",
+    "legacySnapshot": "c0350234937890e770d413c1a8eded44272f8a87cf3f14e612f53fa76206ccf0",
+    "narrative": "75ae6ce50bc029fe84b77a04e3006a946e763ca22e229dcfee422674e695952b"
+  }
+}

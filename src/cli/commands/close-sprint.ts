@@ -127,7 +127,7 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
     type: 'close_snapshot',
     sprintN: identity.sprintN,
     snapshotId: traceSnapshotId(fresh.snapshotPath),
-    outcome: normalizeTraceCloseOutcome(args.outcome),
+    outcome: normalizeTraceCloseOutcome(fresh.transaction.checkpoint.close.outcome),
   });
   console.log(`\nSprint ${identity.sprintN} closed. activeSprint cleared; ledger entry, snapshot, and checkpoint recorded.`);
   const handoff = (verify.value as SprintFile).handoff;

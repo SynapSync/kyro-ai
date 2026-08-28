@@ -1,0 +1,476 @@
+{
+  "n": 1,
+  "slug": "evidence-based-scope-classification",
+  "title": "Evidence-based scope classification",
+  "objective": "Classify scope directories from evidence, make every consumer respect that classification, and make the resulting contamination cleanable.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Classification primitives",
+      "objective": "Introduce a neutral checkpoint survey and an evidence-based directory classifier without inverting layers.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "title": "Add a neutral checkpoint discovery module",
+          "description": "Add src/cli/checkpoints/discovery.ts returning structured facts about a scope's close checkpoints, built on resolveEffectiveCheckpointAtPath so a checkpoint only counts when it resolves and its identity names the scope.",
+          "files_to_touch": [
+            "src/cli/checkpoints/discovery.ts",
+            "src/cli/repair/integrity-plan.ts"
+          ],
+          "context": "The equivalent logic lived in commands/artifact-doctor.ts, which returns CheckResult[]; importing it from artifacts/ would invert the dependency and risk cycles. A third copy of the readdir/filter pattern also existed in integrity-plan.ts.",
+          "acceptance_criteria": [
+            "The module returns structured data, not presentation types.",
+            "A checkpoint counts as usable only when it resolves to valid or canonicalized and its identity matches the scope.",
+            "No module under artifacts/ imports from commands/.",
+            "The duplicate checkpoint listing in integrity-plan.ts is removed."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S4"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added src/cli/checkpoints/discovery.ts returning structured checkpoint facts built on resolveEffectiveCheckpointAtPath, and removed the duplicate checkpoint listing from integrity-plan.ts.",
+            "validation": [
+              "A checkpoint copied from another scope is correctly rejected as unusable (identity mismatch), proving presence alone is not the signal",
+              "artifacts/ imports checkpoints/, never commands/; verified src/cli/checkpoints does not import artifacts/scopes so no cycle exists",
+              "npm run typecheck and npm run build clean"
+            ],
+            "files_changed": [
+              "src/cli/checkpoints/discovery.ts",
+              "src/cli/repair/integrity-plan.ts"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:36:20.977Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "The module returns structured data, not presentation types.",
+              "A checkpoint counts as usable only when it resolves to valid or canonicalized and its identity matches the scope.",
+              "No module under artifacts/ imports from commands/.",
+              "The duplicate checkpoint listing in integrity-plan.ts is removed."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:36:21.072Z"
+          }
+        },
+        {
+          "id": "T1.2",
+          "title": "Classify scope directories from evidence",
+          "description": "Add the five-way directory classifier and derive listOwnedScopeDirectories, listRegistrableScopeDirectories and listForeignScopeDirectories from it. Keep listScopeFolders as a compatibility wrapper. Extract readScopeSprint as the single sprint reader and remove the 4.47.1 trace-only special case.",
+          "files_to_touch": [
+            "src/cli/artifacts/scopes.ts"
+          ],
+          "context": "listScopeFolders returned every directory under scopes/, feeding roughly ten consumers including registry writes.",
+          "acceptance_criteria": [
+            "Directories classify as valid, corrupt, recoverable, owned-damaged or foreign.",
+            "An empty archive directory is not evidence of ownership.",
+            "The trace-only special case is deleted and its behaviour still holds through the general rule.",
+            "Sprint reading and validation exist in exactly one place."
+          ],
+          "depends_on": [
+            "T1.1"
+          ],
+          "scenario_refs": [
+            "S1",
+            "S3",
+            "S4",
+            "S7"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added SCOPE_DIR_CLASS with the five-way classifier, derived listOwnedScopeDirectories / listRegistrableScopeDirectories / listForeignScopeDirectories from it, kept listScopeFolders as a compatibility wrapper, extracted readScopeSprint, and deleted the trace-only special case.",
+            "validation": [
+              "Sandbox: notes-backup and .ds-junk classify FOREIGN; global prepare returns blockers: []",
+              "check:blast-radius-isolation still asserts a trace-only leftover is never a scope, now via the general rule",
+              "Falsification: replacing the owned-class filter with a pass-through makes the gate fail"
+            ],
+            "files_changed": [
+              "src/cli/artifacts/scopes.ts"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:36:21.169Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Directories classify as valid, corrupt, recoverable, owned-damaged or foreign.",
+              "An empty archive directory is not evidence of ownership.",
+              "The trace-only special case is deleted and its behaviour still holds through the general rule.",
+              "Sprint reading and validation exist in exactly one place."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:36:21.269Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Consumers and repair",
+      "objective": "Make classification actually govern registry classification, integrity reporting, registry writes and explicit scope arguments.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T2.1",
+          "title": "Derive registry classification from both axes",
+          "description": "Classify from the cross product of directory class and registry membership: distinguish recoverable, owned-damaged and corrupt instead of one bucket, treat a registered foreign directory as an orphan, and stop reporting a registered scope with an invalid sprint.json as healthy.",
+          "files_to_touch": [
+            "src/cli/project/reconcile.ts"
+          ],
+          "context": "classifyOne collapsed missing, invalid and not-a-scope into IRRECONCILABLE, and a registered scope with an invalid sprint fell through to present-and-registered.",
+          "acceptance_criteria": [
+            "Recoverable, owned-damaged and corrupt are distinct classifications.",
+            "A registered id whose directory is foreign classifies as a registered orphan.",
+            "A registered scope with an invalid sprint.json classifies as corrupt.",
+            "A directory that is absent still classifies as it did before."
+          ],
+          "depends_on": [
+            "T1.2"
+          ],
+          "scenario_refs": [
+            "S3",
+            "S4",
+            "S8"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "classifyOne now derives from directory class crossed with registry membership: recoverable, owned-damaged and corrupt are distinct; a registered id whose directory is foreign becomes a registered orphan; a registered scope with an invalid sprint.json is no longer reported as healthy.",
+            "validation": [
+              "Sandbox: registered entry + foreign directory produces targets.unregister, not a blocker",
+              "Sandbox: demo without sprint.json but with its own checkpoint classifies recoverable, not irreconcilable",
+              "check:scope-remediation 716 assertions and check:repair-integrity 90 assertions still pass"
+            ],
+            "files_changed": [
+              "src/cli/project/reconcile.ts"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:36:42.242Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Recoverable, owned-damaged and corrupt are distinct classifications.",
+              "A registered id whose directory is foreign classifies as a registered orphan.",
+              "A registered scope with an invalid sprint.json classifies as corrupt.",
+              "A directory that is absent still classifies as it did before."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:36:42.339Z"
+          }
+        },
+        {
+          "id": "T2.2",
+          "title": "Report recoverable and damaged as different blockers",
+          "description": "Add distinct integrity blocker codes so a scope with a usable checkpoint points at the resume path while Kyro artifacts without one are reported as damaged with no promise of recovery.",
+          "files_to_touch": [
+            "src/cli/repair/integrity-plan.ts"
+          ],
+          "context": "Both cases previously produced the same irreconcilable blocker, giving the operator no signal about which one could actually come back.",
+          "acceptance_criteria": [
+            "recoverable-no-sprint names how many usable checkpoints exist.",
+            "owned-damaged states that no automatic recovery path exists.",
+            "Corrupt sprint.json keeps the irreconcilable code."
+          ],
+          "depends_on": [
+            "T2.1"
+          ],
+          "scenario_refs": [
+            "S3",
+            "S4"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added recoverable-no-sprint and owned-damaged blocker codes with distinct messages; corrupt sprint.json keeps irreconcilable.",
+            "validation": [
+              "Sandbox: recoverable-no-sprint reports '1 usable close checkpoint(s) in archive/ can resume it'",
+              "Sandbox: a directory whose only checkpoint is unreadable reports owned-damaged and never claims recoverability"
+            ],
+            "files_changed": [
+              "src/cli/repair/integrity-plan.ts"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:36:42.436Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "recoverable-no-sprint names how many usable checkpoints exist.",
+              "owned-damaged states that no automatic recovery path exists.",
+              "Corrupt sprint.json keeps the irreconcilable code."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:36:42.532Z"
+          }
+        },
+        {
+          "id": "T2.3",
+          "title": "Make contaminated registry entries cleanable",
+          "description": "Change unregister-orphan so it re-verifies the directory is still foreign at apply time, aborts if Kyro evidence appeared, removes only the registry entry, and never modifies the directory.",
+          "files_to_touch": [
+            "src/cli/repair/integrity-apply.ts"
+          ],
+          "context": "applyUnregister threw DIVERGED whenever the directory existed, so an entry an earlier rehydrate wrote for a stray folder could never be removed.",
+          "acceptance_criteria": [
+            "A registered foreign directory can be unregistered.",
+            "The directory is preserved byte for byte.",
+            "Evidence appearing between prepare and apply still aborts with DIVERGED."
+          ],
+          "depends_on": [
+            "T2.1"
+          ],
+          "scenario_refs": [
+            "S5"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "applyUnregister re-classifies at apply time and proceeds only when the directory is absent or still foreign, removing just the registry entry.",
+            "validation": [
+              "Sandbox: contaminated entry cleaned; README.md SHA-256 identical before and after; directory still present",
+              "Falsification: restoring the old existsSync guard makes the gate fail with 'Scope directory notes-backup reappeared before apply'"
+            ],
+            "files_changed": [
+              "src/cli/repair/integrity-apply.ts"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:36:42.630Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A registered foreign directory can be unregistered.",
+              "The directory is preserved byte for byte.",
+              "Evidence appearing between prepare and apply still aborts with DIVERGED."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:36:42.727Z"
+          }
+        },
+        {
+          "id": "T2.4",
+          "title": "Restrict registry writes and explicit scope arguments",
+          "description": "Point rehydrate and the install prompt at registrable directories only, remove the fabricated planning fallback, and reject an explicit scope naming a foreign directory across resolution, integrity prepare and artifact doctor.",
+          "files_to_touch": [
+            "src/cli/core/scopes.ts",
+            "src/cli/commands/install.ts",
+            "src/cli/core/scope-resolution.ts",
+            "src/cli/repair/integrity-plan.ts",
+            "src/cli/commands/artifact-doctor.ts"
+          ],
+          "context": "rehydrate minted a planning entry for any unreadable directory, and an explicit --kyro-scope bypassed discovery entirely.",
+          "acceptance_criteria": [
+            "Only valid scopes are registered by install and sync.",
+            "The install prompt lists only what will actually be registered.",
+            "An explicit foreign scope fails SCOPE_NOT_FOUND on status, context-pack, integrity prepare and artifact doctor."
+          ],
+          "depends_on": [
+            "T1.2"
+          ],
+          "scenario_refs": [
+            "S2",
+            "S6"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "rehydrate and the install prompt now use listRegistrableScopeDirectories, the fabricated planning fallback is gone, and assertNotForeignDirectory guards resolution, integrity prepare and artifact doctor.",
+            "validation": [
+              "Sandbox: status, context-pack, repair integrity prepare and doctor --artifacts with --kyro-scope notes-backup all exit non-zero with SCOPE_NOT_FOUND",
+              "check:install-rehydrate updated and passing: a foreign directory is no longer registered"
+            ],
+            "files_changed": [
+              "src/cli/core/scopes.ts",
+              "src/cli/commands/install.ts",
+              "src/cli/core/scope-resolution.ts",
+              "src/cli/repair/integrity-plan.ts",
+              "src/cli/commands/artifact-doctor.ts"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:36:42.824Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Only valid scopes are registered by install and sync.",
+              "The install prompt lists only what will actually be registered.",
+              "An explicit foreign scope fails SCOPE_NOT_FOUND on status, context-pack, integrity prepare and artifact doctor."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:36:42.920Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Advisory, gate and documentation",
+      "objective": "Keep ignored directories visible without blocking, prove the whole contract, and record the behaviour change.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.1",
+          "title": "Warn about ignored directories on global doctor only",
+          "description": "Add a non-blocking doctor check listing directories under scopes/ that are not Kyro scopes, emitted only when no scope is requested.",
+          "files_to_touch": [
+            "src/cli/commands/doctor.ts"
+          ],
+          "context": "Ignoring foreign directories silently would leave a user with no way to learn why their folder never appears as a scope.",
+          "acceptance_criteria": [
+            "The check warns and never fails.",
+            "A scoped doctor does not emit it."
+          ],
+          "depends_on": [
+            "T1.2"
+          ],
+          "scenario_refs": [
+            "S1"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added checkForeignScopeDirectories, a WARN-only doctor check emitted solely when no scope is requested.",
+            "validation": [
+              "Sandbox: global doctor prints '[WARN] scope directories: 2 ... ignored: .ds-junk, notes-backup' and exits 0",
+              "Sandbox: doctor --kyro-scope demo does not emit the warning"
+            ],
+            "files_changed": [
+              "src/cli/commands/doctor.ts"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:37:00.088Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "The check warns and never fails.",
+              "A scoped doctor does not emit it."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:37:00.185Z"
+          }
+        },
+        {
+          "id": "T3.2",
+          "title": "Extend the blast-radius gate to the full matrix",
+          "description": "Add regressions for foreign directories, recoverable versus damaged, pre-existing contamination with byte preservation, and explicit foreign scope arguments, rather than adding another bespoke check script.",
+          "files_to_touch": [
+            "scripts/check-blast-radius-isolation.mjs",
+            "scripts/check-install-rehydrate.mjs"
+          ],
+          "context": "check-install-rehydrate asserted that a directory with no sprint.json registers with a planning status, encoding the defect as expected behaviour.",
+          "acceptance_criteria": [
+            "The matrix of directory class and registry membership is covered.",
+            "The rehydrate test asserts a foreign directory is not registered.",
+            "Reverting either the discovery filter or the unregister fix makes the gate fail.",
+            "No new check script is added."
+          ],
+          "depends_on": [
+            "T2.3",
+            "T2.4",
+            "T3.1"
+          ],
+          "scenario_refs": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Extended check:blast-radius-isolation with foreign-directory, recoverable-vs-damaged, pre-existing-contamination and explicit-foreign-scope regressions, and rewrote the check-install-rehydrate assertion that encoded the defect. No new check script was added.",
+            "validation": [
+              "Falsification 1: pass-through discovery filter makes the gate fail",
+              "Falsification 2: restoring the old unregister guard makes the gate fail",
+              "Contamination case asserts SHA-256 equality of the foreign file before and after apply",
+              "npm run check passes end to end, exit 0"
+            ],
+            "files_changed": [
+              "scripts/check-blast-radius-isolation.mjs",
+              "scripts/check-install-rehydrate.mjs"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:37:00.285Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "The matrix of directory class and registry membership is covered.",
+              "The rehydrate test asserts a foreign directory is not registered.",
+              "Reverting either the discovery filter or the unregister fix makes the gate fail.",
+              "No new check script is added."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:37:00.384Z"
+          }
+        },
+        {
+          "id": "T3.3",
+          "title": "Document the behaviour change",
+          "description": "Record the change under Unreleased and correct the docs that describe rehydration and doctor warnings, without deciding a release version.",
+          "files_to_touch": [
+            "CHANGELOG.md",
+            "docs/teams.md",
+            "docs/cli.md"
+          ],
+          "context": "4.47.1 is already published and this is a separate behavioural change.",
+          "acceptance_criteria": [
+            "The change is described under Unreleased.",
+            "Rehydration and doctor documentation match the new behaviour.",
+            "No version field changes."
+          ],
+          "depends_on": [
+            "T3.2"
+          ],
+          "scenario_refs": [],
+          "status": "done",
+          "evidence": {
+            "summary": "Recorded the behaviour change under CHANGELOG Unreleased and corrected docs/teams.md rehydration wording and docs/cli.md doctor warning list. No version field touched.",
+            "validation": [
+              "check:versions still reports all versions matching 4.47.1",
+              "check:links passes over the edited docs"
+            ],
+            "files_changed": [
+              "CHANGELOG.md",
+              "docs/teams.md",
+              "docs/cli.md"
+            ],
+            "by": "claude",
+            "recordedAt": "2026-08-16T20:37:00.480Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "The change is described under Unreleased.",
+              "Rehydration and doctor documentation match the new behaviour.",
+              "No version field changes."
+            ],
+            "findings": [],
+            "by": "reviewer",
+            "reviewedAt": "2026-08-16T20:37:00.575Z"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "A directory with no Kyro artifacts never blocks integrity, never resolves, and is never registered.",
+    "A scope with a usable close checkpoint but no sprint.json stays discoverable and is reported as recoverable.",
+    "Kyro artifacts without a usable checkpoint are reported as damaged with no promise of recovery.",
+    "A registry entry pointing at a foreign directory is cleanable with the directory preserved byte for byte.",
+    "An explicit foreign scope fails SCOPE_NOT_FOUND on every entry point that accepts one.",
+    "The blast-radius gate covers the matrix and fails when either fix is reverted.",
+    "npm run check passes end to end and the real workspace stays green."
+  ]
+}

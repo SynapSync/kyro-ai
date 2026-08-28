@@ -160,11 +160,27 @@ The project keeps only state and artifacts (layered):
 ├── project.json                 # SHARED — commit: principles, team policy, scopes registry cache
 ├── local.json                   # LOCAL — gitignored: activeScope, installedAdapters
 ├── .gitignore                   # install/sync assist (local-only files; never project.json/scopes/)
+├── trace/{scope}/               # LOCAL — gitignored: append-only per-machine event log
 └── scopes/
     └── {scope}/
         ├── sprint.json          # single source of truth
         ├── archive/             # write-only, at sprint close
         └── findings/            # write-only INIT analysis evidence
+```
+
+A host repository that ignores `.agents/` wholesale also shadows the nested `.gitignore` above, since
+git never descends into an excluded directory — the shared artifacts then silently stop being
+versioned and the scope is no longer reproducible from a clone. Exclude the local paths explicitly
+instead (this repository's own `.gitignore` is a worked example):
+
+```text
+/.agents/*
+!/.agents/kyro/
+/.agents/kyro/*
+!/.agents/kyro/project.json
+!/.agents/kyro/scopes/
+/.agents/kyro/**/trace/
+/.agents/kyro/local.json
 ```
 
 Full commit matrix, including migration off the pre-layered monolito: [Teams](teams.md).
@@ -483,10 +499,33 @@ never pruned: `kyro scope inspect` prints it and `kyro context-pack` exposes it 
 
 Because both transitions move live state off the close checkpoint's after-image, `kyro doctor
 --artifacts` does not trust the records it finds. It replays the recorded transitions from the
-after-image through the same builders the writers use and accepts the live state only if the replay
-reproduces it exactly — reported as `sprint=after (explicit lifecycle transition)`. Any edit a
-lifecycle transition could not have produced, and any corrupt immutable artifact, still fails closed
-as `DIVERGED`.
+after-image through the same builders the writers use and accepts the live state only if one atomic
+verification reproduces both `sprint.json` and the project registry exactly — reported as
+`sprint=after (structurally replayed lifecycle; actor identity unverified)`. Any edit the claimed
+transitions do not reproduce, and any corrupt immutable artifact, still fails closed as `DIVERGED`.
+
+Two properties make that a verification rather than a restatement of the records, and both matter
+once a scope goes round the cycle more than once:
+
+- **Prefix exactness.** A scope may complete, reopen, plan, close, and complete again any number of
+  times. Each close seals the `completionHistory` as it stood into its own after-image, so a replay
+  starting from that image may only apply the *suffix* the live state adds on top of it. Re-applying
+  the sealed prefix would double every earlier transition and report a lawful multi-cycle scope as
+  `DIVERGED`. A live history that is not an exact extension of the sealed prefix — rewritten or
+  truncated — is refused outright, and nothing replays.
+- **Structurally bound suffix.** Every replayed record must carry `requestDigest` and
+  `beforeEntryDigest`, and each must re-derive from the record's own content: the request digest from
+  the scope plus the summary or the reason and the exact superseded completion, the registry digest
+  from the entry the step started from. Missing, stale, partially edited, reordered, or misbound
+  records fail closed. Records already sealed inside an immutable after-image are historical evidence
+  and are not re-verified.
+
+These SHA-256 values are public deterministic consistency bindings, not signatures. An editor able to
+rewrite both durable layers can recompute them and produce a structurally valid projection; Kyro
+cannot distinguish that from its own writer inside the same trust domain. `by` is self-asserted, so
+neither actor identity nor process identity is authenticated. Repositories requiring adversarial
+authenticity must protect history with signed commits or an external append-only store. See
+[Lossless sprint-close checkpoints](sprint-close-checkpoints.md#lifecycle-verification-trust-boundary).
 
 ## Human-gated scope retirement (`kyro scope retire`)
 
