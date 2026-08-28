@@ -4,7 +4,7 @@ import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { formatScopeAuthor } from '../core/actor';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { unregisteredScopeFolders } from '../core/scopes';
-import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
+import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, isTaskVerifiedComplete } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { deriveScopeVerificationState } from '../remediation/plan';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
@@ -105,12 +105,23 @@ interface PhaseSummary {
   blockedTasks: number;
 }
 
+interface DispositionSummary {
+  deferred: number;
+  blocked: number;
+  superseded: number;
+  cancelled: number;
+}
+
 interface TaskSummary {
   total: number;
   pending: number;
   inProgress: number;
   blocked: number;
   done: number;
+  /** Verified completion: done + pass and never a disposition. */
+  verified: number;
+  /** Unfinished tasks carrying a typed disposition, by kind. */
+  dispositions: DispositionSummary;
 }
 
 interface FullStatusReport extends BriefStatusReport {
@@ -327,12 +338,18 @@ function collectSprintTasks(activeSprint: ActiveSprint | null): Task[] {
 }
 
 function countTasksByStatus(tasks: Task[]): TaskSummary {
+  const dispositions: DispositionSummary = { deferred: 0, blocked: 0, superseded: 0, cancelled: 0 };
+  for (const task of tasks) {
+    if (task.disposition) dispositions[task.disposition.kind] += 1;
+  }
   return {
     total: tasks.length,
     pending: tasks.filter((task) => task.status === 'pending').length,
     inProgress: tasks.filter((task) => task.status === 'in_progress').length,
     blocked: tasks.filter((task) => task.status === 'blocked').length,
     done: tasks.filter((task) => task.status === 'done').length,
+    verified: tasks.filter((task) => isTaskVerifiedComplete(task)).length,
+    dispositions,
   };
 }
 
@@ -392,7 +409,12 @@ function printFullStatus(report: FullStatusReport): void {
       console.log(`- ${phase.id}: ${phase.title} (${phase.status}) — ${phase.doneTasks}/${phase.totalTasks} done, ${phase.blockedTasks} blocked`);
     }
   }
-  console.log(`\nTasks: pending=${report.taskSummary.pending}, in_progress=${report.taskSummary.inProgress}, blocked=${report.taskSummary.blocked}, done=${report.taskSummary.done}`);
+  console.log(`\nTasks: pending=${report.taskSummary.pending}, in_progress=${report.taskSummary.inProgress}, blocked=${report.taskSummary.blocked}, done=${report.taskSummary.done}, verified=${report.taskSummary.verified}`);
+  const disposition = report.taskSummary.dispositions;
+  const disposedCount = disposition.deferred + disposition.blocked + disposition.superseded + disposition.cancelled;
+  if (disposedCount > 0) {
+    console.log(`Dispositions: deferred=${disposition.deferred}, blocked=${disposition.blocked}, superseded=${disposition.superseded}, cancelled=${disposition.cancelled}`);
+  }
   if (report.reviewDebt.length > 0) {
     console.log('Review debt:');
     for (const item of report.reviewDebt) console.log(`- ${item.id}: ${item.title} (${item.phaseTitle ?? 'unknown phase'})`);

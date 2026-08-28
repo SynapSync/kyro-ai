@@ -253,7 +253,7 @@ function closeSuccessfully(root) {
     assert(after.ledger[0].snapshot === 'archive/sprint-001-demo-sprint.json', 'legacy snapshot link changed');
     assert(after.ledger[0].checkpoint === 'archive/sprint-001-demo-sprint.checkpoint.json', 'checkpoint ledger link missing');
     assert(/^[a-f0-9]{64}$/.test(after.ledger[0].checkpointSha256), 'external checkpoint ledger commitment missing');
-    assert(projectAfter.scopes.find((scope) => scope.id === 'demo').status === 'completed', 'final close must complete project scope');
+    assert(projectAfter.scopes.find((scope) => scope.id === 'demo').status === 'planning', 'final close must leave the project scope open for planning');
     assert(JSON.stringify(projectAfter.scopes.find((scope) => scope.id === 'unrelated')) === JSON.stringify(projectBefore.scopes.find((scope) => scope.id === 'unrelated')), 'unrelated scope entry changed');
     assert(JSON.stringify(projectAfter.runtimeExtension) === JSON.stringify(projectBefore.runtimeExtension), 'unrelated top-level project state changed');
     assert(existsSync(paths(root).snapshot) && existsSync(paths(root).narrative), 'dual-write artifacts missing');
@@ -325,7 +325,7 @@ function closeSuccessfully(root) {
     writeJson(paths(root).sprint, sprint);
     const checkpoint = closeSuccessfully(root);
     assert(checkpoint.projectScopeAfter.status === 'planning', 'empty roadmap must yield projectScopeAfter=planning under SSOT');
-    assert(readJson(paths(root).sprint).handoff.nextAction === 'done', 'empty roadmap remaining=0 must route handoff to done');
+    assert(readJson(paths(root).sprint).handoff.nextAction === 'plan_sprint', 'empty roadmap remaining=0 must still route handoff to plan_sprint');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -522,6 +522,29 @@ for (const boundary of ['checkpoint', 'snapshot', 'narrative', 'sprint', 'projec
     assert(conflicting.status === 1 && output(conflicting).includes('CHECKPOINT_CONFLICT'), 'different close inputs must conflict with frozen checkpoint metadata');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
+
+// A partial close retried without an explicit --outcome must derive the same frozen partial input.
+{
+  const root = makeSandbox();
+  try {
+    const sprint = readJson(paths(root).sprint);
+    const task = sprint.activeSprint.phases[0].tasks[0];
+    task.status = 'pending';
+    task.verdict = null;
+    task.disposition = {
+      kind: 'cancelled',
+      reason: 'The user removed this work from the sprint.',
+      by: 'maker',
+      recordedAt: '2026-08-23T00:00:00.000Z',
+    };
+    writeJson(paths(root).sprint, sprint);
+    const partialArgs = closeArgs.filter((arg, index) => !(arg === '--outcome' || (index > 0 && closeArgs[index - 1] === '--outcome')));
+    const failed = run(root, partialArgs, { KYRO_TEST_CLOSE_FAIL_AFTER: 'checkpoint' });
+    assert(failed.status === 1 && existsSync(paths(root).checkpoint), `partial checkpoint preparation failed:\n${output(failed)}`);
+    const retried = run(root, partialArgs);
+    assert(retried.status === 0, `implicit partial retry must match frozen checkpoint inputs:\n${output(retried)}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
 {
   const root = makeSandbox();
   try {
@@ -587,7 +610,7 @@ for (const mode of ['corrupt', 'unsupported']) {
     assert(retry.status === 0, `missing state recovery failed:\n${output(retry)}`);
     assert(JSON.stringify(readJson(paths(root).sprint)) === JSON.stringify(checkpoint.intendedAfterClose), 'missing sprint was not restored to intendedAfterClose');
     const restoredProject = readJson(paths(root).project);
-    assert(restoredProject.scopes.some((scope) => scope.id === 'demo' && scope.status === 'completed'), 'missing affected project scope was not restored');
+    assert(restoredProject.scopes.some((scope) => scope.id === 'demo' && scope.status === 'planning'), 'missing affected project scope was not restored');
     assert(restoredProject.scopes.some((scope) => scope.id === 'unrelated' && scope.custom === 'preserve-me'), 'missing-scope recovery damaged unrelated project state');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
@@ -1156,11 +1179,11 @@ for (const mode of ['corrupt', 'unsupported']) {
     });
     unlinkSync(paths(root).project);
     const checkpoint = closeSuccessfully(root);
-    assert(checkpoint.projectScopeAfter.status === 'completed', 'layered final close must complete scope');
+    assert(checkpoint.projectScopeAfter.status === 'planning', 'layered final close must leave the scope open for planning');
     assert(existsSync(paths(root).shared), 'layered close must keep project.json');
     assert(!existsSync(paths(root).project), 'layered close must not recreate live monolito kyro.json');
     const shared = readJson(paths(root).shared);
-    assert(shared.scopes.find((scope) => scope.id === 'demo')?.status === 'completed', 'layered close must mark demo completed on project.json');
+    assert(shared.scopes.find((scope) => scope.id === 'demo')?.status === 'planning', 'layered close must mark demo planning on project.json');
     assert(shared.scopes.some((scope) => scope.id === 'unrelated'), 'layered close must preserve unrelated scopes on project.json');
     assert(!('activeScope' in shared), 'shared project.json must never gain activeScope on close');
   } finally { rmSync(root, { recursive: true, force: true }); }

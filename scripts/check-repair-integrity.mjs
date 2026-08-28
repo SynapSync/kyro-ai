@@ -260,7 +260,9 @@ function main() {
 
   const ckRoot = mkdtempSync(join(tmpdir(), 'kyro-ck-family-'));
   try {
-    writeProject(ckRoot, family.scopes.map((scope) => ({ id: scope.id, title: scope.id, status: 'completed' })), '');
+    // New close transitions leave every non-retired scope open for planning. The registry must
+    // match the checkpoint after-image so this fixture tests canonicalization, not stale status.
+    writeProject(ckRoot, family.scopes.map((scope) => ({ id: scope.id, title: scope.id, status: 'planning' })), '');
     for (const item of identities) {
       const { after } = materializeLegacyCheckpoint(ckRoot, item.scope, item.n, item.slug);
       writeJson(join(ckRoot, `.agents/kyro/scopes/${item.scope}/sprint.json`), after);
@@ -309,7 +311,7 @@ function main() {
   const unsupportedRoot = mkdtempSync(join(tmpdir(), 'kyro-unsupported-'));
   try {
     const scope = 'legacy-unsupported';
-    writeProject(unsupportedRoot, [{ id: scope, title: scope, status: 'completed' }], '');
+    writeProject(unsupportedRoot, [{ id: scope, title: scope, status: 'planning' }], '');
     const { after } = materializeLegacyCheckpoint(unsupportedRoot, scope, 1, 'future-schema');
     const ckPath = join(unsupportedRoot, '.agents/kyro/scopes', scope, 'archive/sprint-001-future-schema.checkpoint.json');
     const stored = JSON.parse(readFileSync(ckPath, 'utf8'));
@@ -332,7 +334,7 @@ function main() {
   const liveRoot = mkdtempSync(join(tmpdir(), 'kyro-two-conv-'));
   try {
     const scope = 'live-scope';
-    writeProject(liveRoot, [{ id: scope, title: scope, status: 'completed' }], scope);
+    writeProject(liveRoot, [{ id: scope, title: scope, status: 'planning' }], scope);
     const { after } = materializeLegacyCheckpoint(liveRoot, scope, 1, 'closed-base');
     const live = {
       ...after,

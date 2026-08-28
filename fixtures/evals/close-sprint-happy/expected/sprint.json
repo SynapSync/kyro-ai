@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "scope": "demo",
   "title": "Demo",
-  "status": "completed",
+  "status": "planning",
   "objective": "Demo objective",
   "successCriteria": [
     "Demo works."
@@ -42,10 +42,10 @@
   "activeSprint": null,
   "debt": [],
   "handoff": {
-    "nextAction": "done",
+    "nextAction": "plan_sprint",
     "nextTaskId": null,
     "blockers": [],
-    "note": "Sprint 1 (demo-sprint) closed as shipped. No sprints remain \u2014 scope objective met.",
+    "note": "Sprint 1 (demo-sprint) closed as shipped. Scope remains open for planning.",
     "lastUpdated": "<NORMALIZED>"
   }
 }

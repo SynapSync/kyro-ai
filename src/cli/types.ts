@@ -31,6 +31,10 @@ export interface KyroScopeEntry {
   status: KyroScopeEntryStatus;
   /** Tool-owned terminal transition metadata. Absent on scopes that remain in the work lifecycle. */
   retirement?: ScopeRetirement;
+  /** Tool-owned explicit completion metadata. Distinct from retirement and mutually exclusive with it. */
+  completion?: ScopeCompletion;
+  /** Append-only record of completions that were explicitly reopened. Never rewritten or pruned. */
+  completionHistory?: ScopeReopenRecord[];
 }
 
 /** Human-authorized, state-bound reason a scope left the active work lifecycle. */
@@ -39,6 +43,51 @@ export interface ScopeRetirement {
   retiredAt: string;
   supersededBy?: string;
   planDigest: string;
+}
+
+/** Explicit, confirmed statement that an open scope's work is complete. Not a retirement and never automatic. */
+export interface ScopeCompletion {
+  completedAt: string;
+  by: string;
+  summary?: string;
+  /**
+   * sha256({kind:'scope-completion', schemaVersion, part:'request', scope, summary}). Present on
+   * completions written by the locked transactional apply; absent on legacy pre-fix records, which
+   * remain readable but are not resumable/idempotent.
+   */
+  requestDigest?: string;
+  /**
+   * sha256 of the registry KyroScopeEntry exactly as it stood immediately before this completion was
+   * applied. Present iff requestDigest is present; lets an interrupted apply resume by writing only
+   * the registry once it verifies the registry hasn't drifted since sprint.json was completed.
+   */
+  beforeEntryDigest?: string;
+}
+
+/**
+ * Append-only evidence that a completed, non-retired scope was explicitly reopened for later work.
+ * Reopening clears the live `completion` (the scope is no longer complete) but never erases it: the
+ * superseded record is preserved here with the reason it was reopened. Reopen is not a retirement
+ * reversal — a retired scope is terminal and this path never applies to it.
+ */
+export interface ScopeReopenRecord {
+  reopenedAt: string;
+  by: string;
+  reason: string;
+  /** The completion record this reopen superseded, preserved verbatim. */
+  completion: ScopeCompletion;
+  /**
+   * sha256({kind:'scope-reopen', schemaVersion, part:'request', scope, reason, completion}). Binds the
+   * reopen to the exact completion it reverses, so a retry is idempotent and a later, different
+   * reopen can never be mistaken for this one.
+   */
+  requestDigest?: string;
+  /**
+   * sha256 of the registry KyroScopeEntry exactly as it stood immediately before this reopen was
+   * applied. Present iff requestDigest is present; lets an interrupted apply resume by writing only
+   * the registry once it verifies the registry has not drifted since sprint.json was reopened.
+   */
+  beforeEntryDigest?: string;
 }
 
 /** Built-in, machine-checkable predicates a principle can bind to (enforced by `kyro analyze`). */
@@ -166,6 +215,36 @@ export interface Clarification {
 
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
 export type DebtStatus = 'open' | 'in_progress' | 'resolved' | 'deferred';
+
+/** Terminal explanation for unfinished work. Not a success status and not a checker verdict. */
+export const TASK_DISPOSITION_KIND = {
+  DEFERRED: 'deferred',
+  BLOCKED: 'blocked',
+  SUPERSEDED: 'superseded',
+  CANCELLED: 'cancelled',
+} as const;
+export type TaskDispositionKind = (typeof TASK_DISPOSITION_KIND)[keyof typeof TASK_DISPOSITION_KIND];
+
+export const TASK_DISPOSITION_TARGET_KIND = {
+  DEBT: 'debt',
+  TASK: 'task',
+  SPRINT: 'sprint',
+} as const;
+export type TaskDispositionTargetKind =
+  (typeof TASK_DISPOSITION_TARGET_KIND)[keyof typeof TASK_DISPOSITION_TARGET_KIND];
+
+export interface TaskDispositionTarget {
+  kind: TaskDispositionTargetKind;
+  id: string;
+}
+
+export interface TaskDisposition {
+  kind: TaskDispositionKind;
+  reason: string;
+  by: string;
+  recordedAt: string;
+  target?: TaskDispositionTarget;
+}
 export const TASK_VERDICT_RESULT = {
   PASS: 'pass',
   FAIL: 'fail',
@@ -250,6 +329,15 @@ export interface SprintCloseIdentity {
   sprintN: number;
   sprintSlug: string;
 }
+
+export const SPRINT_CLOSE_OUTCOME = {
+  SHIPPED: 'shipped',
+  COMPLETED: 'completed',
+  PARTIAL: 'partial',
+  ABANDONED: 'abandoned',
+  ABORTED: 'aborted',
+} as const;
+export type SprintCloseOutcome = (typeof SPRINT_CLOSE_OUTCOME)[keyof typeof SPRINT_CLOSE_OUTCOME];
 
 export interface SprintCloseInputs {
   outcome: string;
@@ -402,6 +490,8 @@ export interface Task {
   status: TaskStatus;
   evidence: TaskEvidence | null;
   verdict: TaskVerdict | null;
+  /** Absent on historical tasks and on work that is still in progress. Never a pass. */
+  disposition?: TaskDisposition;
 }
 
 export interface Phase {
@@ -619,6 +709,13 @@ export interface SprintFile {
   certifications?: CertificationAnchor[];
   /** Present only after `kyro scope retire` applies its human-approved terminal transition. */
   retirement?: ScopeRetirement;
+  /** Present only after `kyro scope complete` records an explicit, confirmed completion. Distinct from retirement. */
+  completion?: ScopeCompletion;
+  /**
+   * Append-only history of completions superseded by `kyro scope reopen`. Absent on scopes that were
+   * never reopened. Completion history is preserved for audit even while the scope is open again.
+   */
+  completionHistory?: ScopeReopenRecord[];
   handoff: Handoff;
 }
 
@@ -690,7 +787,7 @@ export interface OperationPlan {
 
 // --- portable guardrail policy ---
 
-export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'scope_retire' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
+export type GuardedOperation = 'close_sprint' | 'repair_scope' | 'scope_set_active' | 'scope_retire' | 'scope_complete' | 'scope_reopen' | 'clear_active_sprint' | 'delete_archive' | 'review_task';
 export type GuardLevel = 'tool_owned' | 'confirm' | 'blocked';
 export type GuardDecisionKind = 'allow' | 'confirmation_required' | 'blocked';
 export type EnforcementTier = 'enforced' | 'advisory';
@@ -825,6 +922,13 @@ export interface ContextPackCliRecipe {
   command: string;
 }
 
+/** Compact reopen evidence for the pack: enough to see the scope was completed and why it reopened. */
+export interface ContextPackReopen {
+  reopenedAt: string;
+  completedAt: string;
+  reason: string;
+}
+
 export interface ContextPackOutput {
   schemaVersion: 4;
   packMode: ContextPackMode;
@@ -833,6 +937,10 @@ export interface ContextPackOutput {
   status: string | null;
   objective: string | null;
   retirement: ScopeRetirement | null;
+  /** Live explicit completion, if the scope is currently completed. Never implied by roadmap state. */
+  completion: ScopeCompletion | null;
+  /** Compact, append-only record of completions that were reopened. Empty on scopes never reopened. */
+  reopenHistory: ContextPackReopen[];
   nextAction: string | null;
   nextTaskId: string | null;
   activeSprintSlug: string | null;

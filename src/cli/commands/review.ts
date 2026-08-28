@@ -3,7 +3,7 @@ import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import { collectCheckerFindings, countClarificationMarkers, normalizeCriterion } from '../core/analysis';
-import { deriveActiveSprintStatus, derivePhaseStatus } from '../core/status';
+import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { resolveScope } from '../core/scope-resolution';
@@ -94,6 +94,13 @@ export function buildReviewPlan(scope: string, args: ReviewArgs): { sprint: Spri
   if (!sprint || !sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint to review.`);
   const located = locateTask(sprint, args.taskId);
   if (!located) throw new KyroCoreError('TASK_NOT_FOUND', `Task not found: ${args.taskId}`, 'Run kyro context-pack --json to inspect the active sprint tasks.');
+  if (located.task.disposition) {
+    throw new KyroCoreError(
+      'DISPOSED_TASK_NOT_REVIEWABLE',
+      `Task ${located.task.id} has a ${located.task.disposition.kind} disposition and cannot take a checker review.`,
+      'A disposition is terminal for execution: record-evidence removed it from the executable routes and no implicit review path can reopen it. For replacement work in the active sprint, use kyro add-emergent; a true re-open requires a future explicit operation.',
+    );
+  }
   const clarificationMarkers = countClarificationMarkers(sprint);
   if (clarificationMarkers > 0) {
     throw new KyroCoreError(
@@ -155,7 +162,7 @@ function withReviewedTask(sprint: SprintFile, located: LocatedTask, verdict: Tas
   nextActive.status = deriveActiveSprintStatus(nextActive);
 
   const tasks = nextActive.phases.flatMap((phase) => phase.tasks).concat(nextActive.emergentTasks);
-  const nextPending = tasks.find((item) => item.status === 'pending' || item.status === 'in_progress');
+  const nextExecutable = nextExecutableTaskId(nextActive);
   const allDonePass = tasks.length > 0 && tasks.every((item) => item.status === 'done' && item.verdict?.result === 'pass');
   return {
     ...sprint,
@@ -163,7 +170,7 @@ function withReviewedTask(sprint: SprintFile, located: LocatedTask, verdict: Tas
     handoff: {
       ...sprint.handoff,
       nextAction: verdict.result === 'fail' ? 'execute_task' : allDonePass ? 'close_sprint' : 'execute_task',
-      nextTaskId: verdict.result === 'fail' ? task.id : nextPending?.id ?? null,
+      nextTaskId: verdict.result === 'fail' ? task.id : nextExecutable,
       note: verdict.result === 'pass' ? `Task ${task.id} passed checker review.` : `Task ${task.id} failed checker review and returned to execution.`,
       lastUpdated: reviewedAt,
     },

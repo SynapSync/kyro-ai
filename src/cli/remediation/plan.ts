@@ -7,9 +7,14 @@ import { canonicalJson, checkpointCommitmentOfRecord, sha256 } from '../checkpoi
 import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
 import { EFFECTIVE_CHECKPOINT_STATUS, effectiveCommitment, resolveEffectiveCheckpoint, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
 import { surveyScopeCheckpoints } from '../checkpoints/discovery';
+import {
+  SCOPE_LIFECYCLE_VERIFICATION_STATUS,
+  verifyScopeLifecycleEvolution,
+} from '../checkpoints/lifecycle-state';
 import { inspectScopeRetirement } from '../checkpoints/scope-retirement';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
+import { readProjectState } from '../state';
 import type { CheckResult, RemediationAnchor, ScopeVerification, SprintCloseCheckpointV1, SprintFile } from '../types';
 import { canonicalRemediationState, debtCollectionDigest, observedValueDigest } from './canonical-state';
 import { resolveCertificationForChainHead } from './certification-plan';
@@ -865,16 +870,47 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
   }
 
   const liveBusiness = businessStateDigest(live);
-  const afterBusiness = businessStateDigest(checkpoint.intendedAfterClose);
   const physicalRead = readJsonSafely(listValidCloseCheckpoints(scope)[0]?.path ?? '');
-  const physicalAfter = physicalRead.exists && !physicalRead.error
-    ? (physicalRead.value as { intendedAfterClose?: unknown }).intendedAfterClose
+  const physicalCheckpoint = physicalRead.exists && !physicalRead.error
+    ? (physicalRead.value as { intendedAfterClose?: unknown; projectScopeAfter?: SprintCloseCheckpointV1['projectScopeAfter'] })
     : null;
-  const physicalAfterBusiness = physicalAfter ? businessStateDigest(physicalAfter) : null;
-  const atAfterImage = liveBusiness !== null && (
-    (afterBusiness !== null && liveBusiness === afterBusiness)
-    || (physicalAfterBusiness !== null && liveBusiness === physicalAfterBusiness)
-  );
+  const physicalAfter = physicalCheckpoint?.intendedAfterClose ?? null;
+  const liveEntry = readProjectState()?.scopes.find((entry) => entry.id === scope);
+  // An explicit `scope complete` / `scope reopen` legitimately moves live state off the close
+  // after-image. Like a remediation chain, the transition is replayed rather than trusted: the
+  // recorded lifecycle records are re-applied to the after-image and only an exact reproduction of
+  // the live business state is accepted, so drift a lifecycle transition could not produce still
+  // reads as divergence.
+  const acceptedAfterDigests = new Set<string>();
+  // Tracked separately from the sealed after-image digests: reaching the after-image *because a
+  // lifecycle transition was replayed* is a different fact than live state never having moved, and
+  // reporting both as "matches the checkpoint after-image" contradicts Doctor, which labels the
+  // replayed case as structural lifecycle evolution with unverified actor identity.
+  const lifecycleAfterDigests = new Set<string>();
+  const lifecycleCandidates = [
+    { image: checkpoint.intendedAfterClose, entry: checkpoint.projectScopeAfter },
+    { image: physicalAfter, entry: physicalCheckpoint?.projectScopeAfter },
+  ];
+  for (const candidate of lifecycleCandidates) {
+    const image = candidate.image;
+    if (image === null || image === undefined) continue;
+    const digest = businessStateDigest(image);
+    if (digest) acceptedAfterDigests.add(digest);
+    const verification = verifyScopeLifecycleEvolution(image, candidate.entry, live, liveEntry);
+    if (verification.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED) {
+      const replayedDigest = businessStateDigest(verification.sprint);
+      if (replayedDigest) {
+        acceptedAfterDigests.add(replayedDigest);
+        lifecycleAfterDigests.add(replayedDigest);
+      }
+    }
+  }
+  const atAfterImage = liveBusiness !== null && acceptedAfterDigests.has(liveBusiness);
+  // Only lifecycle when replay is the *reason* the states agree. An untouched after-image that also
+  // happens to be replay-reachable stays historical.
+  const atAfterImageViaLifecycle = liveBusiness !== null
+    && lifecycleAfterDigests.has(liveBusiness)
+    && !isSealedAfterImageDigest(liveBusiness, checkpoint.intendedAfterClose, physicalAfter);
 
   // A present chain must be replayed even when it net-restored the after-image. The head digest
   // only binds the claimed result to live state; without replaying operations, a re-anchored record
@@ -898,9 +934,20 @@ export function deriveScopeVerificationState(scope: string): ScopeVerification |
 
   // No chain at all: historical only when the live state is exactly the checkpoint after-image.
   if (atAfterImage) {
-    return { state: 'historical', detail: 'live business state matches the checkpoint after-image' };
+    return atAfterImageViaLifecycle
+      ? { state: 'historical', detail: 'live business state is structurally replayed from the checkpoint by explicit lifecycle transitions; actor identity unverified' }
+      : { state: 'historical', detail: 'live business state matches the checkpoint after-image' };
   }
   return { state: 'diverged', detail: 'live state differs from the checkpoint after-image with no remediation chain to explain it' };
+}
+
+/** True when the digest is one of the sealed after-images themselves, replay aside. */
+function isSealedAfterImageDigest(digest: string, intendedAfter: unknown, physicalAfter: unknown): boolean {
+  for (const image of [intendedAfter, physicalAfter]) {
+    if (image === null || image === undefined) continue;
+    if (businessStateDigest(image) === digest) return true;
+  }
+  return false;
 }
 
 /**

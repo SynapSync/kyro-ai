@@ -263,6 +263,217 @@ function assertDescribeWriteFailureClassifiesErrno() {
   assert(plain === null, `describeWriteFailure(generic Error) should return null, got ${JSON.stringify(plain)}`);
 }
 
+// 8. No-auto-complete mutation guard (R2): deriveScopeStatus must return "planning", not "completed",
+//    for a scope whose original roadmap is exhausted but whose handoff is NOT "done". Only an explicit
+//    terminal handoff mints "completed". If this derivation regresses to "roadmap closed => completed",
+//    an open post-close scope would falsely read as a completed terminal scope.
+function assertDeriveScopeStatusMutationGuard() {
+  const { deriveScopeStatus } = require(resolve(repo, 'dist/cli/core/status.js'));
+  const makeClosedRoadmapSprint = (overrides = {}) => ({
+    schemaVersion: 4,
+    scope: 'demo',
+    title: 'Demo',
+    status: 'planning',
+    objective: 'Demo objective',
+    successCriteria: ['Demo works.'],
+    clarifications: [],
+    conventions: [],
+    roadmap: {
+      plannedSprintCount: 1,
+      sizingRationale: 'One sprint is enough.',
+      sprints: [{ n: 1, slug: 'demo-sprint', title: 'Demo Sprint', state: 'closed' }],
+    },
+    ledger: [],
+    previousSprint: null,
+    activeSprint: null,
+    debt: [],
+    handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: 'Resume.', lastUpdated: '2026-07-02' },
+    ...overrides,
+  });
+
+  // Open post-close scope: roadmap exhausted, but nextAction is plan_sprint -> must be planning.
+  const openPostClose = deriveScopeStatus(makeClosedRoadmapSprint(), false);
+  assert(openPostClose === 'planning', `exhausted-roadmap + plan_sprint must derive planning, got ${openPostClose}`);
+
+  // Explicit terminal handoff (historical completion / retirement companion) -> completed.
+  const terminal = deriveScopeStatus(makeClosedRoadmapSprint({ handoff: { nextAction: 'done', nextTaskId: null, blockers: [], note: 'Retired.', lastUpdated: '2026-07-02' } }), false);
+  assert(terminal === 'completed', `explicit done handoff must derive completed, got ${terminal}`);
+
+  // Active sprint -> active (unchanged).
+  const active = deriveScopeStatus(makeClosedRoadmapSprint({ activeSprint: { n: 1, slug: 's', title: 'S', objective: 'o', status: 'complete', phases: [], emergentTasks: [], definitionOfDone: [] } }), true);
+  assert(active === 'active', `active sprint must derive active, got ${active}`);
+}
+
+// 9. CLI status must distinguish verified completion from disposed work in the full task summary
+//    (AC1 of T1.5): a disposed task is never counted as verified, and its kind is reported.
+function assertStatusTaskSummaryDistinguishesDispositions() {
+  const root = sandbox();
+  try {
+    const sprint = JSON.parse(readFileSync(sprintPath(root), 'utf-8'));
+    sprint.debt = [{ id: 'debt-1', title: 'Deferred demo work', origin: 1, priority: 'medium', status: 'open', targetSprint: 2, note: 'Carry forward.' }];
+    sprint.activeSprint.phases[0].tasks[0].status = 'pending';
+    sprint.activeSprint.phases[0].tasks[0].disposition = { kind: 'deferred', reason: 'Deferred to debt.', by: 'maker', recordedAt: '2026-07-15T00:00:00.000Z', target: { kind: 'debt', id: 'debt-1' } };
+    sprint.activeSprint.phases[0].tasks.push({
+      id: 'T1.2',
+      title: 'Done demo',
+      description: 'Done.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Done.'],
+      depends_on: [],
+      status: 'done',
+      evidence: { summary: 'done', validation: 'ok', files_changed: [], notes: '', by: 'maker', recordedAt: '2026-07-15T00:00:00.000Z' },
+      verdict: { result: 'pass', checked_criteria: ['Done.'], findings: [], by: 'checker', reviewedAt: '2026-07-15T00:00:01.000Z' },
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const full = run(['status', 'full', '--kyro-scope', 'demo', '--json'], root);
+    assert(full.status === 0, `kyro status full --json should succeed: ${full.stderr || full.stdout}`);
+    const report = JSON.parse(full.stdout);
+    assert(report.taskSummary.verified === 1, `verified should count done+pass+no disposition (1), got ${JSON.stringify(report.taskSummary)}`);
+    assert(report.taskSummary.dispositions.deferred === 1, `deferred disposition should be reported, got ${JSON.stringify(report.taskSummary.dispositions)}`);
+    assert(report.taskSummary.dispositions.cancelled === 0, `cancelled disposition should be 0, got ${JSON.stringify(report.taskSummary.dispositions)}`);
+
+    const text = run(['status', 'full', '--kyro-scope', 'demo'], root);
+    assert(text.stdout.includes('Dispositions: deferred=1'), `full text output should list dispositions: ${text.stdout}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 10. Explicit scope completion model (T2.1): deriveScopeStatus reads a `completion` record as
+//     completed and retirement as retired, while a legacy `done` handoff stays readable; the
+//     validator rejects contradictory/malformed completion metadata.
+function assertScopeCompletionModel() {
+  const { deriveScopeStatus } = require(resolve(repo, 'dist/cli/core/status.js'));
+  const { validateSprintFile } = require(resolve(repo, 'dist/cli/artifacts/schema.js'));
+  const base = {
+    schemaVersion: 4,
+    scope: 'demo',
+    title: 'Demo',
+    status: 'completed',
+    objective: 'Demo objective',
+    successCriteria: ['Demo works.'],
+    clarifications: [],
+    conventions: [],
+    roadmap: { plannedSprintCount: 1, sizingRationale: 'x', sprints: [{ n: 1, slug: 's', title: 'S', state: 'closed' }] },
+    ledger: [],
+    previousSprint: null,
+    activeSprint: null,
+    debt: [],
+    handoff: { nextAction: 'done', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-02' },
+  };
+
+  // Explicit completion -> completed, distinct from retirement.
+  const completed = deriveScopeStatus({ ...base, completion: { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker', summary: 'All done.' } }, false);
+  assert(completed === 'completed', `explicit completion must derive completed, got ${completed}`);
+
+  // Retirement wins over completion/legacy-done.
+  const retired = deriveScopeStatus({ ...base, retirement: { reason: 'Replaced.', retiredAt: '2026-07-02T00:00:00.000Z', planDigest: 'a'.repeat(64) } }, false);
+  assert(retired === 'retired', `retirement must derive retired, got ${retired}`);
+
+  // Legacy terminal read: done handoff without an explicit record stays readable as completed.
+  const legacy = deriveScopeStatus(base, false);
+  assert(legacy === 'completed', `legacy done handoff must stay readable as completed, got ${legacy}`);
+
+  // Open scope with no terminal signal -> planning (roadmap exhaustion is not completion).
+  const open = deriveScopeStatus({ ...base, status: 'planning', handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-02' } }, false);
+  assert(open === 'planning', `open scope must derive planning, got ${open}`);
+
+  // Malformed completion metadata is rejected without any write.
+  const malformed = validateSprintFile({ ...base, completion: { completedAt: 'not-a-date', by: '' } }, 'demo/sprint.json');
+  assert(malformed.some((issue) => issue.field === 'completion.completedAt'), 'malformed completedAt must be rejected');
+  assert(malformed.some((issue) => issue.field === 'completion.by'), 'empty completion.by must be rejected');
+
+  // Contradictory completion+retirement is rejected.
+  const both = validateSprintFile(
+    { ...base, completion: { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker' }, retirement: { reason: 'r', retiredAt: '2026-07-02T00:00:00.000Z', planDigest: 'a'.repeat(64) } },
+    'demo/sprint.json',
+  );
+  assert(both.some((issue) => issue.field === 'completion' && issue.message.includes('retirement')), 'completion+retirement coexistence must be rejected');
+
+  // A scope entry with completion metadata validates in project state.
+  const { validateProjectStateShape } = require(resolve(repo, 'dist/cli/artifacts/schema.js'));
+  const state = {
+    schemaVersion: 4,
+    artifactRoot: '.agents/kyro/scopes',
+    scopes: [{ id: 'demo', title: 'Demo', status: 'completed', completion: { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker' } }],
+    activeScope: null,
+    runtimePath: '~/.agents/kyro/current',
+    installedAdapters: [],
+  };
+  const stateIssues = validateProjectStateShape(state, '.agents/kyro/kyro.json');
+  assert(stateIssues.length === 0, `scope entry with completion must validate, got ${JSON.stringify(stateIssues)}`);
+}
+
+// 11. Explicit scope reopen model (T2.3): a reopened scope reads as open again while its superseded
+//     completions stay readable as append-only history; history is audit evidence, never a status
+//     signal, and malformed or reordered history is rejected without any write.
+function assertScopeReopenModel() {
+  const { deriveScopeStatus } = require(resolve(repo, 'dist/cli/core/status.js'));
+  const { validateSprintFile, validateProjectStateShape } = require(resolve(repo, 'dist/cli/artifacts/schema.js'));
+  const completion = { completedAt: '2026-07-02T00:00:00.000Z', by: 'maker', summary: 'First pass done.' };
+  const record = { reopenedAt: '2026-07-03T00:00:00.000Z', by: 'maker', reason: 'A regression appeared.', completion };
+  const base = {
+    schemaVersion: 4,
+    scope: 'demo',
+    title: 'Demo',
+    status: 'planning',
+    objective: 'Demo objective',
+    successCriteria: ['Demo works.'],
+    clarifications: [],
+    conventions: [],
+    roadmap: { plannedSprintCount: 1, sizingRationale: 'x', sprints: [{ n: 1, slug: 's', title: 'S', state: 'closed' }] },
+    ledger: [],
+    previousSprint: null,
+    activeSprint: null,
+    debt: [],
+    completionHistory: [record],
+    handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: 'reopened', lastUpdated: '2026-07-03' },
+  };
+
+  // Reopened: open again for planning, never read as completed on the strength of its history.
+  const reopened = deriveScopeStatus(base, false);
+  assert(reopened === 'planning', `a reopened scope must derive planning, got ${reopened}`);
+  assert(validateSprintFile(base, 'demo/sprint.json').length === 0, 'a reopened scope with history must validate');
+
+  // History survives a later completion and stays independent of the live lifecycle state.
+  const completedAgain = {
+    ...base,
+    status: 'completed',
+    completion: { completedAt: '2026-07-05T00:00:00.000Z', by: 'maker' },
+    handoff: { nextAction: 'done', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-07-05' },
+  };
+  assert(deriveScopeStatus(completedAgain, false) === 'completed', 'a re-completed scope must derive completed');
+  assert(validateSprintFile(completedAgain, 'demo/sprint.json').length === 0, 'completion may coexist with history');
+
+  // Malformed, empty, and out-of-order history is rejected without any write.
+  const emptyHistory = validateSprintFile({ ...base, completionHistory: [] }, 'demo/sprint.json');
+  assert(emptyHistory.some((issue) => issue.field === 'completionHistory'), 'empty history must be rejected');
+  const noReason = validateSprintFile({ ...base, completionHistory: [{ ...record, reason: '' }] }, 'demo/sprint.json');
+  assert(noReason.some((issue) => issue.field === 'completionHistory[0].reason'), 'a history record without a reason must be rejected');
+  const badCompletion = validateSprintFile({ ...base, completionHistory: [{ ...record, completion: { completedAt: 'nope', by: '' } }] }, 'demo/sprint.json');
+  assert(badCompletion.some((issue) => issue.field === 'completionHistory[0].completion.completedAt'), 'a malformed superseded completion must be rejected');
+  const unpaired = validateSprintFile({ ...base, completionHistory: [{ ...record, requestDigest: 'a'.repeat(64) }] }, 'demo/sprint.json');
+  assert(unpaired.some((issue) => issue.field === 'completionHistory[0]'), 'unpaired reopen digests must be rejected');
+  const outOfOrder = validateSprintFile(
+    { ...base, completionHistory: [record, { ...record, reopenedAt: '2026-07-01T00:00:00.000Z' }] },
+    'demo/sprint.json',
+  );
+  assert(outOfOrder.some((issue) => issue.field === 'completionHistory[1].reopenedAt'), 'append-only ordering must be enforced');
+
+  // The registry carries the same append-only history for a reopened scope.
+  const stateIssues = validateProjectStateShape({
+    schemaVersion: 4,
+    artifactRoot: '.agents/kyro/scopes',
+    scopes: [{ id: 'demo', title: 'Demo', status: 'planning', completionHistory: [record] }],
+    activeScope: null,
+    runtimePath: '~/.agents/kyro/current',
+    installedAdapters: [],
+  }, '.agents/kyro/kyro.json');
+  assert(stateIssues.length === 0, `a reopened scope entry must validate, got ${JSON.stringify(stateIssues)}`);
+}
+
 function main() {
   assertStatusCoreIsPure();
   assertAnalyzeReportsActiveSprintStatusDrift();
@@ -272,6 +483,10 @@ function main() {
   assertStatusRouterDocumentsReviewDebt();
   assertCliStatusCommand();
   assertDescribeWriteFailureClassifiesErrno();
+  assertDeriveScopeStatusMutationGuard();
+  assertStatusTaskSummaryDistinguishesDispositions();
+  assertScopeCompletionModel();
+  assertScopeReopenModel();
   console.log('check:status — status coherence invariants passed');
 }
 

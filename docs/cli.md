@@ -18,6 +18,8 @@ kyro capabilities       # List supported tool-owned verbs + version (runtime han
 kyro eval               # Run deterministic behavioral eval cases
 kyro mcp serve          # Start the tools-only MCP stdio server
 kyro scope set-active <scope> --yes  # Change active scope with guardrail confirmation
+kyro scope complete --kyro-scope <scope> [--summary "..."] --yes  # Explicit scope completion
+kyro scope reopen --kyro-scope <scope> --reason "..." --yes       # Return a completed scope to planning
 kyro scope retire --kyro-scope <scope> --reason "..."  # Read-only retirement preparation
 kyro repair integrity prepare --json                   # Read-only integrity diagnosis
 kyro repair integrity apply --digest <sha256> --yes    # Digest-bound integrity apply
@@ -158,11 +160,27 @@ The project keeps only state and artifacts (layered):
 ├── project.json                 # SHARED — commit: principles, team policy, scopes registry cache
 ├── local.json                   # LOCAL — gitignored: activeScope, installedAdapters
 ├── .gitignore                   # install/sync assist (local-only files; never project.json/scopes/)
+├── trace/{scope}/               # LOCAL — gitignored: append-only per-machine event log
 └── scopes/
     └── {scope}/
         ├── sprint.json          # single source of truth
         ├── archive/             # write-only, at sprint close
         └── findings/            # write-only INIT analysis evidence
+```
+
+A host repository that ignores `.agents/` wholesale also shadows the nested `.gitignore` above, since
+git never descends into an excluded directory — the shared artifacts then silently stop being
+versioned and the scope is no longer reproducible from a clone. Exclude the local paths explicitly
+instead (this repository's own `.gitignore` is a worked example):
+
+```text
+/.agents/*
+!/.agents/kyro/
+/.agents/kyro/*
+!/.agents/kyro/project.json
+!/.agents/kyro/scopes/
+/.agents/kyro/**/trace/
+/.agents/kyro/local.json
 ```
 
 Full commit matrix, including migration off the pre-layered monolito: [Teams](teams.md).
@@ -436,7 +454,7 @@ Trace files are audit data only. They are never read for routing or workflow dec
 
 ## Portable guardrails
 
-Kyro evaluates dangerous operations through a shared policy core. `scope set-active` requires `--yes`. `scope retire` is stricter: preparation is read-only, then apply requires the reviewed state-bound digest plus `--yes`; stale state returns `DIVERGED`, and missing confirmation returns `HUMAN_APPROVAL_REQUIRED`. MCP mutating tools use their existing two-phase `confirm: true` protocol. Use `kyro doctor --adapters` to see whether each adapter is `enforced` or `advisory` for guarded operations. See [guardrails.md](guardrails.md).
+Kyro evaluates dangerous operations through a shared policy core. `scope set-active`, `scope complete` and `scope reopen` require `--yes`. `scope retire` is stricter: preparation is read-only, then apply requires the reviewed state-bound digest plus `--yes`; stale state returns `DIVERGED`, and missing confirmation returns `HUMAN_APPROVAL_REQUIRED`. MCP mutating tools use their existing two-phase `confirm: true` protocol. Use `kyro doctor --adapters` to see whether each adapter is `enforced` or `advisory` for guarded operations. See [guardrails.md](guardrails.md).
 
 ## Maker/checker review
 
@@ -444,11 +462,70 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 `kyro close-sprint` is the only verb that confirms interactively. Outside a TTY (agent harness, CI, piped shell) it fails immediately with `CONFIRMATION_REQUIRED` instead of prompting for input that can never arrive — pass `--yes` to complete the gate non-interactively, or `--dry-run` to preview it.
 
+Close requires every unfinished task to have a typed `task.disposition`. The persisted outcome is `shipped`/`completed` only when every task is `done` with a passing verdict; otherwise it is derived `partial` (or explicit `abandoned`). Dry-run, the narrative, the checkpoint `beforeClose` image, and the ledger entry all expose those dispositions. Closing a sprint never completes the scope: `handoff.nextAction` returns to `plan_sprint` so a later sprint can be materialized with `kyro plan --from`. Retirement remains the only terminal path.
+
 ## Runtime capability handshake (`kyro capabilities`)
 
 `kyro capabilities [--json]` lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start: a missing verb — or an `UNKNOWN_COMMAND` failure on the command itself — means the installed runtime predates the skill assets and the forge must abort with an upgrade request instead of improvising hand-edits. `kyro doctor` probes the installed runtime with the same handshake (`CLI capabilities` check).
 
 The payload covers the sprint-lifecycle verbs plus the tool-owned state writers agents reach for (`clarify`, `scenario`, `adr`, `scope`, `status`). It excludes operator surface (`install`, `sync`, `uninstall`, `detect`, `eval`, `tui`, `mcp`, `trace`) and `capabilities` itself — the handshake cannot verify itself, since its absence is the staleness signal. `npm run check:capabilities` enforces both directions: every `{{KYRO_CLI}} <verb>` the shipped assets invoke must be advertised, and every advertised verb must be dispatchable.
+
+## Explicit scope completion and reopen (`kyro scope complete` / `kyro scope reopen`)
+
+A roadmap is an estimate, so closing its last sprint never completes a scope: a scope stays open for
+planning until someone says otherwise. Completion is that explicit statement, and it is not
+retirement — the scope stays in the work lifecycle and can be reopened later.
+
+```bash
+kyro scope complete --kyro-scope billing-api --summary "Objective met; nothing outstanding." --yes
+kyro scope reopen   --kyro-scope billing-api --reason "Rounding regression found in production." --yes
+```
+
+Both are single locked transactions over `sprint.json` and the project registry, bound to a request
+digest, idempotent and resumable (an identical retry after an interrupted apply finishes the
+registry write instead of rewriting anything). Neither reads or rewrites `archive/`. Drop `--yes` to
+see the plan and fail closed with `CONFIRMATION_REQUIRED`, or pass `--dry-run` to preview only.
+
+`complete` refuses an active sprint, open debt, a done task without a pass verdict, blocking analyze
+findings, and artifact divergence (`NOT_READY_TO_COMPLETE`, `BLOCKING_FINDINGS`, `DIVERGED`), then
+records `completion` plus `status: completed` and `handoff.nextAction: done`.
+
+`reopen` requires a non-empty `--reason`, refuses retired (`SCOPE_RETIRED`), already-open and
+never-completed scopes (`SCOPE_ALREADY_OPEN`) and malformed state — each without writing. It clears
+the live `completion`, appends it to append-only `completionHistory` together with the reason, and
+returns the scope to `status: planning` / `handoff.nextAction: plan_sprint`, so the next sprint is
+planned through the ordinary `kyro plan` route with no recovery or hand-edit. Completion history is
+never pruned: `kyro scope inspect` prints it and `kyro context-pack` exposes it as `reopenHistory`.
+
+Because both transitions move live state off the close checkpoint's after-image, `kyro doctor
+--artifacts` does not trust the records it finds. It replays the recorded transitions from the
+after-image through the same builders the writers use and accepts the live state only if one atomic
+verification reproduces both `sprint.json` and the project registry exactly — reported as
+`sprint=after (structurally replayed lifecycle; actor identity unverified)`. Any edit the claimed
+transitions do not reproduce, and any corrupt immutable artifact, still fails closed as `DIVERGED`.
+
+Two properties make that a verification rather than a restatement of the records, and both matter
+once a scope goes round the cycle more than once:
+
+- **Prefix exactness.** A scope may complete, reopen, plan, close, and complete again any number of
+  times. Each close seals the `completionHistory` as it stood into its own after-image, so a replay
+  starting from that image may only apply the *suffix* the live state adds on top of it. Re-applying
+  the sealed prefix would double every earlier transition and report a lawful multi-cycle scope as
+  `DIVERGED`. A live history that is not an exact extension of the sealed prefix — rewritten or
+  truncated — is refused outright, and nothing replays.
+- **Structurally bound suffix.** Every replayed record must carry `requestDigest` and
+  `beforeEntryDigest`, and each must re-derive from the record's own content: the request digest from
+  the scope plus the summary or the reason and the exact superseded completion, the registry digest
+  from the entry the step started from. Missing, stale, partially edited, reordered, or misbound
+  records fail closed. Records already sealed inside an immutable after-image are historical evidence
+  and are not re-verified.
+
+These SHA-256 values are public deterministic consistency bindings, not signatures. An editor able to
+rewrite both durable layers can recompute them and produce a structurally valid projection; Kyro
+cannot distinguish that from its own writer inside the same trust domain. `by` is self-asserted, so
+neither actor identity nor process identity is authenticated. Repositories requiring adversarial
+authenticity must protect history with signed commits or an external append-only store. See
+[Lossless sprint-close checkpoints](sprint-close-checkpoints.md#lifecycle-verification-trust-boundary).
 
 ## Human-gated scope retirement (`kyro scope retire`)
 
@@ -498,6 +575,17 @@ never reachable from Forge, routing or handoffs.
 ```
 
 Each target is either an exact `open_question` or a clarification `marker`. The command validates every resolution before writing; rejects duplicate, stale, empty, or malformed entries without changing state; appends the durable clarification record; and leaves `nextAction: clarify` until all questions and markers are resolved. Once clear, it routes to `plan_sprint` (no active sprint) or `execute_task` (an existing sprint).
+
+## Tool-owned task evidence and disposition (`kyro record-evidence`)
+
+`kyro record-evidence <task> --summary <text> --validation <text> [--file <path> ...] [--status done|blocked] [--disposition deferred|blocked|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]]` is the single maker write onto a located task. It never hand-edits `sprint.json`.
+
+- Default `--status done` records evidence and routes to `review_task`. The checker verdict stays on `kyro review`.
+- `--status blocked` without `--disposition` is the in-sprint block (still reviewable).
+- `--disposition` records a typed terminal explanation for unfinished work. It requires a non-empty `--reason`. `deferred` and `superseded` also require `--target` (`debt:<id>` must exist in `debt[]`; `task:<id>` must be a different task in the sprint; `sprint:<n>` is a positive integer and may name a future sprint). Unknown kinds, blank reasons, `--status done`, and invalid targets fail with no write.
+- A disposition is not `done` and not `pass`. Historical tasks omit the field.
+
+See [adr-adaptive-sprint-lifecycle.md](plans/adr-adaptive-sprint-lifecycle.md) and [status-coherence.md](status-coherence.md).
 
 ## Tool-owned debt mutation (`kyro debt`)
 
@@ -639,7 +727,7 @@ that leaves an immutable record of itself.
 | Runtime | Operations | Repairs |
 | --- | --- | --- |
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
-| **4.44.0 and later** (current: **4.47.2**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+| **4.44.0 and later** (current: **4.47.3**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

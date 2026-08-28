@@ -1,0 +1,132 @@
+{
+  "n": 1,
+  "slug": "versioned-replay-foundation",
+  "title": "Versioned replay foundation",
+  "objective": "Make replay dispatch explicit and fail-closed for immutable remediation evidence before introducing a compact record representation.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Versioned replay contract",
+      "objective": "Define the typed version-dispatch boundary from evidence parsing through replay validation.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "title": "Model versioned replay witnesses",
+          "description": "Introduce closed, strongly typed protocol/version discriminants for remediation results and replay witnesses; document the compatibility policy for v1 records and unknown future versions.",
+          "files_to_touch": [
+            "src/cli/remediation",
+            "src/cli/artifacts/schema.ts",
+            "src/cli/types.ts"
+          ],
+          "context": "Debt-4 requires version-aware validation without coercing immutable evidence. This task establishes the contract and explicit unsupported path only.",
+          "acceptance_criteria": [
+            "Known v1 evidence routes through an explicit v1 validator rather than the ambient current SprintFile parser.",
+            "Unknown record or witness versions produce an actionable fail-closed diagnostic.",
+            "The version model contains no arbitrary JSON or generic patch escape hatch."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S1",
+            "S2"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added explicit version-dispatched replay witness parsing with typed v1 output and fail-closed unsupported handling.",
+            "validation": [
+              "OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm run build (passed)",
+              "npm run check:replay-witness (5 assertions passed)",
+              "npm run check:scope-remediation (292 assertions passed)",
+              "npm run check:verification-states (143 assertions passed)"
+            ],
+            "files_changed": [
+              "src/cli/remediation/replay-witness.ts",
+              "src/cli/remediation/plan.ts",
+              "scripts/check-replay-witness.mjs",
+              "package.json"
+            ],
+            "notes": "ADR-0001 records the v1 compatibility and future-version fail-closed policy.",
+            "by": "maker",
+            "recordedAt": "2026-08-09T16:49:21.624Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Known v1 evidence routes through an explicit v1 validator rather than the ambient current SprintFile parser.",
+              "Unknown record or witness versions produce an actionable fail-closed diagnostic.",
+              "The version model contains no arbitrary JSON or generic patch escape hatch."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-09T16:49:21.755Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Historical compatibility vectors",
+      "objective": "Prove that the new dispatch preserves historical integrity and rejects unsupported evidence.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.2",
+          "title": "Certify version-aware replay vectors",
+          "description": "Extend the real remediation and verification harnesses with v1 compatibility, unsupported-version, and multi-record chain cases.",
+          "files_to_touch": [
+            "scripts/check-scope-remediation.mjs",
+            "scripts/check-verification-states.mjs",
+            "src/cli/remediation"
+          ],
+          "context": "Validation must cover real close/remediate flows and ensure historic checkpoints remain byte-identical.",
+          "acceptance_criteria": [
+            "Existing v1 remediation chains remain verified without rewriting their records.",
+            "Unsupported version vectors fail closed in both doctor and status.",
+            "The regression harness proves checkpoint, snapshot, narrative, and ledger bytes remain unchanged."
+          ],
+          "depends_on": [
+            "T1.1"
+          ],
+          "scenario_refs": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Certified explicit replay-witness dispatch with real v1 multi-record replay and unknown-version fail-closed vectors.",
+            "validation": "OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm run build; npm run check:replay-witness (5 assertions); npm run check:scope-remediation (295 assertions); npm run check:verification-states (152 assertions)",
+            "files_changed": [
+              "src/cli/remediation/replay-witness.ts",
+              "src/cli/remediation/plan.ts",
+              "scripts/check-replay-witness.mjs",
+              "scripts/check-scope-remediation.mjs",
+              "scripts/check-verification-states.mjs",
+              "package.json"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-08-09T16:52:10.819Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Existing v1 remediation chains remain verified without rewriting their records.",
+              "Unsupported version vectors fail closed in both doctor and status.",
+              "The regression harness proves checkpoint, snapshot, narrative, and ledger bytes remain unchanged."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-09T16:52:19.451Z"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "Version-aware replay dispatch is typed, fail-closed, and covered by real artifact vectors.",
+    "Historical v1 remediation chains remain valid without mutation.",
+    "npm run build, npm run check:scope-remediation, npm run check:verification-states, and npm run check pass."
+  ]
+}

@@ -227,4 +227,422 @@ function run(args, root) {
   }
 }
 
+function addDebtAndReplacement(root) {
+  const sprint = readSprint(root);
+  sprint.debt.push({
+    id: 'debt-1',
+    title: 'Deferred demo work',
+    origin: 1,
+    priority: 'medium',
+    status: 'open',
+    targetSprint: 2,
+    note: 'Carry forward.',
+  });
+  sprint.activeSprint.phases[0].tasks.push({
+    id: 'T1.2',
+    title: 'Replacement demo',
+    description: 'Replacement work.',
+    files_to_touch: [],
+    context: 'ctx',
+    acceptance_criteria: ['Replacement exists.'],
+    depends_on: [],
+    status: 'pending',
+    evidence: null,
+    verdict: null,
+  });
+  writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+}
+
+// 11) --disposition deferred with an existing debt is not done/pass and does not route to review_task.
+{
+  const root = sandbox();
+  try {
+    addDebtAndReplacement(root);
+    const rec = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'Deferring remaining work.',
+      '--validation', 'user decision to defer',
+      '--disposition', 'deferred',
+      '--reason', 'Blocked on an upstream API; carry to debt-1.',
+      '--target', 'debt:debt-1',
+    ], root);
+    assert(rec.status === 0, `deferred disposition should succeed: ${rec.stdout}${rec.stderr}`);
+    const task = readSprint(root).activeSprint.phases[0].tasks[0];
+    assert(task.status !== 'done', `deferred work must not be done, got ${task.status}`);
+    assert(task.verdict == null, 'disposition must not write a verdict');
+    assert(task.disposition && task.disposition.kind === 'deferred', 'disposition.kind should be deferred');
+    assert(task.disposition.reason.includes('upstream API'), 'disposition.reason should be stored');
+    assert(task.disposition.target && task.disposition.target.kind === 'debt' && task.disposition.target.id === 'debt-1', 'deferred target should be debt-1');
+    const handoff = readSprint(root).handoff;
+    assert(handoff.nextAction === 'execute_task', `deferred must not route to review_task, got ${handoff.nextAction}`);
+    assert(handoff.nextTaskId === 'T1.2', `next executable should be T1.2, got ${handoff.nextTaskId}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 12) Invalid/missing dispositions fail without writes.
+{
+  const root = sandbox();
+  try {
+    addDebtAndReplacement(root);
+    const before = readFileSync(sprintPath(root), 'utf-8');
+
+    const noReason = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'x', '--validation', 'tsc',
+      '--disposition', 'cancelled',
+    ], root);
+    assert(noReason.status === 1 && (noReason.stderr + noReason.stdout).includes('--reason'), 'missing --reason should fail');
+
+    const unknownKind = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'x', '--validation', 'tsc',
+      '--disposition', 'skipped', '--reason', 'nope',
+    ], root);
+    assert(unknownKind.status === 1 && (unknownKind.stderr + unknownKind.stdout).includes('--disposition'), 'unknown kind should fail');
+
+    const missingDebt = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'x', '--validation', 'tsc',
+      '--disposition', 'deferred', '--reason', 'later',
+      '--target', 'debt:debt-99',
+    ], root);
+    assert(missingDebt.status === 1 && (missingDebt.stderr + missingDebt.stdout).includes('DEBT_NOT_FOUND'), 'unknown debt target should fail');
+
+    const missingTask = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'x', '--validation', 'tsc',
+      '--disposition', 'superseded', '--reason', 'replaced',
+      '--target', 'task:T9.9',
+    ], root);
+    assert(missingTask.status === 1 && (missingTask.stderr + missingTask.stdout).includes('TASK_NOT_FOUND'), 'unknown task target should fail');
+
+    const doneCombo = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'x', '--validation', 'tsc',
+      '--disposition', 'cancelled', '--reason', 'skip',
+      '--status', 'done',
+    ], root);
+    assert(doneCombo.status === 1 && (doneCombo.stderr + doneCombo.stdout).includes('--status done'), 'done+disposition should fail');
+
+    const noTarget = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'x', '--validation', 'tsc',
+      '--disposition', 'deferred', '--reason', 'later',
+    ], root);
+    assert(noTarget.status === 1 && (noTarget.stderr + noTarget.stdout).includes('--target'), 'deferred without target should fail');
+
+    assert(readFileSync(sprintPath(root), 'utf-8') === before, 'rejected disposition calls must not write sprint.json');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 13) cancelled and superseded write a non-success terminal record; blocked disposition sets status blocked.
+{
+  const root = sandbox();
+  try {
+    addDebtAndReplacement(root);
+    const cancelled = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'Dropping the original approach.',
+      '--validation', 'user cancelled',
+      '--disposition', 'cancelled',
+      '--reason', 'Product dropped this slice.',
+    ], root);
+    assert(cancelled.status === 0, `cancelled should succeed: ${cancelled.stdout}${cancelled.stderr}`);
+    const cancelledTask = readSprint(root).activeSprint.phases[0].tasks[0];
+    assert(cancelledTask.status !== 'done', 'cancelled must not be done');
+    assert(cancelledTask.disposition.kind === 'cancelled', 'kind should be cancelled');
+    assert(!('target' in cancelledTask.disposition), 'cancelled without --target omits target');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+{
+  const root = sandbox();
+  try {
+    addDebtAndReplacement(root);
+    const superseded = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'Replaced by T1.2.',
+      '--validation', 'user replaced',
+      '--disposition', 'superseded',
+      '--reason', 'T1.2 is the surviving approach.',
+      '--target', 'task:T1.2',
+    ], root);
+    assert(superseded.status === 0, `superseded should succeed: ${superseded.stdout}${superseded.stderr}`);
+    const task = readSprint(root).activeSprint.phases[0].tasks[0];
+    assert(task.disposition.kind === 'superseded' && task.disposition.target.id === 'T1.2', 'superseded target should be T1.2');
+    assert(task.status !== 'done', 'superseded must not be done');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+{
+  const root = sandbox();
+  try {
+    const rec = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'Still blocked on access.',
+      '--validation', 'three failed rounds',
+      '--disposition', 'blocked',
+      '--reason', 'Cannot proceed without staging credentials.',
+    ], root);
+    assert(rec.status === 0, `blocked disposition should succeed: ${rec.stdout}${rec.stderr}`);
+    const task = readSprint(root).activeSprint.phases[0].tasks[0];
+    assert(task.status === 'blocked', `blocked disposition should set status blocked, got ${task.status}`);
+    assert(task.disposition.kind === 'blocked', 'kind should be blocked');
+    assert(readSprint(root).handoff.nextAction === 'execute_task', 'blocked disposition must not route to review_task');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 14) A disposed task is not executable: dispose T1.1 deferred, execute + approve T1.2, and the
+//     handoff must never route back to T1.1. After the replacement passes, only disposed work
+//     remains, so handoff stays on execute_task with nextTaskId null (close semantics are T1.3's).
+{
+  const root = sandbox();
+  try {
+    addDebtAndReplacement(root);
+    const dispose = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'Deferring T1.1.',
+      '--validation', 'user decision to defer',
+      '--disposition', 'deferred',
+      '--reason', 'Carry to debt-1.',
+      '--target', 'debt:debt-1',
+    ], root);
+    assert(dispose.status === 0, `deferred dispose should succeed: ${dispose.stdout}${dispose.stderr}`);
+
+    const afterDispose = readSprint(root);
+    assert(afterDispose.handoff.nextAction === 'execute_task', `after dispose should stay execute_task, got ${afterDispose.handoff.nextAction}`);
+    assert(afterDispose.handoff.nextTaskId === 'T1.2', `after dispose next executable should be T1.2, got ${afterDispose.handoff.nextTaskId}`);
+
+    const rec = run(['record-evidence', 'T1.2', '--kyro-scope', 'demo', '--summary', 'Replacement done.', '--validation', 'tsc'], root);
+    assert(rec.status === 0, `T1.2 record should succeed: ${rec.stdout}${rec.stderr}`);
+    const review = run(['review', 'T1.2', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+    assert(review.status === 0, `T1.2 review should pass: ${review.stdout}${review.stderr}`);
+
+    const handoff = readSprint(root).handoff;
+    assert(handoff.nextTaskId !== 'T1.1', `disposed T1.1 must not reappear as next task, got ${handoff.nextTaskId}`);
+    assert(handoff.nextTaskId === null, `no executable tasks left, nextTaskId should be null, got ${handoff.nextTaskId}`);
+    assert(handoff.nextAction === 'execute_task', `no executable tasks left, handoff stays execute_task, got ${handoff.nextAction}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 15) superseded and cancelled dispositions keep the task pending and are the vulnerable case:
+//     the review pass must not route the handoff back to the disposed task.
+for (const kind of ['superseded', 'cancelled']) {
+  {
+    const root = sandbox();
+    try {
+      addDebtAndReplacement(root);
+      const extra = [kind === 'superseded' ? '--target' : null, kind === 'superseded' ? 'task:T1.2' : null].filter(Boolean);
+      const dispose = run([
+        'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+        '--summary', `Dropping T1.1 (${kind}).`,
+        '--validation', 'user decision',
+        '--disposition', kind,
+        '--reason', kind === 'superseded' ? 'T1.2 is the surviving approach.' : 'Product dropped this slice.',
+        ...extra,
+      ], root);
+      assert(dispose.status === 0, `${kind} dispose should succeed: ${dispose.stdout}${dispose.stderr}`);
+
+      const afterDispose = readSprint(root);
+      assert(afterDispose.handoff.nextTaskId === 'T1.2', `${kind}: next executable should be T1.2, got ${afterDispose.handoff.nextTaskId}`);
+
+      const rec = run(['record-evidence', 'T1.2', '--kyro-scope', 'demo', '--summary', 'Replacement done.', '--validation', 'tsc'], root);
+      assert(rec.status === 0, `${kind}: T1.2 record should succeed: ${rec.stdout}${rec.stderr}`);
+      const review = run(['review', 'T1.2', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+      assert(review.status === 0, `${kind}: T1.2 review should pass: ${review.stdout}${review.stderr}`);
+
+      const handoff = readSprint(root).handoff;
+      assert(handoff.nextTaskId !== 'T1.1', `${kind}: disposed T1.1 must not reappear as next task, got ${handoff.nextTaskId}`);
+      assert(handoff.nextTaskId === null, `${kind}: no executable tasks left, nextTaskId should be null, got ${handoff.nextTaskId}`);
+      assert(handoff.nextAction === 'execute_task', `${kind}: handoff stays execute_task, got ${handoff.nextAction}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+}
+
+// 16) A pending task without disposition is still selected after a sibling is disposed (not skipped
+//     because a later phase/emergent task was disposed first, and not skipped when it precedes it).
+{
+  const root = sandbox();
+  try {
+    addDebtAndReplacement(root);
+    const dispose = run([
+      'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+      '--summary', 'Cancelling T1.1.',
+      '--validation', 'user decision',
+      '--disposition', 'cancelled',
+      '--reason', 'Not needed.',
+    ], root);
+    assert(dispose.status === 0, `cancel should succeed: ${dispose.stdout}${dispose.stderr}`);
+    const handoff = readSprint(root).handoff;
+    assert(handoff.nextTaskId === 'T1.2', `pending T1.2 without disposition should be selected, got ${handoff.nextTaskId}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 17) A disposed emergent task is not executable: after a phase task passes, the handoff must not
+//     route back to the disposed emergent task.
+{
+  const root = sandbox();
+  try {
+    const sprint = readSprint(root);
+    sprint.activeSprint.emergentTasks.push({
+      id: 'E1',
+      title: 'Emergent task',
+      description: 'Emergent work.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Done.'],
+      status: 'pending',
+      evidence: null,
+      verdict: null,
+    });
+    sprint.activeSprint.phases[0].tasks.push({
+      id: 'T1.2',
+      title: 'Replacement demo',
+      description: 'Replacement work.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Replacement exists.'],
+      depends_on: [],
+      status: 'pending',
+      evidence: null,
+      verdict: null,
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const dispose = run([
+      'record-evidence', 'E1', '--kyro-scope', 'demo',
+      '--summary', 'Dropping emergent work.',
+      '--validation', 'user decision',
+      '--disposition', 'cancelled',
+      '--reason', 'Superseded by the phase work.',
+    ], root);
+    assert(dispose.status === 0, `emergent dispose should succeed: ${dispose.stdout}${dispose.stderr}`);
+
+    const rec = run(['record-evidence', 'T1.2', '--kyro-scope', 'demo', '--summary', 'Replacement done.', '--validation', 'tsc'], root);
+    assert(rec.status === 0, `T1.2 record should succeed: ${rec.stdout}${rec.stderr}`);
+    const review = run(['review', 'T1.2', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+    assert(review.status === 0, `T1.2 review should pass: ${review.stdout}${review.stderr}`);
+
+    const handoff = readSprint(root).handoff;
+    assert(handoff.nextTaskId !== 'E1', `disposed emergent E1 must not reappear as next task, got ${handoff.nextTaskId}`);
+    assert(handoff.nextTaskId === 'T1.1', `pending T1.1 without disposition should still be selected, got ${handoff.nextTaskId}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 18) Compatibility: a sprint with no dispositions keeps the prior routing — the executed task goes
+//     to review_task and, once reviewed, the next pending task is selected; a blocked task without
+//     disposition still routes to review_task.
+{
+  const root = sandbox();
+  try {
+    const sprint = readSprint(root);
+    sprint.activeSprint.phases[0].tasks.push({
+      id: 'T1.2',
+      title: 'Second demo',
+      description: 'More work.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Done.'],
+      depends_on: [],
+      status: 'pending',
+      evidence: null,
+      verdict: null,
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const rec = run(['record-evidence', 'T1.1', '--kyro-scope', 'demo', '--summary', 'First done.', '--validation', 'tsc'], root);
+    assert(rec.status === 0, `record should succeed: ${rec.stdout}${rec.stderr}`);
+    let handoff = readSprint(root).handoff;
+    assert(handoff.nextAction === 'review_task' && handoff.nextTaskId === 'T1.1', `no-disposition record routes to review_task for the task, got ${handoff.nextAction}/${handoff.nextTaskId}`);
+
+    const review = run(['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+    assert(review.status === 0, `review should pass: ${review.stdout}${review.stderr}`);
+    handoff = readSprint(root).handoff;
+    assert(handoff.nextTaskId === 'T1.2', `next pending without disposition should be selected after review, got ${handoff.nextTaskId}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 19) Compatibility: a blocked task without a disposition still routes to review_task (blocked is
+//     excluded as an executable state, but the handoff records it for checker review as before).
+{
+  const root = sandbox();
+  try {
+    const sprint = readSprint(root);
+    sprint.activeSprint.phases[0].tasks.push({
+      id: 'T1.2',
+      title: 'Second demo',
+      description: 'More work.',
+      files_to_touch: [],
+      context: 'ctx',
+      acceptance_criteria: ['Done.'],
+      depends_on: [],
+      status: 'pending',
+      evidence: null,
+      verdict: null,
+    });
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const rec = run(['record-evidence', 'T1.1', '--kyro-scope', 'demo', '--summary', 'Stuck.', '--validation', 'tsc', '--status', 'blocked'], root);
+    assert(rec.status === 0, `blocked record should succeed: ${rec.stdout}${rec.stderr}`);
+    const handoff = readSprint(root).handoff;
+    assert(handoff.nextAction === 'review_task' && handoff.nextTaskId === 'T1.1', `blocked without disposition routes to review_task for the task, got ${handoff.nextAction}/${handoff.nextTaskId}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 20) A disposed task rejects checker review outright, for BOTH pass and fail, before any plan is
+//     built or applied: no writes, no handoff change, no accidental re-open of disposed work.
+for (const verdict of ['pass', 'fail']) {
+  {
+    const root = sandbox();
+    try {
+      addDebtAndReplacement(root);
+      const dispose = run([
+        'record-evidence', 'T1.1', '--kyro-scope', 'demo',
+        '--summary', 'Deferring T1.1.',
+        '--validation', 'user decision to defer',
+        '--disposition', 'deferred',
+        '--reason', 'Carry to debt-1.',
+        '--target', 'debt:debt-1',
+      ], root);
+      assert(dispose.status === 0, `deferred dispose should succeed: ${dispose.stdout}${dispose.stderr}`);
+
+      const before = readFileSync(sprintPath(root), 'utf-8');
+      const review = run(['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', verdict, '--yes'], root);
+      assert(review.status === 1, `${verdict} review of disposed T1.1 should fail, got exit ${review.status}`);
+      const output = review.stderr + review.stdout;
+      assert(output.includes('DISPOSED_TASK_NOT_REVIEWABLE'), `${verdict} review of disposed T1.1 should emit the typed error, got: ${output}`);
+      assert(output.includes('kyro add-emergent'), `${verdict} review remedy should direct active-sprint replacement work to kyro add-emergent, got: ${output}`);
+      assert(!output.includes('clarify'), `${verdict} review remedy must not present clarify as a re-open path, got: ${output}`);
+      assert(readFileSync(sprintPath(root), 'utf-8') === before, `${verdict} review of disposed T1.1 must not write sprint.json`);
+
+      const handoff = readSprint(root).handoff;
+      assert(handoff.nextTaskId === 'T1.2', `${verdict} review of disposed T1.1 must not change the handoff, got ${handoff.nextTaskId}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+}
+
 console.log('check:record-evidence — tool-owned evidence write verified end-to-end');

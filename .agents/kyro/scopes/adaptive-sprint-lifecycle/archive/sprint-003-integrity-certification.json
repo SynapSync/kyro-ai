@@ -1,0 +1,199 @@
+{
+  "n": 3,
+  "slug": "integrity-certification",
+  "title": "Integrity recalibration and lifecycle certification",
+  "objective": "Prove that dispositions, truthful closes, explicit completion, and reopen replay identically through Doctor and Integrity without weakening immutable-artifact safety.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Lifecycle replay parity",
+      "objective": "Make lifecycle replay an observable, adversarially tested contract rather than a trusted record.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.1",
+          "title": "Certify completion and reopen replay against artifacts",
+          "description": "Exercise explicit completion and reopen from a closed checkpoint after-image, proving Doctor and Integrity accept only the state exactly rebuilt by the lifecycle builders and reject unexplainable drift.",
+          "files_to_touch": [
+            "src/cli/checkpoints/lifecycle-state.ts",
+            "src/cli/commands/artifact-doctor.ts",
+            "scripts/check-scope-retire.mjs"
+          ],
+          "context": "Use the shared lifecycle builders as the sole authority. The recorded lifecycle metadata is evidence, never authority; keep legacy checkpoint reads compatible and do not rewrite archive bytes.",
+          "acceptance_criteria": [
+            "Doctor and Integrity accept a completion/reopen state only when replay from the checkpoint after-image reproduces both sprint and registry state exactly.",
+            "A forged, incomplete, or extra live-state change remains a scoped DIVERGED failure with no repair or canonicalization proposal.",
+            "Historical checkpoint and retirement reads remain distinguishable from the open completion/reopen lifecycle."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S4",
+            "S5"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Made Integrity replay lifecycle records through the shared completion/reopen builders and require exact sprint plus registry reproduction; forged or extra lifecycle drift is now a scoped diverged blocker.",
+            "validation": [
+              "npm run typecheck",
+              "npm run build",
+              "npm run check:scope-retire"
+            ],
+            "files_changed": [
+              "src/cli/checkpoints/lifecycle-state.ts",
+              "src/cli/commands/artifact-doctor.ts",
+              "src/cli/remediation/plan.ts",
+              "src/cli/repair/integrity-plan.ts",
+              "scripts/check-scope-retire.mjs"
+            ],
+            "by": "executor",
+            "recordedAt": "2026-08-26T13:42:41.996Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Doctor and Integrity accept a completion/reopen state only when replay from the checkpoint after-image reproduces both sprint and registry state exactly.",
+              "A forged, incomplete, or extra live-state change remains a scoped DIVERGED failure with no repair or canonicalization proposal.",
+              "Historical checkpoint and retirement reads remain distinguishable from the open completion/reopen lifecycle."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-26T13:42:47.519Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "End-to-end adaptive lifecycle",
+      "objective": "Prove the ordinary developer journey needs no manual state edits or recovery detour.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.2",
+          "title": "Add an end-to-end partial-close, plan, complete, and reopen proof",
+          "description": "Run the compiled CLI in an isolated workspace through disposition, truthful partial close, later sprint planning, explicit completion, and deliberate reopen, preserving checkpoints and traceability at every boundary.",
+          "files_to_touch": [
+            "scripts/check-close-handoff.mjs",
+            "scripts/check-plan.mjs",
+            "scripts/check-scope-retire.mjs"
+          ],
+          "context": "This is the acceptance path for the original rigidity problem: unfinished work is disposed with a reason and destination, not silently completed; normal planning resumes without manual edits. Use tool-owned commands only.",
+          "acceptance_criteria": [
+            "A partially completed sprint closes truthfully with typed dispositions and leaves the scope routable to plan_sprint.",
+            "The next sprint materializes through kyro plan without recovery, and explicit completion remains distinct from retirement.",
+            "A deliberate reopen preserves completion history, returns the scope to plan_sprint, and leaves every pre-existing archive byte unchanged."
+          ],
+          "depends_on": [
+            "T3.1"
+          ],
+          "scenario_refs": [
+            "S1",
+            "S2",
+            "S3",
+            "S6",
+            "S7"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added one compiled-CLI acceptance path from typed disposition through truthful partial close, follow-up planning, verified completion, and deliberate reopen; immutable archive bytes are checked across lifecycle-only steps.",
+            "validation": [
+              "npm run build",
+              "npm run check:scope-retire"
+            ],
+            "files_changed": [
+              "scripts/check-close-handoff.mjs",
+              "scripts/check-plan.mjs",
+              "scripts/check-scope-retire.mjs"
+            ],
+            "by": "executor",
+            "recordedAt": "2026-08-26T13:45:27.272Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A partially completed sprint closes truthfully with typed dispositions and leaves the scope routable to plan_sprint.",
+              "The next sprint materializes through kyro plan without recovery, and explicit completion remains distinct from retirement.",
+              "A deliberate reopen preserves completion history, returns the scope to plan_sprint, and leaves every pre-existing archive byte unchanged."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-26T13:45:27.389Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Objective evidence and release decision",
+      "objective": "Turn the scope success criteria into explicit evidence without auto-completing the scope or publishing a release.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.3",
+          "title": "Verify success criteria and certify lifecycle readiness",
+          "description": "Map every scope success criterion to the completed behavioral evidence and run the full repository and scoped integrity gates; report any remaining gap as debt or a blocker instead of asserting scope completion.",
+          "files_to_touch": [
+            "scripts/check-scope-retire.mjs",
+            "scripts/check-status.mjs",
+            "scripts/check-repair-integrity.mjs"
+          ],
+          "context": "The Sprint 2 recommendation is incorporated here: all-tasks-done is not proof of the objective. This task produces evidence for a later human scope-completion decision; it must not invoke scope complete, retirement, release, or installation.",
+          "acceptance_criteria": [
+            "Each of the five scope success criteria maps to concrete passing behavior and verification evidence, or an explicit unresolved item.",
+            "npm run check, scoped Doctor, Analyze, and scoped Integrity prepare pass after the end-to-end lifecycle proof.",
+            "The resulting handoff identifies scope completion as a separate human decision rather than auto-completing the scope."
+          ],
+          "depends_on": [
+            "T3.2"
+          ],
+          "scenario_refs": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6",
+            "S7"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Certified all five requirements: R1 typed disposition and immutable pre-close trace (T3.2 E2E); R2 truthful partial close/open scope (check-close-handoff); R3 normal follow-up plan after partial close (T3.2 E2E/check-plan); R4 exact Doctor and Integrity lifecycle replay with forged drift blocked (T3.1); R5 completion/reopen distinct from retirement and historical checkpoints readable (check-scope-retire). Scope completion remains an explicit human decision.",
+            "validation": [
+              "npm run check",
+              "node dist/cli.js doctor --artifacts --kyro-scope adaptive-sprint-lifecycle",
+              "node dist/cli.js analyze --kyro-scope adaptive-sprint-lifecycle",
+              "node dist/cli.js repair integrity prepare --kyro-scope adaptive-sprint-lifecycle --json",
+              "git diff --check"
+            ],
+            "files_changed": [
+              "scripts/check-scope-retire.mjs",
+              "scripts/check-status.mjs",
+              "scripts/check-repair-integrity.mjs"
+            ],
+            "by": "executor",
+            "recordedAt": "2026-08-26T13:46:48.107Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Each of the five scope success criteria maps to concrete passing behavior and verification evidence, or an explicit unresolved item.",
+              "npm run check, scoped Doctor, Analyze, and scoped Integrity prepare pass after the end-to-end lifecycle proof.",
+              "The resulting handoff identifies scope completion as a separate human decision rather than auto-completing the scope."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-08-26T13:46:48.316Z"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "All Sprint 3 tasks have tool-owned evidence and a pass verdict.",
+    "The seven lifecycle scenarios replay through the compiled CLI without manual edits or archive rewrites.",
+    "Doctor, Analyze, scoped Integrity prepare, and the full repository check pass.",
+    "Each scope success criterion has explicit evidence or an honest unresolved disposition; scope completion remains a separate human decision."
+  ]
+}

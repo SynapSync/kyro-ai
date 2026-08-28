@@ -6,6 +6,10 @@ import { archiveDir } from '../artifacts/paths';
 import { listScopeFolders, readScopeSprint } from '../artifacts/scopes';
 import { assertNotForeignDirectory } from '../core/scope-resolution';
 import { CHECKPOINT_DISCOVERY_STATUS, surveyScopeCheckpoints } from '../checkpoints/discovery';
+import {
+  SCOPE_LIFECYCLE_VERIFICATION_STATUS,
+  verifyScopeLifecycleEvolution,
+} from '../checkpoints/lifecycle-state';
 import { canonicalJson, sha256 } from '../checkpoints/sprint-close';
 import { rebuildCanonicalCheckpointFromDisk } from '../checkpoints/canonicalize';
 import { EFFECTIVE_CHECKPOINT_STATUS, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
@@ -332,6 +336,31 @@ export function prepareIntegrityPlan(options: {
     const physicalAfter = physicalRead.exists && !physicalRead.error
       ? (physicalRead.value as { intendedAfterClose?: SprintFile }).intendedAfterClose
       : null;
+    // Lifecycle records are not authority by themselves. Completion/reopen is structurally coherent
+    // only when one verifier reproduces both durable layers from the same checkpoint after-image.
+    if (hasLifecycleEvidence(live)) {
+      const lifecycleBase = physicalAfter ?? after;
+      const lifecycleEntryBase = resolved.checkpoint?.projectScopeAfter ?? rebuilt?.projection.projectScopeAfter;
+      const liveEntry = readProjectState()?.scopes.find((entry) => entry.id === scope);
+      const lifecycleVerification = verifyScopeLifecycleEvolution(
+        lifecycleBase,
+        lifecycleEntryBase,
+        live,
+        liveEntry,
+      );
+      const lifecycleClean = lifecycleVerification.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.CHECKPOINT_EXACT
+        || lifecycleVerification.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED;
+      if (!lifecycleClean) {
+        const blocker: IntegrityFinding = {
+          class: 'blocker',
+          code: 'diverged',
+          summary: `${scope}: completion/reopen records do not exactly replay from the close checkpoint into sprint and registry state (${lifecycleVerification.reason})`,
+        };
+        blockers.push(blocker);
+        findings.push(blocker);
+        continue;
+      }
+    }
     const replay = resolveRemediationReplayState(scope, physicalAfter ?? after);
     if (replay.kind === 'broken') {
       const blocker: IntegrityFinding = {
@@ -603,6 +632,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+function hasLifecycleEvidence(sprint: SprintFile): boolean {
+  return sprint.completion !== undefined || (sprint.completionHistory?.length ?? 0) > 0;
 }
 
 function planLiveEvolution(scope: string, live: SprintFile, after: SprintFile, options: { includeReanchor: boolean }): IntegrityOperation[] {

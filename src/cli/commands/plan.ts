@@ -124,10 +124,20 @@ export function runPlanCommand(rawArgs: string[]): void {
     throw new KyroCoreError(
       'NOT_READY_TO_PLAN',
       `Scope "${scope}" is not ready to plan a sprint (nextAction=${currentSprint.handoff.nextAction}).`,
-      'Resolve the current handoff first (e.g. clarify, or done means the scope is complete).',
+      planRemedy(currentSprint, scope),
     );
   }
   runPlanSprintMode(raw, scope, currentSprint, args, state);
+}
+
+/**
+ * A completed scope is not a dead end: reopening it is the lawful, auditable route back to planning,
+ * so the remedy names that route instead of leaving the user to a manual edit or a recovery flow.
+ */
+function planRemedy(sprint: SprintFile, scope: string): string {
+  if (sprint.retirement) return 'This scope is retired and terminal. Plan the follow-on work in a new scope.';
+  if (sprint.completion) return `This scope is explicitly completed. Run kyro scope reopen --kyro-scope ${scope} --reason "<why>" --yes to return it to planning.`;
+  return 'Resolve the current handoff first (e.g. clarify, or done means the scope is complete).';
 }
 
 function runPlanInitMode(raw: unknown, scope: string, args: PlanArgs, state: KyroProjectState): void {
@@ -334,7 +344,17 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
   };
 
   const roadmapEntry = next.roadmap.sprints.find((entry) => entry.n === input.sprint.n);
-  if (roadmapEntry) roadmapEntry.state = 'active';
+  if (roadmapEntry) {
+    roadmapEntry.state = 'active';
+  } else {
+    next.roadmap.sprints.push({
+      n: input.sprint.n,
+      slug: input.sprint.slug,
+      title: input.sprint.title,
+      state: 'active',
+    });
+    next.roadmap.plannedSprintCount = Math.max(next.roadmap.plannedSprintCount, next.roadmap.sprints.length);
+  }
   // Deliberate scope cut for this increment: sprint mode does not auto-transition debt[] items (e.g.
   // marking due debt "in_progress" the way the plan-sprint workflow does by hand). Debt is left as-is;
   // the agent/checker can transition it explicitly. Never dropped or reset either way.

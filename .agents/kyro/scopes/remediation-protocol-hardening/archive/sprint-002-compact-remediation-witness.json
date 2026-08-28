@@ -1,0 +1,184 @@
+{
+  "n": 2,
+  "slug": "compact-remediation-witness",
+  "title": "Compact remediation witness",
+  "objective": "Emit a compact, versioned remediation record and verify mixed historic and compact chains without rewriting any immutable evidence.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Compact protocol producer",
+      "objective": "Define and emit the strongly typed v2 record that replaces a full result snapshot with deterministic operation replay evidence.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T2.1",
+          "title": "Define and emit compact remediation v2",
+          "description": "Add the closed v2 remediation-record contract and change new remediation plans to emit it without embedding a SprintFile snapshot.",
+          "files_to_touch": [
+            "src/cli/remediation/protocol.ts",
+            "src/cli/remediation/plan.ts",
+            "src/cli/remediation/replay-witness.ts"
+          ],
+          "context": "v1 records are immutable and remain readable. v2 must have an explicit strongly typed witness/discriminant, preserve all commitment and provenance fields, and retain only the state digest plus typed operation replay evidence needed for deterministic verification.",
+          "acceptance_criteria": [
+            "New remediate preview and apply plans produce a schemaVersion 2 record with no full SprintFile result snapshot.",
+            "The v2 record validator rejects unknown fields and malformed witness data with field-specific diagnostics.",
+            "Existing v1 records continue to parse through their v1 validator without mutation."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S4",
+            "S5"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Defined the closed v2 compact remediation record and emit a typed operations-replay witness instead of a full SprintFile snapshot.",
+            "validation": "OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm run build; npm run check:compact-remediation-witness (9 assertions); npm run check:replay-witness (5 assertions); npm run typecheck",
+            "files_changed": [
+              "src/cli/remediation/protocol.ts",
+              "src/cli/remediation/plan.ts",
+              "src/cli/remediation/transaction.ts",
+              "scripts/check-compact-remediation-witness.mjs",
+              "package.json"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-08-09T17:01:00.600Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "New remediate preview and apply plans produce a schemaVersion 2 record with no full SprintFile result snapshot.",
+              "The v2 record validator rejects unknown fields and malformed witness data with field-specific diagnostics.",
+              "Existing v1 records continue to parse through their v1 validator without mutation."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-09T17:01:00.718Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Mixed-chain replay",
+      "objective": "Replay each record using its immutable protocol version rather than a stored full state image.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T2.2",
+          "title": "Verify mixed v1 and compact chains",
+          "description": "Refactor remediation inspection and rebase to dispatch v1 and v2 records explicitly, replay v2 operations directly, and keep doctor/status fail-closed.",
+          "files_to_touch": [
+            "src/cli/remediation/plan.ts",
+            "src/cli/remediation/replay-witness.ts",
+            "scripts/check-scope-remediation.mjs",
+            "scripts/check-verification-states.mjs"
+          ],
+          "context": "A v2 record has no state snapshot. Chain replay must derive its result from the checkpoint/base and typed operations, compare every declared digest, and reject unknown versions or forged compact witnesses before a scope can report remediated or recertified.",
+          "acceptance_criteria": [
+            "Doctor and status verify genuine v1→v2 and v2→v2 remediation chains without rewriting historic records.",
+            "A forged operation, digest, witness, or unknown record version makes the scope fail closed rather than remediated or recertified.",
+            "Replay preserves checkpoint, legacy snapshot, narrative, and ledger bytes."
+          ],
+          "depends_on": [
+            "T2.1"
+          ],
+          "scenario_refs": [
+            "S4",
+            "S5",
+            "S6"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Replayed compact v2 operations directly while preserving versioned v1 snapshot replay; all remediation chains now replay before verification claims remediated.",
+            "validation": "OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm run build; npm run check:scope-remediation (304 assertions); npm run check:verification-states (162 assertions); npm run check:compact-remediation-witness (9 assertions); npm run check:replay-witness (5 assertions); npm run typecheck",
+            "files_changed": [
+              "src/cli/remediation/plan.ts",
+              "scripts/check-scope-remediation.mjs",
+              "scripts/check-verification-states.mjs",
+              "src/cli/remediation/protocol.ts"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-08-09T17:05:56.209Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Doctor and status verify genuine v1→v2 and v2→v2 remediation chains without rewriting historic records.",
+              "A forged operation, digest, witness, or unknown record version makes the scope fail closed rather than remediated or recertified.",
+              "Replay preserves checkpoint, legacy snapshot, narrative, and ledger bytes."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-09T17:05:56.302Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Growth and debt certification",
+      "objective": "Prove compact records bound archive growth and close only the debt demonstrated by the new evidence.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T2.3",
+          "title": "Certify bounded compact archives",
+          "description": "Extend the real remediation harness with deterministic size and schema assertions, wire it into the full check, and resolve the scope debt items only when the relevant proof passes.",
+          "files_to_touch": [
+            "scripts/check-scope-remediation.mjs",
+            "scripts/check-replay-witness.mjs",
+            "package.json"
+          ],
+          "context": "Bounded means new v2 records do not duplicate the full live SprintFile; it does not claim a historical migration. Tests must use real close/remediate flows and prove growth is linear in record payloads rather than quadratic in repeated snapshots.",
+          "acceptance_criteria": [
+            "A multi-record v2 chain proves no v2 record contains a full SprintFile snapshot and demonstrates bounded incremental archive growth.",
+            "The complete check suite covers v1 compatibility, v2 replay, unknown-version rejection, and immutable-history byte preservation.",
+            "debt-1 and debt-2 are resolved through Kyro only after their corresponding acceptance evidence passes."
+          ],
+          "depends_on": [
+            "T2.2"
+          ],
+          "scenario_refs": [
+            "S4",
+            "S5",
+            "S6"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Certified four-link compact v2 archive growth, wired compact witness coverage into the full check, and resolved both evidenced remediation debts through Kyro.",
+            "validation": "OPENSSL_CONF=/private/tmp/kyro-empty-openssl.cnf npm run check (passed); npm run check:scope-remediation (307 assertions); npm run check:compact-remediation-witness (9 assertions); npm run check:verification-states (162 assertions); npm run check:replay-witness (5 assertions)",
+            "files_changed": [
+              "scripts/check-scope-remediation.mjs",
+              "scripts/check-compact-remediation-witness.mjs",
+              "scripts/check-replay-witness.mjs",
+              "package.json"
+            ],
+            "notes": "debt-1 and debt-2 were resolved through kyro debt resolve only after the complete suite passed.",
+            "by": "maker",
+            "recordedAt": "2026-08-09T17:08:44.770Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A multi-record v2 chain proves no v2 record contains a full SprintFile snapshot and demonstrates bounded incremental archive growth.",
+              "The complete check suite covers v1 compatibility, v2 replay, unknown-version rejection, and immutable-history byte preservation.",
+              "debt-1 and debt-2 are resolved through Kyro only after their corresponding acceptance evidence passes."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-08-09T17:08:44.862Z"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "New remediation records use a compact, strongly typed versioned witness and never embed a full SprintFile snapshot.",
+    "Doctor and status preserve valid v1 verification and fail closed for malformed, forged, or unsupported v2 evidence.",
+    "Real multi-record vectors prove deterministic replay, bounded archive growth, and byte-identical historic close artifacts.",
+    "npm run build and npm run check pass."
+  ]
+}

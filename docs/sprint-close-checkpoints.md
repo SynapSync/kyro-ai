@@ -27,6 +27,28 @@ Digests use SHA-256 over canonical JSON for structured state and exact UTF-8 byt
 
 The ledger commitment detects archive-only tampering even if someone rewrites embedded states and recomputes the checkpoint's internal digests. Its trust boundary is the live/versioned scope state: an attacker able to rewrite both the checkpoint archive and its live ledger anchor can replace both, so repositories that require adversarial authenticity must also protect history with signed commits or an external append-only store.
 
+## Lifecycle verification trust boundary
+
+Explicit scope completion and reopen may lawfully move live state beyond the most recent close
+checkpoint. Kyro verifies that evolution by replaying only the lifecycle suffix not already sealed in
+the checkpoint and by projecting `sprint.json` and the project registry together.
+
+The governing invariants are:
+
+- sprint close and scope completion remain separate decisions;
+- live `completionHistory` must extend the sealed prefix exactly;
+- request and prior-entry digests must re-derive before a suffix step can replay;
+- both durable layers must exactly match one shared projection;
+- immutable checkpoints, snapshots and narratives are never rewritten by lifecycle verification;
+- the result proves structural consistency only — `by`, actor identity and writer-process identity are
+  not authenticated.
+
+All lifecycle bindings are plain SHA-256 values over public repository content. They support
+idempotency, interrupted-write recovery and detection of incomplete or inconsistent edits. They
+cannot distinguish the transactional writer from an editor who controls both durable layers and
+recomputes every value. Authenticating that stronger claim requires a trust root outside those files,
+such as signed repository history or an external append-only attestation service.
+
 Package consumers can import `SprintCloseCheckpointV1`, `SPRINT_CLOSE_CHECKPOINT_SCHEMA_VERSION`, `SPRINT_CLOSE_CHECKPOINT_KIND`, and `SPRINT_CLOSE_TRANSACTION_STATUS` from the supported `kyro-ai` entrypoint.
 
 ## Project scope status on close

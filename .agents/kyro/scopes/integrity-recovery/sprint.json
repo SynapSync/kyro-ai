@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 4,
+  "scope": "integrity-recovery",
+  "title": "Integrity recovery without a new public surface",
+  "status": "completed",
+  "objective": "Make integrity repair approval, replay, resume, and checkpoint overlays fail-closed without adding a public command.",
+  "successCriteria": [
+    "An approved digest authenticates the exact executable warrant payload.",
+    "Retrying the same digest preserves remediation records, anchors, and Doctor PASS.",
+    "A valid remediation chain can accept a later delta with continuous base and result digests.",
+    "Tampered warrants and overlays fail without writes.",
+    "Portable adversarial tests and the complete Kyro gate pass."
+  ],
+  "spec": {
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "Integrity apply must authenticate the persisted warrant and resolve it before preparing new state.",
+        "priority": "must",
+        "rationale": "Human approval must bind exactly the operations that execute."
+      },
+      {
+        "id": "R2",
+        "statement": "Remediation replay must expose the effective chain state so retries are idempotent and later deltas continue the chain.",
+        "priority": "must",
+        "rationale": "Rebasing every record on the close image creates duplicate or divergent records."
+      },
+      {
+        "id": "R3",
+        "statement": "Canonicalization apply must reject any invalid matching overlay or broken overlay chain.",
+        "priority": "must",
+        "rationale": "Invalid evidence must never be treated as absent and replaced."
+      },
+      {
+        "id": "R4",
+        "statement": "Regression tests must verify artifact invariance and Doctor after every retry frontier.",
+        "priority": "must",
+        "rationale": "Exit code alone did not detect a corrupted remediation chain."
+      },
+      {
+        "id": "R5",
+        "statement": "The implementation must retain six public commands, one agent, and version 4.47.0 metadata without delivery actions.",
+        "priority": "must",
+        "rationale": "This is integrity hardening, not a public-surface expansion or release."
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "S1",
+        "requirement": "R1",
+        "given": "an approved persisted warrant",
+        "when": "an operation is altered without changing the approved digest",
+        "then": "apply fails DIVERGED and writes nothing"
+      },
+      {
+        "id": "S2",
+        "requirement": "R2",
+        "given": "an applied live-state remediation",
+        "when": "the same integrity digest is applied again",
+        "then": "the existing record and sprint bytes remain unchanged and Doctor passes"
+      },
+      {
+        "id": "S3",
+        "requirement": "R2",
+        "given": "a valid R-001 chain and a later live delta",
+        "when": "the delta is prepared and applied",
+        "then": "R-002 starts from R-001 result and Doctor passes"
+      },
+      {
+        "id": "S4",
+        "requirement": "R3",
+        "given": "a matching overlay whose committed content was altered",
+        "when": "the original warrant is retried",
+        "then": "apply fails and publishes no replacement overlay"
+      }
+    ],
+    "nonGoals": [
+      "Add a seventh slash command or a new root CLI verb.",
+      "Modify, install, release, commit, push, or publish the NutriLens consumer.",
+      "Rewrite immutable checkpoint, snapshot, or narrative bytes."
+    ],
+    "openQuestions": []
+  },
+  "clarifications": [],
+  "conventions": [],
+  "adrs": [],
+  "roadmap": {
+    "plannedSprintCount": 1,
+    "sizingRationale": "One focused sprint covers the five review blockers and their adversarial certification.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "fail-closed-integrity-recovery",
+        "title": "Fail-closed integrity recovery",
+        "state": "closed"
+      }
+    ]
+  },
+  "ledger": [
+    {
+      "n": 1,
+      "slug": "fail-closed-integrity-recovery",
+      "outcome": "completed",
+      "closedAt": "2026-08-15",
+      "archive": "archive/sprint-001-fail-closed-integrity-recovery.md",
+      "snapshot": "archive/sprint-001-fail-closed-integrity-recovery.json",
+      "checkpoint": "archive/sprint-001-fail-closed-integrity-recovery.checkpoint.json",
+      "recommendations": [
+        "Before delivery, stage only the integrity-recovery changes after reconciling them with the pre-existing staged worktree changes."
+      ],
+      "checkpointSha256": "cb3db23d006d3a9afee6e4504819c88a2714de849733315ee68296b155f4d13e"
+    }
+  ],
+  "previousSprint": {
+    "n": 1,
+    "slug": "fail-closed-integrity-recovery",
+    "outcome": "completed",
+    "summary": "Implemented and certified fail-closed integrity recovery across warrant validation, remediation replay, and overlay publication."
+  },
+  "activeSprint": null,
+  "debt": [],
+  "handoff": {
+    "nextAction": "done",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "Implementation and local certification are complete; no commit, push, release, installation, or consumer change was performed.",
+    "lastUpdated": "2026-08-15"
+  },
+  "author": {
+    "name": "Roimer Peraza",
+    "email": "joisephdev@gmail.com",
+    "source": "git",
+    "capturedAt": "2026-08-15T02:01:25.775Z"
+  }
+}

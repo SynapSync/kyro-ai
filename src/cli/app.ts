@@ -196,5 +196,7 @@ function isMutatingInvocation(command: string, args: string[]): boolean {
   if (['sync', 'uninstall', 'repair', 'remediate', 'recertify', 'review', 'record-evidence', 'plan', 'debt', 'add-emergent', 'scenario', 'clarify', 'adr', 'rule'].includes(command)) return true;
   if (command === 'scope' && args[0] === 'set-active') return true;
   if (command === 'scope' && args[0] === 'retire' && args.includes('--yes')) return true;
+  if (command === 'scope' && args[0] === 'complete' && args.includes('--yes')) return true;
+  if (command === 'scope' && args[0] === 'reopen' && args.includes('--yes')) return true;
   return command === 'trace' && args.includes('--clear');
 }

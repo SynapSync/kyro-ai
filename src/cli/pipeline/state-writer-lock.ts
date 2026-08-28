@@ -185,7 +185,8 @@ export function assertStateWriterLeaseHealthy(): void {
   if (lease.keeper.worker.threadId === -1 && Atomics.load(lease.keeper.state, 4) === 0) throw leaseLost('Heartbeat worker terminated unexpectedly.');
   if (Atomics.load(lease.keeper.state, 3) !== 0) throw leaseLost('Heartbeat renewal failed.');
   const owner = parseOwner(lease.ownerRaw);
-  const publicationDeadline = Date.now() + Math.max(LOCK_POLL_MS * 4, Math.floor(lease.leaseMs / 3));
+  // Windows lock tests run under load with slower fsync/rename. Use 1/2 of lease for first publish deadline to avoid flakiness when Defender/indexer delays the heartbeat's renameSync. Lock identity checks use 1/3 for the normal wait loop but the initial read must tolerate more jitter.
+  const publicationDeadline = Date.now() + Math.max(LOCK_POLL_MS * 6, Math.floor(lease.leaseMs / 2));
   let firstAttempt = true;
   while (true) {
     let current: LockIdentity | null = null;

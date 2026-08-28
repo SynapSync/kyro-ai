@@ -1,0 +1,822 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "4bafcb002ec1d43a6d115bcd241e693a00daf7a8f696a5351dcc75a38d47eceb",
+  "createdAt": "2026-08-16T07:38:37.252Z",
+  "identity": {
+    "scope": "scoped-integrity-preflight",
+    "sprintN": 1,
+    "sprintSlug": "scope-isolation-and-trace-relocation"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": "Follow-up to integrity-recovery: fixes the product defect that made one broken scope block every scope. No release decision taken; CHANGELOG entry sits under Unreleased.",
+    "summary": "Scope-isolated integrity preflight and trace relocation, gated against regression.",
+    "recommendations": [
+      "Decide the next version and move the Unreleased entry into it before publishing; 4.47.0 is already on npm.",
+      "Consider promoting the scope-bound-by-default rule to a global convention via kyro rule add --global.",
+      "Audit any remaining project-wide check that runs implicitly during routing for the same blast-radius shape."
+    ],
+    "learnings": [
+      "The 4.47.0 hardening made repair safer but did not stop a local fault from escalating to a global block; safety of an operation and blast radius of a check are separate concerns.",
+      "The startup contract was duplicated across four assets (router, skill, orchestrator, recover mode); fixing three of them still left the incident reproducible through the fourth.",
+      "A path change that keeps a reader working on the happy upgrade path can still be wrong under rollback or mixed runtimes; merge by data, not by assumed deployment order."
+    ]
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/scoped-integrity-preflight/archive/sprint-001-scope-isolation-and-trace-relocation.json",
+    "narrative": ".agents/kyro/scopes/scoped-integrity-preflight/archive/sprint-001-scope-isolation-and-trace-relocation.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "scoped-integrity-preflight",
+    "title": "Scoped integrity preflight and trace relocation",
+    "status": "planning",
+    "objective": "Stop an unrelated scope's drift from blocking work on a healthy scope, and keep trace writes out of the scope-discovery tree.",
+    "successCriteria": [
+      "Every startup surface resolves the target scope before integrity prepare and passes --kyro-scope through prepare, apply, and the post-repair doctor check.",
+      "A healthy scope routes, closes, and passes scoped Doctor while an unrelated scope on disk is irreconcilable.",
+      "An explicit global scan without --kyro-scope still reports every scope.",
+      "A trace write can never create a directory that scope discovery classifies as a scope.",
+      "Trace history recorded at the previous location stays readable and merges in timestamp order.",
+      "A regression gate fails if any startup surface reintroduces a global integrity preflight."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Every startup surface must resolve the target scope before running integrity prepare, and must pass --kyro-scope to it.",
+          "priority": "must",
+          "rationale": "The preflight ran before scope resolution and without a scope, so drift in any scope blocked routing for every scope."
+        },
+        {
+          "id": "R2",
+          "statement": "Verification that follows a scoped repair must stay bound to the repaired scope.",
+          "priority": "must",
+          "rationale": "A global doctor --artifacts after a successful scoped repair still let an unrelated scope's failure block the flow."
+        },
+        {
+          "id": "R3",
+          "statement": "A project-wide integrity scan must remain available when a human explicitly asks for it.",
+          "priority": "must",
+          "rationale": "Isolating the routine path must not remove the ability to audit the whole project on purpose."
+        },
+        {
+          "id": "R4",
+          "statement": "Trace events must be written outside the tree that scope discovery scans.",
+          "priority": "must",
+          "rationale": "A trace write for a name with no sprint.json created a directory under scopes/ that discovery then classified as an invalid scope."
+        },
+        {
+          "id": "R5",
+          "statement": "Trace history recorded at the previous location must stay readable and must merge with current-path events in chronological order.",
+          "priority": "must",
+          "rationale": "Moving the path must not hide forensic history, and a rollback or mixed-version runtime can still append to the previous location after current-path events exist."
+        },
+        {
+          "id": "R6",
+          "statement": "Scope discovery must ignore an existing directory whose only content is a leftover trace folder.",
+          "priority": "must",
+          "rationale": "Preventing new phantom scopes does not help installs that already carry one from the previous layout."
+        },
+        {
+          "id": "R7",
+          "statement": "A regression gate must fail if any startup surface reintroduces a global integrity preflight or an unscoped post-repair doctor.",
+          "priority": "must",
+          "rationale": "The defect is one wording edit away from returning, across four separate files that must stay in agreement."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "a healthy scope A and an unrelated scope B on disk whose sprint.json is invalid",
+          "when": "a startup surface runs its integrity preflight for scope A",
+          "then": "the preflight reports no findings and no blockers, and routing continues for A"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "a scoped integrity repair that has just been applied to scope A",
+          "when": "recover mode runs its post-repair verification",
+          "then": "the verification is bound to scope A and is not failed by unrelated scope B"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "a healthy scope A and an irreconcilable scope B",
+          "when": "a human runs repair integrity prepare with no --kyro-scope",
+          "then": "the plan still reports B as a blocker"
+        },
+        {
+          "id": "S4",
+          "requirement": "R4",
+          "given": "a command that emits trace events for a scope",
+          "when": "the events are written",
+          "then": "they land under .agents/kyro/trace/{scope}/ and create nothing under .agents/kyro/scopes/"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "a previous-location trace file whose newest event is later than the newest current-location event",
+          "when": "kyro trace reads the scope with a tail limit",
+          "then": "events are ordered by timestamp and the tail keeps the genuinely newest event"
+        },
+        {
+          "id": "S6",
+          "requirement": "R5",
+          "given": "events at both locations carrying identical timestamps",
+          "when": "kyro trace reads the scope twice",
+          "then": "both reads render the same stable order"
+        },
+        {
+          "id": "S7",
+          "requirement": "R6",
+          "given": "a directory under scopes/ whose only content is a leftover trace folder",
+          "when": "scope discovery runs",
+          "then": "the directory is not reported as a scope and is not classified as irreconcilable"
+        },
+        {
+          "id": "S8",
+          "requirement": "R7",
+          "given": "a startup surface edited to call repair integrity prepare without --kyro-scope",
+          "when": "the regression gate runs",
+          "then": "the gate fails and names the offending file and line"
+        }
+      ],
+      "nonGoals": [
+        "Adding a public command or changing the public command surface.",
+        "Changing prepareIntegrityPlan or classifyRegistry scoping logic, which already isolates correctly when given a scope.",
+        "Migrating, moving, or deleting trace files that already exist on disk.",
+        "Reopening or modifying the closed integrity-recovery scope.",
+        "Deciding or publishing the next release version."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [
+      {
+        "id": "architecture-1",
+        "rule": "Fail closed on the operation being performed; degrade in isolation everywhere else. A project-wide scan runs only when a human explicitly asks for it, never implicitly during routing.",
+        "tags": [
+          "architecture"
+        ],
+        "addedSprint": 1
+      },
+      {
+        "id": "architecture-2",
+        "rule": "Tool-owned side artifacts (trace, locks, repair records) must never live under a path that discovery scans for scopes.",
+        "tags": [
+          "architecture"
+        ],
+        "addedSprint": 1
+      },
+      {
+        "id": "process-1",
+        "rule": "When a contract is duplicated across several startup assets, add a gate that fails if any copy drifts; agreement between Markdown files is not self-enforcing.",
+        "tags": [
+          "process"
+        ],
+        "addedSprint": 1
+      }
+    ],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 1,
+      "sizingRationale": "One sprint: the change is a startup-order correction across four assets plus one path relocation with read compatibility, all provable by a single new portable gate.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "scope-isolation-and-trace-relocation",
+          "title": "Scope-isolated preflight and trace relocation",
+          "state": "active"
+        }
+      ]
+    },
+    "ledger": [],
+    "previousSprint": null,
+    "activeSprint": {
+      "n": 1,
+      "slug": "scope-isolation-and-trace-relocation",
+      "title": "Scope-isolated preflight and trace relocation",
+      "objective": "Bind the integrity preflight and its verification to the resolved scope, move trace out of the scope-discovery tree, and gate both against regression.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Scope-isolated preflight",
+          "objective": "Make all four startup surfaces resolve the scope first and keep every integrity operation and its verification bound to that scope.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.1",
+              "title": "Resolve scope before integrity prepare in the three routers",
+              "description": "Reorder the startup steps in commands/forge.md, internal/skills/sprint-forge/SKILL.md and agents/orchestrator.md so the target scope is resolved before repair integrity prepare runs, and pass --kyro-scope to it. Stop when no single scope can be resolved instead of running an unscoped preflight.",
+              "files_to_touch": [
+                "commands/forge.md",
+                "internal/skills/sprint-forge/SKILL.md",
+                "agents/orchestrator.md"
+              ],
+              "context": "prepareIntegrityPlan (src/cli/repair/integrity-plan.ts) scans every registered scope, every archive scope and every scope folder when kyroScope is null, so an unscoped preflight made one broken scope block all routing.",
+              "acceptance_criteria": [
+                "All three routers resolve the scope before invoking repair integrity prepare.",
+                "All three routers pass --kyro-scope to repair integrity prepare.",
+                "An unresolvable or ambiguous scope stops and asks instead of running an unscoped preflight."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S1"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Reordered startup in the three routers so the scope resolves before repair integrity prepare, which now always receives --kyro-scope; an unresolvable scope stops and asks instead of running an unscoped preflight.",
+                "validation": [
+                  "check:blast-radius-isolation asserts scope resolution precedes prepare in all three routers and that no invocation omits --kyro-scope",
+                  "Sandbox: repair integrity prepare --kyro-scope demo --json returns findings=[] blockers=[] with an irreconcilable sibling scope present",
+                  "npm run check passes end to end (exit 0)"
+                ],
+                "files_changed": [
+                  "commands/forge.md",
+                  "internal/skills/sprint-forge/SKILL.md",
+                  "agents/orchestrator.md"
+                ],
+                "by": "claude",
+                "recordedAt": "2026-08-16T07:36:38.261Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "All three routers resolve the scope before invoking repair integrity prepare.",
+                  "All three routers pass --kyro-scope to repair integrity prepare.",
+                  "An unresolvable or ambiguous scope stops and asks instead of running an unscoped preflight."
+                ],
+                "findings": [],
+                "by": "reviewer",
+                "reviewedAt": "2026-08-16T07:36:45.713Z"
+              }
+            },
+            {
+              "id": "T1.2",
+              "title": "Keep recover mode scoped through apply and verification",
+              "description": "Pass --kyro-scope to repair integrity prepare, repair integrity apply and the post-repair doctor --artifacts in recover mode, so a successful scoped repair is not undone by an unrelated scope's failure at verification time.",
+              "files_to_touch": [
+                "internal/skills/sprint-forge/assets/modes/recover.md"
+              ],
+              "context": "doctor --artifacts falls back to auditing every scope when --kyro-scope is absent (resolveScopeNames in src/cli/commands/artifact-doctor.ts).",
+              "acceptance_criteria": [
+                "Recover mode passes --kyro-scope to prepare, apply and the post-repair doctor.",
+                "The mode states why the flag must never be dropped."
+              ],
+              "depends_on": [
+                "T1.1"
+              ],
+              "scenario_refs": [
+                "S2",
+                "S3"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Recover mode now passes --kyro-scope to repair integrity prepare, to repair integrity apply, and to the post-repair doctor --artifacts, and states why the flag must never be dropped.",
+                "validation": [
+                  "Confirmed in src/cli/commands/artifact-doctor.ts resolveScopeNames that doctor --artifacts audits every scope when --kyro-scope is absent",
+                  "check:blast-radius-isolation asserts recover.md never invokes prepare/apply/doctor --artifacts without --kyro-scope",
+                  "Sandbox: doctor --artifacts --kyro-scope demo exits 0 with an irreconcilable sibling scope present"
+                ],
+                "files_changed": [
+                  "internal/skills/sprint-forge/assets/modes/recover.md"
+                ],
+                "by": "claude",
+                "recordedAt": "2026-08-16T07:36:53.662Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Recover mode passes --kyro-scope to prepare, apply and the post-repair doctor.",
+                  "The mode states why the flag must never be dropped."
+                ],
+                "findings": [],
+                "by": "reviewer",
+                "reviewedAt": "2026-08-16T07:36:53.760Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Trace relocation and read compatibility",
+          "objective": "Move trace writes out of scopes/, keep previously recorded history readable in chronological order, and stop discovery from seeing leftover trace-only directories.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.1",
+              "title": "Write trace as a sibling of scopes/",
+              "description": "Point traceDir at KYRO_PROJECT_ROOT/trace/{scope} instead of ARTIFACT_ROOT/{scope}/trace, and update the check scripts and docs that hardcode the previous location.",
+              "files_to_touch": [
+                "src/cli/artifacts/paths.ts",
+                "scripts/check-trace.mjs",
+                "scripts/check-guardrails.mjs",
+                "scripts/check-maker-checker.mjs",
+                "scripts/check-status.mjs",
+                "docs/trace.md",
+                "docs/agent-adapters.md"
+              ],
+              "context": "emitTraceEvent creates the trace directory for any scope string, and listScopeFolders treats every directory under scopes/ as a scope, so a trace write for a name without sprint.json produced a directory classified as an invalid scope.",
+              "acceptance_criteria": [
+                "Trace events are written under .agents/kyro/trace/{scope}/.",
+                "No trace write creates a directory under .agents/kyro/scopes/.",
+                "Check scripts and docs reference the new location."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S4"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "traceDir now returns KYRO_PROJECT_ROOT/trace/{scope}, a sibling of scopes/ rather than a child, and the four check scripts plus two docs that hardcoded the previous location were updated.",
+                "validation": [
+                  "Sandbox close-sprint wrote .agents/kyro/trace/demo/events.ndjson and created nothing new under .agents/kyro/scopes/",
+                  "check:trace, check:guardrails, check:maker-checker and check:status pass against the new location",
+                  "check:blast-radius-isolation asserts no trace write creates a scope-like directory"
+                ],
+                "files_changed": [
+                  "src/cli/artifacts/paths.ts",
+                  "scripts/check-trace.mjs",
+                  "scripts/check-guardrails.mjs",
+                  "scripts/check-maker-checker.mjs",
+                  "scripts/check-status.mjs",
+                  "docs/trace.md",
+                  "docs/agent-adapters.md"
+                ],
+                "by": "claude",
+                "recordedAt": "2026-08-16T07:37:00.853Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Trace events are written under .agents/kyro/trace/{scope}/.",
+                  "No trace write creates a directory under .agents/kyro/scopes/.",
+                  "Check scripts and docs reference the new location."
+                ],
+                "findings": [],
+                "by": "reviewer",
+                "reviewedAt": "2026-08-16T07:37:00.955Z"
+              }
+            },
+            {
+              "id": "T2.2",
+              "title": "Merge previous-location trace history chronologically",
+              "description": "Read both the current and the previous trace locations, merge them by timestamp with a stable tie-break, apply tail after merging, and make trace --clear remove both files.",
+              "files_to_touch": [
+                "src/cli/artifacts/paths.ts",
+                "src/cli/core/trace.ts",
+                "src/cli/commands/trace.ts"
+              ],
+              "context": "Concatenating previous-location events before current ones assumes the previous path never grows again. A rollback or a mixed-version runtime breaks that assumption and would let --tail hide genuinely newer events.",
+              "acceptance_criteria": [
+                "History at the previous location remains visible through kyro trace.",
+                "Merged output is ordered by timestamp regardless of which file an event came from.",
+                "Equal timestamps produce a stable, reproducible order.",
+                "tail is applied after the merge, so it keeps the newest events.",
+                "trace --clear removes both the current and the previous file."
+              ],
+              "depends_on": [
+                "T2.1"
+              ],
+              "scenario_refs": [
+                "S5",
+                "S6"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "readTrace reads both locations and merges them by timestamp with a stable tie-break (previous location first, then original line index), applying tail after the merge; trace --clear removes both files. An earlier concatenation-based version was corrected after review showed it mis-ordered a rollback or mixed-runtime write.",
+                "validation": [
+                  "Verified against this repo's real history: 31 pre-move events for integrity-recovery remain readable via kyro trace",
+                  "check:blast-radius-isolation asserts timestamp ordering when the previous location holds the newest event, and that --tail 1 keeps it",
+                  "check:blast-radius-isolation asserts identical timestamps render the same stable order across repeated reads",
+                  "Falsification: reverting the merge to plain concatenation makes the new assertions fail, so the gate is load-bearing"
+                ],
+                "files_changed": [
+                  "src/cli/artifacts/paths.ts",
+                  "src/cli/core/trace.ts",
+                  "src/cli/commands/trace.ts"
+                ],
+                "by": "claude",
+                "recordedAt": "2026-08-16T07:37:09.601Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "History at the previous location remains visible through kyro trace.",
+                  "Merged output is ordered by timestamp regardless of which file an event came from.",
+                  "Equal timestamps produce a stable, reproducible order.",
+                  "tail is applied after the merge, so it keeps the newest events.",
+                  "trace --clear removes both the current and the previous file."
+                ],
+                "findings": [],
+                "by": "reviewer",
+                "reviewedAt": "2026-08-16T07:37:09.697Z"
+              }
+            },
+            {
+              "id": "T2.3",
+              "title": "Ignore leftover trace-only directories in scope discovery",
+              "description": "Make listScopeFolders skip any directory under scopes/ whose only entry is a trace folder, so installs upgraded from the previous layout stop carrying phantom scopes.",
+              "files_to_touch": [
+                "src/cli/artifacts/scopes.ts"
+              ],
+              "context": "classifyOne marks an on-disk directory with no valid sprint.json as IRRECONCILABLE, which is a hard blocker.",
+              "acceptance_criteria": [
+                "A directory containing only a trace folder is never reported as a scope.",
+                "A real scope directory is still discovered."
+              ],
+              "depends_on": [
+                "T2.1"
+              ],
+              "scenario_refs": [
+                "S7"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "listScopeFolders now skips any directory under scopes/ whose only entry is a trace folder, so installs upgraded from the previous layout stop surfacing phantom scopes as IRRECONCILABLE blockers.",
+                "validation": [
+                  "Sandbox: a scopes/ghost/trace-only directory no longer appears in repair integrity prepare --json output",
+                  "check:blast-radius-isolation asserts a trace-only leftover is never discovered as a scope",
+                  "check:scope-remediation (716 assertions) and check:repair-integrity (90 assertions) still pass, so real scope discovery is unaffected"
+                ],
+                "files_changed": [
+                  "src/cli/artifacts/scopes.ts"
+                ],
+                "by": "claude",
+                "recordedAt": "2026-08-16T07:37:16.045Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "A directory containing only a trace folder is never reported as a scope.",
+                  "A real scope directory is still discovered."
+                ],
+                "findings": [],
+                "by": "reviewer",
+                "reviewedAt": "2026-08-16T07:37:16.145Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P3",
+          "title": "Regression gate",
+          "objective": "Prove the isolation holds end to end and fail the build if any startup surface reintroduces a global preflight.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T3.1",
+              "title": "Add the blast-radius isolation gate",
+              "description": "Add a portable check that statically asserts all four startup surfaces keep --kyro-scope and keep scope resolution ahead of prepare, and functionally asserts healthy/broken sibling isolation, preserved global scanning, phantom-scope suppression and trace merge ordering. Wire it into npm run check.",
+              "files_to_touch": [
+                "scripts/check-blast-radius-isolation.mjs",
+                "package.json"
+              ],
+              "context": "The contract lives in four separate Markdown assets that must stay in agreement; nothing previously failed when one of them drifted back to a global call.",
+              "acceptance_criteria": [
+                "The gate fails when a startup surface drops --kyro-scope.",
+                "The gate fails when trace merge is not chronological.",
+                "The gate runs inside npm run check.",
+                "A healthy scope closes while an unrelated scope is irreconcilable.",
+                "An explicit global scan still reports the broken scope."
+              ],
+              "depends_on": [
+                "T1.2",
+                "T2.3"
+              ],
+              "scenario_refs": [
+                "S1",
+                "S3",
+                "S5",
+                "S7",
+                "S8"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Added scripts/check-blast-radius-isolation.mjs and wired it into npm run check. It combines static guards over the four startup surfaces with functional sandbox cases for sibling isolation, preserved global scanning, phantom-scope suppression and trace merge ordering.",
+                "validation": [
+                  "Falsification 1: dropping --kyro-scope from commands/forge.md makes the gate fail and name the file; restoring it makes it pass",
+                  "Falsification 2: reverting the trace merge to concatenation makes the ordering assertions fail",
+                  "Functional: healthy scope A closes with exit 0 while scope B is irreconcilable",
+                  "Functional: an explicit global prepare with no --kyro-scope still reports B as a blocker",
+                  "The gate runs inside npm run check, which passes end to end (exit 0)"
+                ],
+                "files_changed": [
+                  "scripts/check-blast-radius-isolation.mjs",
+                  "package.json"
+                ],
+                "by": "claude",
+                "recordedAt": "2026-08-16T07:37:23.492Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "The gate fails when a startup surface drops --kyro-scope.",
+                  "The gate fails when trace merge is not chronological.",
+                  "The gate runs inside npm run check.",
+                  "A healthy scope closes while an unrelated scope is irreconcilable.",
+                  "An explicit global scan still reports the broken scope."
+                ],
+                "findings": [],
+                "by": "reviewer",
+                "reviewedAt": "2026-08-16T07:37:23.589Z"
+              }
+            },
+            {
+              "id": "T3.2",
+              "title": "Record the change under Unreleased",
+              "description": "Document both fixes in CHANGELOG.md under Unreleased without deciding or claiming a release version.",
+              "files_to_touch": [
+                "CHANGELOG.md"
+              ],
+              "context": "4.47.0 is already published, so this work must not be folded into that entry.",
+              "acceptance_criteria": [
+                "Both fixes appear under Unreleased.",
+                "No version number is changed and no release is claimed."
+              ],
+              "depends_on": [
+                "T3.1"
+              ],
+              "scenario_refs": [],
+              "status": "done",
+              "evidence": {
+                "summary": "Both fixes are documented under CHANGELOG.md Unreleased. No version field was changed and no release is claimed; 4.47.0 is already published and stays untouched.",
+                "validation": [
+                  "CHANGELOG.md Unreleased carries a Fixed section describing the integrity blast radius and the trace relocation",
+                  "check:versions still reports all versions matching 4.47.0, so no version was bumped",
+                  "Source comments say 'through 4.47.0' rather than naming an undecided next release"
+                ],
+                "files_changed": [
+                  "CHANGELOG.md"
+                ],
+                "by": "claude",
+                "recordedAt": "2026-08-16T07:37:29.142Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Both fixes appear under Unreleased.",
+                  "No version number is changed and no release is claimed."
+                ],
+                "findings": [],
+                "by": "reviewer",
+                "reviewedAt": "2026-08-16T07:37:29.242Z"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [],
+      "definitionOfDone": [
+        "All four startup surfaces resolve the scope before integrity prepare and pass --kyro-scope through prepare, apply and post-repair doctor.",
+        "A healthy scope closes and passes scoped Doctor while an unrelated scope on disk is irreconcilable.",
+        "An explicit global scan without --kyro-scope still reports the broken scope.",
+        "No trace write can create a directory that scope discovery classifies as a scope, and leftover trace-only directories are ignored.",
+        "Previous-location trace history stays readable and merges by timestamp with a stable tie-break.",
+        "check:blast-radius-isolation runs in npm run check and fails when the contract regresses.",
+        "npm run check passes end to end and scoped Doctor passes."
+      ]
+    },
+    "debt": [],
+    "handoff": {
+      "nextAction": "close_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task T3.2 passed checker review.",
+      "lastUpdated": "2026-08-16T07:37:29.242Z"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-16T07:35:37.727Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "scoped-integrity-preflight",
+    "title": "Scoped integrity preflight and trace relocation",
+    "status": "completed",
+    "objective": "Stop an unrelated scope's drift from blocking work on a healthy scope, and keep trace writes out of the scope-discovery tree.",
+    "successCriteria": [
+      "Every startup surface resolves the target scope before integrity prepare and passes --kyro-scope through prepare, apply, and the post-repair doctor check.",
+      "A healthy scope routes, closes, and passes scoped Doctor while an unrelated scope on disk is irreconcilable.",
+      "An explicit global scan without --kyro-scope still reports every scope.",
+      "A trace write can never create a directory that scope discovery classifies as a scope.",
+      "Trace history recorded at the previous location stays readable and merges in timestamp order.",
+      "A regression gate fails if any startup surface reintroduces a global integrity preflight."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Every startup surface must resolve the target scope before running integrity prepare, and must pass --kyro-scope to it.",
+          "priority": "must",
+          "rationale": "The preflight ran before scope resolution and without a scope, so drift in any scope blocked routing for every scope."
+        },
+        {
+          "id": "R2",
+          "statement": "Verification that follows a scoped repair must stay bound to the repaired scope.",
+          "priority": "must",
+          "rationale": "A global doctor --artifacts after a successful scoped repair still let an unrelated scope's failure block the flow."
+        },
+        {
+          "id": "R3",
+          "statement": "A project-wide integrity scan must remain available when a human explicitly asks for it.",
+          "priority": "must",
+          "rationale": "Isolating the routine path must not remove the ability to audit the whole project on purpose."
+        },
+        {
+          "id": "R4",
+          "statement": "Trace events must be written outside the tree that scope discovery scans.",
+          "priority": "must",
+          "rationale": "A trace write for a name with no sprint.json created a directory under scopes/ that discovery then classified as an invalid scope."
+        },
+        {
+          "id": "R5",
+          "statement": "Trace history recorded at the previous location must stay readable and must merge with current-path events in chronological order.",
+          "priority": "must",
+          "rationale": "Moving the path must not hide forensic history, and a rollback or mixed-version runtime can still append to the previous location after current-path events exist."
+        },
+        {
+          "id": "R6",
+          "statement": "Scope discovery must ignore an existing directory whose only content is a leftover trace folder.",
+          "priority": "must",
+          "rationale": "Preventing new phantom scopes does not help installs that already carry one from the previous layout."
+        },
+        {
+          "id": "R7",
+          "statement": "A regression gate must fail if any startup surface reintroduces a global integrity preflight or an unscoped post-repair doctor.",
+          "priority": "must",
+          "rationale": "The defect is one wording edit away from returning, across four separate files that must stay in agreement."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "a healthy scope A and an unrelated scope B on disk whose sprint.json is invalid",
+          "when": "a startup surface runs its integrity preflight for scope A",
+          "then": "the preflight reports no findings and no blockers, and routing continues for A"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "a scoped integrity repair that has just been applied to scope A",
+          "when": "recover mode runs its post-repair verification",
+          "then": "the verification is bound to scope A and is not failed by unrelated scope B"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "a healthy scope A and an irreconcilable scope B",
+          "when": "a human runs repair integrity prepare with no --kyro-scope",
+          "then": "the plan still reports B as a blocker"
+        },
+        {
+          "id": "S4",
+          "requirement": "R4",
+          "given": "a command that emits trace events for a scope",
+          "when": "the events are written",
+          "then": "they land under .agents/kyro/trace/{scope}/ and create nothing under .agents/kyro/scopes/"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "a previous-location trace file whose newest event is later than the newest current-location event",
+          "when": "kyro trace reads the scope with a tail limit",
+          "then": "events are ordered by timestamp and the tail keeps the genuinely newest event"
+        },
+        {
+          "id": "S6",
+          "requirement": "R5",
+          "given": "events at both locations carrying identical timestamps",
+          "when": "kyro trace reads the scope twice",
+          "then": "both reads render the same stable order"
+        },
+        {
+          "id": "S7",
+          "requirement": "R6",
+          "given": "a directory under scopes/ whose only content is a leftover trace folder",
+          "when": "scope discovery runs",
+          "then": "the directory is not reported as a scope and is not classified as irreconcilable"
+        },
+        {
+          "id": "S8",
+          "requirement": "R7",
+          "given": "a startup surface edited to call repair integrity prepare without --kyro-scope",
+          "when": "the regression gate runs",
+          "then": "the gate fails and names the offending file and line"
+        }
+      ],
+      "nonGoals": [
+        "Adding a public command or changing the public command surface.",
+        "Changing prepareIntegrityPlan or classifyRegistry scoping logic, which already isolates correctly when given a scope.",
+        "Migrating, moving, or deleting trace files that already exist on disk.",
+        "Reopening or modifying the closed integrity-recovery scope.",
+        "Deciding or publishing the next release version."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [
+      {
+        "id": "architecture-1",
+        "rule": "Fail closed on the operation being performed; degrade in isolation everywhere else. A project-wide scan runs only when a human explicitly asks for it, never implicitly during routing.",
+        "tags": [
+          "architecture"
+        ],
+        "addedSprint": 1
+      },
+      {
+        "id": "architecture-2",
+        "rule": "Tool-owned side artifacts (trace, locks, repair records) must never live under a path that discovery scans for scopes.",
+        "tags": [
+          "architecture"
+        ],
+        "addedSprint": 1
+      },
+      {
+        "id": "process-1",
+        "rule": "When a contract is duplicated across several startup assets, add a gate that fails if any copy drifts; agreement between Markdown files is not self-enforcing.",
+        "tags": [
+          "process"
+        ],
+        "addedSprint": 1
+      }
+    ],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 1,
+      "sizingRationale": "One sprint: the change is a startup-order correction across four assets plus one path relocation with read compatibility, all provable by a single new portable gate.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "scope-isolation-and-trace-relocation",
+          "title": "Scope-isolated preflight and trace relocation",
+          "state": "closed"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "scope-isolation-and-trace-relocation",
+        "outcome": "shipped",
+        "closedAt": "2026-08-16",
+        "archive": "archive/sprint-001-scope-isolation-and-trace-relocation.md",
+        "snapshot": "archive/sprint-001-scope-isolation-and-trace-relocation.json",
+        "checkpoint": "archive/sprint-001-scope-isolation-and-trace-relocation.checkpoint.json",
+        "recommendations": [
+          "Decide the next version and move the Unreleased entry into it before publishing; 4.47.0 is already on npm.",
+          "Consider promoting the scope-bound-by-default rule to a global convention via kyro rule add --global.",
+          "Audit any remaining project-wide check that runs implicitly during routing for the same blast-radius shape."
+        ],
+        "checkpointSha256": "a66e6bc805aef51a1382310a86c3e5b4e0a7c1cfe484a373f4a112ff9f4c7fea"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "scope-isolation-and-trace-relocation",
+      "outcome": "shipped",
+      "summary": "Scope-isolated integrity preflight and trace relocation, gated against regression."
+    },
+    "activeSprint": null,
+    "debt": [],
+    "handoff": {
+      "nextAction": "done",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Follow-up to integrity-recovery: fixes the product defect that made one broken scope block every scope. No release decision taken; CHANGELOG entry sits under Unreleased.",
+      "lastUpdated": "2026-08-16"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-08-16T07:35:37.727Z"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "scoped-integrity-preflight",
+    "title": "Scoped integrity preflight and trace relocation",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "scoped-integrity-preflight",
+    "title": "Scoped integrity preflight and trace relocation",
+    "status": "completed"
+  },
+  "digests": {
+    "beforeClose": "8b5aada42d5aa5342d424a3a444f831425badaf221035414d3eecc6afb93fe15",
+    "intendedAfterClose": "a8bfe8faf1ef5b9e38f5dc307ed236f212db657e1f1a88c8dbc2b5da6f6b4e86",
+    "projectScopeBefore": "70f628581c9ca3adf7541b5f269f3e7d96c44227cc78e8816413122114846aa8",
+    "projectScopeAfter": "b3436d407f6ce3b909251d6fae1df735182dc20b004641421d296a579882e79e",
+    "legacySnapshot": "e89cd8336417e5deef6ffd95016805cd408a8cd19f1112b92046312d6fd04bab",
+    "narrative": "ab6ff210813a016cd4f79ac1e8385ff920a7f3aad83631bd557563649b2a3409"
+  }
+}

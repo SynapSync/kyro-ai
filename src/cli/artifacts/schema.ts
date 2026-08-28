@@ -1,10 +1,17 @@
-import { ADR_LINK_KEYS, ADR_STATUS, KYRO_SCOPE_ENTRY_STATUS } from '../types';
+import {
+  ADR_LINK_KEYS,
+  ADR_STATUS,
+  KYRO_SCOPE_ENTRY_STATUS,
+  TASK_DISPOSITION_KIND,
+  TASK_DISPOSITION_TARGET_KIND,
+} from '../types';
 import type {
   AdrLinkKey,
   KyroLocalProjectState,
   KyroProjectState,
   KyroSharedProjectState,
   SprintFile,
+  TaskDisposition,
   TaskEvidence,
   TaskVerdict,
 } from '../types';
@@ -16,6 +23,8 @@ export type KyroScopeStatus = (typeof KYRO_SCOPE_STATUS)[keyof typeof KYRO_SCOPE
 export const SCOPE_STATUS_VALUES = Object.values(KYRO_SCOPE_STATUS);
 export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'execute_task', 'review_task', 'close_sprint', 'done'] as const;
 export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
+export const TASK_DISPOSITION_KIND_VALUES = Object.values(TASK_DISPOSITION_KIND);
+export const TASK_DISPOSITION_TARGET_KIND_VALUES = Object.values(TASK_DISPOSITION_TARGET_KIND);
 export const PHASE_STATUS_VALUES = ['pending', 'active', 'blocked', 'done'] as const;
 export const DEBT_STATUS_VALUES = ['open', 'in_progress', 'resolved', 'deferred'] as const;
 export const DEBT_PRIORITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
@@ -302,6 +311,8 @@ function validateScopeEntry(value: unknown, path: string, prefix: string, issues
   requireString(value, 'title', path, issues, `${prefix}.title`);
   requireLiteralSet(value, 'status', SCOPE_STATUS_VALUES, path, issues, `${prefix}.status`);
   validateRetirementInvariant(value, path, prefix, issues);
+  validateCompletionInvariant(value, path, prefix, issues);
+  validateCompletionHistoryInvariant(value, path, prefix, issues);
 }
 
 export interface SprintFileValidationOptions {
@@ -319,6 +330,8 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
   requireString(value, 'status', path, issues);
   requireString(value, 'objective', path, issues);
   validateRetirementInvariant(value, path, '', issues);
+  validateCompletionInvariant(value, path, '', issues);
+  validateCompletionHistoryInvariant(value, path, '', issues);
 
   // author is optional (captured at init from git when available). Present-only so pre-feature
   // scopes and sandboxes without git identity still validate.
@@ -378,7 +391,8 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
     value.ledger.forEach((e, i) => validateLedgerEntry(e, path, `ledger[${i}]`, issues));
   }
 
-  if (value.activeSprint !== null) validateActiveSprint(value.activeSprint, path, 'activeSprint', issues);
+  const refs = collectDispositionRefs(value);
+  if (value.activeSprint !== null) validateActiveSprint(value.activeSprint, path, 'activeSprint', issues, refs);
 
   if (!Array.isArray(value.debt)) {
     issues.push({ path, field: 'debt', message: 'must be an array' });
@@ -413,6 +427,9 @@ export function validateSprintFile(value: unknown, path: string, options: Sprint
     if (value.retirement !== undefined && value.handoff.nextAction !== 'done') {
       issues.push({ path, field: 'handoff.nextAction', message: 'must be done when retirement is present' });
     }
+    if (value.completion !== undefined && value.handoff.nextAction !== 'done') {
+      issues.push({ path, field: 'handoff.nextAction', message: 'must be done when completion is present' });
+    }
   }
   if (value.retirement !== undefined && value.activeSprint !== null) {
     issues.push({ path, field: 'activeSprint', message: 'must be null when retirement is present' });
@@ -441,6 +458,90 @@ function validateRetirementInvariant(value: Record<string, unknown>, path: strin
     issues.push({ path, field: field('retirement.planDigest'), message: 'must be a lowercase SHA-256 digest' });
   }
   if ('supersededBy' in retirement) requireNonEmptyString(retirement, 'supersededBy', path, issues, field('retirement.supersededBy'));
+}
+
+function validateCompletionInvariant(value: Record<string, unknown>, path: string, prefix: string, issues: ValidationIssue[]): void {
+  const field = (name: string): string => prefix ? `${prefix}.${name}` : name;
+  const completion = value.completion;
+  if (completion === undefined) return;
+  // Completion and retirement are distinct lifecycle facts; both present is contradictory.
+  if (value.retirement !== undefined) {
+    issues.push({ path, field: field('completion'), message: 'must not coexist with retirement (a scope cannot be both completed and retired)' });
+  }
+  if (value.status !== 'completed') {
+    issues.push({ path, field: field('status'), message: 'must be completed when completion is present' });
+  }
+  if ('activeSprint' in value && value.activeSprint !== null) {
+    issues.push({ path, field: field('activeSprint'), message: 'must be null when completion is present' });
+  }
+  validateCompletionRecord(completion, path, field('completion'), issues);
+}
+
+/** Shape of a single completion record, wherever it lives: live `completion` or preserved history. */
+function validateCompletionRecord(completion: unknown, path: string, field: string, issues: ValidationIssue[]): void {
+  if (!isRecord(completion)) {
+    issues.push({ path, field, message: 'must be an object' });
+    return;
+  }
+  requireIsoString(completion, 'completedAt', path, issues, `${field}.completedAt`);
+  requireNonEmptyString(completion, 'by', path, issues, `${field}.by`);
+  if ('summary' in completion) requireNonEmptyString(completion, 'summary', path, issues, `${field}.summary`);
+  validatePairedDigests(completion, path, field, issues);
+}
+
+/**
+ * `requestDigest`/`beforeEntryDigest` are written together by the locked transactional applies and
+ * absent together on legacy records. One without the other is drift, not a legacy shape.
+ */
+function validatePairedDigests(record: Record<string, unknown>, path: string, field: string, issues: ValidationIssue[]): void {
+  if ('requestDigest' in record && (typeof record.requestDigest !== 'string' || !SHA256_HEX_PATTERN.test(record.requestDigest))) {
+    issues.push({ path, field: `${field}.requestDigest`, message: 'must be a lowercase SHA-256 digest' });
+  }
+  if ('beforeEntryDigest' in record && (typeof record.beforeEntryDigest !== 'string' || !SHA256_HEX_PATTERN.test(record.beforeEntryDigest))) {
+    issues.push({ path, field: `${field}.beforeEntryDigest`, message: 'must be a lowercase SHA-256 digest' });
+  }
+  if (('requestDigest' in record) !== ('beforeEntryDigest' in record)) {
+    issues.push({ path, field, message: 'requestDigest and beforeEntryDigest must be present together or both absent' });
+  }
+}
+
+/**
+ * `completionHistory` is append-only audit evidence of completions that `kyro scope reopen`
+ * superseded. It is independent of the live lifecycle state: a reopened scope is open again and
+ * carries no `completion`, yet must still show that it was once completed and why it was reopened.
+ * It may therefore coexist with any status, including a later completion or a retirement.
+ */
+function validateCompletionHistoryInvariant(value: Record<string, unknown>, path: string, prefix: string, issues: ValidationIssue[]): void {
+  const name = prefix ? `${prefix}.completionHistory` : 'completionHistory';
+  const history = value.completionHistory;
+  if (history === undefined) return;
+  if (!Array.isArray(history)) {
+    issues.push({ path, field: name, message: 'must be an array of reopen records' });
+    return;
+  }
+  if (history.length === 0) {
+    issues.push({ path, field: name, message: 'must be absent rather than empty' });
+    return;
+  }
+  let previousReopenedAt = '';
+  history.forEach((entry, index) => {
+    const field = `${name}[${index}]`;
+    if (!isRecord(entry)) {
+      issues.push({ path, field, message: 'must be an object { reopenedAt, by, reason, completion }' });
+      return;
+    }
+    requireIsoString(entry, 'reopenedAt', path, issues, `${field}.reopenedAt`);
+    requireNonEmptyString(entry, 'by', path, issues, `${field}.by`);
+    requireNonEmptyString(entry, 'reason', path, issues, `${field}.reason`);
+    validateCompletionRecord(entry.completion, path, `${field}.completion`, issues);
+    validatePairedDigests(entry, path, field, issues);
+    if (typeof entry.reopenedAt === 'string') {
+      if (entry.reopenedAt < previousReopenedAt) {
+        issues.push({ path, field: `${field}.reopenedAt`, message: 'must not precede the previous entry (history is append-only)' });
+      }
+      previousReopenedAt = entry.reopenedAt;
+    }
+  });
 }
 
 function validateClarification(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
@@ -676,7 +777,13 @@ function validateRoadmapSprint(value: unknown, path: string, prefix: string, iss
  * Validate every field the runtime (close-sprint, analyze, context-pack) reads from activeSprint.
  * Contract: if this passes, no downstream command may crash on a missing field.
  */
-function validateActiveSprint(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+function validateActiveSprint(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  refs: DispositionRefs,
+): void {
   if (!isRecord(value)) {
     issues.push({ path, field: prefix, message: 'must be an object or null' });
     return;
@@ -703,12 +810,57 @@ function validateActiveSprint(value: unknown, path: string, prefix: string, issu
         issues.push({ path, field: `${prefix}.phases[${pi}].tasks`, message: 'must be an array' });
         return;
       }
-      phase.tasks.forEach((task, ti) => validateTask(task, path, `${prefix}.phases[${pi}].tasks[${ti}]`, issues));
+      phase.tasks.forEach((task, ti) => validateTask(task, path, `${prefix}.phases[${pi}].tasks[${ti}]`, issues, refs));
     });
+  }
+  if ('emergentTasks' in value) {
+    if (!Array.isArray(value.emergentTasks)) {
+      issues.push({ path, field: `${prefix}.emergentTasks`, message: 'must be an array when present' });
+    } else {
+      value.emergentTasks.forEach((task, ti) => validateTask(task, path, `${prefix}.emergentTasks[${ti}]`, issues, refs));
+    }
   }
 }
 
-function validateTask(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+interface DispositionRefs {
+  taskIds: Set<string>;
+  debtIds: Set<string>;
+}
+
+function collectDispositionRefs(sprint: Record<string, unknown>): DispositionRefs {
+  const taskIds = new Set<string>();
+  const debtIds = new Set<string>();
+  const active = sprint.activeSprint;
+  if (isRecord(active)) {
+    if (Array.isArray(active.phases)) {
+      for (const phase of active.phases) {
+        if (!isRecord(phase) || !Array.isArray(phase.tasks)) continue;
+        for (const task of phase.tasks) {
+          if (isRecord(task) && typeof task.id === 'string') taskIds.add(task.id);
+        }
+      }
+    }
+    if (Array.isArray(active.emergentTasks)) {
+      for (const task of active.emergentTasks) {
+        if (isRecord(task) && typeof task.id === 'string') taskIds.add(task.id);
+      }
+    }
+  }
+  if (Array.isArray(sprint.debt)) {
+    for (const item of sprint.debt) {
+      if (isRecord(item) && typeof item.id === 'string') debtIds.add(item.id);
+    }
+  }
+  return { taskIds, debtIds };
+}
+
+function validateTask(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  refs: DispositionRefs,
+): void {
   if (!isRecord(value)) {
     issues.push({ path, field: prefix, message: 'must be an object' });
     return;
@@ -721,6 +873,98 @@ function validateTask(value: unknown, path: string, prefix: string, issues: Vali
   if ('acceptance_criteria' in value) requireStringArrayField(value, 'acceptance_criteria', path, issues, `${prefix}.acceptance_criteria`);
   if ('depends_on' in value) requireStringArrayField(value, 'depends_on', path, issues, `${prefix}.depends_on`);
   if ('scenario_refs' in value) requireStringArrayField(value, 'scenario_refs', path, issues, `${prefix}.scenario_refs`);
+  if ('disposition' in value) {
+    const selfId = typeof value.id === 'string' ? value.id : '';
+    validateTaskDisposition(value.disposition, path, `${prefix}.disposition`, issues, refs, selfId);
+    if (value.status === 'done') {
+      issues.push({ path, field: `${prefix}.disposition`, message: 'must not be present when status is done' });
+    }
+    if (isRecord(value.verdict) && value.verdict.result === 'pass') {
+      issues.push({ path, field: `${prefix}.disposition`, message: 'must not accompany a pass verdict' });
+    }
+  }
+}
+
+const DISPOSITION_KEYS = ['kind', 'reason', 'by', 'recordedAt', 'target'] as const;
+const DISPOSITION_TARGET_KEYS = ['kind', 'id'] as const;
+
+function validateTaskDisposition(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  refs: DispositionRefs,
+  selfId: string,
+): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object when present' });
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!DISPOSITION_KEYS.includes(key as (typeof DISPOSITION_KEYS)[number])) {
+      issues.push({ path, field: `${prefix}.${key}`, message: 'is not a disposition key' });
+    }
+  }
+  requireLiteralSet(value, 'kind', TASK_DISPOSITION_KIND_VALUES, path, issues, `${prefix}.kind`);
+  requireNonEmptyString(value, 'reason', path, issues, `${prefix}.reason`);
+  requireNonEmptyString(value, 'by', path, issues, `${prefix}.by`);
+  requireIsoString(value, 'recordedAt', path, issues, `${prefix}.recordedAt`);
+  const kind = value.kind;
+  const requiresTarget = kind === TASK_DISPOSITION_KIND.DEFERRED || kind === TASK_DISPOSITION_KIND.SUPERSEDED;
+  if (requiresTarget && !('target' in value)) {
+    issues.push({ path, field: `${prefix}.target`, message: `is required for ${String(kind)} dispositions` });
+  }
+  if ('target' in value) {
+    validateTaskDispositionTarget(value.target, path, `${prefix}.target`, issues, refs, selfId, typeof kind === 'string' ? kind : null);
+  }
+}
+
+function validateTaskDispositionTarget(
+  value: unknown,
+  path: string,
+  prefix: string,
+  issues: ValidationIssue[],
+  refs: DispositionRefs,
+  selfId: string,
+  dispositionKind: string | null,
+): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object { kind, id }' });
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!DISPOSITION_TARGET_KEYS.includes(key as (typeof DISPOSITION_TARGET_KEYS)[number])) {
+      issues.push({ path, field: `${prefix}.${key}`, message: 'is not a disposition target key' });
+    }
+  }
+  requireLiteralSet(value, 'kind', TASK_DISPOSITION_TARGET_KIND_VALUES, path, issues, `${prefix}.kind`);
+  requireNonEmptyString(value, 'id', path, issues, `${prefix}.id`);
+  const targetKind = value.kind;
+  const targetId = value.id;
+  if (typeof targetKind !== 'string' || typeof targetId !== 'string') return;
+  if (dispositionKind === TASK_DISPOSITION_KIND.DEFERRED && targetKind !== TASK_DISPOSITION_TARGET_KIND.DEBT && targetKind !== TASK_DISPOSITION_TARGET_KIND.SPRINT) {
+    issues.push({ path, field: prefix, message: 'deferred target kind must be debt or sprint' });
+  }
+  if (dispositionKind === TASK_DISPOSITION_KIND.SUPERSEDED && targetKind !== TASK_DISPOSITION_TARGET_KIND.TASK) {
+    issues.push({ path, field: prefix, message: 'superseded target kind must be task' });
+  }
+  if (targetKind === TASK_DISPOSITION_TARGET_KIND.DEBT && !refs.debtIds.has(targetId)) {
+    issues.push({ path, field: `${prefix}.id`, message: `must reference an existing debt id (unknown "${targetId}")` });
+  }
+  if (targetKind === TASK_DISPOSITION_TARGET_KIND.TASK) {
+    if (!refs.taskIds.has(targetId)) {
+      issues.push({ path, field: `${prefix}.id`, message: `must reference an existing task id (unknown "${targetId}")` });
+    } else if (targetId === selfId) {
+      issues.push({ path, field: `${prefix}.id`, message: 'must not reference the same task' });
+    }
+  }
+  if (targetKind === TASK_DISPOSITION_TARGET_KIND.SPRINT && !isPositiveSprintId(targetId)) {
+    issues.push({ path, field: `${prefix}.id`, message: 'must be a positive integer sprint number' });
+  }
+}
+
+function isPositiveSprintId(value: string): boolean {
+  return /^[1-9]\d*$/.test(value);
 }
 
 function validateTaskEvidence(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
@@ -1054,6 +1298,24 @@ export function asTaskVerdict(value: unknown): TaskVerdict | null {
   if (value === null) return null;
   validateTaskVerdict(value, 'task.verdict', 'verdict', issues);
   return issues.length === 0 ? value as TaskVerdict : null;
+}
+
+export function asTaskDisposition(
+  value: unknown,
+  refs: { taskIds: Iterable<string>; debtIds: Iterable<string> } = { taskIds: [], debtIds: [] },
+  selfId = '',
+): TaskDisposition | null {
+  const issues: ValidationIssue[] = [];
+  if (value === undefined) return null;
+  validateTaskDisposition(
+    value,
+    'task.disposition',
+    'disposition',
+    issues,
+    { taskIds: new Set(refs.taskIds), debtIds: new Set(refs.debtIds) },
+    selfId,
+  );
+  return issues.length === 0 ? value as TaskDisposition : null;
 }
 
 export function asScopeState(value: unknown): KyroScopeState | null {
