@@ -402,7 +402,7 @@ withWorkspace('kyro-layered-bootstrap-readonly-', (cwd) => {
     { cwd, env, encoding: 'utf-8' },
   );
   assert(status.status === 0, `status should exit 0: ${status.stderr || status.stdout}`);
-  const statusReport = JSON.parse(status.stdout);
+  const statusReport = JSON.parse(status.stdout).data;
   assert(
     typeof statusReport.bootstrapRemedy === 'string' && statusReport.bootstrapRemedy.includes('install --init-workspace'),
     `status must include bootstrap remedy: ${status.stdout}`,
@@ -416,7 +416,7 @@ withWorkspace('kyro-layered-bootstrap-readonly-', (cwd) => {
     { cwd, env, encoding: 'utf-8' },
   );
   assert(pack.status === 0, `context-pack should exit 0: ${pack.stderr || pack.stdout}`);
-  const packReport = JSON.parse(pack.stdout);
+  const packReport = JSON.parse(pack.stdout).data;
   assert(
     Array.isArray(packReport.warnings)
       && packReport.warnings.some((w) => typeof w === 'string' && w.includes('install --init-workspace')),

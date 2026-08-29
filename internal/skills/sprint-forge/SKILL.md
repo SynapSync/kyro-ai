@@ -28,11 +28,11 @@ allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task
 
 # Kyro Sprint Forge — Runtime Contract (v4)
 
-One scope = one `sprint.json`. Agents read project state + the scope's lean pack, then route on `nextAction`. No other agent-facing files.
+One scope = one `sprint.json`. Agents read project state + its lean pack, then route on `nextAction`. No agent-facing files.
 
 ## Step 0 — Startup (MANDATORY, before anything else)
 
-Run this before reading any other section, and before writing any Kyro artifact. It is the same
+Run this before reading any other section and before writing any Kyro artifact. It is the same
 handshake the orchestrator performs; it is repeated here in full because this skill is invocable on
 its own (`kyro-ai:sprint-forge`), and on that path the orchestrator is never loaded.
 
@@ -55,9 +55,10 @@ its own (`kyro-ai:sprint-forge`), and on that path the orchestrator is never loa
 4. Silently run `{{KYRO_CLI}} repair integrity prepare --kyro-scope <scope> --json` before
    `context-pack`, using the scope resolved above. Never omit `--kyro-scope` here — it isolates this
    scope from unrelated drift. Findings/blockers → load `modes/recover.md` and stop. None → continue.
-5. **Capability handshake:** run `{{KYRO_CLI}} capabilities --json`. Unknown command, or
-   `record-evidence`/`review` missing — runtime too old: ABORT and report `{{KYRO_CLI}} --version`.
-   Never work around a missing verb by hand (invariant 9).
+5. **Capability handshake:** run `{{KYRO_CLI}} capabilities --json`. Unknown command, handshake
+   failure, or a missing tool-owned verb (`record-evidence` included) means the runtime is unusable: ABORT without mutating Kyro
+   state. Report the observed output of `{{KYRO_CLI}} --version` (or `not installed`) and the exact
+   remedy `npx kyro-ai@latest sync --scope workspace --yes`. Never work around it by hand.
 6. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack:
    `nextAction`, `nextTaskId`, `reviewPending`, `conventions`, budget). Do not open the full
    `sprint.json` to route. No `sprint.json` → INIT.
@@ -65,8 +66,8 @@ its own (`kyro-ai:sprint-forge`), and on that path the orchestrator is never loa
 
 **If Step 0 did not complete, no Kyro artifact gets written.** A CLI you could not resolve, a failed
 handshake, or a missing runtime are all STOP conditions — never a reason to hand-author `sprint.json`,
-`project.json`, or `local.json`. Hand-writing a scope produces an unroutable artifact and is blocked by
-Kyro's `PreToolUse` guard.
+`project.json`, or `local.json`. Claude Code may add a `PreToolUse` defense, but that host-specific hook
+is reinforcement only; the portable guarantee is this fail-closed CLI contract.
 
 ## Core Invariants
 
@@ -82,19 +83,14 @@ Kyro's `PreToolUse` guard.
 
 ## Read Path Contract (context-pack first) — MANDATORY
 
-The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open the full file only to write or in `plan_sprint`/`close_sprint`/status-full (invariant 7).
+The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open the full file only when `plan_sprint`/`close_sprint`/status-full needs its planning or reporting context; agents never open it in order to write it.
 
 ## Artifact Write Contract (MANDATORY)
 
-Every mutation of `sprint.json` or project state MUST be owned by a CLI verb. The CLI performs the
-safe write internally:
-
-> Read the whole file → `JSON.parse` → mutate the object → serialize → overwrite in one write → re-parse to confirm. If the re-parse fails, restore and report.
-
-Agents must not perform those steps themselves. If a required state-changing verb is absent, stop for
-a runtime update; never substitute an editor, patch, or script.
-
-NEVER partial/string-replace structural changes (nulling `activeSprint`, removing a nested block) — it orphans and corrupts the JSON. Exception: the archive snapshot (fresh file, pure write).
+Every mutation of `sprint.json`, project state, checkpoints, or `archive/` MUST be owned by a CLI verb.
+The CLI validates, locks, writes, and re-verifies the affected state internally. Agents must not
+substitute an editor, patch, or ad-hoc script. If a required state-changing verb is absent, stop and
+report the observed runtime version plus `npx kyro-ai@latest sync --scope workspace --yes`.
 
 ## Tool-owned operations (use the CLI, do not hand-roll)
 
@@ -109,7 +105,8 @@ Irreversible or schema-critical operations are CLI-owned, never hand-rolled:
 | `{{KYRO_CLI}} clarify --from <file> --kyro-scope <scope>` | Records one or more accepted clarification decisions and safely advances routing when clear. |
 | `{{KYRO_CLI}} rule add ... [--global]` | Adds a scope rule; `--global` also writes `project.json` after approval. |
 
-Claude Code's `PreToolUse` hook blocks edits nulling `activeSprint`; others rely on this contract.
+Claude Code's `PreToolUse` hook adds host-specific defense against manual managed-state writes. Other
+hosts may not expose an equivalent hook, so correctness never depends on it.
 
 ## Routing (handoff.nextAction → mode)
 

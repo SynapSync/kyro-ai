@@ -39,7 +39,8 @@ function assertRoute(item: DiscoveredEvalCase, cwd: string, home: string): EvalF
   if (!route) return [];
   const result = spawnCli(['context-pack', '--kyro-scope', item.case.scope, '--json'], cwd, home);
   if (result.status !== 0) return [{ at: 'route.context-pack.exitCode', expected: 0, actual: result.status }];
-  const parsed = JSON.parse(result.stdout) as { nextAction?: string; routing?: { modes?: string[] }; budgetClass?: string; reasoningTier?: string };
+  const raw = JSON.parse(result.stdout) as { data?: unknown };
+  const parsed = (isCliEnvelope(raw) ? raw.data : raw) as { nextAction?: string; routing?: { modes?: string[] }; budgetClass?: string; reasoningTier?: string };
   const failures: EvalFailure[] = [];
   compare(failures, 'route.nextAction', route.nextAction, parsed.nextAction);
   compare(failures, 'route.routing.modes', route.expectedModes, parsed.routing?.modes ?? []);
@@ -52,8 +53,9 @@ function runStep(run: string[], env: Record<string, string>, expect: { exitCode:
   const result = spawnCli(run, cwd, home, env);
   const failures: EvalFailure[] = [];
   compare(failures, `step[${index}].exitCode`, expect.exitCode, result.status);
-  for (const needle of expect.stdoutIncludes ?? []) if (!result.stdout.includes(needle)) failures.push({ at: `step[${index}].stdoutIncludes`, expected: needle, actual: result.stdout });
-  for (const needle of expect.stdoutExcludes ?? []) if (result.stdout.includes(needle)) failures.push({ at: `step[${index}].stdoutExcludes`, expected: `not ${needle}`, actual: result.stdout });
+  const comparableStdout = `${result.stdout}\n${normalizedJsonOutput(result.stdout)}`;
+  for (const needle of expect.stdoutIncludes ?? []) if (!comparableStdout.includes(needle)) failures.push({ at: `step[${index}].stdoutIncludes`, expected: needle, actual: result.stdout });
+  for (const needle of expect.stdoutExcludes ?? []) if (comparableStdout.includes(needle)) failures.push({ at: `step[${index}].stdoutExcludes`, expected: `not ${needle}`, actual: result.stdout });
   for (const needle of expect.stderrIncludes ?? []) if (!result.stderr.includes(needle)) failures.push({ at: `step[${index}].stderrIncludes`, expected: needle, actual: result.stderr });
   for (const needle of expect.stderrExcludes ?? []) if (result.stderr.includes(needle)) failures.push({ at: `step[${index}].stderrExcludes`, expected: `not ${needle}`, actual: result.stderr });
   return failures;
@@ -83,4 +85,16 @@ function spawnCli(args: string[], cwd: string, home: string, extraEnv: Record<st
 
 function compare(failures: EvalFailure[], at: string, expected: unknown, actual: unknown): void {
   if (JSON.stringify(expected) !== JSON.stringify(actual)) failures.push({ at, expected, actual });
+}
+
+function isCliEnvelope(value: unknown): value is { schemaVersion: 1; ok: true; data: unknown } {
+  return typeof value === 'object' && value !== null
+    && (value as { schemaVersion?: unknown }).schemaVersion === 1
+    && (value as { ok?: unknown }).ok === true
+    && 'data' in value;
+}
+
+function normalizedJsonOutput(output: string): string {
+  try { return JSON.stringify(JSON.parse(output), null, 2); }
+  catch { return output; }
 }

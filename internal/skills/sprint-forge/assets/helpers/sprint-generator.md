@@ -35,4 +35,4 @@ Use only from `plan-sprint.md` after the next sprint number is known. Produces t
 - Planned phases are reviewable and independently verifiable.
 - `emergentTasks` starts empty; it is filled during execution only.
 - Sprint numbers are sequential and never reused. Emergent tasks use `TE.{n}`.
-- The generator hands this object back to `plan-sprint.md`, which performs the single safe-write to `sprint.json`. No `phases/` files, no `state.json`, no `index.json`.
+- The generator hands this object back to `plan-sprint.md`, which passes a lean input to the tool-owned `{{KYRO_CLI}} plan` command. No direct `sprint.json`, `phases/`, `state.json`, or `index.json` writes.

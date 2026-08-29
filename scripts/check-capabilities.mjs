@@ -18,6 +18,13 @@ function run(args) {
   return spawnSync(process.execPath, [cli, ...args], { cwd: repo, encoding: 'utf-8' });
 }
 
+function capabilitiesEnvelope(result) {
+  assert(result.status === 0, `capabilities --json should succeed: ${result.stdout}${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  assert(envelope.schemaVersion === 1 && envelope.ok === true, 'capabilities must return a successful CLI envelope');
+  return envelope.data;
+}
+
 function walk(dir) {
   const out = [];
   for (const entry of readdirSync(dir)) {
@@ -32,8 +39,7 @@ function walk(dir) {
 //    forge cannot run without are present.
 {
   const result = run(['capabilities', '--json']);
-  assert(result.status === 0, `capabilities --json should succeed: ${result.stdout}${result.stderr}`);
-  const payload = JSON.parse(result.stdout);
+  const payload = capabilitiesEnvelope(result);
   const pkg = JSON.parse(readFileSync(resolve(repo, 'package.json'), 'utf-8'));
   assert(payload.version === pkg.version, `payload version ${payload.version} should match package.json ${pkg.version}`);
   assert(Array.isArray(payload.capabilities), 'capabilities should be an array');
@@ -48,7 +54,7 @@ function walk(dir) {
 //     `capabilities` is the one exemption: the handshake cannot verify itself (if it is missing the
 //     command does not run at all, and that failure IS the staleness signal).
 {
-  const payload = JSON.parse(run(['capabilities', '--json']).stdout);
+  const payload = capabilitiesEnvelope(run(['capabilities', '--json']));
   const referenced = new Set();
   for (const dir of ['internal/skills', 'agents', 'commands']) {
     for (const file of walk(resolve(repo, dir))) {
@@ -72,7 +78,7 @@ function walk(dir) {
 //     that was renamed or removed in app.ts while the payload kept promising it — the handshake
 //     would pass and the forge would then die mid-sprint on UNKNOWN_COMMAND.
 {
-  const payload = JSON.parse(run(['capabilities', '--json']).stdout);
+  const payload = capabilitiesEnvelope(run(['capabilities', '--json']));
   for (const verb of payload.capabilities) {
     const result = run([verb, '--help']);
     const combined = result.stdout + result.stderr;

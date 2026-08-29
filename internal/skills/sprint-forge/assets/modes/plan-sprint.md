@@ -1,6 +1,6 @@
 # Plan Sprint Mode
 
-Generate the next sprint as the `activeSprint` object inside `sprint.json`. It writes ONLY `sprint.json` — no other files.
+Generate a lean sprint-plan input and let `{{KYRO_CLI}} plan` materialize the next `activeSprint`. The agent never writes `sprint.json`.
 
 ## Inputs
 
@@ -17,9 +17,9 @@ Generate the next sprint as the `activeSprint` object inside `sprint.json`. It w
 5. Fold relevant `conventions[]` into each task's `context`.
 6. If `spec.requirements[]` exists, create or refine `spec.scenarios[]` as Given/When/Then checks per requirement, then set each task's `scenario_refs[]` to the scenarios it implements. Leave `scenario_refs: []` only when the task is intentionally non-spec work and explain that in `context`.
 
-## Write (safe-write to sprint.json only)
+## Apply through the CLI
 
-Preferred: `{{KYRO_CLI}} plan --from <file> --kyro-scope {scope}` (tool-owned, validated). `sprint-forge` is a skill, not a Task subagent. Fallback: hand-write using the Artifact Write Contract in `../../SKILL.md` (read → parse → mutate object → overwrite whole file → re-parse):
+Run `{{KYRO_CLI}} plan --from <file> --kyro-scope {scope}`. `sprint-forge` is a skill, not a Task subagent. The lean input must describe:
 
 - Set `activeSprint` to the new sprint object: `{ n, slug, title, objective, status: "executing", phases, emergentTasks: [], definitionOfDone }`. Copy `title` verbatim from `roadmap.sprints[]` for Sprint N — it must never be omitted (a missing title renders `Sprint N: undefined` in the archive narrative).
 - Mark due `debt[]` items `in_progress` (do not delete or reset any debt).
@@ -46,4 +46,4 @@ Preferred: `{{KYRO_CLI}} plan --from <file> --kyro-scope {scope}` (tool-owned, v
 - Never generate Sprint N+1 before Sprint N is closed (in `ledger[]`).
 - Every previous recommendation must be incorporated, deferred, resolved, marked N/A, or converted to a phase.
 - Debt is inherited completely; never reset or drop debt items.
-- Write nothing but `sprint.json`. No `phases/`, no `*.summary.json`, no `state.json`, no `index.json`.
+- Write only the temporary lean plan input. No direct `sprint.json`, `phases/`, `*.summary.json`, `state.json`, or `index.json` writes.

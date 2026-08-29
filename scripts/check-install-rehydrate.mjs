@@ -4,6 +4,7 @@
  * Covers the multi-dev pattern: scopes + project.json committed, local.json gitignored.
  */
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -199,6 +200,16 @@ function assertLayeredInstall(cwd, label) {
   assert(gitignore.includes('kyro.json'), `${label}: gitignore must list kyro.json`);
   assert(!/^project\.json\s*$/m.test(gitignore), `${label}: gitignore must not ignore project.json`);
   assert(!/^scopes\/?\s*$/m.test(gitignore), `${label}: gitignore must not ignore scopes/`);
+  try {
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd, stdio: 'ignore' });
+    for (const path of ['.agents/kyro/project.json', '.agents/kyro/scopes/demo/sprint.json', '.agents/kyro/.gitignore']) {
+      let ignored = false;
+      try { execFileSync('git', ['check-ignore', '-q', '--no-index', '--', path], { cwd, stdio: 'ignore' }); ignored = true; } catch (error) { if (error?.status !== 1) throw error; }
+      assert(!ignored, `${label}: ${path} must be trackable according to git check-ignore`);
+    }
+  } catch (error) {
+    if (error?.status === 128) void error; else if (error?.status !== 1) throw error;
+  }
 }
 
 // --- prompt helper (no TTY) ---

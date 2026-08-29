@@ -20,11 +20,11 @@ Report Kyro progress from the single source of truth.
 | `brief` or empty | Report directly from `sprint.json`; include review debt count (`done` tasks without a `pass` verdict). |
 | `full` | `skills/sprint-forge/assets/modes/STATUS.md` for the detailed report shape, including review-debt task ids and ADR summary/recent ADRs. |
 | `debt` | Report `debt[]` from `sprint.json`; load `skills/sprint-forge/assets/helpers/debt-tracker.md` only to explain status semantics. |
-| `debt-add`, `debt-resolve`, `debt-escalate` | `skills/sprint-forge/assets/helpers/debt-tracker.md`, then mutate `sprint.json.debt[]` via the Artifact Write Contract. |
+| `debt-add`, `debt-resolve`, `debt-escalate` | Load `skills/sprint-forge/assets/helpers/debt-tracker.md`, then run the matching `kyro debt` verb. |
 
 ## Rules
 
 - A status report is read-only unless an explicit `debt-*` mutation is requested.
 - Debt items are never deleted; only their `status` changes.
-- Debt mutations follow the Artifact Write Contract in `skills/sprint-forge/SKILL.md`.
+- Debt mutations are CLI-owned; a missing runtime or verb stops without mutation.
 - When reporting from a context pack, prefer `reviewPending` / `nextTaskReview`; otherwise compute review debt from `activeSprint.phases[].tasks` plus `emergentTasks`.
