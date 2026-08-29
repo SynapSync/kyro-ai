@@ -12,7 +12,7 @@ import { prepareDebtCanonicalization, previewDebtCanonicalization } from '../rem
 import { planCertification } from '../remediation/certification-plan';
 import { applyCertificationTransaction } from '../remediation/certification-transaction';
 import { readPackageVersion } from '../help';
-import { buildReviewPlan, checkerErrorCode, parseFinding, parseVerdict, parseWaiver, type ReviewArgs } from '../commands/review';
+import { executeReview, parseFinding, parseVerdict, parseWaiver, type ReviewArgs } from '../commands/review';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { validateSprintFile } from '../artifacts/schema';
@@ -229,29 +229,13 @@ function reviewTaskTool(args: Record<string, unknown>): unknown {
     yes: args.confirm === true,
     dryRun: false,
     help: false,
+    requestDigest: optionalString(args.request_digest),
   };
-  const { sprint, plan, findings } = buildReviewPlan(scope, reviewArgs);
-  if (findings.length > 0 && reviewArgs.verdict === 'pass') {
-    const code = checkerErrorCode(findings);
-    emitBlockedReason(scope, `checker refused pass for task ${reviewArgs.taskId}`, code);
-    throw new KyroCoreError(code, `Checker refused pass for task ${reviewArgs.taskId}.`, 'Resolve the checker findings, then re-run review_task.');
-  }
-  const guard = evaluateGuard('review_task', { surface: 'mcp', scope, confirmed: args.confirm === true });
-  if (guard.kind === 'blocked') {
-    emitBlockedReason(scope, guard.message, guard.code);
-    throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
-  }
-  if (args.confirm !== true) return planResult(scope, plan, { verdict: reviewArgs.verdict });
-  if (guard.kind === 'confirmation_required') {
-    emitBlockedReason(scope, guard.message, guard.code);
-    throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
-  }
-  emitToolCommandRun(scope, 'mcp', 'review', { task: reviewArgs.taskId, verdict: reviewArgs.verdict });
-  applyPlan(plan);
-  assertValidSprint(scope);
-  if (reviewArgs.verdict === 'pass') emitGateApproved(scope, 'checker', reviewArgs.taskId);
-  else emitBlockedReason(scope, `checker failed task ${reviewArgs.taskId}`, 'CHECKER_FAILED');
-  return { phase: 'applied', scope, taskId: reviewArgs.taskId, verdict: reviewArgs.verdict, nextAction: sprint.handoff.nextAction };
+  return executeReview(scope, reviewArgs, {
+    surface: 'mcp',
+    apply: args.confirm === true,
+    confirmed: args.confirm === true,
+  });
 }
 
 function traceTailTool(args: Record<string, unknown>): unknown {

@@ -38,6 +38,8 @@ export type KyroErrorCode =
   | 'SCOPE_ALREADY_OPEN'
   /** Reopen refused because the live records disagree about which completion is being reopened. */
   | 'REOPEN_CONFLICT'
+  /** The reviewed task/evidence or requested verdict changed after a digest-bound preview. */
+  | 'REVIEW_REQUEST_DIVERGED'
   /** A task with a disposition is terminal for execution; no checker review path may reopen it. */
   | 'DISPOSED_TASK_NOT_REVIEWABLE'
   /** Close refused because an unfinished task has no typed disposition. */

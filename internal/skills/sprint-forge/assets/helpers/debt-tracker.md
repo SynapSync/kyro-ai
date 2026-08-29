@@ -23,7 +23,7 @@ Debt never disappears. Items are inherited across sprints and only change status
 
 ## Mutations
 
-Preferred: `{{KYRO_CLI}} debt add|start|resolve|defer|escalate` — tool-owned, deterministic, no hand-edit risk.
+Use `{{KYRO_CLI}} debt add|start|resolve|defer|escalate` — tool-owned and deterministic.
 
 - `debt add --title <t> --priority <p> [--target <n>] [--note <t>]` — fresh id, `status: open`.
 - `debt start <id>` — `open`/`deferred` to `in_progress`.
@@ -31,7 +31,7 @@ Preferred: `{{KYRO_CLI}} debt add|start|resolve|defer|escalate` — tool-owned, 
 - `debt defer <id> --target <n> --note <t>` — `status: deferred` (both flags required).
 - `debt escalate <id> --priority <p>` — raises priority only.
 
-Fallback only: the Artifact Write Contract in `../../SKILL.md` (read, parse, mutate `debt[]` in memory, overwrite the whole `sprint.json`, re-parse). Never splice array items with a string edit.
+If the runtime or verb is unavailable, STOP without mutation. Report the observed version (or `not installed`) and `npx kyro-ai@latest sync --scope workspace --yes`; never edit `debt[]` by hand.
 
 ## Reporting
 

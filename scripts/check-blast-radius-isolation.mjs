@@ -24,6 +24,11 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function machineData(output) {
+  const parsed = JSON.parse(output);
+  return parsed?.schemaVersion === 1 && parsed.ok === true ? parsed.data : parsed;
+}
+
 function makeSandbox(caseName = 'close-sprint-happy') {
   const root = join(tmpdir(), `kyro-blast-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   mkdirSync(root, { recursive: true });
@@ -133,7 +138,7 @@ function assertHealthyScopeIsolatedFromBrokenSibling() {
 
     const scoped = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--json'], sandbox);
     assert(scoped.status === 0, `scoped prepare on the healthy scope should succeed: ${scoped.stderr}`);
-    const scopedPlan = JSON.parse(scoped.stdout);
+    const scopedPlan = machineData(scoped.stdout);
     assert(scopedPlan.findings.length === 0, `scoped prepare must not see the broken sibling scope: ${scoped.stdout}`);
     assert(scopedPlan.blockers.length === 0, `scoped prepare must report zero blockers for the healthy scope: ${scoped.stdout}`);
 
@@ -145,7 +150,7 @@ function assertHealthyScopeIsolatedFromBrokenSibling() {
 
     const global = spawnCli(['repair', 'integrity', 'prepare', '--json'], sandbox);
     assert(global.status === 0, `global prepare should still succeed (report, not crash): ${global.stderr}`);
-    const globalPlan = JSON.parse(global.stdout);
+    const globalPlan = machineData(global.stdout);
     assert(
       globalPlan.blockers.some((b) => b.summary.includes('broken')),
       `an explicit global scan (no --kyro-scope) must still surface the broken scope: ${global.stdout}`,
@@ -187,7 +192,7 @@ function assertForeignDirectoryIsNeverAScope() {
 
     const global = spawnCli(['repair', 'integrity', 'prepare', '--json'], sandbox);
     assert(global.status === 0, `global prepare should succeed: ${global.stderr}`);
-    const plan = JSON.parse(global.stdout);
+    const plan = machineData(global.stdout);
     assert(plan.blockers.length === 0, `foreign directories must never block integrity: ${global.stdout}`);
 
     const list = spawnCli(['scope', 'list'], sandbox);
@@ -229,7 +234,7 @@ function assertRecoverableAndDamagedAreDistinguished() {
 
     const global = spawnCli(['repair', 'integrity', 'prepare', '--json'], sandbox);
     assert(global.status === 0, `global prepare should succeed: ${global.stderr}`);
-    const codes = JSON.parse(global.stdout).blockers.map((blocker) => blocker.code);
+    const codes = machineData(global.stdout).blockers.map((blocker) => blocker.code);
     assert(codes.includes('recoverable-no-sprint'), `a scope with a usable checkpoint must be reported as recoverable: ${global.stdout}`);
     assert(codes.includes('owned-damaged'), `Kyro artifacts without a usable checkpoint must not claim recoverability: ${global.stdout}`);
 
@@ -261,7 +266,7 @@ function assertSymlinkCheckpointNeverClaimsRecovery() {
 
     const prepare = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--json'], sandbox);
     assert(prepare.status === 0, `prepare should diagnose an unsafe checkpoint: ${prepare.stderr}`);
-    const blockers = JSON.parse(prepare.stdout).blockers;
+    const blockers = machineData(prepare.stdout).blockers;
     assert(
       blockers.some((blocker) => blocker.code === 'owned-damaged' && /unsafe|symbolic link/i.test(blocker.summary)),
       `a symlink checkpoint must be owned-damaged with an unsafe-path diagnosis: ${prepare.stdout}`,
@@ -283,7 +288,7 @@ function assertSymlinkCheckpointNeverClaimsRecovery() {
     const restoredPrepare = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--json'], sandbox);
     assert(restoredPrepare.status === 0, `prepare should accept the restored regular checkpoint: ${restoredPrepare.stderr}`);
     assert(
-      JSON.parse(restoredPrepare.stdout).blockers.some((blocker) => blocker.code === 'recoverable-no-sprint'),
+      machineData(restoredPrepare.stdout).blockers.some((blocker) => blocker.code === 'recoverable-no-sprint'),
       `restoring the regular checkpoint must restore the real resume path: ${restoredPrepare.stdout}`,
     );
     const resumed = spawnCli(closeArgs, sandbox);
@@ -327,7 +332,7 @@ function assertGenericArchiveContentIsNotOwnership() {
 
     const global = spawnCli(['repair', 'integrity', 'prepare', '--json'], sandbox);
     assert(global.status === 0, `global prepare should succeed: ${global.stderr}`);
-    const plan = JSON.parse(global.stdout);
+    const plan = machineData(global.stdout);
     assert(
       plan.blockers.length === 0,
       `a generic archive/ must not make a foreign directory an owned-damaged blocker: ${global.stdout}`,
@@ -362,7 +367,7 @@ function assertGenericArchiveContentIsNotOwnership() {
 
     const second = spawnCli(['repair', 'integrity', 'prepare', '--json'], sandbox);
     assert(second.status === 0, `global prepare should succeed: ${second.stderr}`);
-    const damagedBlockers = JSON.parse(second.stdout).blockers
+    const damagedBlockers = machineData(second.stdout).blockers
       .filter((blocker) => blocker.code === 'owned-damaged');
     const summaryFor = (id) => damagedBlockers.find((blocker) => blocker.summary.startsWith(`${id}:`))?.summary ?? '';
     assert(
@@ -420,7 +425,7 @@ function assertPreExistingContaminationIsCleanable() {
       const scopeArgs = mode === 'scoped' ? ['--kyro-scope', 'notes-backup'] : [];
       const prepare = spawnCli(['repair', 'integrity', 'prepare', ...scopeArgs, '--json'], sandbox);
       assert(prepare.status === 0, `${mode} prepare should succeed: ${prepare.stderr}`);
-      const plan = JSON.parse(prepare.stdout);
+      const plan = machineData(prepare.stdout);
       assert(
         plan.targets.unregister.includes('notes-backup'),
         `${mode}: a registry entry pointing at a foreign directory must be an unregister target, not a blocker: ${prepare.stdout}`,
@@ -481,7 +486,7 @@ function assertRegistryMatrixIsClassifiedByBothAxes() {
 
     const prepare = spawnCli(['repair', 'integrity', 'prepare', '--json'], sandbox);
     assert(prepare.status === 0, `global prepare should succeed: ${prepare.stderr}`);
-    const plan = JSON.parse(prepare.stdout);
+    const plan = machineData(prepare.stdout);
     const codeFor = (id) => (plan.blockers.find((blocker) => blocker.summary.startsWith(`${id}:`)) ?? {}).code;
 
     assert(codeFor('demo') === 'recoverable-no-sprint', `registered + recoverable must report recoverable-no-sprint: ${prepare.stdout}`);
@@ -526,7 +531,7 @@ function assertManagedAncestorSymlinksAreScopeBound() {
 
       const first = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--json'], sandbox);
       assert(first.status === 0, `${level}: scoped prepare must diagnose the unsafe path: ${first.stderr}`);
-      const firstPlan = JSON.parse(first.stdout);
+      const firstPlan = machineData(first.stdout);
       assert(
         firstPlan.blockers.some((blocker) => blocker.code === 'owned-damaged' && /unsafe|symbolic link/i.test(blocker.summary)),
         `${level}: a registered unsafe managed path must be owned-damaged: ${first.stdout}`,
@@ -543,7 +548,7 @@ function assertManagedAncestorSymlinksAreScopeBound() {
       const second = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--json'], sandbox);
       assert(second.status === 0, `${level}: repeat prepare must remain diagnostic: ${second.stderr}`);
       const projection = (output) => {
-        const plan = JSON.parse(output);
+        const plan = machineData(output);
         return JSON.stringify({ findings: plan.findings, blockers: plan.blockers, operations: plan.operations });
       };
       assert(
@@ -611,7 +616,7 @@ function assertUnreadableArchiveNeverCollapsesToClean() {
     // unreadable contract where the platform actually enforced it.
     if (permissionsEnforced) {
       assert(prepare.status === 0, `unreadable archive should be diagnosed, not crash: ${prepare.stderr}`);
-      const plan = JSON.parse(prepare.stdout);
+      const plan = machineData(prepare.stdout);
       assert(
         plan.blockers.some((blocker) => blocker.code === 'owned-damaged'),
         `an unreadable registered archive must never produce a clean Integrity plan: ${prepare.stdout}`,
@@ -635,7 +640,7 @@ function assertUnregisterDivergesOnUnsafePathRace() {
       registerScopes(sandbox, [{ id: 'notes-backup', title: 'notes-backup', status: 'planning' }]);
       const prepare = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'notes-backup', '--json'], sandbox);
       assert(prepare.status === 0, `${race}: prepare should approve safe foreign cleanup: ${prepare.stderr}`);
-      const plan = JSON.parse(prepare.stdout);
+      const plan = machineData(prepare.stdout);
       assert(plan.targets.unregister.includes('notes-backup'), `${race}: expected unregister target: ${prepare.stdout}`);
 
       if (race === 'symlink') {

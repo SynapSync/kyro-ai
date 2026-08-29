@@ -50,7 +50,9 @@ function assertMissingAuthorIsLowAdvisory() {
 
     const result = run(['analyze', '--kyro-scope', 'demo', '--json'], root);
     assert(result.status === 0, `missing author alone must not block analyze: ${result.stdout}${result.stderr}`);
-    const report = JSON.parse(result.stdout);
+    const envelope = JSON.parse(result.stdout);
+    assert(envelope.schemaVersion === 1 && envelope.ok === true, 'analyze must return a successful CLI envelope');
+    const report = envelope.data;
     const finding = report.findings.find((f) => f.category === 'metadata' && f.detail.includes('scope has no author'));
     assert(finding, `analyze should report a metadata finding for missing author: ${JSON.stringify(report.findings)}`);
     assert(finding.severity === 'LOW', `missing-author finding must be LOW, got ${finding.severity}`);
@@ -70,7 +72,9 @@ function assertPresentAuthorSuppressesFinding() {
 
     const result = run(['analyze', '--kyro-scope', 'demo', '--json'], root);
     assert(result.status === 0, `analyze should succeed: ${result.stdout}${result.stderr}`);
-    const report = JSON.parse(result.stdout);
+    const envelope = JSON.parse(result.stdout);
+    assert(envelope.schemaVersion === 1 && envelope.ok === true, 'analyze must return a successful CLI envelope');
+    const report = envelope.data;
     const finding = report.findings.find((f) => f.category === 'metadata' && f.detail.includes('scope has no author'));
     assert(!finding, `analyze must not report missing-author finding once author is present: ${JSON.stringify(report.findings)}`);
   } finally {

@@ -14,7 +14,7 @@ Report progress from the single source of truth. One read, no summaries.
 | `brief` or empty | scope + status, active sprint + next action (`handoff`), task progress, open debt count, next recommended command. |
 | `full` | roadmap health, sprint table (from `roadmap` + `ledger[]`), debt trend (`debt[]`), ADR summary/recent ADRs (`adrs[]`), recommendations from the latest `ledger[]` entry. |
 | `debt` | `debt[]` grouped by status; oldest open item; critical count. |
-| `debt-*` | Load `../helpers/debt-tracker.md`, then mutate `sprint.json.debt[]` via the Artifact Write Contract. |
+| `debt-*` | Load `../helpers/debt-tracker.md`, then run the matching `{{KYRO_CLI}} debt` verb. |
 
 ## Metrics (all computed from sprint.json)
 
@@ -44,5 +44,6 @@ coverage, dependency, and overdue-debt issues with severity. Read-only.
 ## Rules
 
 - A report is read-only unless an explicit `debt-*` mutation is requested.
+- Debt mutations are CLI-owned; runtime or verb failure stops without mutation.
 - Debt items are never deleted; only `status` changes.
 - `brief` reads only the scope pack; `full`/`debt` read the full `sprint.json`. No other files.

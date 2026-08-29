@@ -1,6 +1,6 @@
 # INIT Mode — Scope Analysis & sprint.json Bootstrap
 
-Use INIT when a scope has no `sprint.json`. Produces exactly one artifact you write: a new `sprint.json` (besides write-only `findings/`). Project state (`project.json`/`local.json`) is registered by `{{KYRO_CLI}} plan`, not by you. Nothing else.
+Use INIT when a scope has no `sprint.json`. The agent may write analysis findings and a temporary lean plan input; `{{KYRO_CLI}} plan` is the exclusive writer of `sprint.json`, `project.json`, and `local.json`.
 
 ## Inputs
 
@@ -38,7 +38,7 @@ Produce sizing before writing anything:
 
 Rules: every sprint needs a distinct verifiable objective. Multi-sprint plans need explicit split triggers. Never pad to look thorough.
 
-## Step 5 — Write sprint.json
+## Step 5 — Materialize sprint.json through the CLI
 
 Load `../templates/sprint.json`. Fill:
 
@@ -52,15 +52,13 @@ Load `../templates/sprint.json`. Fill:
 - `roadmap` from the sizing above.
 - `conventions: []` (operational learned rules populated later by `learner.md`), `adrs: []` (durable architectural decisions, no markdown ADR files), `clarifications: []` (populated by `clarify.md`), `activeSprint: null`.
 - `handoff.nextAction`: `"clarify"` if any design-affecting unknown remains (write `[NEEDS CLARIFICATION: ...]` markers rather than guessing), otherwise `"plan_sprint"`. `handoff.nextTaskId: null`.
-- **Do not invent `author`.** Scope creator identity is machine-captured only by `{{KYRO_CLI}} plan` from git `user.name` and/or `user.email` when at least one is set. Hand-writing `sprint.json` never captures it — see the mandatory path below.
+- **Do not invent `author`.** Scope creator identity is machine-captured only by `{{KYRO_CLI}} plan` from git `user.name` and/or `user.email` when at least one is set.
 
 **Plan-grade Seedbed mapping:** when a matured-idea document is referenced, load `../helpers/seedbed-init-mapping.md` and apply its exact schema-safe mapping. Account for every material item before writing. Do not load this helper on the normal one-line INIT path.
 
 **Mandatory: materialize `sprint.json` via the CLI, not by hand.** Write a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap` — **no `author` field**) and run `{{KYRO_CLI}} plan --from <file>`. This is tool-owned and validated: it materializes `sprint.json` (including optional `author` captured from git when available) and registers the scope in `project.json`/`local.json` for you — skip straight to Step 6's verification. The startup capability handshake (`{{KYRO_CLI}} capabilities --json`, Step 0 of `../../SKILL.md`) already confirms `plan` is supported before INIT ever runs, so there is essentially never a legitimate reason to skip this.
 
-If `{{KYRO_CLI}} plan --from <file>` returns a validation error (e.g. `INVALID_INPUT`, `INVALID_SPRINT_SHAPE`), **fix the lean plan JSON and retry the CLI** — do not fall back to hand-writing. Hand-writing `sprint.json` directly is a **recovery-only fallback**, reserved for when the CLI genuinely cannot run (`UNKNOWN_COMMAND`, missing binary, crash) — never a routine choice. On that narrow fallback, hand-write the document without inventing `author`.
-
-Write the completed document to `.agents/kyro/scopes/{scope}/sprint.json` using the Artifact Write Contract in `../../SKILL.md`: read the current target when present, serialize the complete v4 document, write atomically, then re-read and parse it before continuing. Create `archive/` and `findings/` beside it. Do not touch project state until this verification succeeds.
+If `{{KYRO_CLI}} plan --from <file>` returns a validation error (for example `INVALID_INPUT` or `INVALID_SPRINT_SHAPE`), fix the lean plan JSON and retry the CLI. If the runtime is absent, the handshake fails, or `plan` is unknown, STOP without creating or changing Kyro-managed files. Report the observed runtime version (or `not installed`) and the exact remedy `npx kyro-ai@latest sync --scope workspace --yes`.
 
 ## Step 6 — Verify project state (do not hand-write it)
 
@@ -88,6 +86,6 @@ Report: scope, work type, finding count, sprint count, sizing rationale, files c
 
 ## Rules
 
-- Write only `sprint.json` (plus write-only `findings/`). Project state (`project.json`/`local.json`) is written by the CLI, not by you. No other files — no `README.md`, no getting-started guides, no scope-level Markdown of any kind.
+- Write only the lean plan input and write-only `findings/`; the CLI writes all Kyro-managed state. No `README.md`, getting-started guide, or scope-level Markdown.
 - Do not generate the first sprint — that is `plan-sprint.md`'s job.
 - Do not load sprint templates, debt tracker, execution modes, or unrelated analysis helpers during INIT.
