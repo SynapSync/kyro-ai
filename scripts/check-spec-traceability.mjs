@@ -101,12 +101,16 @@ function assertContextPackAndDoctor() {
   try {
     const scopePack = run(['context-pack', '--kyro-scope', 'demo', '--json'], root);
     assert(scopePack.status === 0, `scope context-pack should pass: ${scopePack.stdout}${scopePack.stderr}`);
-    const scopeJson = JSON.parse(scopePack.stdout);
+    const scopeEnvelope = JSON.parse(scopePack.stdout);
+    assert(scopeEnvelope.schemaVersion === 1 && scopeEnvelope.ok === true, 'scope context-pack must return a successful CLI envelope');
+    const scopeJson = scopeEnvelope.data;
     assert(scopeJson.specRequirements.length === 1 && scopeJson.specNonGoals.length === 0 && scopeJson.specOpenQuestions.length === 0, 'scope pack should expose spec arrays');
 
     const taskPack = run(['context-pack', '--kyro-scope', 'demo', '--task', 'T1.1', '--json'], root);
     assert(taskPack.status === 0, `task context-pack should pass: ${taskPack.stdout}${taskPack.stderr}`);
-    const taskJson = JSON.parse(taskPack.stdout);
+    const taskEnvelope = JSON.parse(taskPack.stdout);
+    assert(taskEnvelope.schemaVersion === 1 && taskEnvelope.ok === true, 'task context-pack must return a successful CLI envelope');
+    const taskJson = taskEnvelope.data;
     assert(taskJson.taskScenarios.length === 1 && taskJson.taskScenarios[0].id === 'S1', 'task pack should resolve task scenarios');
     assert(Array.isArray(scopeJson.cliRecipes) && scopeJson.cliRecipes.length > 0, 'scope pack should include cliRecipes');
     assert(scopeJson.cliRecipes.every((r) => typeof r.command === 'string' && r.command.length > 0), 'cliRecipes need commands');

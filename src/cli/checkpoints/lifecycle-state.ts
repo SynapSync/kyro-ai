@@ -83,12 +83,16 @@ export function completedScopeEntry(entry: KyroScopeEntry, completion: ScopeComp
 }
 
 /** Reopen clears the live completion and preserves it in append-only history — it never erases it. */
-export function reopenedSprintState(sprint: SprintFile, record: ScopeReopenRecord): SprintFile {
+export function reopenedSprintState(
+  sprint: SprintFile,
+  record: ScopeReopenRecord,
+  completionHistory: ScopeReopenRecord[] = [...(sprint.completionHistory ?? []), record],
+): SprintFile {
   const { completion: _superseded, ...rest } = sprint;
   return {
     ...rest,
     status: 'planning',
-    completionHistory: [...(sprint.completionHistory ?? []), record],
+    completionHistory,
     handoff: {
       ...sprint.handoff,
       nextAction: 'plan_sprint',
@@ -100,12 +104,17 @@ export function reopenedSprintState(sprint: SprintFile, record: ScopeReopenRecor
   };
 }
 
-export function reopenedScopeEntry(entry: KyroScopeEntry, record: ScopeReopenRecord, sprint: SprintFile): KyroScopeEntry {
+export function reopenedScopeEntry(
+  entry: KyroScopeEntry,
+  record: ScopeReopenRecord,
+  sprint: SprintFile,
+  completionHistory: ScopeReopenRecord[] = [...(entry.completionHistory ?? []), record],
+): KyroScopeEntry {
   const { completion: _superseded, ...rest } = entry;
   return {
     ...rest,
     status: deriveScopeStatus(sprint, Boolean(sprint.activeSprint)),
-    completionHistory: [...(entry.completionHistory ?? []), record],
+    completionHistory,
   };
 }
 
@@ -208,10 +217,11 @@ export function verifyScopeLifecycleEvolution(
 
   const sealedHistory = image.completionHistory ?? [];
   const liveHistory = liveSprint.completionHistory ?? [];
-  if (!isExactPrefix(sealedHistory, liveHistory)) {
+  const prefix = exactPrefixSuffix(sealedHistory, liveHistory);
+  if (prefix === null) {
     return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.HISTORY_PREFIX_MISMATCH);
   }
-  const pendingHistory = liveHistory.slice(sealedHistory.length);
+  const pendingHistory = prefix;
 
   // A live completion already present in the sealed image is not a post-checkpoint transition.
   const liveCompletion = liveSprint.completion;
@@ -223,73 +233,37 @@ export function verifyScopeLifecycleEvolution(
     return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.NOTHING_TO_REPLAY);
   }
 
-  let sprint = image;
-  let entry = afterEntry;
-  let appliedOperations = 0;
-
+  const replay: LifecycleReplayState = {
+    scope,
+    sprint: image,
+    entry: afterEntry,
+    sprintHistory: [...sealedHistory],
+    entryHistory: [...(afterEntry.completionHistory ?? [])],
+    appliedOperations: 0,
+  };
   for (const record of pendingHistory) {
-    if (!hasValidReopenBinding(scope, record)) {
-      return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.REOPEN_BINDING_MISMATCH);
-    }
-    const supersededCompletion = record.completion;
-
-    // A checkpoint may already contain the completion this suffix reopens. In that case it is sealed
-    // history and must not be applied or re-verified. Otherwise the suffix claims a completion step
-    // immediately followed by this reopen, so verify and project that step first.
-    if (sprint.completion !== undefined) {
-      if (
-        canonicalJson(sprint.completion) !== canonicalJson(supersededCompletion)
-        || canonicalJson(entry.completion) !== canonicalJson(supersededCompletion)
-      ) {
-        return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION);
-      }
-    } else {
-      if (!hasValidCompletionBinding(scope, supersededCompletion)) {
-        return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.COMPLETION_BINDING_MISMATCH);
-      }
-      if (completionRegistryEntryDigest(entry) !== supersededCompletion.beforeEntryDigest) {
-        return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.ENTRY_BEFORE_BINDING_MISMATCH);
-      }
-      sprint = completedSprintState(sprint, supersededCompletion);
-      entry = completedScopeEntry(entry, supersededCompletion);
-      appliedOperations += 1;
-    }
-
-    if (reopenRegistryEntryDigest(entry) !== record.beforeEntryDigest) {
-      return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.ENTRY_BEFORE_BINDING_MISMATCH);
-    }
-    sprint = reopenedSprintState(sprint, record);
-    entry = reopenedScopeEntry(entry, record, sprint);
-    appliedOperations += 1;
+    const completion = replay.sprint.completion === undefined ? applyLifecycleEvent(replay, { kind: 'complete', completion: record.completion }) : null;
+    if (completion) return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, completion);
+    const reopen = applyLifecycleEvent(replay, { kind: 'reopen', record });
+    if (reopen) return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, reopen);
   }
-
   if (pendingCompletion !== undefined) {
-    if (sprint.completion !== undefined) {
-      return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION);
-    }
-    if (!hasValidCompletionBinding(scope, pendingCompletion)) {
-      return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.COMPLETION_BINDING_MISMATCH);
-    }
-    if (completionRegistryEntryDigest(entry) !== pendingCompletion.beforeEntryDigest) {
-      return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.ENTRY_BEFORE_BINDING_MISMATCH);
-    }
-    sprint = completedSprintState(sprint, pendingCompletion);
-    entry = completedScopeEntry(entry, pendingCompletion);
-    appliedOperations += 1;
+    const completion = applyLifecycleEvent(replay, { kind: 'complete', completion: pendingCompletion });
+    if (completion) return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, completion);
   }
 
-  if (canonicalJson(sprint) !== canonicalJson(liveSprint)) {
+  if (canonicalJson(replay.sprint) !== canonicalJson(liveSprint)) {
     return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.SPRINT_AFTER_MISMATCH);
   }
-  if (canonicalJson(entry) !== canonicalJson(liveEntry)) {
+  if (canonicalJson(replay.entry) !== canonicalJson(liveEntry)) {
     return lifecycleFailure(SCOPE_LIFECYCLE_VERIFICATION_STATUS.DIVERGED, SCOPE_LIFECYCLE_VERIFICATION_REASON.REGISTRY_AFTER_MISMATCH);
   }
   return {
     status: SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED,
     reason: SCOPE_LIFECYCLE_VERIFICATION_REASON.LIFECYCLE_REPLAYED,
-    sprint,
-    entry,
-    appliedOperations,
+    sprint: replay.sprint,
+    entry: replay.entry,
+    appliedOperations: replay.appliedOperations,
     actorAssurance: SCOPE_LIFECYCLE_ACTOR_ASSURANCE.UNVERIFIED,
   };
 }
@@ -308,13 +282,64 @@ function lifecycleFailure(
   };
 }
 
-/** A sealed prefix must appear verbatim at the head of the live history. */
-function isExactPrefix(sealed: ScopeReopenRecord[], live: ScopeReopenRecord[]): boolean {
-  if (sealed.length > live.length) return false;
-  for (let index = 0; index < sealed.length; index += 1) {
-    if (canonicalJson(sealed[index]) !== canonicalJson(live[index])) return false;
+type LifecycleEvent =
+  | { kind: 'complete'; completion: ScopeCompletion }
+  | { kind: 'reopen'; record: ScopeReopenRecord };
+
+interface LifecycleReplayState {
+  scope: string;
+  sprint: SprintFile;
+  entry: KyroScopeEntry;
+  sprintHistory: ScopeReopenRecord[];
+  entryHistory: ScopeReopenRecord[];
+  appliedOperations: number;
+}
+
+type LifecycleTransition = (state: LifecycleReplayState, event: LifecycleEvent) => ScopeLifecycleVerificationReason | null;
+
+const LIFECYCLE_TRANSITIONS: Record<LifecycleEvent['kind'], LifecycleTransition> = {
+  complete(state, event) {
+    if (event.kind !== 'complete') return SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION;
+    if (state.sprint.completion !== undefined) return SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION;
+    if (!hasValidCompletionBinding(state.scope, event.completion)) return SCOPE_LIFECYCLE_VERIFICATION_REASON.COMPLETION_BINDING_MISMATCH;
+    if (completionRegistryEntryDigest(state.entry) !== event.completion.beforeEntryDigest) return SCOPE_LIFECYCLE_VERIFICATION_REASON.ENTRY_BEFORE_BINDING_MISMATCH;
+    state.sprint = completedSprintState(state.sprint, event.completion);
+    state.entry = completedScopeEntry(state.entry, event.completion);
+    state.appliedOperations += 1;
+    return null;
+  },
+  reopen(state, event) {
+    if (event.kind !== 'reopen') return SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION;
+    if (!hasValidReopenBinding(state.scope, event.record)) return SCOPE_LIFECYCLE_VERIFICATION_REASON.REOPEN_BINDING_MISMATCH;
+    if (
+      state.sprint.completion === undefined
+      || state.entry.completion === undefined
+      || canonicalJson(state.sprint.completion) !== canonicalJson(event.record.completion)
+      || canonicalJson(state.entry.completion) !== canonicalJson(event.record.completion)
+    ) return SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION;
+    if (reopenRegistryEntryDigest(state.entry) !== event.record.beforeEntryDigest) return SCOPE_LIFECYCLE_VERIFICATION_REASON.ENTRY_BEFORE_BINDING_MISMATCH;
+    state.sprintHistory.push(event.record);
+    state.entryHistory.push(event.record);
+    state.sprint = reopenedSprintState(state.sprint, event.record, state.sprintHistory);
+    state.entry = reopenedScopeEntry(state.entry, event.record, state.sprint, state.entryHistory);
+    state.appliedOperations += 1;
+    return null;
+  },
+};
+
+function applyLifecycleEvent(state: LifecycleReplayState, event: LifecycleEvent): ScopeLifecycleVerificationReason | null {
+  return LIFECYCLE_TRANSITIONS[event.kind](state, event);
+}
+
+/** Canonicalize the compared records once, then return only the unsealed suffix. */
+function exactPrefixSuffix(sealed: ScopeReopenRecord[], live: ScopeReopenRecord[]): ScopeReopenRecord[] | null {
+  if (sealed.length > live.length) return null;
+  const sealedCanonical = sealed.map(canonicalJson);
+  const liveCanonical = live.map(canonicalJson);
+  for (let index = 0; index < sealedCanonical.length; index += 1) {
+    if (sealedCanonical[index] !== liveCanonical[index]) return null;
   }
-  return true;
+  return live.slice(sealed.length);
 }
 
 /**

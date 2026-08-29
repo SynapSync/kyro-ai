@@ -60,8 +60,9 @@ function run(args, root) {
 
     const analyzeResult = run(['analyze', '--kyro-scope', 'demo', '--json'], root);
     assert(analyzeResult.status === 0, `analyze should succeed after debt add: ${analyzeResult.stdout}${analyzeResult.stderr}`);
-    const parsed = JSON.parse(analyzeResult.stdout);
-    const findings = Array.isArray(parsed) ? parsed : parsed.findings ?? [];
+    const envelope = JSON.parse(analyzeResult.stdout);
+    assert(envelope.schemaVersion === 1 && envelope.ok === true, 'analyze must return a successful CLI envelope');
+    const findings = envelope.data.findings ?? [];
     const critical = findings.filter((f) => f.severity === 'CRITICAL');
     assert(critical.length === 0, `analyze should report no CRITICAL findings, got ${JSON.stringify(critical)}`);
   } finally {

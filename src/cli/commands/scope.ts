@@ -116,7 +116,7 @@ function inspectScopeCommand(scope: string): void {
     if (check.remedy) console.log(`       Remedy: ${check.remedy}`);
     if (check.status === 'fail') failed = true;
   }
-  if (failed) process.exit(1);
+  if (failed) process.exitCode = 1;
 }
 
 function printScopeSummary(scope: string): void {

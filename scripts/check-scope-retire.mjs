@@ -89,7 +89,7 @@ function integrityPrepare(root) {
   const result = run(root, ['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--json']);
   let plan = null;
   try {
-    plan = JSON.parse(result.stdout);
+    plan = JSON.parse(result.stdout).data;
   } catch {
     // The caller will surface the command output in its assertion. Keeping parsing here means the
     // acceptance cases below exercise the public JSON contract rather than an implementation detail.
@@ -284,13 +284,13 @@ try {
 
     const status = run(root, ['status', 'brief', '--kyro-scope', 'demo', '--json']);
     assert(status.status === 0, `status must understand retired scopes: ${output(status)}`);
-    const statusJson = JSON.parse(status.stdout);
+    const statusJson = JSON.parse(status.stdout).data;
     assert(statusJson.status === 'retired' && statusJson.nextAction === 'done', 'status must report retired/done');
     assert(statusJson.retirement?.supersededBy === 'successor', 'status must expose retirement metadata');
 
     const context = run(root, ['context-pack', '--kyro-scope', 'demo', '--json']);
     assert(context.status === 0, `context-pack must understand retired scopes: ${output(context)}`);
-    const contextJson = JSON.parse(context.stdout);
+    const contextJson = JSON.parse(context.stdout).data;
     assert(contextJson.nextAction === 'done' && contextJson.retirement?.planDigest === prepared.digest, 'context-pack must terminate at done');
 
     const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
@@ -434,12 +434,12 @@ try {
     // Completion is visible in status and context-pack, distinct from retirement.
     const status = run(root, ['status', 'brief', '--kyro-scope', 'demo', '--json']);
     assert(status.status === 0, `status must understand completed scopes: ${output(status)}`);
-    const statusJson = JSON.parse(status.stdout);
+    const statusJson = JSON.parse(status.stdout).data;
     assert(statusJson.status === 'completed' && statusJson.nextAction === 'done', 'status must report completed/done');
     assert(statusJson.retirement === null, 'status must not conflate completion with retirement');
     const context = run(root, ['context-pack', '--kyro-scope', 'demo', '--json']);
     assert(context.status === 0, `context-pack must understand completed scopes: ${output(context)}`);
-    assert(JSON.parse(context.stdout).nextAction === 'done', 'context-pack must terminate at done');
+    assert(JSON.parse(context.stdout).data.nextAction === 'done', 'context-pack must terminate at done');
 
     // Completion cannot be applied twice, and a completed scope cannot be retired without a conflict.
     const twice = run(root, ['scope', 'complete', '--kyro-scope', 'demo', '--summary', 'again', '--yes']);
@@ -640,14 +640,14 @@ try {
     assert(output(inspected).includes('Reopened at:') && output(inspected).includes(reason), `inspect must show reopen history: ${output(inspected)}`);
     const context = run(root, ['context-pack', '--kyro-scope', 'demo', '--json']);
     assert(context.status === 0, `context-pack must succeed after reopen: ${output(context)}`);
-    const pack = JSON.parse(context.stdout);
+    const pack = JSON.parse(context.stdout).data;
     assert(pack.nextAction === 'plan_sprint', 'pack must route a reopened scope to plan_sprint');
     assert(pack.completion === null, 'pack must not report a reopened scope as completed');
     assert(pack.reopenHistory.length === 1 && pack.reopenHistory[0].reason === reason, 'pack must surface reopen history');
     assert(pack.retirement === null, 'reopen must never be conflated with retirement');
     const statusAfter = run(root, ['status', 'brief', '--kyro-scope', 'demo', '--json']);
     assert(statusAfter.status === 0, `status must succeed after reopen: ${output(statusAfter)}`);
-    assert(JSON.parse(statusAfter.stdout).status === 'planning', 'status must report a reopened scope as planning');
+    assert(JSON.parse(statusAfter.stdout).data.status === 'planning', 'status must report a reopened scope as planning');
 
     // The point of reopening: a later sprint plans through the normal tool-owned route (S3, S7).
     const planned = run(root, ['plan', '--from', leanSprint, '--kyro-scope', 'demo']);

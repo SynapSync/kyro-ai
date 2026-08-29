@@ -30,6 +30,22 @@ kyro uninstall          # Remove managed workspace assets, preserving scope arti
 
 `npx kyro-ai@latest` resolves to the same CLI entrypoint. Prefer **`@latest`** for install/sync so clients do not reuse a stale npx cache; pin an explicit version only when you need reproducibility.
 
+## Machine-readable output
+
+Every tool-owned verb accepts `--json` either before or after its command (for example,
+`kyro --json review T1.1 --dry-run` and `kyro review T1.1 --dry-run --json`). Help remains
+human-readable. JSON mode writes exactly one document to stdout and nothing to stderr:
+
+```json
+{ "schemaVersion": 1, "ok": true, "command": "review", "phase": "preview", "data": {} }
+```
+
+Failures keep a non-zero exit code and use the same envelope with `ok: false` and
+`error: { code, message, remedy?, remedyCommand?, details? }`. Mutating results identify whether
+the request was `preview`, `applied`, or `noop`, with the scope, digest or operation id when
+available, affected files, confirmation state, and the next action. Human output is unchanged when
+`--json` is absent.
+
 ### Interactive TUI by package root
 
 The no-argument TUI is package-root-aware:
@@ -293,7 +309,7 @@ After clone:
 2. `npx kyro-ai@latest install --init-workspace --yes` (or interactive install and answer **y**) so layers exist here and scopes are registered.
 3. If more than one scope: `kyro scope set-active <yours> --yes` (or the projected `node ~/.agents/kyro/current/dist/cli.js …` form).
 
-`kyro doctor` validates layered shapes, WARNs on leftover live monolito when layers exist, WARNs on unregistered on-disk scopes, WARNs (global runs only) on directories under `scopes/` that hold no Kyro artifacts and were therefore ignored, and may WARN when `team.minPackageVersion` is newer than the runtime (non-blocking).
+`kyro doctor` validates layered shapes, WARNs on leftover live monolito when layers exist, WARNs on unregistered on-disk scopes, WARNs (global runs only) on directories under `scopes/` that hold no Kyro artifacts and were therefore ignored, and may WARN when `team.minPackageVersion` is newer than the runtime (non-blocking). In Git workspaces it also FAILs when shared `project.json` or `scopes/**` are ignored, and WARNs when only `.agents/kyro/.gitignore` is ignored; the diagnostic prints the exact required negations. It skips this check outside Git.
 
 The project state intentionally does not copy runtime infrastructure fields. Kyro has one global active runtime: authoritative `packageVersion` and `kyroInvocation` live on `~/.agents/kyro/current/manifest.json`. Install and sync remove legacy project-local `runtimeVersion` and `kyroInvocation` while preserving scopes, principles, adapters, and custom metadata.
 
@@ -458,7 +474,7 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 ## Maker/checker review
 
-`kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. `--dry-run` and `--yes` are mutually exclusive (preview or confirm, not both) — the same applies to `kyro close-sprint`. See [maker-checker.md](maker-checker.md).
+`kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. `--dry-run` and `--yes` are mutually exclusive (preview or confirm, not both) — the same applies to `kyro close-sprint`. A resumable review is two-phase: run `kyro review <task> --dry-run --json`, retain `data.requestDigest`, then run `kyro review <task> --digest <sha256> --yes`. The digest binds the task, evidence, criteria, waivers, findings, actor, and verdict. An exact retry is `noop` without changing the verdict timestamp or trace; changed reviewed material fails with `REVIEW_REQUEST_DIVERGED` and needs a new preview. See [maker-checker.md](maker-checker.md).
 
 `kyro close-sprint` is the only verb that confirms interactively. Outside a TTY (agent harness, CI, piped shell) it fails immediately with `CONFIRMATION_REQUIRED` instead of prompting for input that can never arrive — pass `--yes` to complete the gate non-interactively, or `--dry-run` to preview it.
 
@@ -727,7 +743,7 @@ that leaves an immutable record of itself.
 | Runtime | Operations | Repairs |
 | --- | --- | --- |
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
-| **4.44.0 and later** (current: **4.47.3**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+| **4.44.0 and later** (current: **4.48.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

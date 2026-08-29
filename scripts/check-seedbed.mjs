@@ -44,7 +44,7 @@ requireText('internal/skills/seedbed/assets/templates/matured-idea.md', [
   '## Core thesis', '## Current-state evidence', '## Product laws / invariants',
   '## Execution blueprint', '## Acceptance and validation matrix', '## Forge handoff',
 ]);
-requireText('internal/skills/sprint-forge/assets/modes/INIT.md', ['Plan-grade Seedbed mapping', '../helpers/seedbed-init-mapping.md', 'normal one-line INIT path', '.agents/kyro/scopes/{scope}/sprint.json', 'Artifact Write Contract', 'Do not touch project state until']);
+requireText('internal/skills/sprint-forge/assets/modes/INIT.md', ['Plan-grade Seedbed mapping', '../helpers/seedbed-init-mapping.md', 'normal one-line INIT path', 'sprint.json', 'exclusive writer', 'without creating or changing']);
 requireText('internal/skills/sprint-forge/assets/helpers/seedbed-init-mapping.md', ['spec.requirements[].rationale', 'spec.scenarios[]', 'roadmap.sizingRationale', 'unmapped blocker', 'Never fabricate executed']);
 requireText('src/cli/adapters/command-skills.ts', ['rough or mature idea', 'execution-ready pre-scope plan']);
 requireText('src/cli/adapters/opencode.ts', ['rough or mature idea', 'execution-ready plan']);

@@ -263,6 +263,68 @@ function assertDryRunYesExclusive() {
   }
 }
 
+function assertReviewDigestResumption() {
+  const root = sandbox();
+  try {
+    prepareDoneTask(root);
+    const args = ['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass'];
+    const beforePreview = sig(sprintPath(root));
+    const preview = run([...args, '--dry-run', '--json'], root);
+    assert(preview.status === 0 && preview.stderr === '', `review preview must be one stdout envelope: ${preview.stdout}${preview.stderr}`);
+    const previewEnvelope = JSON.parse(preview.stdout);
+    const digest = previewEnvelope.data?.digest;
+    assert(previewEnvelope.ok === true && previewEnvelope.phase === 'preview' && /^[a-f0-9]{64}$/.test(digest), `review preview must return a digest: ${preview.stdout}`);
+    const afterPreview = sig(sprintPath(root));
+    assert(beforePreview.bytes === afterPreview.bytes && beforePreview.mtimeMs === afterPreview.mtimeMs, 'review preview must write zero bytes');
+
+    const applied = run([...args, '--digest', digest, '--yes', '--json'], root);
+    const appliedEnvelope = JSON.parse(applied.stdout);
+    assert(applied.status === 0 && appliedEnvelope.phase === 'applied' && appliedEnvelope.data.digest === digest, `digest-bound review must apply: ${applied.stdout}${applied.stderr}`);
+    const firstVerdict = readSprint(root).activeSprint.phases[0].tasks[0].verdict;
+    assert(firstVerdict.requestDigest === digest && /^[a-f0-9]{64}$/.test(firstVerdict.reviewedMaterialDigest), 'new verdicts must persist both review digests');
+    const bytesAfterApply = sig(sprintPath(root));
+    const tracePath = join(root, '.agents/kyro/trace/demo/events.ndjson');
+    const traceAfterApply = readFileSync(tracePath, 'utf-8');
+
+    const retry = run([...args, '--digest', digest, '--yes', '--json'], root);
+    const retryEnvelope = JSON.parse(retry.stdout);
+    assert(retry.status === 0 && retryEnvelope.phase === 'noop' && retryEnvelope.data.resumed === true, `identical review retry must be noop: ${retry.stdout}${retry.stderr}`);
+    const bytesAfterRetry = sig(sprintPath(root));
+    assert(bytesAfterRetry.bytes === bytesAfterApply.bytes && bytesAfterRetry.mtimeMs === bytesAfterApply.mtimeMs, 'identical retry must preserve sprint bytes and mtime');
+    assert(readSprint(root).activeSprint.phases[0].tasks[0].verdict.reviewedAt === firstVerdict.reviewedAt, 'identical retry must preserve reviewedAt');
+    assert(readFileSync(tracePath, 'utf-8') === traceAfterApply, 'identical retry must not duplicate trace events');
+
+    const distinctPreview = run([...args, '--finding', 'suggestion:Add docs', '--dry-run', '--json'], root);
+    const distinctDigest = JSON.parse(distinctPreview.stdout).data.digest;
+    assert(distinctDigest !== digest, 'a genuinely different review must produce a new digest');
+    const distinctApply = run([...args, '--finding', 'suggestion:Add docs', '--digest', distinctDigest, '--yes', '--json'], root);
+    assert(distinctApply.status === 0 && JSON.parse(distinctApply.stdout).phase === 'applied', `different review must apply: ${distinctApply.stdout}${distinctApply.stderr}`);
+    const secondVerdict = readSprint(root).activeSprint.phases[0].tasks[0].verdict;
+    assert(Date.parse(secondVerdict.reviewedAt) > Date.parse(firstVerdict.reviewedAt), 'different review must receive a later timestamp');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+
+  const staleRoot = sandbox();
+  try {
+    prepareDoneTask(staleRoot);
+    const args = ['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass'];
+    const preview = JSON.parse(run([...args, '--dry-run', '--json'], staleRoot).stdout);
+    const digest = preview.data.digest;
+    const changed = readSprint(staleRoot);
+    changed.activeSprint.phases[0].tasks[0].evidence.summary = 'Evidence changed after preview.';
+    writeSprint(staleRoot, changed);
+    const beforeApply = sig(sprintPath(staleRoot));
+    const stale = run([...args, '--digest', digest, '--yes', '--json'], staleRoot);
+    const staleEnvelope = JSON.parse(stale.stdout);
+    assert(stale.status === 1 && stale.stderr === '' && staleEnvelope.error?.code === 'REVIEW_REQUEST_DIVERGED', `stale review digest must fail closed: ${stale.stdout}${stale.stderr}`);
+    const afterApply = sig(sprintPath(staleRoot));
+    assert(beforeApply.bytes === afterApply.bytes && beforeApply.mtimeMs === afterApply.mtimeMs, 'stale digest must write zero bytes');
+  } finally {
+    rmSync(staleRoot, { recursive: true, force: true });
+  }
+}
+
 function assertCloseSprintFailsFastWithoutTty() {
   // close-sprint is the only verb that confirms interactively. spawnSync gives it piped stdio, so
   // stdin can never answer the prompt — it used to block until the caller timed out. It must fail
@@ -299,6 +361,7 @@ function main() {
   assertSelfReviewPolicy();
   assertReviewConfirmationPolicy();
   assertNormalizedCriterionMatching();
+  assertReviewDigestResumption();
   assertDryRunYesExclusive();
   assertCloseSprintFailsFastWithoutTty();
   console.log('check:maker-checker — deterministic maker/checker invariants passed');

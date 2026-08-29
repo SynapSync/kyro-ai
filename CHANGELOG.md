@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.48.0] - 2026-08-29
+
+### Added
+
+- **Machine-actionable CLI contract.** Tool-owned CLI verbs accept `--json` before or after the
+  command and return one versioned envelope on stdout. Errors preserve non-zero exit codes while
+  exposing a stable code, remedy, optional command, and structured details.
+- **Idempotent review requests.** `review --dry-run --json` exposes a canonical request digest;
+  `review --digest <sha256> --yes` revalidates it under lock. Exact retries are no-ops, while stale
+  reviewed material fails closed with `REVIEW_REQUEST_DIVERGED`.
+- **Git trackability diagnostic.** Doctor now reports ignored shared Kyro state with exact
+  `.gitignore` remedies, and skips the check outside Git workspaces.
+
+### Changed
+
+- **CLI-owned artifact policy.** Canonical and projected workflow assets no longer authorize
+  manual writes to managed state. Missing or incompatible runtimes stop with a precise upgrade
+  command; the Claude `PreToolUse` hook is documented as defense in depth, not portable authority.
+- **Lifecycle replay** is declarative and linear: sprint and registry projection share transition
+  builders, canonicalize history records once, and accumulate post-checkpoint histories without
+  repeatedly copying growing arrays.
+
 ## [4.47.3] - 2026-08-20
 
 ### Fixed

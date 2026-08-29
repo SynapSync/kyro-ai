@@ -69,7 +69,7 @@ function assertAnalyzeReportsActiveSprintStatusDrift() {
     writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
     const result = run(['analyze', '--kyro-scope', 'demo', '--json'], root);
     assert(result.stdout.trim().startsWith('{'), `analyze --json should write JSON: ${result.stderr || result.stdout}`);
-    const report = JSON.parse(result.stdout);
+    const report = JSON.parse(result.stdout).data;
     const drift = report.findings.find((finding) => finding.detail === 'activeSprint status "planned" contradicts task states (should be "complete")');
     assert(drift && drift.severity === 'MEDIUM', `analyze should report MEDIUM activeSprint drift, got ${JSON.stringify(report.findings)}`);
   } finally {
@@ -114,7 +114,7 @@ function assertContextPackSurfacesReviewDebt() {
     addDemoAdr(root);
     const result = run(['context-pack', '--kyro-scope', 'demo', '--task', 'T1.1', '--json'], root);
     assert(result.status === 0, `context-pack should succeed: ${result.stderr || result.stdout}`);
-    const pack = JSON.parse(result.stdout);
+    const pack = JSON.parse(result.stdout).data;
     assert(Array.isArray(pack.reviewPending), 'context-pack output must declare reviewPending[]');
     assert(pack.reviewPending.includes('T1.1'), `reviewPending should include the done/no-verdict task, got ${JSON.stringify(pack.reviewPending)}`);
     assert(pack.nextTaskReview && pack.nextTaskReview.hasPassVerdict === false, 'nextTaskReview should report the missing pass verdict');
@@ -178,12 +178,12 @@ function assertCliStatusCommand() {
 
     const implicitBrief = run(['status', '--json'], root);
     assert(implicitBrief.status === 0, `kyro status --json should resolve the active scope: ${implicitBrief.stderr || implicitBrief.stdout}`);
-    const implicitReport = JSON.parse(implicitBrief.stdout);
+    const implicitReport = JSON.parse(implicitBrief.stdout).data;
     assert(implicitReport.scope === 'demo', `implicit status should use activeScope demo: ${implicitBrief.stdout}`);
 
     const brief = run(['status', '--kyro-scope', 'demo', '--json'], root);
     assert(brief.status === 0, `kyro status --json should succeed: ${brief.stderr || brief.stdout}`);
-    const report = JSON.parse(brief.stdout);
+    const report = JSON.parse(brief.stdout).data;
     assert(report.scope === 'demo', `brief scope should be stable: ${brief.stdout}`);
     assert(report.status === 'active', `brief status should be derived from active sprint: ${brief.stdout}`);
     assert(report.objective === 'Demo objective', `brief objective missing: ${brief.stdout}`);
@@ -196,7 +196,7 @@ function assertCliStatusCommand() {
 
     const full = run(['status', 'full', '--kyro-scope', 'demo', '--json'], root);
     assert(full.status === 0, `kyro status full --json should succeed: ${full.stderr || full.stdout}`);
-    const fullReport = JSON.parse(full.stdout);
+    const fullReport = JSON.parse(full.stdout).data;
     assert(Array.isArray(fullReport.phaseSummary) && fullReport.phaseSummary[0].id === 'P1', `full mode should include phase summary: ${full.stdout}`);
     assert(fullReport.taskSummary && fullReport.taskSummary.done === 1, `full mode should include task summary: ${full.stdout}`);
     assert(Array.isArray(fullReport.reviewDebt) && fullReport.reviewDebt[0].id === 'T1.1', `full mode should include review debt: ${full.stdout}`);
@@ -216,7 +216,7 @@ function assertCliStatusCommand() {
     const debtStateText = readFileSync(statePath, 'utf-8');
     const debt = run(['status', 'debt', '--kyro-scope', 'demo', '--json'], root);
     assert(debt.status === 0, `kyro status debt --json should succeed: ${debt.stderr || debt.stdout}`);
-    const debtReport = JSON.parse(debt.stdout);
+    const debtReport = JSON.parse(debt.stdout).data;
     assert(debtReport.byStatus.find((group) => group.key === 'open').count === 1, `debt mode should group by status: ${debt.stdout}`);
     assert(debtReport.byStatus.find((group) => group.key === 'deferred').count === 1, `debt mode should include deferred status: ${debt.stdout}`);
     assert(debtReport.byPriority.find((group) => group.key === 'critical').count === 1, `debt mode should group by priority: ${debt.stdout}`);
@@ -329,7 +329,7 @@ function assertStatusTaskSummaryDistinguishesDispositions() {
 
     const full = run(['status', 'full', '--kyro-scope', 'demo', '--json'], root);
     assert(full.status === 0, `kyro status full --json should succeed: ${full.stderr || full.stdout}`);
-    const report = JSON.parse(full.stdout);
+    const report = JSON.parse(full.stdout).data;
     assert(report.taskSummary.verified === 1, `verified should count done+pass+no disposition (1), got ${JSON.stringify(report.taskSummary)}`);
     assert(report.taskSummary.dispositions.deferred === 1, `deferred disposition should be reported, got ${JSON.stringify(report.taskSummary.dispositions)}`);
     assert(report.taskSummary.dispositions.cancelled === 0, `cancelled disposition should be 0, got ${JSON.stringify(report.taskSummary.dispositions)}`);

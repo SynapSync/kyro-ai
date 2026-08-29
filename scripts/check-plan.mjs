@@ -759,7 +759,9 @@ function initScope(root, scope = 'demo-scope') {
     writeFileSync(sprintPath(root, 'demo-scope'), `${JSON.stringify(closed, null, 2)}\n`);
     const packResult = run(['context-pack', '--kyro-scope', 'demo-scope', '--json'], root);
     assert(packResult.status === 0, `post-close context-pack should succeed: ${packResult.stdout}${packResult.stderr}`);
-    const pack = JSON.parse(packResult.stdout);
+    const envelope = JSON.parse(packResult.stdout);
+    assert(envelope.schemaVersion === 1 && envelope.ok === true, 'context-pack must return a successful CLI envelope');
+    const pack = envelope.data;
     assert(pack.status === 'planning', `context-pack must derive planning instead of stale completed, got ${pack.status}`);
     assert(pack.nextAction === 'plan_sprint', `context-pack must preserve plan_sprint routing, got ${pack.nextAction}`);
 

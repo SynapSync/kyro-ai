@@ -211,7 +211,7 @@ function main() {
     const beforeProject = readFileSync(join(root, '.agents/kyro/project.json'));
     const prep = run(root, ['repair', 'integrity', 'prepare', '--json', '--reason', 'directory absent']);
     assert(prep.status === 0, `prepare failed: ${prep.stderr}\n${prep.stdout}`);
-    const plan = JSON.parse(prep.stdout);
+    const plan = JSON.parse(prep.stdout).data;
     assert(typeof plan.digest === 'string' && plan.digest.length === 64, 'prepare digest');
     assert(plan.targets.register.includes('disk-only'), 'register target');
     assert(plan.targets.unregister.includes('ghost'), 'unregister target');
@@ -269,7 +269,7 @@ function main() {
     }
     const ckPrep = run(ckRoot, ['repair', 'integrity', 'prepare', '--json']);
     assert(ckPrep.status === 0, `family prepare failed: ${ckPrep.stderr}\n${ckPrep.stdout}`);
-    const ckPlan = JSON.parse(ckPrep.stdout);
+    const ckPlan = JSON.parse(ckPrep.stdout).data;
     assert(ckPlan.targets.canonicalize.length === 11, `expected 11 canonicalize targets, got ${ckPlan.targets.canonicalize.length}`);
     const beforeBytes = identities.map((item) => {
       const pad = String(item.n).padStart(3, '0');
@@ -320,7 +320,7 @@ function main() {
     writeJson(join(unsupportedRoot, `.agents/kyro/scopes/${scope}/sprint.json`), after);
     const prep = run(unsupportedRoot, ['repair', 'integrity', 'prepare', '--json']);
     assert(prep.status === 0, `unsupported prepare should still diagnose: ${prep.stderr}\n${prep.stdout}`);
-    const plan = JSON.parse(prep.stdout);
+    const plan = JSON.parse(prep.stdout).data;
     assert(plan.findings.length > 0, 'unsupported prepare must not hide findings');
     assert(plan.blockers.some((item) => item.code === 'unsupported'), `expected unsupported blocker, got ${JSON.stringify(plan.blockers)}`);
     const apply = run(unsupportedRoot, ['repair', 'integrity', 'apply', '--digest', plan.digest, '--yes']);
@@ -359,7 +359,7 @@ function main() {
     writeJson(join(liveRoot, `.agents/kyro/scopes/${scope}/sprint.json`), live);
     const prep = run(liveRoot, ['repair', 'integrity', 'prepare', '--json']);
     assert(prep.status === 0, `two-convention prepare failed: ${prep.stderr}\n${prep.stdout}`);
-    const plan = JSON.parse(prep.stdout);
+    const plan = JSON.parse(prep.stdout).data;
     const conventionOps = plan.operations.filter((op) => op.kind === 'convention.append');
     assert(conventionOps.length === 2, `expected two convention.append ops, got ${conventionOps.length}`);
     assert(conventionOps[0].expectedConventionCollectionSha256 !== conventionOps[1].expectedConventionCollectionSha256, 'progressive preconditions');
@@ -397,7 +397,7 @@ function main() {
     writeJson(join(liveRoot, `.agents/kyro/scopes/${scope}/sprint.json`), evolved);
     const secondPrep = run(liveRoot, ['repair', 'integrity', 'prepare', '--json']);
     assert(secondPrep.status === 0, `second evolution prepare failed: ${secondPrep.stderr}\n${secondPrep.stdout}`);
-    const secondPlan = JSON.parse(secondPrep.stdout);
+    const secondPlan = JSON.parse(secondPrep.stdout).data;
     const secondConventionOps = secondPlan.operations.filter((operation) => operation.kind === 'convention.append');
     assert(
       secondConventionOps.length === 1 && secondConventionOps[0].after.id === 'process-3',
@@ -435,7 +435,7 @@ function main() {
     const demo = JSON.parse(readFileSync(join(repo, 'fixtures/evals/close-sprint-happy/state/.agents/kyro/scopes/demo/sprint.json'), 'utf8'));
     writeJson(join(identityRoot, '.agents/kyro/scopes/folder-id/sprint.json'), { ...demo, scope: 'other-id', title: 'Other' });
     const prep = run(identityRoot, ['repair', 'integrity', 'prepare', '--json']);
-    const plan = JSON.parse(prep.stdout);
+    const plan = JSON.parse(prep.stdout).data;
     assert(plan.blockers.some((item) => item.code === 'identity-conflict'), `identity conflict must block: ${JSON.stringify(plan.blockers)}`);
   } finally {
     rmSync(identityRoot, { recursive: true, force: true });

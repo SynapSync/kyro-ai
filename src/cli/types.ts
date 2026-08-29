@@ -447,6 +447,10 @@ export interface TaskVerdict {
   findings: TaskVerdictFinding[];
   by: string;
   reviewedAt: string;
+  /** Canonical digest of the review request. Optional only when reading verdicts written before 4.48.0. */
+  requestDigest?: string;
+  /** Canonical digest of the evidence and task material checked by this verdict. */
+  reviewedMaterialDigest?: string;
 }
 
 export const SPEC_REQUIREMENT_PRIORITY = {

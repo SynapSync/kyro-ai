@@ -1021,6 +1021,12 @@ function validateTaskVerdict(value: unknown, path: string, prefix: string, issue
   }
   requireNonEmptyString(value, 'by', path, issues, `${prefix}.by`);
   requireIsoString(value, 'reviewedAt', path, issues, `${prefix}.reviewedAt`);
+  for (const digestField of ['requestDigest', 'reviewedMaterialDigest'] as const) {
+    if (!(digestField in value) || value[digestField] === undefined) continue;
+    if (typeof value[digestField] !== 'string' || !/^[a-f0-9]{64}$/.test(value[digestField])) {
+      issues.push({ path, field: `${prefix}.${digestField}`, message: 'must be a lowercase sha256 digest when present' });
+    }
+  }
 }
 
 function validateTaskVerdictFinding(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {

@@ -1,0 +1,8 @@
+# Kyro — personal/machine overlay and local locks (do not commit).
+# Keep project.json and scopes/ trackable for multi-dev clones.
+
+local.json
+kyro.json
+kyro.json.migrated
+.kyro-state-writer.lock
+.kyro-state-writer.lock/

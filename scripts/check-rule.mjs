@@ -111,7 +111,9 @@ function output(result) {
 
     const pack = run(['context-pack', '--kyro-scope', 'other', '--json'], root);
     assert(pack.status === 0, `other scope context-pack should succeed: ${output(pack)}`);
-    const inherited = JSON.parse(pack.stdout).conventions;
+    const envelope = JSON.parse(pack.stdout);
+    assert(envelope.schemaVersion === 1 && envelope.ok === true, 'context-pack must return a successful CLI envelope');
+    const inherited = envelope.data.conventions;
     assert(inherited.some((rule) => rule.rule === global.rule), 'other scope should inherit global project rule');
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -147,7 +149,9 @@ function output(result) {
     assert(readSprint(root).conventions[0].id === 'process-2', 'scope id allocator must skip inherited global ids');
     const pack = run(['context-pack', '--json'], root);
     assert(pack.status === 0, `context-pack with local/global rules should succeed: ${output(pack)}`);
-    assert(JSON.parse(pack.stdout).conventions.length === 2, 'both global and scope rule must survive the merge');
+    const envelope = JSON.parse(pack.stdout);
+    assert(envelope.schemaVersion === 1 && envelope.ok === true, 'context-pack must return a successful CLI envelope');
+    assert(envelope.data.conventions.length === 2, 'both global and scope rule must survive the merge');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

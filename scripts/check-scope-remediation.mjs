@@ -85,6 +85,11 @@ function mcpCall(root, tool, args) {
   return JSON.parse(result.stdout);
 }
 
+function machineData(output) {
+  const parsed = JSON.parse(output);
+  return parsed?.schemaVersion === 1 && parsed.ok === true ? parsed.data : parsed;
+}
+
 function fileTree(dir) {
   const out = {};
   const walk = (current) => {
@@ -1133,7 +1138,7 @@ withFixture((fx) => {
     const before = scopeDigest(fx.root);
     const cli = run(fx.root, ['remediate', 'canonicalize-prepare', '--debt', 'D1', '--kyro-scope', SCOPE, '--json']);
     assert(cli.status === 0, `canonicalize-prepare must succeed while reporting undecided values: ${cli.output}`);
-    const fromCli = JSON.parse(cli.output);
+    const fromCli = machineData(cli.output);
     assert(fromCli.status === 'INPUT_REQUIRED', `expected INPUT_REQUIRED, got ${fromCli.status}`);
     assert(fromCli.readOnly === true, 'preparation must declare itself read-only');
     assert(fromCli.manifest === null, 'an incomplete preparation must not produce a manifest');
@@ -1155,7 +1160,7 @@ withFixture((fx) => {
     const cli = run(fx.root, ['remediate', 'canonicalize-prepare', '--debt', 'D1', '--kyro-scope', SCOPE,
       '--origin', '1', '--priority', 'high', '--target-sprint', 'null', '--reason', 'Predates the contract.', '--actor', 'operator', '--json']);
     assert(cli.status === 0, `complete preparation must succeed: ${cli.output}`);
-    const fromCli = JSON.parse(cli.output);
+    const fromCli = machineData(cli.output);
     assert(fromCli.status === 'READY', `expected READY, got ${fromCli.status} — ${fromCli.detail ?? ''}`);
     assert(fromCli.manifest.schemaVersion === 3, 'a canonicalization manifest must declare protocol revision 3');
     assert(fromCli.manifest.operations[0].kind === 'debt.canonicalize', 'the manifest must carry the typed operation');
@@ -1174,7 +1179,7 @@ withFixture((fx) => {
     writeJson(join(fx.root, 'manifest.json'), fromCli.manifest);
     const accepted = run(fx.root, ['remediate', 'canonicalize-preview', '--manifest', 'manifest.json', '--kyro-scope', SCOPE, '--json']);
     assert(accepted.status === 0, `preview of a complete, true manifest must succeed: ${accepted.output}`);
-    const preview = JSON.parse(accepted.output);
+    const preview = machineData(accepted.output);
     assert(preview.accepted === true && preview.readOnly === true, 'preview must accept and declare itself read-only');
     assert(JSON.stringify(preview.after[0]) === JSON.stringify(fromCli.after), 'preview must show the exact after-image');
     const mcpPreview = mcpCall(fx.root, 'remediate_canonicalize_preview', { scope: SCOPE, manifest: 'manifest.json' });
@@ -1197,14 +1202,14 @@ withFixture((fx) => {
     writeJson(sprintPath(fx.root), live);
     const before = scopeDigest(fx.root);
 
-    const partial = JSON.parse(run(fx.root, ['remediate', 'canonicalize-prepare', '--debt', 'D1', '--kyro-scope', SCOPE,
+    const partial = machineData(run(fx.root, ['remediate', 'canonicalize-prepare', '--debt', 'D1', '--kyro-scope', SCOPE,
       '--origin', '1', '--priority', 'high', '--target-sprint', 'null', '--json']).output);
     assert(partial.status === 'INPUT_REQUIRED', `an absent note must still require a decision, got ${partial.status}`);
     const note = partial.unresolved.find((u) => u.field === 'note');
     assert(note.suggested === 'Resolution: Decide explicitly whether the retry stays latent by design until independent-nutrition-corroboration lands, or is re-anchored to a different condition.',
       `the note suggestion must be composed from the legacy prose, got ${note.suggested}`);
 
-    const decided = JSON.parse(run(fx.root, ['remediate', 'canonicalize-prepare', '--debt', 'D1', '--kyro-scope', SCOPE,
+    const decided = machineData(run(fx.root, ['remediate', 'canonicalize-prepare', '--debt', 'D1', '--kyro-scope', SCOPE,
       '--origin', '1', '--priority', 'high', '--target-sprint', 'null', '--note', 'Explicitly authorized note.', '--json']).output);
     assert(decided.status === 'READY' && decided.after.note === 'Explicitly authorized note.',
       'only the operator value may become the canonical note');
@@ -1301,7 +1306,7 @@ function prepareManifest(root, extraArgs = []) {
     '--reason', 'The record predates the canonical debt contract.', '--actor', 'regression-harness',
     '--json', ...extraArgs]);
   assert(prepared.status === 0, `preparation failed: ${prepared.output}`);
-  const result = JSON.parse(prepared.output);
+  const result = machineData(prepared.output);
   assert(result.status === 'READY', `preparation must be READY, got ${result.status}: ${prepared.output}`);
   return result.manifest;
 }
@@ -1336,7 +1341,7 @@ function applyCanonicalization(root, extraArgs = []) {
     const relPath = writeManifest(fx.root, prepareManifest(fx.root));
     const preview = run(fx.root, ['remediate', 'canonicalize-preview', '--manifest', relPath, '--kyro-scope', SCOPE, '--json']);
     assert(preview.status === 0, `preview of a complete manifest must be accepted: ${preview.output}`);
-    assert(JSON.parse(preview.output).accepted === true, 'preview must accept the prepared manifest');
+    assert(machineData(preview.output).accepted === true, 'preview must accept the prepared manifest');
 
     const applied = run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']);
     assert(applied.status === 0, `apply of a prepared canonicalization must succeed: ${applied.output}`);
@@ -1402,7 +1407,7 @@ function applyCanonicalization(root, extraArgs = []) {
     // publish is precisely a record with no anchor yet.
     const before = run(fx.root, ['remediate', 'preview', '--manifest', relPath, '--kyro-scope', SCOPE, '--json']);
     assert(before.status === 0, `preview of an interrupted transaction must succeed: ${before.output}`);
-    assert(JSON.parse(before.output).transactionStatus === 'PREPARED',
+    assert(machineData(before.output).transactionStatus === 'PREPARED',
       `an interrupted canonicalization must be reported as PREPARED: ${before.output}`);
 
     const resumed = run(fx.root, ['remediate', 'apply', '--manifest', relPath, '--kyro-scope', SCOPE, '--yes']);

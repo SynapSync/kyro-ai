@@ -15,7 +15,7 @@ export function analyze(options: Pick<CliOptions, "kyroScope" | "json">): void {
   } else {
     printReport(result.scope, result.findings);
   }
-  if (result.blocking) process.exit(1);
+  if (result.blocking) process.exitCode = 1;
 }
 
 function printReport(scope: string, findings: AnalysisFinding[]): void {

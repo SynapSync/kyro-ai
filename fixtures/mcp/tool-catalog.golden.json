@@ -368,6 +368,10 @@
             "type": "string",
             "description": "Reviewer actor id. Defaults to \"checker\"."
           },
+          "request_digest": {
+            "type": "string",
+            "description": "Digest returned by a preview. A repeated applied digest is a no-op."
+          },
           "confirm": {
             "type": "boolean",
             "description": "Required for mutation. Omit or false to return the dry-run plan without writing."
@@ -380,7 +384,7 @@
       },
       "annotations": {
         "destructiveHint": true,
-        "idempotentHint": false
+        "idempotentHint": true
       }
     },
     {

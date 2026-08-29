@@ -45,6 +45,7 @@ import { listScopes, unregisteredScopeFolders } from '../core/scopes';
 import { listForeignScopeDirectories } from '../artifacts/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
+import { diagnoseKyroGitTrackability } from '../core/git-trackability';
 import type { Agent, CheckResult, CliOptions } from '../types';
 
 const PROJECT_STATE_INSTALL_REMEDY = PROJECT_STATE_BOOTSTRAP_REMEDY;
@@ -70,7 +71,7 @@ export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adap
     if (check.status === 'fail') failed = true;
   }
 
-  if (failed) process.exit(1);
+  if (failed) process.exitCode = 1;
 }
 
 export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit: boolean, includeAdapterInventory: boolean, includeTraceSummary: boolean, kyroScope: string | null): CheckResult[] {
@@ -85,6 +86,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
   const checks = [
     ...packagingChecks,
     ...checkProjectState(),
+    diagnoseKyroGitTrackability(),
     checkUnregisteredScopes(),
     ...(kyroScope ? [] : checkForeignScopeDirectories()),
     checkTeamMinPackageVersion(),
@@ -601,7 +603,10 @@ function checkCliCapabilities(): CheckResult {
     const raw = getPersistedKyroInvocation();
     const [command, ...args] = raw.trim().split(/\s+/).map(expandHome);
     const stdout = execFileSync(command, [...args, 'capabilities', '--json'], { encoding: 'utf8', timeout: 5000 });
-    const payload = JSON.parse(stdout) as { version?: unknown; capabilities?: unknown };
+    const parsed = JSON.parse(stdout) as { schemaVersion?: unknown; ok?: unknown; data?: unknown; version?: unknown; capabilities?: unknown };
+    const payload = parsed.schemaVersion === 1 && parsed.ok === true && typeof parsed.data === 'object' && parsed.data !== null
+      ? parsed.data as { version?: unknown; capabilities?: unknown }
+      : parsed;
     const verbs = Array.isArray(payload.capabilities) ? payload.capabilities : [];
     const missing = TOOL_OWNED_VERBS.filter((verb) => !verbs.includes(verb));
     if (missing.length > 0) {

@@ -34,6 +34,6 @@ Captures the mental context a fresh session needs to resume — hypotheses, deci
 1. Read current `sprint.json` for task state.
 2. Review the session for hypotheses, decisions, and blockers.
 3. Check `git status` for uncommitted work.
-4. Write `handoff` via the Artifact Write Contract in `../../SKILL.md`.
+4. Persist the transition through the CLI verb that owns the task, review, plan, or close operation. There is no standalone hand-written handoff update.
 
 There is no `handoffs/` directory and no `RE-ENTRY-PROMPTS.md` — the resume context is a field on the single source of truth.
