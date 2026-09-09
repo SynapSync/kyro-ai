@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.48.3] - 2026-09-09
+
+### Fixed
+
+- **Doctor no longer reports a false FAIL on healthy Windows installs.** npm on Windows
+  installs `.cmd`/`.ps1` shims rather than a real `kyro.exe`: Node's spawn without a shell
+  ignores PATHEXT (`spawnSync("kyro")` fails with ENOENT) and spawning `kyro.cmd` directly
+  is blocked since CVE-2024-27980 (EINVAL), so a bare `kyroInvocation: "kyro"` manifest value
+  could never self-spawn via `doctor` — `CLI invocation` and `CLI capabilities` went red on
+  installations where everything else passed. The installer now persists the
+  `node <runtime>/dist/cli.js` form on Windows, and `doctor` resolves legacy bare values via
+  the projected runtime (`process.execPath` + `<runtime>/dist/cli.js`) instead of failing.
+  No action needed on existing installs: legacy manifests pass as-is and migrate naturally on
+  the next install/sync. The invocation remedy text now documents the Windows behavior so it
+  no longer points at a dead-end reinstall.
+
 ## [4.48.2] - 2026-09-08
 
 ### Fixed
