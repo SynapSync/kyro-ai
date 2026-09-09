@@ -26,6 +26,7 @@ export function parseOptions(args: string[]): CliOptions {
   const evalTags: string[] = [];
   let evalList = false;
   let keepSandbox = false;
+  let check = false;
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -66,6 +67,8 @@ export function parseOptions(args: string[]): CliOptions {
       evalList = true;
     } else if (arg === '--keep-sandbox') {
       keepSandbox = true;
+    } else if (arg === '--check') {
+      check = true;
     } else if (arg === '--case') {
       const value = args[i + 1];
       if (!value) throw invalidInput('--case requires a value', 'Use --case <id> or --case=<id>.');
@@ -145,6 +148,7 @@ export function parseOptions(args: string[]): CliOptions {
     evalTags,
     evalList,
     keepSandbox,
+    check,
   };
 }
 

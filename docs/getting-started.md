@@ -96,14 +96,22 @@ Full multi-dev commit matrix: [Teams](teams.md).
 
 Installed as a **Claude Code plugin** instead (marketplace install, no `npx kyro-ai install` ever run)? The plugin channel ships the raw skill/agent files unsubstituted — the orchestrator resolves the CLI invocation itself at the start of every session (same `kyro` vs. `node ~/.agents/kyro/current/dist/cli.js` decision, see `agents/orchestrator.md`'s Startup Step 1), so no separate setup is required for that path either.
 
-After upgrades (from the project root):
+Upgrading (from the project root) is one command — it checks the registry for the latest
+release, updates the global package when behind, and refreshes the runtime plus the current
+workspace from the fresh package, asking first unless `--yes`:
 
 ```bash
 cd /path/to/your-app
-npx kyro-ai@latest sync --scope workspace --yes
+kyro update
 ```
 
-See [CLI · invocation persistence](cli.md#cli-invocation-persistence-kyroinvocation).
+Useful variants: `kyro update --check` reports the status without changing anything,
+`kyro update --dry-run` previews the planned steps, and `kyro update --yes` skips the
+confirmation (for scripts). The manual equivalent is `npx kyro-ai@latest sync --scope workspace`
+plus `npm i -g kyro-ai` when you keep a global install.
+
+See [CLI · invocation persistence](cli.md#cli-invocation-persistence-kyroinvocation) and
+[CLI · update](cli.md#update-kyro-update).
 
 ## First run
 
