@@ -1,6 +1,4 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import {
   ARTIFACT_ROOT,
@@ -12,7 +10,14 @@ import {
   PACKAGE_ROOT,
   PROJECT_STATE_PATH,
 } from '../constants';
-import { getPersistedKyroInvocation, isEphemeralPackageManagerPath, resolveKyroBinaryPath } from '../invocation';
+import {
+  execKyroInvocationSync,
+  getPersistedKyroInvocation,
+  isBareKyroInvocation,
+  isEphemeralPackageManagerPath,
+  resolveInvocationSpawn,
+  resolveKyroBinaryPath,
+} from '../invocation';
 import { managedPathExists, readJsonFromPackage, readPackageText, resolveManagedPath } from '../fs';
 import { readPackageVersion } from '../help';
 import {
@@ -58,7 +63,7 @@ const PRINCIPLES_ON_LOCAL_REMEDY =
 const TEAM_MIN_PACKAGE_REMEDY =
   'Upgrade Kyro to at least the team minPackageVersion (npx kyro-ai@latest install / sync from the full npm package).';
 const CLI_INVOCATION_REMEDY =
-  'Re-run once: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) from the full npm package so ~/.agents/kyro/current/manifest.json.kyroInvocation is refreshed (global for all workspaces). Agents should use that form (often `node ~/.agents/kyro/current/dist/cli.js`), not a bare `kyro` that only existed during npx.';
+  'Re-run once: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) from the full npm package so ~/.agents/kyro/current/manifest.json.kyroInvocation is refreshed (global for all workspaces). On Windows the installer persists the `node <runtime>/dist/cli.js` form because bare `kyro` shims cannot be self-spawned by Node (PATHEXT is ignored without a shell, and direct `.cmd` spawn is blocked since CVE-2024-27980). Agents should use that form, not a bare `kyro` that only existed during npx.';
 
 export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'trace' | 'kyroScope'>): void {
   const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.trace ?? false, options?.kyroScope ?? null);
@@ -532,11 +537,6 @@ function checkGlobalRuntime(): CheckResult {
   return { status: 'pass', name: 'global runtime', detail: `${runtimeFiles.length} runtime files present` };
 }
 
-/** Expand a leading `~` to the user's home dir; execFileSync does no shell expansion. */
-function expandHome(segment: string): string {
-  return segment === '~' || segment.startsWith('~/') ? homedir() + segment.slice(1) : segment;
-}
-
 function checkCliInvocation(): CheckResult {
   const remedy = CLI_INVOCATION_REMEDY;
   try {
@@ -551,8 +551,11 @@ function checkCliInvocation(): CheckResult {
     const raw = getPersistedKyroInvocation();
     // Bare `kyro` is only safe when PATH still resolves to a durable (non-npx) binary.
     // A stale install from `npx kyro-ai install` often leaves kyroInvocation="kyro" after the
-    // temporary npx bin is gone — fail closed with a re-sync remedy.
-    if (raw.trim() === 'kyro') {
+    // temporary npx bin is gone — fail closed with a re-sync remedy. On win32 the bare form
+    // is a legacy value (the installer now persists the node form because shims cannot be
+    // self-spawned); the robust spawn below resolves it via the projected runtime, so skip
+    // the POSIX PATH gate there instead of reporting a false FAIL on a healthy install.
+    if (isBareKyroInvocation(raw) && process.platform !== 'win32') {
       const resolved = resolveKyroBinaryPath();
       if (!resolved) {
         return {
@@ -571,16 +574,19 @@ function checkCliInvocation(): CheckResult {
         };
       }
     }
-    // The invocation is a shell string (e.g. `node ~/.agents/kyro/current/dist/cli.js`), not a
-    // bare binary — split into command + args and expand `~` before exec, which does neither.
-    const [command, ...args] = raw.trim().split(/\s+/).map(expandHome);
-    execFileSync(command, [...args, '--version'], { stdio: 'ignore', timeout: 5000 });
+    // Self-spawn without a shell: `node <cli.js>` runs via process.execPath and legacy bare
+    // `kyro` on win32 falls back to the projected runtime (see invocation.ts) instead of ENOENT.
+    const spawn = resolveInvocationSpawn(raw);
+    execKyroInvocationSync(raw, ['--version'], { stdio: 'ignore', timeout: 5000 });
     // Always surface the canonical agent entrypoint in the PASS line so hosts without `kyro` on
     // PATH still see how to invoke the harness (post-mortem #2 F1).
+    const fallbackNote = spawn.fallbackUsed
+      ? ' Legacy bare "kyro" resolved via the projected runtime; the next install/sync on Windows persists the node form.'
+      : '';
     return {
       status: 'pass',
       name: 'CLI invocation',
-      detail: `canonical agent entrypoint: ${raw} (--version runs). Prefer this form over bare \`kyro\` when PATH is empty.`,
+      detail: `canonical agent entrypoint: ${raw} (--version runs). Prefer this form over bare \`kyro\` when PATH is empty.${fallbackNote}`,
     };
   } catch (error: unknown) {
     return { status: 'fail', name: 'CLI invocation', detail: errorMessage(error), remedy };
@@ -601,8 +607,7 @@ function checkCliCapabilities(): CheckResult {
       return { status: 'warn', name: 'CLI capabilities', detail: `${KYRO_MANIFEST_PATH} not found; no installed runtime to probe`, remedy };
     }
     const raw = getPersistedKyroInvocation();
-    const [command, ...args] = raw.trim().split(/\s+/).map(expandHome);
-    const stdout = execFileSync(command, [...args, 'capabilities', '--json'], { encoding: 'utf8', timeout: 5000 });
+    const stdout = execKyroInvocationSync(raw, ['capabilities', '--json'], { encoding: 'utf8', timeout: 5000 });
     const parsed = JSON.parse(stdout) as { schemaVersion?: unknown; ok?: unknown; data?: unknown; version?: unknown; capabilities?: unknown };
     const payload = parsed.schemaVersion === 1 && parsed.ok === true && typeof parsed.data === 'object' && parsed.data !== null
       ? parsed.data as { version?: unknown; capabilities?: unknown }

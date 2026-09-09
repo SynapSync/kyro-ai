@@ -1,5 +1,7 @@
-import { execFileSync } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
+import { existsSync, realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { resolve } from 'node:path';
 import { KYRO_ROOT } from './constants';
 import { readManifest } from './state';
 
@@ -14,15 +16,27 @@ export interface KyroInvocation {
 }
 
 /**
- * Pure: no I/O. Given whether a *durable* `kyro` is on PATH and the runtime root to fall back to,
- * produces the invocation value. `kyroRoot` is the single active runtime path, so persisted
- * invocations survive package updates without pinning historical version directories.
+ * Pure: no I/O (besides the defaulted platform probe). Given whether a *durable* `kyro` is on
+ * PATH and the runtime root to fall back to, produces the invocation value. `kyroRoot` is the
+ * single active runtime path, so persisted invocations survive package updates without pinning
+ * historical version directories.
  *
  * Callers must not pass `true` for ephemeral package-manager bins (npx cache, etc.) — those
  * vanish after the install process exits and leave agents with a dead `kyro` string.
+ *
+ * Windows note: npm on win32 installs `.cmd`/`.ps1` shims, not a real `kyro.exe`. Node's spawn
+ * without `shell: true` ignores PATHEXT, so `spawnSync("kyro")` always fails with ENOENT, and
+ * spawning `kyro.cmd` directly is blocked since CVE-2024-27980 (EINVAL on Node >= 18.20 / 20.12
+ * / 22). A bare `"kyro"` manifest value can therefore never be self-spawned by doctor on
+ * Windows, even on a healthy global install. Persist the `node <runtime>/dist/cli.js` form on
+ * win32 instead — it works in shells and via execFileSync alike.
  */
-export function buildInvocation(durableKyroOnPath: boolean, kyroRoot: string): KyroInvocation {
-  if (durableKyroOnPath) {
+export function buildInvocation(
+  durableKyroOnPath: boolean,
+  kyroRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): KyroInvocation {
+  if (durableKyroOnPath && platform !== 'win32') {
     return { raw: 'kyro', command: 'kyro', args: [] };
   }
   const cliPath = `${kyroRoot}/dist/cli.js`;
@@ -117,4 +131,116 @@ export function getPersistedKyroInvocation(): string {
     return manifest.kyroInvocation.trim();
   }
   return resolveKyroInvocation().raw;
+}
+
+/** Expand a leading `~` to the user's home dir; execFileSync does no shell expansion. */
+export function expandInvocationHome(segment: string): string {
+  return segment === '~' || segment.startsWith('~/') ? homedir() + segment.slice(1) : segment;
+}
+
+/** Split an invocation string into tokens, respecting single/double quotes (for paths with spaces). Pure. */
+export function splitInvocation(raw: string): string[] {
+  const parts: string[] = [];
+  const pattern = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(raw)) !== null) {
+    parts.push(match[1] ?? match[2] ?? match[3]);
+  }
+  return parts;
+}
+
+/** True for legacy bare invocations (`kyro`, `kyro.cmd`, `kyro-ai`, …) with no script path. Pure. */
+export function isBareKyroInvocation(raw: string): boolean {
+  const first = splitInvocation(raw.trim())[0] ?? '';
+  const base = first.toLowerCase().split(/[\\/]/).pop() ?? '';
+  return (
+    base === 'kyro' ||
+    base === 'kyro.cmd' ||
+    base === 'kyro.bat' ||
+    base === 'kyro.ps1' ||
+    base === 'kyro-ai' ||
+    base === 'kyro-ai.cmd' ||
+    base === 'kyro-ai.bat' ||
+    base === 'kyro-ai.ps1'
+  );
+}
+
+/** Absolute path to the projected runtime entrypoint (`<KYRO_ROOT>/dist/cli.js`). */
+export function resolveProjectedCliJs(kyroRoot: string = KYRO_ROOT): string {
+  return resolve(expandInvocationHome(kyroRoot), 'dist/cli.js');
+}
+
+export interface InvocationSpawn {
+  command: string;
+  args: string[];
+  /** True when a legacy bare `kyro` was mapped to `node <runtime>/dist/cli.js` (win32). */
+  fallbackUsed: boolean;
+}
+
+/**
+ * Map a persisted invocation string to a directly-spawnable argv (no shell).
+ *
+ * - `node <cli.js>` → `process.execPath <cli.js>` (same runtime, no PATH lookup).
+ * - bare `kyro` on win32 → `process.execPath <projected dist/cli.js>` (PATHEXT is ignored
+ *   by spawn without shell, and direct `.cmd` spawn is blocked since CVE-2024-27980, so the
+ *   bare form can never self-spawn on Windows even on a healthy install).
+ * - everything else → split + `~`-expanded as-is (POSIX semantics unchanged).
+ *
+ * Pure except for the defaulted platform probe; pass `platform` explicitly in unit tests to
+ * simulate Windows on POSIX CI.
+ */
+export function resolveInvocationSpawn(raw: string, platform: NodeJS.Platform = process.platform): InvocationSpawn {
+  const parts = splitInvocation(raw.trim()).map(expandInvocationHome);
+  const [command = '', ...args] = parts;
+  const lower = command.toLowerCase();
+  const isNode =
+    lower === 'node' ||
+    lower.endsWith('/node') ||
+    lower.endsWith('\\node') ||
+    lower === 'node.exe' ||
+    lower.endsWith('/node.exe') ||
+    lower.endsWith('\\node.exe');
+  if (isNode) {
+    return { command: process.execPath, args, fallbackUsed: false };
+  }
+  if (platform === 'win32' && isBareKyroInvocation(raw)) {
+    return { command: process.execPath, args: [resolveProjectedCliJs(), ...args], fallbackUsed: true };
+  }
+  return { command, args, fallbackUsed: false };
+}
+
+/**
+ * execFileSync wrapper for persisted invocations. Uses {@link resolveInvocationSpawn} so legacy
+ * bare-`kyro` manifests self-spawn on Windows via the projected runtime instead of ENOENT, and
+ * retries once via the projected runtime when a direct win32 spawn fails with ENOENT/EINVAL
+ * (covers quoted/absolute shim spellings the static check may miss).
+ */
+export function execKyroInvocationSync(
+  raw: string,
+  extraArgs: string[],
+  options: ExecFileSyncOptions & { encoding: 'utf8' },
+): string;
+export function execKyroInvocationSync(raw: string, extraArgs: string[], options?: ExecFileSyncOptions): Buffer;
+export function execKyroInvocationSync(
+  raw: string,
+  extraArgs: string[],
+  options?: ExecFileSyncOptions,
+): string | Buffer {
+  const spawn = resolveInvocationSpawn(raw);
+  try {
+    return execFileSync(spawn.command, [...spawn.args, ...extraArgs], options as ExecFileSyncOptions & { encoding: 'utf8' }) as string | Buffer;
+  } catch (error) {
+    if (process.platform === 'win32' && !spawn.fallbackUsed && isBareKyroInvocation(raw) && isMissingExecutableError(error)) {
+      const cliJs = resolveProjectedCliJs();
+      if (existsSync(cliJs)) {
+        return execFileSync(process.execPath, [cliJs, ...spawn.args, ...extraArgs], options as ExecFileSyncOptions & { encoding: 'utf8' }) as string | Buffer;
+      }
+    }
+    throw error;
+  }
+}
+
+function isMissingExecutableError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  return code === 'ENOENT' || code === 'EINVAL';
 }

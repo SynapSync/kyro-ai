@@ -142,8 +142,10 @@ Install/sync probe PATH once, write the result into the **runtime manifest**, an
 
 | Situation | Persisted invocation (manifest) |
 | --------- | -------------------- |
-| Durable global `kyro` on PATH (`npm i -g kyro-ai`, user shim under `~/.local/bin`, …) | `kyro` |
-| No `kyro`, **or** only an ephemeral package-manager bin (npx/`_npx` cache, yarn dlx, pnpm dlx) | `node ~/.agents/kyro/current/dist/cli.js` |
+| Durable global `kyro` on PATH on POSIX (`npm i -g kyro-ai`, user shim under `~/.local/bin`, …) | `kyro` |
+| Windows (any PATH state), no `kyro`, **or** only an ephemeral package-manager bin (npx/`_npx` cache, yarn dlx, pnpm dlx) | `node ~/.agents/kyro/current/dist/cli.js` |
+
+On Windows npm installs `.cmd`/`.ps1` shims, not a real `kyro.exe`: Node's spawn without a shell ignores PATHEXT (`spawnSync("kyro")` → ENOENT) and direct `.cmd` spawn is blocked since CVE-2024-27980 (EINVAL), so a bare `kyro` manifest value can never self-spawn via `doctor`. The installer therefore always persists the `node` form on win32, and `doctor` resolves legacy bare values via the projected runtime (`process.execPath` + `<runtime>/dist/cli.js`) instead of reporting a false FAIL on a healthy install.
 
 **Why:** `npx kyro-ai@latest install` puts a temporary `…/.npm/_npx/…/bin/kyro` on PATH for the install process only. Treating that as durable used to persist bare `kyro`, which then failed for agents after npx exited and pushed them into hand-writing `sprint.json`. Ephemeral package-manager paths are rejected. Re-run `npx kyro-ai@latest sync` (or install) **once** (any workspace, or runtime-only install) so the global manifest and projected modes refresh; you do not need to visit every project just to fix the invocation string.
 

@@ -14,10 +14,14 @@ const repo = resolve(new URL('..', import.meta.url).pathname);
 const require = createRequire(import.meta.url);
 const {
   buildInvocation,
+  execKyroInvocationSync,
   getPersistedKyroInvocation,
+  isBareKyroInvocation,
   isDurableKyroOnPath,
   isEphemeralPackageManagerPath,
+  resolveInvocationSpawn,
   resolveKyroInvocation,
+  splitInvocation,
 } = require(resolve(repo, 'dist/cli/invocation.js'));
 
 function assert(condition, message) {
@@ -50,9 +54,27 @@ for (const sample of durableSamples) {
 }
 
 // --- buildInvocation ---
+// POSIX: durable global install persists bare `kyro` (direct spawn works — real exe + shebang).
+// Windows: npm installs .cmd/.ps1 shims; Node spawn without shell ignores PATHEXT (ENOENT)
+// and direct .cmd spawn is blocked since CVE-2024-27980 (EINVAL). The installer must persist
+// the node form on win32 even for durable installs, or doctor self-spawn can never succeed.
+const durablePosix = buildInvocation(true, '~/.agents/kyro/current', 'linux');
+assert(durablePosix.raw === 'kyro', `durable POSIX should prefer bare kyro, got ${durablePosix.raw}`);
+assert(durablePosix.command === 'kyro' && durablePosix.args.length === 0, 'durable command shape');
+
+const durableWin = buildInvocation(true, '~/.agents/kyro/current', 'win32');
+assert(
+  durableWin.raw === 'node ~/.agents/kyro/current/dist/cli.js',
+  `durable Windows must use node form (shims cannot self-spawn), got ${durableWin.raw}`,
+);
+assert(durableWin.command === 'node', 'windows durable command');
+
 const durable = buildInvocation(true, '~/.agents/kyro/current');
-assert(durable.raw === 'kyro', `durable should prefer bare kyro, got ${durable.raw}`);
-assert(durable.command === 'kyro' && durable.args.length === 0, 'durable command shape');
+if (process.platform === 'win32') {
+  assert(durable.raw !== 'kyro', `live durable on Windows must not be bare kyro, got ${durable.raw}`);
+} else {
+  assert(durable.raw === 'kyro', `durable should prefer bare kyro, got ${durable.raw}`);
+}
 
 const fallback = buildInvocation(false, '~/.agents/kyro/current');
 assert(
@@ -61,6 +83,12 @@ assert(
 );
 assert(fallback.command === 'node', 'fallback command');
 assert(fallback.args.join(' ') === '~/.agents/kyro/current/dist/cli.js', 'fallback args');
+
+const fallbackWin = buildInvocation(false, '~/.agents/kyro/current', 'win32');
+assert(
+  fallbackWin.raw === 'node ~/.agents/kyro/current/dist/cli.js',
+  `windows fallback must use node form, got ${fallbackWin.raw}`,
+);
 
 // Simulate the npx install decision: ephemeral path → treat as not durable → node form
 const npxPath = '/home/u/.npm/_npx/deadbeef/node_modules/.bin/kyro';
@@ -112,6 +140,37 @@ if (process.platform !== 'win32') {
     persisted === 'kyro' || /^node .+\/dist\/cli\.js$/.test(persisted) || persisted === live,
     `getPersistedKyroInvocation unexpected shape: ${persisted}`,
   );
+}
+
+// --- win32 self-spawn mapping (doctor false-FAIL regression) ---
+// Simulated with explicit platform args so POSIX CI covers the Windows path.
+assert(isBareKyroInvocation('kyro') === true, 'bare kyro is bare');
+assert(isBareKyroInvocation('kyro.cmd') === true, 'kyro.cmd is bare');
+assert(isBareKyroInvocation('"kyro"') === true, 'quoted kyro is bare');
+assert(isBareKyroInvocation('node ~/.agents/kyro/current/dist/cli.js') === false, 'node form is not bare');
+assert(isBareKyroInvocation('C:\\Users\\u\\AppData\\Roaming\\npm\\kyro.cmd') === true, 'absolute shim is bare');
+assert(JSON.stringify(splitInvocation('node "~/a b/c.js" --x')) === JSON.stringify(['node', '~/a b/c.js', '--x']), 'split respects quotes');
+
+{
+  const winBare = resolveInvocationSpawn('kyro', 'win32');
+  assert(winBare.command === process.execPath, `win32 bare kyro must map to process.execPath, got ${winBare.command}`);
+  assert(winBare.args.length === 1 && winBare.args[0].endsWith('/dist/cli.js'), `win32 bare kyro must map to projected cli.js, got ${winBare.args.join(' ')}`);
+  assert(winBare.fallbackUsed === true, 'win32 bare kyro must flag fallbackUsed');
+}
+{
+  const posixBare = resolveInvocationSpawn('kyro', 'linux');
+  assert(posixBare.command === 'kyro' && posixBare.args.length === 0, `posix bare kyro must stay direct, got ${posixBare.command}`);
+  assert(posixBare.fallbackUsed === false, 'posix bare kyro must not flag fallback');
+}
+{
+  const nodeForm = resolveInvocationSpawn('node ~/.agents/kyro/current/dist/cli.js', 'linux');
+  assert(nodeForm.command === process.execPath, `node form must map to process.execPath, got ${nodeForm.command}`);
+  assert(nodeForm.args.length === 1 && nodeForm.fallbackUsed === false, 'node form args/fallback');
+}
+{
+  // Live smoke: the node form must self-spawn on this machine (proves exec wrapper works).
+  const out = execKyroInvocationSync('node ~/.agents/kyro/current/dist/cli.js', ['--version'], { encoding: 'utf8', timeout: 5000 });
+  assert(typeof out === 'string' && /\d+\.\d+\.\d+/.test(out.trim()), `node-form self-spawn must print a version, got ${JSON.stringify(out)}`);
 }
 
 // Projected skill stubs pin runtimeVersion and print a CLI line (post-mortem #2 F1/F2).
