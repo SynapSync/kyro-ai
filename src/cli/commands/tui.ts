@@ -76,5 +76,6 @@ function tuiInstallOptions(agent: Agent): CliOptions {
     evalTags: [],
     evalList: false,
     keepSandbox: false,
+    check: false,
   };
 }

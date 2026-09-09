@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.49.0] - 2026-09-09
+
+### Added
+
+- **One-step upgrades with `kyro update`.** Replaces the manual two-step flow
+  (`npx kyro-ai install` plus `npm i -g kyro-ai`): checks the registry for the latest
+  release, picks the lane by install mode (durable global `kyro` updates via
+  `npm install -g kyro-ai@<exact>`; npx-only setups refresh via `npx -y kyro-ai@<exact>`),
+  asks for confirmation unless `--yes`, then refreshes the global package, the runtime,
+  and the current workspace from the fresh package. `kyro update --check` only reports the
+  status, `--dry-run` previews the steps, and the registry query fails soft when offline.
+  Operator surface like `install`/`sync`: not a tool-owned verb, so the capability
+  handshake is untouched. See `docs/cli.md` (Update) and `docs/getting-started.md`.
+
 ## [4.48.3] - 2026-09-09
 
 ### Fixed

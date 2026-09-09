@@ -34,6 +34,7 @@ Usage:
   kyro trace [options]          Read or clear the append-only scope trace
   kyro scope <subcommand>      List, inspect, activate, complete, reopen, or retire Kyro scopes
   kyro sync [options]          Refresh managed workspace assets
+  kyro update [options]        One-step update: latest release + runtime + workspace
   kyro uninstall [options]     Remove managed workspace assets
 
 Options:
@@ -49,6 +50,7 @@ Options:
   --verbosity <level>          Output depth for context-pack: concise or detailed (default)
   --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
   --prune                      Clean obsolete adapter-owned files during sync
+  --check                      Report update status without changing anything (update)
   --init-workspace             Initialize Kyro in this workspace during install
   --no-init-workspace          Install runtime only; never initialize a new workspace
   --dry-run                    Preview changes
@@ -140,6 +142,9 @@ export function printCommandHelp(command: string): void {
     console.log('Usage: kyro scope list | inspect <scope> | set-active <scope> | complete --kyro-scope <scope> [--summary <text>] [--yes] | reopen --kyro-scope <scope> --reason <reason> [--yes] | retire --kyro-scope <scope> --reason <reason> [--digest <sha256> --yes]');
   } else if (command === 'sync') {
     console.log('Usage: kyro sync [--agent standard|opencode|codex] [--prune] [--dry-run]');
+  } else if (command === 'update') {
+    console.log('Usage: kyro update [--check] [--dry-run] [--yes] [--verbose]');
+    console.log('Checks the registry for the latest kyro-ai release, updates the global package when behind, and refreshes the runtime + current workspace from the fresh package. Prompts before changing anything unless --yes.');
   } else if (command === 'uninstall') {
     console.log('Usage: kyro uninstall [--purge-adapter-assets] [--dry-run] [--yes]');
   } else {

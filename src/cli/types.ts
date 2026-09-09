@@ -759,6 +759,7 @@ export interface CliOptions {
   evalTags: string[];
   evalList: boolean;
   keepSandbox: boolean;
+  check: boolean;
 }
 
 export type ContextPackMode = 'scope' | 'task';

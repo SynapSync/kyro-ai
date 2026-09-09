@@ -2,6 +2,7 @@ import { doctor } from './commands/doctor';
 import { analyze } from './commands/analyze';
 import { detect } from './commands/detect';
 import { install, sync } from './commands/install';
+import { runUpdate } from './commands/update';
 import { runTui } from './commands/tui';
 import { runRepairCommand } from './commands/repair';
 import { runRecertifyCommand } from './commands/recertify';
@@ -177,6 +178,9 @@ export async function runCli(): Promise<void> {
       break;
     case 'sync':
       sync(options);
+      break;
+    case 'update':
+      await runUpdate(options);
       break;
     case 'uninstall':
       uninstall(options);

@@ -439,6 +439,35 @@ If an old manifest lists shared config, sync reports it under `Shared config pre
 
 `--prune` is different from `kyro uninstall --purge-adapter-assets`. Prune cleans adapter-file drift by comparing old manifests against the current install plan. Purge removes adapter entrypoint files during uninstall for adapters recorded in the installed project state. Neither mode removes shared user config.
 
+## Update (`kyro update`)
+
+One command replaces the old two-step upgrade (`npx kyro-ai install` plus `npm i -g kyro-ai`).
+Run it from the project root:
+
+```bash
+kyro update
+```
+
+It reads the running CLI version and the installed runtime version, asks the registry for the
+latest release, and picks a lane by install mode: a durable global `kyro` on PATH updates via
+`npm install -g kyro-ai@<exact>`; npx-only setups refresh via `npx -y kyro-ai@<exact> …` (exact
+pin, never a floating tag). It then re-runs `sync` (or runtime-only `install` when this
+directory has no workspace state) from the fresh package — never continuing in the old process.
+When the CLI is already current but the installed runtime is older, it refreshes the runtime
+locally with no download.
+
+Behavior notes:
+
+- `kyro update` asks for confirmation before changing anything; `--yes` skips the prompt
+  (required outside interactive terminals), `--dry-run` previews the steps, and
+  `kyro update --check` only reports the status.
+- The registry query fails soft when offline: `--check` reports the status as unknown, and a
+  real run retries against the `@latest` tag so npm itself reports any network error.
+- It works from the projected runtime CLI too (the check needs no full package); only the
+  stale-runtime refresh from this package requires the full npm layout.
+- `update` is operator surface like `install` and `sync`: it is not a tool-owned verb, so the
+  capability handshake is untouched and agents never self-update mid-sprint.
+
 ## Claude Plugin Support
 
 The Claude plugin adapter remains first-class through `.claude-plugin/`. The CLI does not replace it; it complements Kyro's adapter story for agents that need workspace-installed commands, skills, root `AGENTS.md` managed blocks, and core assets.
@@ -745,7 +774,7 @@ that leaves an immutable record of itself.
 | Runtime | Operations | Repairs |
 | --- | --- | --- |
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
-| **4.44.0 and later** (current: **4.48.3**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+| **4.44.0 and later** (current: **4.49.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract
