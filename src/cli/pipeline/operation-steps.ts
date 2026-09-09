@@ -75,7 +75,7 @@ class OperationStep implements Step {
     if (this.operation.action !== 'mkdir' && this.operation.action !== 'rmdir-if-empty') {
       assertNotRetiredSprintOverwrite(target);
     }
-    this.snapshot = snapshotTarget(target);
+    this.snapshot = snapshotIfNeeded(this.operation, target);
     assertStateWriterLeaseHealthy();
     applyOperation(this.operation, target, this.context);
   }
@@ -148,6 +148,44 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
       writeFileSync(target, removeJsonPathContent(existing, operation.jsonPath), 'utf-8');
     }
   }
+}
+
+/**
+ * HARN-01 (R1): skip the recursive directory backup only for operations that
+ * provably do not mutate the target. Any ambiguous or unreadable state keeps
+ * the snapshot (conservative: never trade rollback for savings on doubt).
+ * Mutating operations always snapshot, so rollback (R2) is unchanged; skipped
+ * steps leave `snapshot` null and `rollback()` is a no-op for them.
+ */
+function operationNeedsSnapshot(operation: OperationPlan, target: string): boolean {
+  if (operation.action === 'mkdir') {
+    // `mkdir -p` over an existing directory is a proven no-op.
+    // Missing targets, files, symlinks, or unreadable state stay conservative.
+    try {
+      return !lstatSync(target).isDirectory();
+    } catch {
+      return true;
+    }
+  }
+  if (operation.action === 'rmdir-if-empty') {
+    // Only an existing *empty* directory will actually be removed.
+    try {
+      if (!lstatSync(target).isDirectory()) return false;
+    } catch {
+      return true;
+    }
+    try {
+      return readdirSync(target).length === 0;
+    } catch {
+      return true;
+    }
+  }
+  return true;
+}
+
+function snapshotIfNeeded(operation: OperationPlan, target: string): TargetSnapshot | null {
+  if (!operationNeedsSnapshot(operation, target)) return null;
+  return snapshotTarget(target);
 }
 
 function snapshotTarget(target: string): TargetSnapshot {

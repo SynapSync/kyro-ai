@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 4,
+  "scope": "harn-01-snapshots-backups-pipeline",
+  "title": "Snapshots específicos y limpieza de backups del pipeline",
+  "status": "planning",
+  "objective": "Eliminar copias recursivas innecesarias y temporales residuales del pipeline sin debilitar el rollback de operaciones que sí mutan.",
+  "successCriteria": [
+    "Las operaciones sin efecto sobre directorios existentes no realizan copias recursivas y preservan el target.",
+    "Toda ejecución confirmada o revertida limpiamente deja cero backups temporales creados por su plan.",
+    "Un rollback preserva contenido, tipo, modo y destino de enlaces para los targets cubiertos.",
+    "La instalación repetida se valida con métricas comparativas de tiempo, bytes copiados y backups residuales."
+  ],
+  "spec": {
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "Las operaciones de pipeline que se determinan sin efecto no deben crear snapshots de directorios.",
+        "priority": "must",
+        "rationale": "Evita copias recursivas proporcionales al contenido para mkdir y rmdir-if-empty que no mutan; la política debe decidir conservadoramente ante duda."
+      },
+      {
+        "id": "R2",
+        "statement": "Las operaciones que pueden mutar deben conservar información suficiente para restaurar el estado previo durante rollback.",
+        "priority": "must",
+        "rationale": "Preserva el contrato actual de rollback para ausencias, ficheros, directorios, symlinks y permisos."
+      },
+      {
+        "id": "R3",
+        "statement": "Los backups temporales creados por un plan deben retenerse hasta la confirmación total y limpiarse tras éxito o rollback limpio.",
+        "priority": "must",
+        "rationale": "Evita perder recuperabilidad antes del final de la transacción y elimina acumulación silenciosa en tmp."
+      },
+      {
+        "id": "R4",
+        "statement": "Un fallo al crear un snapshot debe propagar el error sin mutar el target ni ocultar evidencia necesaria para diagnóstico.",
+        "priority": "must",
+        "rationale": "Previene que un fallo de tmp o copia se convierta en corrupción o éxito silencioso."
+      },
+      {
+        "id": "R5",
+        "statement": "El scope debe producir evidencia comparativa de instalación repetida que incluya tiempo, bytes copiados y backups residuales antes y después.",
+        "priority": "should",
+        "rationale": "El mecanismo está confirmado, pero el ahorro cuantitativo no se debe prometer sin medición reproducible."
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "S1",
+        "requirement": "R1",
+        "given": "un plan contiene mkdir para un directorio existente con contenido",
+        "when": "el pipeline prepara y aplica ese paso",
+        "then": "el directorio queda intacto y no se crea una copia recursiva de backup"
+      },
+      {
+        "id": "S2",
+        "requirement": "R2",
+        "given": "un plan contiene operaciones mutadoras sobre targets missing, fichero, directorio o symlink",
+        "when": "un paso posterior falla y se ejecuta rollback",
+        "then": "el estado previo del target se restaura con contenido, tipo, modo y destino de enlace aplicables"
+      }
+    ],
+    "nonGoals": [
+      "Cambiar la publicación atómica del estado de proyecto o cualquier trabajo HARN-02 a HARN-07.",
+      "Cambiar la estrategia de concurrencia, locks o paralelismo.",
+      "Cambiar la semántica visible de operaciones fuera de snapshots y limpieza.",
+      "Prometer un ahorro cuantitativo antes de medirlo."
+    ],
+    "openQuestions": []
+  },
+  "clarifications": [],
+  "conventions": [],
+  "adrs": [],
+  "roadmap": {
+    "plannedSprintCount": 2,
+    "sizingRationale": "Dos sprints separan riesgos y verificación: el primero establece la línea base y cambia la política de snapshot, que puede afectar rollback por tipo de target; el segundo introduce la limpieza de ciclo de vida y valida fallos, rollback e instalación repetida. No se divide más porque ambos cambios viven en el mismo pipeline y comparten la misma matriz de regresión.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "snapshot-policy",
+        "title": "Política de snapshots específicos",
+        "state": "closed"
+      },
+      {
+        "n": 2,
+        "slug": "backup-cleanup-validation",
+        "title": "Limpieza y validación de backups",
+        "state": "planned"
+      }
+    ]
+  },
+  "ledger": [
+    {
+      "n": 1,
+      "slug": "snapshot-policy",
+      "outcome": "shipped",
+      "closedAt": "2026-09-09",
+      "archive": "archive/sprint-001-snapshot-policy.md",
+      "snapshot": "archive/sprint-001-snapshot-policy.json",
+      "checkpoint": "archive/sprint-001-snapshot-policy.checkpoint.json",
+      "recommendations": [
+        "Sprint 2: implementar limpieza global diferida de temporales residuales con evidencia comparativa tiempo/bytes/backups antes-despues (R5).",
+        "Medir ahorro cuantitativo reproducible de instalacion repetida antes de prometerlo (spec R5 should)."
+      ],
+      "checkpointSha256": "9f7eac145ba6109dc13994acc629c06dd3a1e005626d5adffb6c9004539aa76e"
+    }
+  ],
+  "previousSprint": {
+    "n": 1,
+    "slug": "snapshot-policy",
+    "outcome": "shipped",
+    "summary": "Sprint 1 snapshot-policy shipped: no-op mkdir/rmdir sin copia recursiva, rollback 6/6 preservado, gate 0/0/0, QA APPROVED WITH NOTES."
+  },
+  "activeSprint": null,
+  "debt": [],
+  "handoff": {
+    "nextAction": "plan_sprint",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "Sprint 1 cerrado tras QA APPROVED WITH NOTES y aprobacion explicita de cierre del usuario. Sprint 2 no planificado en este turno; ver archive/sprint-001-snapshot-policy.md para handoff.",
+    "lastUpdated": "2026-09-09"
+  },
+  "author": {
+    "name": "Roimer Peraza",
+    "email": "joisephdev@gmail.com",
+    "source": "git",
+    "capturedAt": "2026-09-09T22:45:46.931Z"
+  }
+}

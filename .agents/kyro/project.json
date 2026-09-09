@@ -41,6 +41,11 @@
       "id": "adaptive-sprint-lifecycle",
       "title": "Adaptive sprint lifecycle",
       "status": "planning"
+    },
+    {
+      "id": "harn-01-snapshots-backups-pipeline",
+      "title": "Snapshots específicos y limpieza de backups del pipeline",
+      "status": "planning"
     }
   ],
   "conventions": [
