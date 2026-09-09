@@ -154,7 +154,7 @@ assert(JSON.stringify(splitInvocation('node "~/a b/c.js" --x')) === JSON.stringi
 {
   const winBare = resolveInvocationSpawn('kyro', 'win32');
   assert(winBare.command === process.execPath, `win32 bare kyro must map to process.execPath, got ${winBare.command}`);
-  assert(winBare.args.length === 1 && winBare.args[0].endsWith('/dist/cli.js'), `win32 bare kyro must map to projected cli.js, got ${winBare.args.join(' ')}`);
+  assert(winBare.args.length === 1 && /[/\\]dist[/\\]cli\.js$/.test(winBare.args[0]), `win32 bare kyro must map to projected cli.js, got ${winBare.args.join(' ')}`);
   assert(winBare.fallbackUsed === true, 'win32 bare kyro must flag fallbackUsed');
 }
 {
@@ -168,8 +168,10 @@ assert(JSON.stringify(splitInvocation('node "~/a b/c.js" --x')) === JSON.stringi
   assert(nodeForm.args.length === 1 && nodeForm.fallbackUsed === false, 'node form args/fallback');
 }
 {
-  // Live smoke: the node form must self-spawn on this machine (proves exec wrapper works).
-  const out = execKyroInvocationSync('node ~/.agents/kyro/current/dist/cli.js', ['--version'], { encoding: 'utf8', timeout: 5000 });
+  // Live smoke: the node form must self-spawn (proves exec wrapper works). Uses the repo's own
+  // dist/cli.js — hermetic on fresh machines/CI where no global runtime is installed yet.
+  const repoCli = resolve(repo, 'dist/cli.js');
+  const out = execKyroInvocationSync(`node "${repoCli}"`, ['--version'], { encoding: 'utf8', timeout: 5000 });
   assert(typeof out === 'string' && /\d+\.\d+\.\d+/.test(out.trim()), `node-form self-spawn must print a version, got ${JSON.stringify(out)}`);
 }
 
