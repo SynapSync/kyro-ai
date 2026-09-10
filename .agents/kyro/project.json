@@ -45,7 +45,14 @@
     {
       "id": "harn-01-snapshots-backups-pipeline",
       "title": "Snapshots específicos y limpieza de backups del pipeline",
-      "status": "planning"
+      "status": "completed",
+      "completion": {
+        "completedAt": "2026-09-10T00:46:20.480Z",
+        "by": "maker",
+        "summary": "2/2 sprints shipped; R1-R5 covered (no-op directory snapshots, rollback matrix, backup confirm/dispose, snapshot-create fail-closed, comparative metrics without claimed savings); QA APPROVED WITH NOTES; doctor and analyze clean; no debt.",
+        "requestDigest": "c34fc1cb9ae7e309253553a63a04b41e38b84c6c155079de37ca9cb26db26745",
+        "beforeEntryDigest": "4516d0f4bd9bdc2854f11cb287f64d76c277c9c4bfef2c76d1c574491e1915f6"
+      }
     }
   ],
   "conventions": [

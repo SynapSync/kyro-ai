@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.49.1] - 2026-09-10
+
+### Fixed
+
+- **Pipeline skips snapshots for no-op directory operations and disposes backups on confirm.** `mkdir` over an existing directory and non-acting `rmdir-if-empty` no longer create recursive `kyro-pipeline-*` backups; mutating operations keep rollback for missing, file, directory, symlink, permission-mode, rmdir-acting and mkdir-new cases. `PipelineOrchestrator` now confirms registered backup roots after total success or clean rollback and retains them as diagnostic evidence when rollback itself fails. Snapshot creation failures (`mkdtemp`/`cpSync`) clean partial backups and fail closed before mutating the target. Adds `check:operation-snapshots` (S1/S1b/S2/S3/S4/S5/S6) to `npm run check` with reproducible time, bytes-copied and residual metrics and no claimed savings.
+
 ## [4.49.0] - 2026-09-09
 
 ### Added

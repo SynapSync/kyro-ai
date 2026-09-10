@@ -1,15 +1,24 @@
 #!/usr/bin/env node
-// HARN-01 Sprint 1 (T1.1 baseline + T1.2 policy gate): snapshot/backup coverage.
+// HARN-01 snapshot/backup coverage (Sprint 1 R1/R2 + Sprint 2 T2.1 lifecycle gates).
 //
 // Exercises the public pipeline (applyOperationPlan from dist) and:
 //   S1  (R1): `mkdir` over an existing directory with content must leave the
 //         target byte-identical AND create no recursive backup (strict gate).
 //   S1b (R1): `rmdir-if-empty` that does not act (missing / non-empty dir /
 //         file target) must create no backup; the acting case (empty dir)
-//         keeps its snapshot so rollback still works.
+//         still snapshots during the transaction then disposes on confirm.
 //   S2  (R2): mutating operations keep rollback for missing, file, directory,
 //         symlink, permission-mode, rmdir-acting and mkdir-new cases: a
 //         failing tail step triggers rollback and the pre-state is restored.
+//   S3  (R3): a successful plan that creates a directory backup must leave
+//         zero `kyro-pipeline-*` residuals of that plan after confirm.
+//   S4  (R3): clean rollback disposes that plan's directory backups; a rollback
+//         that fails mid-way must keep remaining backups as diagnostic evidence.
+//   S5  (R4): snapshot create failure (mkdtemp) must propagate, leave the
+//         target unchanged, and fail closed before apply (must not report
+//         "rollback completed" when nothing was mutated).
+//   S6  (R5): print a COMPARATIVE line (time, bytes copied, residuals) versus
+//         the Sprint 1 baseline without claiming a quantitative savings.
 // Detection uses two independent signals:
 //      a) instrumented fs.cpSync / fs.mkdtempSync call + byte counting, with a
 //         positive-control probe proving the detector is sensitive;
@@ -19,8 +28,8 @@
 //
 // Modes (default is strict since the T1.2 policy landed):
 //   - default / --strict: exit 1 if any no-op scenario creates a recursive
-//     copy or residual backup. This is the `npm run check:operation-snapshots`
-//     integration mode.
+//     copy or residual backup, OR if the S3–S5 lifecycle gates fail. This is
+//     the `npm run check:operation-snapshots` integration mode.
 //   - --baseline: record metrics and exit 0 even when backups are observed
 //     (pre-policy recording mode kept for comparison runs).
 import { createRequire } from 'node:module';
@@ -70,6 +79,10 @@ const realMkdtempSync = fs.mkdtempSync;
 let copyCalls = 0;
 let copiedBytes = 0;
 let mkdtempPipelineCalls = 0;
+const createdPipelineTemps = [];
+// Test-only interceptors: S4 fails a later restore copy; S5 fails snapshot mkdtemp.
+let failCpSyncIf = null;
+let failMkdtempIf = null;
 
 function dirBytes(root) {
   let total = 0;
@@ -102,6 +115,7 @@ function resetCounters() {
   copyCalls = 0;
   copiedBytes = 0;
   mkdtempPipelineCalls = 0;
+  createdPipelineTemps.length = 0;
 }
 
 fs.cpSync = function countedCpSync(src, dest, options) {
@@ -113,12 +127,21 @@ fs.cpSync = function countedCpSync(src, dest, options) {
       /* best-effort accounting only */
     }
   }
+  if (failCpSyncIf && failCpSyncIf(src, dest)) {
+    throw new Error(`simulated copy failure dest=${dest}`);
+  }
   return realCpSync(src, dest, options);
 };
 
 fs.mkdtempSync = function countedMkdtempSync(prefix, options) {
+  if (failMkdtempIf && failMkdtempIf(prefix)) {
+    throw new Error('ENOSPC: no space left on device (simulated mkdtemp)');
+  }
   const created = realMkdtempSync(prefix, options);
-  if (String(prefix).includes('kyro-pipeline-')) mkdtempPipelineCalls += 1;
+  if (String(prefix).includes('kyro-pipeline-')) {
+    mkdtempPipelineCalls += 1;
+    createdPipelineTemps.push(created);
+  }
   return created;
 };
 
@@ -201,6 +224,22 @@ let totalBytesCopied = 0;
 let totalMkdtemp = 0;
 // Gate aggregates: every no-op scenario (S1 + S1b non-acting) must stay at zero.
 const gate = { copyCalls: 0, mkdtemp: 0, residuals: 0 };
+// Sprint 2 lifecycle gates (S3–S5): success-path and clean-rollback residuals
+// must be 0; failed rollback must keep remaining directory backups; snapshot
+// create failure must fail closed before apply.
+const lifecycle = {
+  s3Residuals: -1,
+  s3ElapsedMs: 0,
+  s3CopyCalls: 0,
+  s3BytesCopied: 0,
+  s4CleanResiduals: -1,
+  s4FailedRemaining: -1,
+  s4FailedExpected: 2,
+  s5Threw: false,
+  s5TargetIntact: false,
+  s5FailClosed: false,
+  s6Printed: false,
+};
 const tempsBeforeAll = listPipelineTemps();
 const tidyTemps = [];
 
@@ -210,6 +249,14 @@ function snapTemps() {
 
 function diffTemps(before) {
   return listPipelineTemps().filter((name) => !before.has(name));
+}
+
+function planResidualPaths() {
+  return createdPipelineTemps.filter((path) => existsSync(path));
+}
+
+function planResidualNames() {
+  return planResidualPaths().map((path) => path.split(/[/\\]/).pop());
 }
 
 function tidy(names) {
@@ -231,7 +278,7 @@ function runNoopScenario(label, plan, verify) {
   applyOperationPlan(plan, context);
   const elapsedMs = Date.now() - startedAt;
   verify();
-  const newTemps = diffTemps(tempsBefore);
+  const newTemps = planResidualNames();
   gate.copyCalls += copyCalls;
   gate.mkdtemp += mkdtempPipelineCalls;
   gate.residuals += newTemps.length;
@@ -239,7 +286,7 @@ function runNoopScenario(label, plan, verify) {
   totalCopyCalls += copyCalls;
   totalBytesCopied += copiedBytes;
   totalMkdtemp += mkdtempPipelineCalls;
-  tidyTemps.push(...newTemps);
+  tidyTemps.push(...newTemps, ...diffTemps(tempsBefore));
   console.log(
     `${label}: targetIntact=true elapsedMs=${elapsedMs} copyCalls=${copyCalls} ` +
       `bytesCopied=${copiedBytes} mkdtempPipeline=${mkdtempPipelineCalls} ` +
@@ -296,19 +343,18 @@ try {
     assert(readFileSync(fileTarget, 'utf-8') === 'file-content\n', 'S1b file: content altered');
   });
 
-  // --- S1b acting case: empty dir IS removed and keeps its snapshot (R2) ---
+  // --- S1b acting case: empty dir is removed; snapshot is taken then disposed on confirm ---
   {
     const emptyDir = join(s1b, 'empty');
     mkdirSync(emptyDir, { recursive: true });
-    const tempsBefore = snapTemps();
     resetCounters();
     applyOperationPlan([{ action: 'rmdir-if-empty', path: emptyDir }], context);
-    const newTemps = diffTemps(tempsBefore);
+    const newTemps = planResidualNames();
     assert(!existsSync(emptyDir), 'S1b acting: empty dir must be removed');
-    assert(copyCalls === 1 && mkdtempPipelineCalls === 1, 'S1b acting: mutating op must keep its snapshot ' +
+    assert(copyCalls === 1 && mkdtempPipelineCalls === 1, 'S1b acting: mutating op must snapshot during the transaction ' +
       `(copyCalls=${copyCalls}, mkdtemp=${mkdtempPipelineCalls})`);
-    assert(newTemps.length === 1, 'S1b acting: snapshot backup must be retained for the transaction');
-    console.log(`S1b acting: removed=true snapshotKept=true copyCalls=1 bytesCopied=${copiedBytes} newResiduals=1`);
+    assert(newTemps.length === 0, 'S1b acting: successful apply must dispose the plan backup (want 0 residuals)');
+    console.log(`S1b acting: removed=true snapshotTaken=true disposed=true copyCalls=1 bytesCopied=${copiedBytes} newResiduals=0`);
     tidyTemps.push(...newTemps);
   }
 
@@ -325,7 +371,7 @@ try {
     resetCounters();
     expectPlanThrow('S2 missing', [{ action: 'write', path: created, content: 'hello' }, FAIL_TAIL(dir)]);
     assert(!existsSync(created), 'S2 missing: created file must vanish on rollback');
-    assert(diffTemps(tempsBefore).length === 0, 'S2 missing: no residual backup expected');
+    assert(planResidualNames().length === 0, 'S2 missing: no residual backup expected');
     console.log('S2 missing: restored=true (absent)');
   }
   { // file + permission mode
@@ -339,7 +385,7 @@ try {
     expectPlanThrow('S2 file', [{ action: 'write', path: target, content: 'MUTATED' }, FAIL_TAIL(dir)]);
     assert(readFileSync(target, 'utf-8') === 'orig-content', 'S2 file: content not restored');
     assert((statSync(target).mode & 0o777) === 0o600, 'S2 file: permission mode not restored');
-    assert(diffTemps(tempsBefore).length === 0, 'S2 file: no residual backup expected');
+    assert(planResidualNames().length === 0, 'S2 file: no residual backup expected');
     console.log('S2 file: restored=true content+mode(0600)');
   }
   { // directory with content removed then restored
@@ -354,7 +400,7 @@ try {
     expectPlanThrow('S2 directory', [{ action: 'remove', path: victim }, FAIL_TAIL(dir)]);
     assert(existsSync(victim), 'S2 directory: removed dir must be restored');
     assert(sameInventory(beforeInv, inventory(victim)), 'S2 directory: content not restored');
-    assert(diffTemps(tempsBefore).length === 0, 'S2 directory: rollback must clean its own backup');
+    assert(planResidualNames().length === 0, 'S2 directory: rollback must clean its own backup');
     console.log(`S2 directory: restored=true snapshotBytes=${copiedBytes}`);
   }
   { // symlink removed then restored with the same destination
@@ -370,7 +416,7 @@ try {
     expectPlanThrow('S2 symlink', [{ action: 'remove', path: link }, FAIL_TAIL(dir)]);
     assert(lstatSync(link).isSymbolicLink(), 'S2 symlink: link must be restored as a symlink');
     assert(readlinkSync(link) === destBefore, 'S2 symlink: destination changed');
-    assert(diffTemps(tempsBefore).length === 0, 'S2 symlink: no residual backup expected');
+    assert(planResidualNames().length === 0, 'S2 symlink: no residual backup expected');
     console.log('S2 symlink: restored=true destination preserved');
   }
   { // rmdir-if-empty acting rollback: empty dir comes back
@@ -382,7 +428,7 @@ try {
     expectPlanThrow('S2 rmdir-acting', [{ action: 'rmdir-if-empty', path: victim }, FAIL_TAIL(dir)]);
     assert(existsSync(victim) && lstatSync(victim).isDirectory(), 'S2 rmdir-acting: dir must be restored');
     assert(readdirSync(victim).length === 0, 'S2 rmdir-acting: restored dir must be empty');
-    assert(diffTemps(tempsBefore).length === 0, 'S2 rmdir-acting: rollback must clean its own backup');
+    assert(planResidualNames().length === 0, 'S2 rmdir-acting: rollback must clean its own backup');
     console.log('S2 rmdir-acting: restored=true (empty dir)');
   }
   { // mkdir-new rollback: created dir vanishes
@@ -393,8 +439,119 @@ try {
     resetCounters();
     expectPlanThrow('S2 mkdir-new', [{ action: 'mkdir', path: created }, FAIL_TAIL(dir)]);
     assert(!existsSync(created), 'S2 mkdir-new: created dir must vanish on rollback');
-    assert(diffTemps(tempsBefore).length === 0, 'S2 mkdir-new: no residual backup expected');
+    assert(planResidualNames().length === 0, 'S2 mkdir-new: no residual backup expected');
     console.log('S2 mkdir-new: restored=true (absent)');
+  }
+
+  // --- S3 (R3): successful plan that creates a directory backup must leave 0 residuals ---
+  {
+    console.log('SCENARIO S3: successful directory-mutating plan must leave 0 kyro-pipeline-* residuals');
+    const dir = join(sandbox, 's3');
+    const victim = join(dir, 'victim');
+    mkdirSync(join(victim, 'nested'), { recursive: true });
+    writeFileSync(join(victim, 'payload.txt'), `${'payload\n'.repeat(50)}`, 'utf-8');
+    writeFileSync(join(victim, 'nested', 'leaf.txt'), 'leaf\n', 'utf-8');
+    resetCounters();
+    const startedAt = Date.now();
+    applyOperationPlan([{ action: 'remove', path: victim }], context);
+    const elapsedMs = Date.now() - startedAt;
+    assert(!existsSync(victim), 'S3: victim directory must be removed on success');
+    const newTemps = planResidualNames();
+    lifecycle.s3Residuals = newTemps.length;
+    lifecycle.s3ElapsedMs = elapsedMs;
+    lifecycle.s3CopyCalls = copyCalls;
+    lifecycle.s3BytesCopied = copiedBytes;
+    tidyTemps.push(...newTemps);
+    console.log(
+      `S3 success: removed=true elapsedMs=${elapsedMs} copyCalls=${copyCalls} ` +
+        `bytesCopied=${copiedBytes} mkdtempPipeline=${mkdtempPipelineCalls} ` +
+        `newResiduals=${newTemps.length} (want 0)`,
+    );
+  }
+
+  // --- S4 (R3): clean rollback disposes backups; failed rollback keeps remaining ---
+  {
+    console.log('SCENARIO S4: clean rollback disposes backups; failed rollback keeps remaining as evidence');
+    const cleanDir = join(sandbox, 's4-clean');
+    const victim = join(cleanDir, 'victim');
+    mkdirSync(join(victim, 'nested'), { recursive: true });
+    writeFileSync(join(victim, 'a.txt'), 'aaa', 'utf-8');
+    writeFileSync(join(victim, 'nested', 'b.txt'), 'bbb', 'utf-8');
+    const beforeInv = inventory(victim);
+    resetCounters();
+    expectPlanThrow('S4 clean-rollback', [{ action: 'remove', path: victim }, FAIL_TAIL(cleanDir)]);
+    assert(existsSync(victim), 'S4 clean-rollback: removed dir must be restored');
+    assert(sameInventory(beforeInv, inventory(victim)), 'S4 clean-rollback: content not restored');
+    const cleanTemps = planResidualNames();
+    lifecycle.s4CleanResiduals = cleanTemps.length;
+    tidyTemps.push(...cleanTemps);
+    console.log(`S4 clean-rollback: restored=true newResiduals=${cleanTemps.length} (want 0)`);
+
+    const failDir = join(sandbox, 's4-failed');
+    const dirA = join(failDir, 'later-restore-a');
+    const dirB = join(failDir, 'first-restore-b');
+    mkdirSync(join(dirA, 'nested'), { recursive: true });
+    writeFileSync(join(dirA, 'a.txt'), 'aaa', 'utf-8');
+    mkdirSync(join(dirB, 'nested'), { recursive: true });
+    writeFileSync(join(dirB, 'b.txt'), 'bbb', 'utf-8');
+    resetCounters();
+    failCpSyncIf = (_src, dest) => resolve(String(dest)) === resolve(dirA);
+    let failedRollbackThrew = false;
+    try {
+      applyOperationPlan(
+        [{ action: 'remove', path: dirA }, { action: 'remove', path: dirB }, FAIL_TAIL(failDir)],
+        context,
+      );
+    } catch (error) {
+      failedRollbackThrew = true;
+      console.log(`S4 failed-rollback: plan failed as designed (${error.message.slice(0, 120)})`);
+    } finally {
+      failCpSyncIf = null;
+    }
+    assert(failedRollbackThrew, 'S4 failed-rollback: expected apply+rollback failure');
+    assert(existsSync(dirB), 'S4 failed-rollback: first restore (dirB) should have succeeded');
+    const remaining = planResidualNames();
+    lifecycle.s4FailedRemaining = remaining.length;
+    tidyTemps.push(...remaining);
+    console.log(
+      `S4 failed-rollback: remaining=${remaining.length} (want ${lifecycle.s4FailedExpected} directory backups as evidence)`,
+    );
+  }
+
+  // --- S5 (R4): snapshot create failure must fail closed without mutating the target ---
+  {
+    console.log('SCENARIO S5: snapshot create failure propagates; target unchanged; fail-closed');
+    const dir = join(sandbox, 's5');
+    const victim = join(dir, 'victim');
+    mkdirSync(join(victim, 'nested'), { recursive: true });
+    writeFileSync(join(victim, 'keep.txt'), 'must-survive\n', 'utf-8');
+    const beforeInv = inventory(victim);
+    resetCounters();
+    failMkdtempIf = (prefix) => String(prefix).includes('kyro-pipeline-');
+    let threw = false;
+    let errorMessage = '';
+    try {
+      applyOperationPlan([{ action: 'remove', path: victim }], context);
+    } catch (error) {
+      threw = true;
+      errorMessage = error.message;
+      console.log(`S5 snapshot-create: plan failed as designed (${errorMessage.slice(0, 160)})`);
+    } finally {
+      failMkdtempIf = null;
+    }
+    const intact = existsSync(victim) && sameInventory(beforeInv, inventory(victim));
+    const failClosed = threw && intact && !/rollback completed/i.test(errorMessage);
+    lifecycle.s5Threw = threw;
+    lifecycle.s5TargetIntact = intact;
+    lifecycle.s5FailClosed = failClosed;
+    const newTemps = planResidualNames();
+    tidyTemps.push(...newTemps);
+    console.log(
+      `S5 snapshot-create: threw=${threw} targetIntact=${intact} failClosed=${failClosed} ` +
+        `newResiduals=${newTemps.length} (failClosed wants threw+intact and no "rollback completed")`,
+    );
+    assert(threw, 'S5: snapshot create failure must propagate (must not report success)');
+    assert(intact, 'S5: target must be unchanged after snapshot create failure');
   }
 } finally {
   rmSync(sandbox, { recursive: true, force: true });
@@ -420,8 +577,46 @@ const baseline = {
 };
 console.log(`BASELINE_JSON ${JSON.stringify(baseline)}`);
 
-// Tidy the transaction-retained backups this run created for acting steps
-// (Sprint 2 owns the real confirmation-time cleanup; counts above are evidence).
+// S6 (R5): comparative metrics vs Sprint 1 — record only, never claim savings.
+const SPRINT1_BASELINE = {
+  source: 'sprint-001-snapshot-policy',
+  scenario: 'S1 mkdir-noop + S1b rmdir-noops + S2 rollback-matrix',
+  repeats: 3,
+  gateNoopCopyCalls: 0,
+  gateNoopMkdtemp: 0,
+  gateNoopResiduals: 0,
+  documentedNoopBytesCopied: 0,
+  rollbackCases: 6,
+  successPathResiduals: 1,
+};
+const comparative = {
+  versus: SPRINT1_BASELINE.source,
+  sprint1: SPRINT1_BASELINE,
+  current: {
+    repeats: REPEATS,
+    totalElapsedMs,
+    totalCopyCalls,
+    totalBytesCopied,
+    gateNoopCopyCalls: gate.copyCalls,
+    gateNoopMkdtemp: gate.mkdtemp,
+    gateNoopResiduals: gate.residuals,
+    s3SuccessResiduals: lifecycle.s3Residuals,
+    s3ElapsedMs: lifecycle.s3ElapsedMs,
+    s3CopyCalls: lifecycle.s3CopyCalls,
+    s3BytesCopied: lifecycle.s3BytesCopied,
+    s4CleanResiduals: lifecycle.s4CleanResiduals,
+    s4FailedRemaining: lifecycle.s4FailedRemaining,
+    s5FailClosed: lifecycle.s5FailClosed,
+    residualsBefore: tempsBeforeAll.length,
+    residualsAfter: tempsAfterAll.length,
+  },
+  claimedSavings: false,
+};
+console.log(`COMPARATIVE ${JSON.stringify(comparative)}`);
+lifecycle.s6Printed = true;
+
+// Tidy any leftovers this run still owns (failed-rollback evidence, incomplete
+// snapshot attempts). Successful plans and clean rollbacks should already be 0.
 tidy(tidyTemps);
 
 if (STRICT && (gate.copyCalls > 0 || gate.mkdtemp > 0 || gate.residuals > 0)) {
@@ -432,8 +627,26 @@ if (STRICT && (gate.copyCalls > 0 || gate.mkdtemp > 0 || gate.residuals > 0)) {
   process.exit(1);
 }
 
-if (!STRICT && (gate.copyCalls > 0 || gate.residuals > 0)) {
+const lifecycleFailed =
+  lifecycle.s3Residuals !== 0 ||
+  lifecycle.s4CleanResiduals !== 0 ||
+  lifecycle.s4FailedRemaining < lifecycle.s4FailedExpected ||
+  !lifecycle.s5FailClosed ||
+  !lifecycle.s6Printed;
+
+if (STRICT && lifecycleFailed) {
+  console.error(
+    `LIFECYCLE_GATE_FAILED s3Residuals=${lifecycle.s3Residuals} (want 0) ` +
+      `s4CleanResiduals=${lifecycle.s4CleanResiduals} (want 0) ` +
+      `s4FailedRemaining=${lifecycle.s4FailedRemaining} (want >=${lifecycle.s4FailedExpected}) ` +
+      `s5FailClosed=${lifecycle.s5FailClosed} s6Printed=${lifecycle.s6Printed}: ` +
+      `success-path leak, failed-rollback evidence, or snapshot fail-closed gap`,
+  );
+  process.exit(1);
+}
+
+if (!STRICT && (gate.copyCalls > 0 || gate.residuals > 0 || lifecycleFailed)) {
   console.log('RESULT: BASELINE_RECORDED (backups observed; strict gate off via --baseline)');
 } else {
-  console.log('RESULT: PASS (no recursive backup for no-ops; rollback preserved for mutations)');
+  console.log('RESULT: PASS (no recursive backup for no-ops; rollback preserved; lifecycle gates green)');
 }

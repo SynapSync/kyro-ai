@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "scope": "harn-01-snapshots-backups-pipeline",
   "title": "Snapshots específicos y limpieza de backups del pipeline",
-  "status": "planning",
+  "status": "completed",
   "objective": "Eliminar copias recursivas innecesarias y temporales residuales del pipeline sin debilitar el rollback de operaciones que sí mutan.",
   "successCriteria": [
     "Las operaciones sin efecto sobre directorios existentes no realizan copias recursivas y preservan el target.",
@@ -57,6 +57,34 @@
         "given": "un plan contiene operaciones mutadoras sobre targets missing, fichero, directorio o symlink",
         "when": "un paso posterior falla y se ejecuta rollback",
         "then": "el estado previo del target se restaura con contenido, tipo, modo y destino de enlace aplicables"
+      },
+      {
+        "id": "S3",
+        "requirement": "R3",
+        "given": "un plan crea backups temporales de directorio kyro-pipeline-* y todas las operaciones aplican con éxito",
+        "when": "el orquestador confirma la transacción",
+        "then": "no quedan residuales kyro-pipeline-* creados por ese plan en tmpdir"
+      },
+      {
+        "id": "S4",
+        "requirement": "R3",
+        "given": "un plan crea backups de directorio y un paso posterior falla",
+        "when": "el rollback del plan termina de forma limpia, o el rollback mismo falla a mitad",
+        "then": "si el rollback es limpio se disponen los backups de ese plan; si el rollback falla se conservan los backups restantes como evidencia de diagnóstico"
+      },
+      {
+        "id": "S5",
+        "requirement": "R4",
+        "given": "la creación del snapshot de un target existente falla (mkdtemp o copia)",
+        "when": "el paso intenta prepararse y aplicarse",
+        "then": "el error se propaga, el target no se muta y no se reporta éxito"
+      },
+      {
+        "id": "S6",
+        "requirement": "R5",
+        "given": "existe la línea base de Sprint 1 de tiempo, bytes copiados y residuales para un plan o instalación repetida representativa",
+        "when": "la comprobación de snapshots se ejecuta tras la limpieza de ciclo de vida",
+        "then": "se registra una comparación reproducible de esas métricas sin afirmar un ahorro que no esté en la medición"
       }
     ],
     "nonGoals": [
@@ -84,7 +112,7 @@
         "n": 2,
         "slug": "backup-cleanup-validation",
         "title": "Limpieza y validación de backups",
-        "state": "planned"
+        "state": "closed"
       }
     ]
   },
@@ -102,27 +130,48 @@
         "Medir ahorro cuantitativo reproducible de instalacion repetida antes de prometerlo (spec R5 should)."
       ],
       "checkpointSha256": "9f7eac145ba6109dc13994acc629c06dd3a1e005626d5adffb6c9004539aa76e"
+    },
+    {
+      "n": 2,
+      "slug": "backup-cleanup-validation",
+      "outcome": "shipped",
+      "closedAt": "2026-09-10",
+      "archive": "archive/sprint-002-backup-cleanup-validation.md",
+      "snapshot": "archive/sprint-002-backup-cleanup-validation.json",
+      "checkpoint": "archive/sprint-002-backup-cleanup-validation.checkpoint.json",
+      "recommendations": [
+        "Roadmap 2/2 is exhausted — do not plan Sprint 3; ask whether to complete the scope.",
+        "Optional follow-up only: inject a dedicated cpSync failure in S5, and surface failed dispose from confirm() instead of swallowing it."
+      ],
+      "checkpointSha256": "e2cf0f8a89bcd1e6315befd08462507a55712262ca81b3363c7c8d0910cc057b"
     }
   ],
   "previousSprint": {
-    "n": 1,
-    "slug": "snapshot-policy",
+    "n": 2,
+    "slug": "backup-cleanup-validation",
     "outcome": "shipped",
-    "summary": "Sprint 1 snapshot-policy shipped: no-op mkdir/rmdir sin copia recursiva, rollback 6/6 preservado, gate 0/0/0, QA APPROVED WITH NOTES."
+    "summary": "Sprint 2 backup-cleanup-validation shipped: retain-until-confirm and dispose registered plan roots; S3 residuals=0, S4 clean=0/failed remaining=2, S5 failClosed=true; COMPARATIVE claimedSavings=false; QA APPROVED WITH NOTES."
   },
   "activeSprint": null,
   "debt": [],
   "handoff": {
-    "nextAction": "plan_sprint",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
-    "note": "Sprint 1 cerrado tras QA APPROVED WITH NOTES y aprobacion explicita de cierre del usuario. Sprint 2 no planificado en este turno; ver archive/sprint-001-snapshot-policy.md para handoff.",
-    "lastUpdated": "2026-09-09"
+    "note": "Scope explicitly completed: 2/2 sprints shipped; R1-R5 covered (no-op directory snapshots, rollback matrix, backup confirm/dispose, snapshot-create fail-closed, comparative metrics without claimed savings); QA APPROVED WITH NOTES; doctor and analyze clean; no debt.",
+    "lastUpdated": "2026-09-10"
   },
   "author": {
     "name": "Roimer Peraza",
     "email": "joisephdev@gmail.com",
     "source": "git",
     "capturedAt": "2026-09-09T22:45:46.931Z"
+  },
+  "completion": {
+    "completedAt": "2026-09-10T00:46:20.480Z",
+    "by": "maker",
+    "summary": "2/2 sprints shipped; R1-R5 covered (no-op directory snapshots, rollback matrix, backup confirm/dispose, snapshot-create fail-closed, comparative metrics without claimed savings); QA APPROVED WITH NOTES; doctor and analyze clean; no debt.",
+    "requestDigest": "c34fc1cb9ae7e309253553a63a04b41e38b84c6c155079de37ca9cb26db26745",
+    "beforeEntryDigest": "4516d0f4bd9bdc2854f11cb287f64d76c277c9c4bfef2c76d1c574491e1915f6"
   }
 }
