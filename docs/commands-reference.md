@@ -84,6 +84,8 @@ already terminal -> stop (done)
 inconsistent     -> recover.md
 ```
 
+`review_task` validates one task's evidence and acceptance criteria; it is the route for a task-level QA request. `qa_or_close` appears only after every task has passed review and offers optional independent `kyro qa <scope>` certification for the complete scope. QA is resolved by the host command/skill, not as a `{{KYRO_CLI}} qa` subcommand. Whether QA is approved or the user chooses to skip it, the agent must still obtain explicit human approval before invoking `close-sprint`.
+
 Gates still apply at orchestrator-defined checkpoints, but the command file does not duplicate the full lifecycle.
 
 ### Gate Options
