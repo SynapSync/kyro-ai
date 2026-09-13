@@ -46,7 +46,7 @@ The resulting artifact can seed `/kyro:forge` or serve directly as an implementa
 
 ## /kyro:forge
 
-**Full sprint cycle: Analyze, Plan, Implement, Review, Close.**
+**Full sprint cycle: Analyze, Plan, Implement, Review, choose QA or Close, then Close.**
 
 ### Syntax
 
@@ -77,6 +77,7 @@ no roadmap       -> INIT.md
 plan_sprint      -> plan-sprint.md
 pending tasks    -> execute-task.md
 validation       -> review-task.md
+all tasks pass   -> qa-or-close.md (`kyro qa` or close without QA)
 closeout         -> close-sprint.md
 roadmap exhausted -> ask: complete or expand
 already terminal -> stop (done)

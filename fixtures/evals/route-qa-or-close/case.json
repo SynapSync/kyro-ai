@@ -1,0 +1,40 @@
+{
+  "evalCaseSchemaVersion": 1,
+  "id": "route-qa-or-close",
+  "title": "Route QA or close decision",
+  "kind": "replay",
+  "tags": [
+    "routing",
+    "qa_or_close"
+  ],
+  "agents": [
+    "any"
+  ],
+  "scope": "demo",
+  "steps": [
+    {
+      "run": [
+        "doctor",
+        "--artifacts",
+        "--kyro-scope",
+        "demo"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutIncludes": [
+          "[PASS]"
+        ]
+      }
+    }
+  ],
+  "expectFinalState": false,
+  "route": {
+    "nextAction": "qa_or_close",
+    "expectedModes": [
+      "SPRINT.md",
+      "qa-or-close.md"
+    ],
+    "expectedBudgetClass": "close",
+    "expectedReasoningTier": "deep"
+  }
+}

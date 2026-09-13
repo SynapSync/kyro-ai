@@ -61,11 +61,16 @@ function initOnlyScope(root, scope = 'no-sprint-scope') {
   assert(result.status === 0, `init-only bootstrap should succeed: ${result.stdout}${result.stderr}`);
 }
 
-// 1) Happy path: add-emergent lands E1 in emergentTasks[], schema-valid, and the full maker/checker
-//    lifecycle (record-evidence -> review --verdict pass) accepts it like any other task.
+// 1) Happy path: add-emergent lands E1 in emergentTasks[], routes a sprint that was ready for
+//    QA/close back to execution, and the full maker/checker lifecycle accepts it like any other task.
 {
   const root = sandbox();
   try {
+    const initialEvidence = run(['record-evidence', 'T1.1', '--kyro-scope', 'demo', '--summary', 'Implemented demo.', '--validation', 'npm test'], root);
+    assert(initialEvidence.status === 0, `fixture evidence setup should succeed: ${initialEvidence.stdout}${initialEvidence.stderr}`);
+    const initialReview = run(['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+    assert(initialReview.status === 0, `fixture review setup should succeed: ${initialReview.stdout}${initialReview.stderr}`);
+    assert(readSprint(root).handoff.nextAction === 'qa_or_close', 'fixture should be ready for QA or close before adding emergent work');
     const before = readFileSync(sprintPath(root), 'utf-8');
     const add = run(['add-emergent', '--kyro-scope', 'demo', '--title', 'Add missing migration', '--description', 'The schema change needs a migration.', '--acceptance', 'Migration runs clean.'], root);
     assert(add.status === 0, `add-emergent should succeed: ${add.stdout}${add.stderr}`);
@@ -83,6 +88,9 @@ function initOnlyScope(root, scope = 'no-sprint-scope') {
     assert(Array.isArray(task.depends_on) && task.depends_on.length === 0, 'depends_on should default to []');
     assert(Array.isArray(task.files_to_touch) && task.files_to_touch.length === 0, 'files_to_touch should default to []');
     assert(task.context === '', 'context should default to empty string');
+    assert(sprint.handoff.nextAction === 'execute_task', `add-emergent should route to execute_task, got ${sprint.handoff.nextAction}`);
+    assert(sprint.handoff.nextTaskId === 'E1', `add-emergent should select E1, got ${sprint.handoff.nextTaskId}`);
+    assert(sprint.handoff.note.includes('Emergent task E1'), 'add-emergent should explain the new execution handoff');
 
     const validate = run(['doctor', '--artifacts', '--kyro-scope', 'demo'], root);
     assert(validate.status === 0, `doctor --artifacts should pass after add-emergent: ${validate.stdout}${validate.stderr}`);
@@ -91,7 +99,9 @@ function initOnlyScope(root, scope = 'no-sprint-scope') {
     assert(rec.status === 0, `record-evidence on emergent task should succeed: ${rec.stdout}${rec.stderr}`);
     const review = run(['review', 'E1', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
     assert(review.status === 0, `review on emergent task should accept a pass without --yes: ${review.stdout}${review.stderr}`);
-    assert(readSprint(root).activeSprint.emergentTasks[0].verdict.result === 'pass', 'emergent task verdict should be pass');
+    const reviewed = readSprint(root);
+    assert(reviewed.activeSprint.emergentTasks[0].verdict.result === 'pass', 'emergent task verdict should be pass');
+    assert(reviewed.handoff.nextAction === 'qa_or_close', `final emergent pass should return to qa_or_close, got ${reviewed.handoff.nextAction}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -203,6 +203,7 @@ export type NextAction =
   | 'await_scope_completion'
   | 'execute_task'
   | 'review_task'
+  | 'qa_or_close'
   | 'close_sprint'
   | 'done';
 

@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- (none)
+
+## [4.49.2] - 2026-09-12
+
+### Added
+
+- **Optional post-task QA-or-close routing.** A final passing task review now routes Forge to `qa_or_close`, where the user may invoke the existing read-only `kyro qa <scope>` command/skill or close without QA. Blocking QA findings return to ordinary task execution through failed task reviews or emergent tasks, with mandatory re-QA inside the active session.
+
+### Fixed
+
+- **Emergent tasks now restore executable routing.** `kyro add-emergent` updates the handoff to `execute_task` and selects the next executable task, preventing QA remediation added at the close boundary from leaving the router pointed at close.
+
 ## [4.49.1] - 2026-09-10
 
 ### Fixed

@@ -26,7 +26,7 @@ Kyro preserves quality by loading the smallest contract needed for the current l
 7. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack: `nextAction`, `nextTaskId`, `reviewPending`, conventions, budget). Do not open full `sprint.json` to route. No `sprint.json` → INIT.
 8. Load `skills/sprint-forge/SKILL.md`, then the single mode named by the pack's `nextAction`.
 
-Open the full `sprint.json` only when `plan_sprint`/`close_sprint`/status-full needs its planning or reporting context (see SKILL.md Read Path Contract). Agents never open it in order to write it.
+Open the full `sprint.json` only when `plan_sprint`/`qa_or_close`/`close_sprint`/status-full needs its planning or reporting context (see SKILL.md Read Path Contract). Agents never open it in order to write it.
 
 ## Routed Loading (route on `handoff.nextAction`)
 
@@ -38,6 +38,7 @@ Open the full `sprint.json` only when `plan_sprint`/`close_sprint`/status-full n
 | `await_scope_completion` | Ask: complete the finished scope, or explicitly expand it. Complete → `scope complete`; expand → then route as `plan_sprint`. |
 | `execute_task` | `assets/modes/SPRINT.md` + `assets/modes/execute-task.md` |
 | `review_task` | `assets/modes/SPRINT.md` + `assets/modes/review-task.md` |
+| `qa_or_close` | `assets/modes/SPRINT.md` + `assets/modes/qa-or-close.md` |
 | `close_sprint` | `assets/modes/SPRINT.md` + `assets/modes/close-sprint.md` |
 | `done` | Stop — already complete or retired. No work mode. |
 | inconsistent state | `assets/modes/SPRINT.md` + `assets/modes/recover.md` |

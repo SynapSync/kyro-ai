@@ -91,7 +91,7 @@ function assertHappyPathTraceAndCloseGate() {
     const sprint = readSprint(root);
     const task = sprint.activeSprint.phases[0].tasks[0];
     assert(task.verdict.result === 'pass' && task.verdict.by === 'checker', 'review command should write pass verdict');
-    assert(sprint.handoff.nextAction === 'close_sprint', 'review should advance to close_sprint when all tasks passed');
+    assert(sprint.handoff.nextAction === 'qa_or_close', 'review should advance to qa_or_close when all tasks passed');
     const trace = readFileSync(join(root, '.agents/kyro/trace/demo/events.ndjson'), 'utf-8');
     assert(trace.includes('gate_approved') && trace.includes('checker'), 'review pass should emit gate_approved checker trace');
 

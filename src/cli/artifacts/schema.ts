@@ -21,7 +21,7 @@ export const KYRO_SCOPE_STATUS = KYRO_SCOPE_ENTRY_STATUS;
 export type KyroScopeStatus = (typeof KYRO_SCOPE_STATUS)[keyof typeof KYRO_SCOPE_STATUS];
 
 export const SCOPE_STATUS_VALUES = Object.values(KYRO_SCOPE_STATUS);
-export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'await_scope_completion', 'execute_task', 'review_task', 'close_sprint', 'done'] as const;
+export const NEXT_ACTION_VALUES = ['init', 'clarify', 'plan_sprint', 'await_scope_completion', 'execute_task', 'review_task', 'qa_or_close', 'close_sprint', 'done'] as const;
 export const TASK_STATUS_VALUES = ['pending', 'in_progress', 'done', 'blocked'] as const;
 export const TASK_DISPOSITION_KIND_VALUES = Object.values(TASK_DISPOSITION_KIND);
 export const TASK_DISPOSITION_TARGET_KIND_VALUES = Object.values(TASK_DISPOSITION_TARGET_KIND);

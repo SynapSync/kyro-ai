@@ -330,7 +330,7 @@ function withReviewedTask(sprint: SprintFile, located: LocatedTask, verdict: Tas
     activeSprint: nextActive,
     handoff: {
       ...sprint.handoff,
-      nextAction: verdict.result === 'fail' ? 'execute_task' : allDonePass ? 'close_sprint' : 'execute_task',
+      nextAction: verdict.result === 'fail' ? 'execute_task' : allDonePass ? 'qa_or_close' : 'execute_task',
       nextTaskId: verdict.result === 'fail' ? task.id : nextExecutable,
       note: verdict.result === 'pass' ? `Task ${task.id} passed checker review.` : `Task ${task.id} failed checker review and returned to execution.`,
       lastUpdated: reviewedAt,

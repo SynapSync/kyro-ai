@@ -49,6 +49,9 @@ const INVOCATION_PATTERNS = [
   /\{\{KYRO_CLI\}\}\s+([a-z][a-z_-]*)/g,
   /(?<![\w/.:-])kyro\s+([a-z][a-z_-]*)/g,
 ];
+// Bare `kyro <name>` agent commands/skills that hosts resolve outside the TypeScript CLI. The
+// templated `{{KYRO_CLI}} <name>` form is still rejected unless the line explicitly negates it.
+const AGENT_COMMANDS = new Set(['qa']);
 // Words that follow "kyro" in prose without being a verb.
 const NOT_A_VERB = new Set(['is', 'and', 'or', 'the', 'to', 'a', 'an', 'in', 'on', 'as', 'for', 'with', 'workflows', 'install', 'owns', 'artifacts', 'runtime', 'state', 'scope', 'scopes', 'doctor', 'plugin', 'lens', 'ai']);
 
@@ -75,6 +78,7 @@ for (const root of roots) {
       for (const match of text.matchAll(pattern)) {
         const verb = match[1];
         if (realVerbs.has(verb) || NOT_A_VERB.has(verb)) continue;
+        if (AGENT_COMMANDS.has(verb) && !match[0].startsWith('{{KYRO_CLI}}')) continue;
         if (NEGATION_CUE.test(lineContaining(text, match.index))) continue;
         // Underscored words are never verbs (they are nextAction values like execute_task) — the
         // exact shape both field incidents invented, so call it out explicitly.

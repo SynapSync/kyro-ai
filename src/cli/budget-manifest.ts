@@ -26,7 +26,7 @@ export function loadBudgetManifest(): BudgetManifest {
 }
 
 export function selectBudgetClass(packMode: ContextPackMode, nextAction: string | null): BudgetClassId {
-  if (nextAction === 'close_sprint') return 'close';
+  if (nextAction === 'qa_or_close' || nextAction === 'close_sprint') return 'close';
   if (nextAction === 'review_task') return 'review';
   if (packMode === 'task' || nextAction === 'execute_task') return 'execute';
   if (nextAction === 'plan_sprint' || nextAction === 'await_scope_completion' || nextAction === 'status' || nextAction === 'done') return 'brief';

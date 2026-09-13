@@ -18,7 +18,7 @@ Captures the mental context a fresh session needs to resume — hypotheses, deci
 }
 ```
 
-- `nextAction`: the route (`init | clarify | plan_sprint | await_scope_completion | execute_task | review_task | close_sprint | done`).
+- `nextAction`: the route (`init | clarify | plan_sprint | await_scope_completion | execute_task | review_task | qa_or_close | close_sprint | done`).
 - `nextTaskId`: the task to resume, or `null`.
 - `blockers`: concrete things preventing progress.
 - `note`: free-text mental context — active hypotheses, pending decisions, where work was left. This is the resume prompt; keep it specific and current.

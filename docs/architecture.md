@@ -25,7 +25,7 @@ Commands are the user-facing interface. Each command is defined as a markdown fi
 
 | Command | Primary Agent | Purpose |
 |---------|--------------|---------|
-| `/kyro:forge` | orchestrator | Full cycle: Analyze, Plan, Implement, Review, Close |
+| `/kyro:forge` | orchestrator | Full cycle: Analyze, Plan, Implement, Review, choose optional `kyro qa` or Close, then Close |
 | `/kyro:status` | orchestrator | Read-only project progress and debt summary |
 | `/kyro:task-context` | orchestrator | Read-only prompt generation for a fresh agent context |
 | `/kyro:idea` | direct skill | Optional evidence-grounded pre-scope planning |
@@ -107,7 +107,7 @@ ORCHESTRATOR
 4. **Planning** - Orchestrator materializes the objective, roadmap, and active sprint into `sprint.json` via `kyro plan --from` (tool-owned; init and sprint modes).
 5. **Gate 2** - User approves the plan.
 6. **Implementation** - Orchestrator executes tasks, then records evidence and the checker verdict through tool-owned verbs (`kyro record-evidence`, `kyro review`) rather than hand-editing `sprint.json`.
-7. **Gate 3** - User approves implementation.
+7. **QA-or-close decision** - After every task passes, the user may run the existing read-only `kyro qa <scope>` command/skill or close without QA. A failed QA result returns corrections to the task lifecycle and requires same-session re-QA.
 8. **Review and Close** - Orchestrator records debt changes with `kyro debt`, runs retro, and closes the sprint with `kyro close-sprint` — writing a verbatim snapshot plus a human narrative to `archive/`.
 
 ---

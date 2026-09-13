@@ -20,7 +20,7 @@
 
 Kyro is a **sprint harness** for AI coding agents. Install once, every agent uses the same source of truth:
 
-- **Shared sprint cycle** — all agents follow init → plan → execute → review → close (gates enforced in code)
+- **Shared sprint cycle** — all agents follow init → plan → execute → review → QA-or-close → close (gates enforced in code)
 - **One scope file** — `.agents/kyro/scopes/{scope}/sprint.json` is the single source of truth
 - **CLI-owned state** — schema and gates run every time; agents can't invent enums or hand-edit
 - **Team-safe by default** — commit `project.json` + scopes; each dev has personal `local.json`
@@ -93,6 +93,7 @@ PLAN      sprint tasks
 ─ gate ─  proceed / adjust / cancel?
 EXECUTE   evidence via CLI (not hand JSON)
 REVIEW    checker verdict via CLI
+QA/CLOSE  choose `kyro qa` or close without QA
 CLOSE     lossless checkpoint + ledger
 
 state ›  .agents/kyro/scopes/oauth2-auth/sprint.json
@@ -189,7 +190,7 @@ Thin routers over scope state — they load only what the current step needs.
 
 | Command / skill | Role |
 | --------------- | ---- |
-| `/kyro:forge` · `kyro-forge` | Full cycle: analyze → plan → execute → review → close a sprint or complete a finished scope |
+| `/kyro:forge` · `kyro-forge` | Full cycle: analyze → plan → execute → review → choose `kyro qa` or close → close a sprint or complete a finished scope |
 | `/kyro:status` · `kyro-status` | Progress, roadmap, debt (`brief` / `full` / `debt`) |
 | `/kyro:idea` · `kyro-idea` | Optional pre-scope: mature an idea into an execution-ready brief |
 | `/kyro:qa` · `kyro-qa` | Independent certification audit (not the forge review gate) |
@@ -228,7 +229,7 @@ nothing else, so it cannot repair a record-level legacy shape: a debt that carri
 *and* legacy-only keys like `detail`/`resolution`/`addedSprint` *and* missing canonical fields.
 **4.44.0 and later** adds `debt.canonicalize` (remediation protocol v3), which repairs the whole
 record at once, emits exactly the seven canonical keys `id, title, origin, priority, status,
-targetSprint, note`, and names the legacy keys it retires. The current release, **4.49.0**, carries
+targetSprint, note`, and names the legacy keys it retires. The current release, **4.49.2**, carries
 that operation unchanged.
 
 Nothing is migrated for you. Installing a newer Kyro never rewrites an existing scope, and Doctor
@@ -248,7 +249,7 @@ Full workflow, expected failure boundaries and the certification evidence table:
 ```text
 read project state (project.json + local.json) + scopes/{scope}/sprint.json (prefer context-pack)
   → route on handoff.nextAction
-    (init → clarify → plan_sprint → execute_task → review_task → close_sprint → done | recover)
+    (init → clarify → plan_sprint → execute_task → review_task → qa_or_close → close_sprint → done | recover)
   → load only that mode/helper
   → one tool-owned write
 ```

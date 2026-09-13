@@ -11,7 +11,8 @@ import { join, resolve } from 'node:path';
 // 2. Source-side: every source skills/** and agents/** markdown file must contain the
 //    placeholder token where it used to hold a literal CLI invocation, and must NOT contain a
 //    bare literal `kyro <subcommand>` invocation (regression guard against a new mode file
-//    shipping raw `kyro close-sprint` instead of `{{KYRO_CLI}} close-sprint`).
+//    shipping raw `kyro close-sprint` instead of `{{KYRO_CLI}} close-sprint`). The intentionally
+//    host-resolved agent command `kyro qa` is not a CLI invocation and is exempt.
 
 const repo = resolve(new URL('..', import.meta.url).pathname);
 const require = createRequire(import.meta.url);
@@ -21,6 +22,7 @@ const PLACEHOLDER = '{{KYRO_CLI}}';
 // requires whitespace after `kyro` so it does not match `kyro.json`, `kyro-forge`, or `/kyro:*`
 // slash-command references, which are correctly excluded from the substitution surface.
 const BARE_INVOCATION_PATTERN = /(?<![\w/.:-])kyro[ \t]+[a-z][a-z-]*/;
+const HOST_AGENT_COMMAND_PATTERN = /(?<![\w/.:-])kyro[ \t]+qa\b/g;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -115,7 +117,8 @@ for (const root of sourceRoots) {
     if (!file.endsWith('.md')) continue;
     const text = readFileSync(file, 'utf-8');
     if (text.includes(PLACEHOLDER)) placeholderFilesFound += 1;
-    const bareMatch = text.match(BARE_INVOCATION_PATTERN);
+    const cliInvocationText = text.replace(HOST_AGENT_COMMAND_PATTERN, 'HOST_QA_COMMAND');
+    const bareMatch = cliInvocationText.match(BARE_INVOCATION_PATTERN);
     assert(
       !bareMatch,
       `check-no-placeholder: source file has a bare literal CLI invocation "${bareMatch?.[0]}" — use {{KYRO_CLI}} instead: ${file}`,
