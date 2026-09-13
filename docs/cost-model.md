@@ -61,7 +61,7 @@ Conventions and technical debt are tracked as fields on `sprint.json`, not as se
 - `plan_sprint` or `status` → `brief`
 - task pack or `execute_task` → `execute`
 - `review_task` → `review`
-- `close_sprint` → `close`
+- `qa_or_close` or `close_sprint` → `close`
 - `done` → `brief` (terminal; emitted only by retirement)
 
 The selected class appears in context-pack output as `budgetClass`, `reasoningTier`, `maxContextTokens`, and `budgetGuidance`.

@@ -23,6 +23,7 @@ export const ROUTING_TABLE = {
   await_scope_completion: { modes: [] },
   execute_task: { modes: ['SPRINT.md', 'execute-task.md'] },
   review_task: { modes: ['SPRINT.md', 'review-task.md'] },
+  qa_or_close: { modes: ['SPRINT.md', 'qa-or-close.md'] },
   close_sprint: { modes: ['SPRINT.md', 'close-sprint.md'] },
   /** Terminal: scope complete — no work mode to load. */
   done: { modes: [] },

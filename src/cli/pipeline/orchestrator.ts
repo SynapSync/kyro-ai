@@ -16,14 +16,19 @@ export class PipelineOrchestrator {
 
     const apply = this.runStage('apply', plan.apply);
     const result: PipelineResult = { prepare, apply };
-    if (apply.success) return result;
+    if (apply.success) {
+      this.confirm([...plan.prepare, ...plan.apply]);
+      return result;
+    }
 
     result.error = apply.error;
     const rollback = this.rollback(apply.steps, stepById);
     result.rollback = rollback;
     if (!rollback.success) {
       result.error = new Error(`Apply failed: ${apply.error?.message}. Rollback also failed: ${rollback.error?.message}`);
+      return result;
     }
+    this.confirm([...plan.prepare, ...plan.apply]);
     return result;
   }
 
@@ -78,6 +83,10 @@ export class PipelineOrchestrator {
       }
     }
     return { stage: 'rollback', success: true, steps };
+  }
+
+  private confirm(steps: Step[]): void {
+    for (const step of steps) step.confirm?.();
   }
 
   private validatePlan(plan: StagePlan): void {

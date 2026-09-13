@@ -3,7 +3,7 @@ name: kyro-sprint-executor
 description: >
   Manual-only. Strict end-to-end Kyro sprint execution: capability handshake,
   per-task context-pack → implement → validate → record-evidence → review,
-  fail-closed on missing CLI verbs, user-approved sprint close. Invoke
+  fail-closed on missing CLI verbs, optional Kyro QA, and user-approved sprint close. Invoke
   explicitly when executing a Kyro sprint outside the full forge workflow.
 license: Apache-2.0
 metadata:
@@ -34,7 +34,9 @@ Run `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` and obey `nextAction
 | `execute_task` | Step 2 (task loop) |
 | `review_task` | Step 2, stage 5 (review the pending task) |
 | `clarify` | STOP — resolve every `[NEEDS CLARIFICATION: <gap>]` with the user first; `record-evidence`/`review` refuse while markers remain (`CLARIFICATION_REQUIRED`) |
-| `plan_sprint` / `close_sprint` | See Sprint close below for `close_sprint`; planning is not this skill's job — report and stop |
+| `plan_sprint` | Planning is not this skill's job — report and stop |
+| `qa_or_close` | See QA or close below; QA is optional, and closing still requires user approval |
+| `close_sprint` | See Sprint close below |
 | `done` | Scope complete — report and stop |
 
 Never infer routing from file presence. Never open the full `sprint.json` to route.
@@ -72,9 +74,18 @@ When the user asks to register, save, or remember a rule **with Kyro**, interpre
 
 Never create `RULES.md`, `rules.md`, or another rule artifact. If `rule` is missing from `capabilities`, abort and request a runtime upgrade; never hand-edit Kyro state.
 
+## QA or close
+
+When routing reports `qa_or_close`:
+
+1. Verify completeness with `{{KYRO_CLI}} status full --kyro-scope <scope>` and `{{KYRO_CLI}} analyze --kyro-scope <scope>`.
+2. Ask whether to run QA or close without QA. Both initial choices are valid.
+3. QA selected: invoke the installed command/skill `kyro qa <scope>` through the host — it is not a verb for the resolved CLI binary — and follow `sprint-forge/assets/modes/qa-or-close.md` for verdict handling, emergent work, and mandatory same-session re-QA after a failure.
+4. Close selected: continue to Sprint close below without recording an omission.
+
 ## Sprint close (USER GATE)
 
-When routing reports `close_sprint`:
+When routing reports `close_sprint`, or QA-or-close has selected the close path:
 
 1. Verify completeness with `{{KYRO_CLI}} status full --kyro-scope <scope>`: no pending tasks, no missing evidence or verdicts, no unresolved critical findings.
 2. **Ask the user for explicit approval.** Closing a sprint is a lifecycle gate — never proceed past it on your own.

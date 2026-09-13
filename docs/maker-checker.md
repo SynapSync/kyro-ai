@@ -85,6 +85,8 @@ kyro review T1.1 --kyro-scope demo --verdict fail --finding critical:"Missing te
 
 `review_task` defaults to `tool_owned`: the deterministic checker (coverage, evidence, self-review, principle vetoes) is the gate, and per-task review is reversible, so a pass does not need `--yes`. A project that wants a human confirmation on every review can set `review_task` to `confirm` in `policy.json`, after which CLI review needs `--yes` (the flag above is always safe to pass either way).
 
+When every phase and emergent task reaches `done` + `pass`, `kyro review` routes to `qa_or_close`, not directly to close. Forge then asks whether to invoke the existing read-only `kyro qa <scope>` command/skill or close without QA. A failed QA report materializes corrections through `review fail` or `add-emergent`; it does not write a second kind of task verdict.
+
 ## Separate checker policy
 
 ```json

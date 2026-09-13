@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- (none)
+
+## [4.49.2] - 2026-09-12
+
+### Added
+
+- **Optional post-task QA-or-close routing.** A final passing task review now routes Forge to `qa_or_close`, where the user may invoke the existing read-only `kyro qa <scope>` command/skill or close without QA. Blocking QA findings return to ordinary task execution through failed task reviews or emergent tasks, with mandatory re-QA inside the active session.
+
+### Fixed
+
+- **Emergent tasks now restore executable routing.** `kyro add-emergent` updates the handoff to `execute_task` and selects the next executable task, preventing QA remediation added at the close boundary from leaving the router pointed at close.
+
+## [4.49.1] - 2026-09-10
+
+### Fixed
+
+- **Pipeline skips snapshots for no-op directory operations and disposes backups on confirm.** `mkdir` over an existing directory and non-acting `rmdir-if-empty` no longer create recursive `kyro-pipeline-*` backups; mutating operations keep rollback for missing, file, directory, symlink, permission-mode, rmdir-acting and mkdir-new cases. `PipelineOrchestrator` now confirms registered backup roots after total success or clean rollback and retains them as diagnostic evidence when rollback itself fails. Snapshot creation failures (`mkdtemp`/`cpSync`) clean partial backups and fail closed before mutating the target. Adds `check:operation-snapshots` (S1/S1b/S2/S3/S4/S5/S6) to `npm run check` with reproducible time, bytes-copied and residual metrics and no claimed savings.
+
 ## [4.49.0] - 2026-09-09
 
 ### Added

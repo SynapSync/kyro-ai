@@ -2,7 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { deriveActiveSprintStatus } from '../core/status';
+import { deriveActiveSprintStatus, nextExecutableTaskId } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
@@ -95,7 +95,17 @@ function withAddedEmergentTask(sprint: SprintFile, task: Task): SprintFile {
   const nextActive = JSON.parse(JSON.stringify(active)) as typeof active;
   nextActive.emergentTasks.push(task);
   nextActive.status = deriveActiveSprintStatus(nextActive);
-  return { ...sprint, activeSprint: nextActive };
+  return {
+    ...sprint,
+    activeSprint: nextActive,
+    handoff: {
+      ...sprint.handoff,
+      nextAction: 'execute_task',
+      nextTaskId: nextExecutableTaskId(nextActive),
+      note: `Emergent task ${task.id} was added and routed to execution.`,
+      lastUpdated: new Date().toISOString(),
+    },
+  };
 }
 
 function collectAllTaskIds(active: ActiveSprint): Set<string> {

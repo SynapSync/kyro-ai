@@ -9,7 +9,7 @@
   "steps": [
     {
       "run": ["review", "T1.1", "--kyro-scope", "demo", "--verdict", "pass", "--yes"],
-      "expect": { "exitCode": 0, "stdoutIncludes": ["Task T1.1 reviewed as pass", "Next action: close_sprint"] }
+      "expect": { "exitCode": 0, "stdoutIncludes": ["Task T1.1 reviewed as pass", "Next action: qa_or_close"] }
     },
     {
       "run": ["analyze", "--kyro-scope", "demo"],

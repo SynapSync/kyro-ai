@@ -16,6 +16,8 @@ export interface Step {
   readonly description: string;
   run(): void;
   rollback?(): void;
+  /** Dispose backups registered by this step after total success or clean rollback. */
+  confirm?(): void;
 }
 
 export interface StagePlan {

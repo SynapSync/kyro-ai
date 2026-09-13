@@ -24,6 +24,7 @@ flowchart TB
   ROUTE -->|plan_sprint| PLAN["plan_sprint<br/>sprint + tasks"]
   ROUTE -->|execute_task| EXEC["execute_task<br/>implementar task"]
   ROUTE -->|review_task| REV["review_task<br/>veredicto"]
+  ROUTE -->|qa_or_close| QAC["qa_or_close<br/>kyro qa o cerrar"]
   ROUTE -->|close_sprint| CLOSE["close_sprint<br/>checkpoint + ledger"]
   ROUTE -->|done| DONE["Scope completo"]
 
@@ -33,7 +34,10 @@ flowchart TB
   EXEC --> REV
   REV -->|pass + más tasks| EXEC
   REV -->|fail| EXEC
-  REV -->|sprint completo| CLOSE
+  REV -->|sprint completo| QAC
+  QAC -->|cerrar sin QA| CLOSE
+  QAC -->|QA aprobado| CLOSE
+  QAC -->|QA falla: corrección emergente| EXEC
   CLOSE -->|más sprints| PLAN
   CLOSE -->|roadmap done| DONE
 
@@ -178,7 +182,9 @@ flowchart TB
   OUT -->|fail| BACK["handoff → execute_task<br/>misma o rework"]
 
   NEXT -->|sí| START2(["nextTaskId = T1.2<br/>loop"])
-  NEXT -->|no| CLOSE(["close_sprint"])
+  NEXT -->|no| QAC(["qa_or_close<br/>kyro qa o cerrar"])
+  QAC -->|cerrar o QA aprobado| CLOSE(["close_sprint"])
+  QAC -->|QA falla| BACK
   BACK --> START
 ```
 

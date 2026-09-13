@@ -38,6 +38,7 @@ Continue Kyro work without loading the whole workflow upfront.
 | `nextAction: "await_scope_completion"` | Ask: complete the finished scope, or explicitly expand it. Complete → `scope complete`; expand → then route as `plan_sprint`. |
 | `nextAction: "execute_task"` | `skills/sprint-forge/assets/modes/execute-task.md` |
 | `nextAction: "review_task"` | `skills/sprint-forge/assets/modes/review-task.md` |
+| `nextAction: "qa_or_close"` | `skills/sprint-forge/assets/modes/qa-or-close.md` |
 | `nextAction: "close_sprint"` | `skills/sprint-forge/assets/modes/close-sprint.md` |
 | `nextAction: "done"` | Stop — already complete or retired. No mode. |
 | `sprint.json` missing/unparseable or inconsistent | `skills/sprint-forge/assets/modes/recover.md` |

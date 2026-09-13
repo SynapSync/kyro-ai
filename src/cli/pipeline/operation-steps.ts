@@ -55,10 +55,23 @@ export function operationPlanToStagePlan(plan: OperationPlan[], context: Operati
   };
 }
 
+class SnapshotCreateError extends Error {
+  readonly target: string;
+  override readonly cause: Error;
+
+  constructor(target: string, cause: Error) {
+    super(`Snapshot create failed for ${target}: ${cause.message}`);
+    this.name = 'SnapshotCreateError';
+    this.target = target;
+    this.cause = cause;
+  }
+}
+
 class OperationStep implements Step {
   readonly id: string;
   readonly description: string;
   private snapshot: TargetSnapshot | null = null;
+  private backupRoots: string[] = [];
 
   constructor(
     index: number,
@@ -75,7 +88,8 @@ class OperationStep implements Step {
     if (this.operation.action !== 'mkdir' && this.operation.action !== 'rmdir-if-empty') {
       assertNotRetiredSprintOverwrite(target);
     }
-    this.snapshot = snapshotTarget(target);
+    this.snapshot = snapshotIfNeeded(this.operation, target);
+    this.registerDirectoryBackup(this.snapshot);
     assertStateWriterLeaseHealthy();
     applyOperation(this.operation, target, this.context);
   }
@@ -84,6 +98,22 @@ class OperationStep implements Step {
     if (!this.snapshot) return;
     assertStateWriterLeaseHealthy();
     restoreTarget(this.context.resolveManagedPath(this.operation.path), this.snapshot);
+  }
+
+  confirm(): void {
+    for (const root of this.backupRoots) {
+      try {
+        assertStateWriterLeaseHealthy();
+        rmSync(root, { recursive: true, force: true });
+      } catch {
+        /* best-effort dispose; a leftover remains diagnostic */
+      }
+    }
+    this.backupRoots = [];
+  }
+
+  private registerDirectoryBackup(snapshot: TargetSnapshot | null): void {
+    if (snapshot?.kind === 'directory') this.backupRoots.push(dirname(snapshot.backupPath));
   }
 }
 
@@ -150,6 +180,44 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
   }
 }
 
+/**
+ * HARN-01 (R1): skip the recursive directory backup only for operations that
+ * provably do not mutate the target. Any ambiguous or unreadable state keeps
+ * the snapshot (conservative: never trade rollback for savings on doubt).
+ * Mutating operations always snapshot, so rollback (R2) is unchanged; skipped
+ * steps leave `snapshot` null and `rollback()` is a no-op for them.
+ */
+function operationNeedsSnapshot(operation: OperationPlan, target: string): boolean {
+  if (operation.action === 'mkdir') {
+    // `mkdir -p` over an existing directory is a proven no-op.
+    // Missing targets, files, symlinks, or unreadable state stay conservative.
+    try {
+      return !lstatSync(target).isDirectory();
+    } catch {
+      return true;
+    }
+  }
+  if (operation.action === 'rmdir-if-empty') {
+    // Only an existing *empty* directory will actually be removed.
+    try {
+      if (!lstatSync(target).isDirectory()) return false;
+    } catch {
+      return true;
+    }
+    try {
+      return readdirSync(target).length === 0;
+    } catch {
+      return true;
+    }
+  }
+  return true;
+}
+
+function snapshotIfNeeded(operation: OperationPlan, target: string): TargetSnapshot | null {
+  if (!operationNeedsSnapshot(operation, target)) return null;
+  return snapshotTarget(target);
+}
+
 function snapshotTarget(target: string): TargetSnapshot {
   if (!existsSync(target)) return { kind: 'missing' };
 
@@ -158,12 +226,28 @@ function snapshotTarget(target: string): TargetSnapshot {
     return { kind: 'symlink', link: readlinkSync(target) };
   }
   if (stat.isDirectory()) {
-    const backupRoot = mkdtempSync(join(tmpdir(), 'kyro-pipeline-'));
+    return snapshotDirectory(target);
+  }
+  return { kind: 'file', content: readFileSync(target), mode: stat.mode };
+}
+
+function snapshotDirectory(target: string): TargetSnapshot {
+  let backupRoot: string | undefined;
+  try {
+    backupRoot = mkdtempSync(join(tmpdir(), 'kyro-pipeline-'));
     const backupPath = join(backupRoot, 'target');
     cpSync(target, backupPath, { recursive: true, verbatimSymlinks: true });
     return { kind: 'directory', backupPath };
+  } catch (error) {
+    if (backupRoot) {
+      try {
+        rmSync(backupRoot, { recursive: true, force: true });
+      } catch {
+        /* keep incomplete backup as diagnostic evidence if dispose fails */
+      }
+    }
+    throw new SnapshotCreateError(target, error instanceof Error ? error : new Error(String(error)));
   }
-  return { kind: 'file', content: readFileSync(target), mode: stat.mode };
 }
 
 function restoreTarget(target: string, snapshot: TargetSnapshot): void {
@@ -181,8 +265,8 @@ function restoreTarget(target: string, snapshot: TargetSnapshot): void {
   } else if (snapshot.kind === 'directory') {
     assertStateWriterLeaseHealthy();
     cpSync(snapshot.backupPath, target, { recursive: true, verbatimSymlinks: true });
-    assertStateWriterLeaseHealthy();
-    rmSync(dirname(snapshot.backupPath), { recursive: true, force: true });
+    // Backup is retained until confirm() after total success or clean rollback
+    // so a later rollback failure still has diagnostic evidence.
   } else if (snapshot.kind === 'symlink') {
     assertStateWriterLeaseHealthy();
     symlinkSync(snapshot.link, target);
@@ -190,8 +274,11 @@ function restoreTarget(target: string, snapshot: TargetSnapshot): void {
 }
 
 function formatPipelineError(result: PipelineResult): Error {
-  const writeFailure = describeWriteFailure(result.error);
+  const snapshotError = result.error instanceof SnapshotCreateError ? result.error : null;
+  const writeFailure = describeWriteFailure(snapshotError?.cause ?? result.error);
   if (writeFailure) return writeFailure;
+  const rollbackAttempted = (result.rollback?.steps.length ?? 0) > 0;
+  if (snapshotError && !rollbackAttempted) return snapshotError;
   const message = result.rollback && !result.rollback.success
     ? `Apply failed and rollback failed: ${result.error?.message ?? 'unknown error'}`
     : `Apply failed and rollback completed: ${result.error?.message ?? 'unknown error'}`;

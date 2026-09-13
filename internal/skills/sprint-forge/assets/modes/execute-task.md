@@ -45,7 +45,7 @@ and sends the user down a dead end.
 When you finish, hand back one of these and nothing else:
 
 - More work in this sprint → “Run `/kyro:forge` to continue with `<nextTaskId>`.”
-- Sprint finished → “Run `/kyro:forge` to close Sprint `<n>`.”
+- Sprint tasks finished → “Run `/kyro:forge` to choose `kyro qa` or close Sprint `<n>`.”
 - Want the state → “Run `/kyro:status`.”
 
 Never compose a `{{KYRO_CLI}}` line for the user unless you have run that exact verb yourself in this

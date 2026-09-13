@@ -86,7 +86,7 @@ is reinforcement only; the portable guarantee is this fail-closed CLI contract.
 
 ## Read Path Contract (context-pack first) — MANDATORY
 
-The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open the full file only when `plan_sprint`/`close_sprint`/status-full needs its planning or reporting context; agents never open it in order to write it.
+The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open the full file only when `plan_sprint`/`qa_or_close`/`close_sprint`/status-full needs its planning or reporting context; agents never open it in order to write it.
 
 ## Artifact Write Contract (MANDATORY)
 
@@ -124,6 +124,7 @@ User intent to complete/close a finished scope is `{{KYRO_CLI}} scope complete` 
 | `await_scope_completion` | Ask: complete the finished scope, or explicitly expand it. Complete → `scope complete`; expand → then route as `plan_sprint`. |
 | `execute_task` | `modes/SPRINT.md`, `modes/execute-task.md` |
 | `review_task` | `modes/SPRINT.md`, `modes/review-task.md`, `helpers/reviewer.md` |
+| `qa_or_close` | `modes/SPRINT.md`, `modes/qa-or-close.md` — ask whether to run `kyro qa <scope>` or close without QA |
 | `close_sprint` | `modes/SPRINT.md`, `modes/close-sprint.md`, `helpers/debt-tracker.md` + `helpers/learner.md` as needed |
 | `done` | Stop — already complete or retired. No work mode. |
 | status report | `modes/STATUS.md` |
