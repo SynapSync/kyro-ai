@@ -182,6 +182,13 @@ export function buildCliRecipes(scope: string, sprint: SprintFile, task: Task | 
           : `${cli} review <taskId> ${scopeFlag} --verdict pass --yes`,
       });
       break;
+    case 'qa_or_close':
+      recipes.push({
+        id: 'analyze',
+        purpose: 'Verify that no CRITICAL or HIGH findings block the QA-or-close decision',
+        command: `${cli} analyze ${scopeFlag}`,
+      });
+      break;
     case 'close_sprint':
       recipes.push({
         id: 'close-sprint',

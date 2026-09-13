@@ -6,9 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.49.3] - 2026-09-13
+
+### Fixed
+
+- **QA-or-close context packs now expose the required analysis preflight.** When the final task review routes to `qa_or_close`, `context-pack` supplies the scoped `analyze` recipe that verifies no CRITICAL or HIGH findings block the decision. It deliberately does not present host-resolved `kyro qa <scope>` as a CLI subcommand or advertise an automatic `close-sprint`; QA remains a scope-level optional certification and closing still requires explicit human approval.
+
 ### Changed
 
-- (none)
+- **Clarified QA boundaries in Forge guidance.** Task-level QA uses `review_task`; independent `kyro qa <scope>` certification is available only after all tasks have passed review.
 
 ## [4.49.2] - 2026-09-12
 

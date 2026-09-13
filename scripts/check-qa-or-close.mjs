@@ -60,7 +60,11 @@ try {
   assert(ready.nextAction === 'qa_or_close', `final task pass should route to qa_or_close, got ${ready.nextAction}`);
   assert(ready.budgetClass === 'close', `qa_or_close should use close budget, got ${ready.budgetClass}`);
   assert(ready.routing.modes.includes('qa-or-close.md'), 'qa_or_close should load qa-or-close.md');
+  const analyze = ready.cliRecipes.find((recipe) => recipe.id === 'analyze');
+  assert(analyze, 'qa_or_close should advertise analyze before the QA-or-close decision');
+  assert(analyze.command.includes('analyze --kyro-scope demo'), `qa_or_close analyze recipe should target the scope: ${analyze.command}`);
   assert(!ready.cliRecipes.some((recipe) => recipe.id === 'close-sprint'), 'qa_or_close must not advertise close-sprint as the only next recipe');
+  assert(!ready.cliRecipes.some((recipe) => /\bqa\b/.test(recipe.command)), 'qa_or_close must not advertise host QA as a resolved CLI subcommand');
 
   const emergent = run(root, [
     'add-emergent', '--kyro-scope', 'demo',
