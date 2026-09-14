@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.49.4] - 2026-09-14
+
+### Fixed
+
+- **Guided active-sprint resolution before scope retirement.** The `/kyro:scope-retire` router no longer ends in an unactionable Forge referral when preparation returns `SPRINT_ALREADY_ACTIVE`: it guides separately approved `cancelled` task dispositions, a truthful `close-sprint --outcome abandoned`, and a fresh digest-bound retirement preparation. `scope retire` itself still never closes or discards an active sprint.
+
 ## [4.49.3] - 2026-09-13
 
 ### Fixed
