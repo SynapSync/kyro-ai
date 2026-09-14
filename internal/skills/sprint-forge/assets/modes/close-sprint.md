@@ -39,9 +39,7 @@ Use `--dry-run` first if you want to review the plan. Do not replicate this by h
 
 ### Disposed work
 
-A disposition is unfinished work: `shipped`/`completed` require every task done+pass. For an
-explicitly discarded sprint, close as `abandoned` and retain its disposition in the checkpoint. This
-mode never retires a scope.
+Dispositions are unfinished work: `shipped`/`completed` need every task done+pass. Close discarded sprints as `abandoned`.
 
 ## Hand off for a fresh session
 
