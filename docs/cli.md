@@ -511,6 +511,14 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 
 Close requires every unfinished task to have a typed `task.disposition`. The persisted outcome is `shipped`/`completed` only when every task is `done` with a passing verdict; otherwise it is derived `partial` (or explicit `abandoned`). Dry-run, the narrative, the checkpoint `beforeClose` image, and the ledger entry all expose those dispositions. Closing a sprint never completes the scope. If roadmap work remains, `handoff.nextAction` is `plan_sprint`; after its final entry it is `await_scope_completion`, which requires an explicit choice to complete (`kyro scope complete`) or expand with `kyro plan --from`. Completion is the delivery terminal; retirement is a separate obsolete-scope path.
 
+When an obsolete scope still has an active sprint, retirement preparation intentionally returns
+`SPRINT_ALREADY_ACTIVE`: `scope retire` never discards active work. The `/kyro:scope-retire` router
+can guide a separately approved resolution: record `cancelled` dispositions for every unfinished,
+undisposed task, preview and confirm `close-sprint --outcome abandoned`, then prepare retirement
+again with its new digest. `abandoned` records an intentional whole-sprint discard; do not describe
+such work as `shipped` or `completed`. Each cancellation, close, and irreversible retirement has its
+own human gate.
+
 ## Runtime capability handshake (`kyro capabilities`)
 
 `kyro capabilities [--json]` lists the tool-owned verbs this CLI exposes plus its version. The orchestrator runs it at forge start: a missing verb — or an `UNKNOWN_COMMAND` failure on the command itself — means the installed runtime predates the skill assets and the forge must abort with an upgrade request instead of improvising hand-edits. `kyro doctor` probes the installed runtime with the same handshake (`CLI capabilities` check).
@@ -601,7 +609,9 @@ identity. The terminal state is `status: retired`, `handoff.nextAction: done`, w
 application timestamp and optional successor in both live scope and registry metadata. Identical
 retries are safe. Other state-writing verbs reject the terminal scope with `SCOPE_RETIRED`; its
 read-only status, context, doctor, analyze and repair-plan surfaces remain available. Retirement is
-never reachable from Forge, routing or handoffs.
+never reachable from Forge, routing or handoffs. The dedicated retirement router may guide a
+separately approved active-sprint cancellation and `abandoned` close after `SPRINT_ALREADY_ACTIVE`;
+it then returns to a new retirement preparation and never auto-applies it.
 
 ## Tool-owned clarification resolution (`kyro clarify`)
 

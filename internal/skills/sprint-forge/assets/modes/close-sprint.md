@@ -37,6 +37,12 @@ The command publishes `sprint-NNN-slug.checkpoint.json` first, then the legacy `
 
 Use `--dry-run` first if you want to review the plan. Do not replicate this by hand.
 
+### Disposed work
+
+A disposition is unfinished work: `shipped`/`completed` require every task done+pass. For an
+explicitly discarded sprint, close as `abandoned` and retain its disposition in the checkpoint. This
+mode never retires a scope.
+
 ## Hand off for a fresh session
 
 `Next action: plan_sprint` means roadmap work remains; begin it in a **fresh session** using the
