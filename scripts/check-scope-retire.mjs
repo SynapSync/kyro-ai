@@ -202,6 +202,49 @@ try {
     assertFailure(active, 'SPRINT_ALREADY_ACTIVE');
     assert(digestTree(join(root, '.agents')) === before, 'active-sprint rejection must not write');
   }
+
+  // A user may discard an active scope only through the auditable lifecycle: add/locate unfinished
+  // work, record its cancelled disposition, close as abandoned, then prepare and apply retirement.
+  // Retirement itself remains unchanged: it never clears the active sprint.
+  {
+    const root = workspace({ close: false });
+    const emergent = run(root, [
+      'add-emergent', '--kyro-scope', 'demo',
+      '--title', 'Discarded scope task',
+      '--description', 'The user no longer needs this scope.',
+      '--acceptance', 'The cancellation is preserved in the close checkpoint.',
+    ]);
+    assert(emergent.status === 0, `emergent task creation must succeed: ${output(emergent)}`);
+    const cancelled = run(root, [
+      'record-evidence', 'E1', '--kyro-scope', 'demo',
+      '--summary', 'Scope discarded by explicit user request; task will not be implemented.',
+      '--validation', 'Explicit user decision to discard the scope.',
+      '--disposition', 'cancelled', '--reason', 'The user explicitly discarded the entire scope.',
+    ]);
+    assert(cancelled.status === 0, `cancelled disposition must succeed: ${output(cancelled)}`);
+    const close = run(root, [
+      'close-sprint', '--kyro-scope', 'demo', '--outcome', 'abandoned', '--yes',
+      '--note', 'Scope was discarded by explicit user request.',
+      '--summary', 'Active work intentionally abandoned.',
+      '--learning', 'Whole-scope discard needs a task-level cancellation record.',
+    ]);
+    assert(close.status === 0, `abandoned close must succeed: ${output(close)}`);
+    const closed = json(scopePath(root));
+    assert(closed.activeSprint === null && closed.ledger.at(-1)?.outcome === 'abandoned', 'close must clear the sprint and record abandoned');
+    const archive = scopePath(root, 'archive');
+    const checkpointName = readdirSync(archive).find((name) => name.endsWith('.checkpoint.json'));
+    assert(checkpointName, 'abandoned close must publish an immutable checkpoint');
+    const checkpoint = json(join(archive, checkpointName));
+    const disposed = checkpoint.beforeClose.activeSprint.emergentTasks.find((task) => task.id === 'E1');
+    assert(disposed?.disposition?.kind === 'cancelled', 'checkpoint must preserve the cancelled task disposition');
+    const archiveBeforeRetirement = digestTree(archive);
+    const prepared = prepare(root);
+    const retired = apply(root, prepared.digest);
+    assert(retired.status === 0, `retirement after abandoned close must succeed: ${output(retired)}`);
+    const retiredSprint = json(scopePath(root));
+    assert(retiredSprint.status === 'retired' && retiredSprint.handoff.nextAction === 'done', 'retirement must reach terminal state only after close');
+    assert(digestTree(archive) === archiveBeforeRetirement, 'retirement must preserve abandoned close history byte-for-byte');
+  }
   {
     const root = workspace();
     const paths = projectPaths(root);
@@ -366,6 +409,13 @@ try {
     assert(/STOP/i.test(router), 'router must explicitly stop after asking for approval');
     assert(router.includes('## Not completion'), 'router must refuse completion language');
     assert(router.includes('scope complete'), 'router must send completion language to Forge');
+    assert(router.includes('## Active sprint resolution — only after `SPRINT_ALREADY_ACTIVE`'), 'router must provide a concrete active-sprint resolution branch');
+    assert(router.includes('--disposition cancelled'), 'active-sprint resolution must record cancellation through record-evidence');
+    assert(router.includes('--outcome abandoned'), 'active-sprint resolution must close discarded work as abandoned');
+    assert(router.includes('¿Autorizas cancelar las N tareas pendientes'), 'router must require a separate cancellation authorization');
+    assert(router.includes('separate close confirmation'), 'router must require a separate close authorization');
+    assert(router.includes('prepare retirement again'), 'router must require fresh retirement preparation after close');
+    assert(!router.includes('--outcome shipped'), 'router must never describe disposed work as shipped');
     const forge = readFileSync(resolve(repo, 'commands/forge.md'), 'utf-8');
     assert(forge.includes('scope complete'), 'forge must route finished-scope closure to scope complete');
     assert(/User intent/i.test(forge), 'forge must overlay user intent before nextAction');

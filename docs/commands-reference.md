@@ -229,6 +229,13 @@ The command does not claim to prove the approver's cryptographic identity and is
 from Forge, routing, or handoffs. Language such as close/complete/finish/cierre is completion, not
 retirement — the router must refuse it and send the user to `/kyro:forge`.
 
+If the user explicitly chooses retirement and preparation returns `SPRINT_ALREADY_ACTIVE`, the
+retirement router guides a separately approved prerequisite: record `cancelled` dispositions for
+unfinished, undisposed tasks, then preview and confirm `close-sprint --outcome abandoned`. It must
+prepare retirement again after that state change and ask the normal digest-bound retirement question
+in a later interaction. This is never automatic and does not make `scope retire` itself close or
+discard active work.
+
 ---
 
 ## /kyro:qa
