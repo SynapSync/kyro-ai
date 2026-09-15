@@ -32,6 +32,14 @@ Commands are the user-facing interface. Each command is defined as a markdown fi
 | `/kyro:qa` | direct skill | Independent scope certification audit |
 | `/kyro:scope-retire` | direct router | Human-gated terminal lifecycle operation |
 
+### Updating existing active work
+
+The existing `plan --update-active` mode accepts a bounded input for task/spec definitions. Its
+read-only preview is bound to the current scope/sprint, input, policy and inspected history. Apply
+revalidates under the existing writer lock and commits definitions plus approval invalidation in one
+atomic live-state replacement. Closed history remains immutable. No new command, task state,
+per-task file, direct-write hook exception or persisted task revision store is introduced.
+
 ### Agent
 
 The orchestrator coordinates the full sprint lifecycle. It performs read-only analysis during discovery, generates plans, executes approved tasks, runs validation, handles debugging, updates sprint artifacts, and owns lifecycle checkpoints.

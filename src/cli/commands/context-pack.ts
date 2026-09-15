@@ -10,6 +10,7 @@ import { deriveScopeStatus } from '../core/status';
 import { emitTraceEvent } from '../core/trace';
 import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
+import { hasStaleReview } from '../core/review-material';
 import { getPersistedKyroInvocation } from '../invocation';
 import { scopeFindingsToTask } from './review';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
@@ -338,7 +339,7 @@ function resolveReviewDebt(sprint: SprintFile, task: Task | null): { reviewPendi
   const active = sprint.activeSprint;
   if (!active) return { reviewPending: [], nextTaskReview: null };
   const allTasks = active.phases.flatMap((phase) => phase.tasks).concat(active.emergentTasks);
-  const hasPass = (t: Task): boolean => asTaskVerdict(t.verdict)?.result === 'pass';
+  const hasPass = (t: Task): boolean => asTaskVerdict(t.verdict)?.result === 'pass' && !hasStaleReview(sprint, t);
   const reviewPending = allTasks.filter((t) => t.status === 'done' && !hasPass(t)).map((t) => t.id);
 
   if (!task) return { reviewPending, nextTaskReview: null };

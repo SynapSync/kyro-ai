@@ -10,7 +10,8 @@ import { evaluateGuard } from '../core/policy';
 import { resolveScope } from '../core/scope-resolution';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun } from '../core/trace';
 import { readProjectState } from '../state';
-import { sha256 } from '../checkpoints/sprint-close';
+import { sha256 } from '../core/digest';
+import { reviewedMaterialDigest as materialDigest } from '../core/review-material';
 import type { AnalysisFinding, OperationPlan, SprintFile, Task, TaskVerdict, TaskVerdictFinding, TaskVerdictFindingSeverity, TaskVerdictResult, WaivedCriterion } from '../types';
 
 export interface ReviewArgs {
@@ -173,10 +174,12 @@ export function buildReviewPlan(scope: string, args: ReviewArgs): ReviewPreparat
   const waivedSet = new Set(args.waivedCriteria.map((w) => normalizeCriterion(w.criterion)));
   const autoChecked = [...acceptanceCriteria].filter((c) => !waivedSet.has(normalizeCriterion(c)));
   const checkedCriteria = args.checkedCriteria.length > 0 ? args.checkedCriteria : args.verdict === 'pass' ? autoChecked : [];
-  const reviewedMaterialDigest = buildReviewedMaterialDigest(scope, sprint, located.task);
+  const reviewedMaterialDigest = materialDigest(scope, sprint.activeSprint, located.task);
   const requestDigest = buildReviewRequestDigest(scope, sprint, located.task, args, checkedCriteria, reviewedMaterialDigest);
   const currentVerdict = located.task.verdict;
-  if (args.requestDigest && currentVerdict?.requestDigest === args.requestDigest) {
+  if (args.requestDigest && currentVerdict?.requestDigest === args.requestDigest
+    && currentVerdict.reviewedMaterialDigest === reviewedMaterialDigest
+    && args.requestDigest === requestDigest) {
     return {
       sprint,
       plan: [],
@@ -254,28 +257,6 @@ function assertReviewWrite(scope: string): void {
   if (issues.length === 0) return;
   const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
   throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Review wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
-}
-
-function buildReviewedMaterialDigest(scope: string, sprint: SprintFile, task: Task): string {
-  const active = sprint.activeSprint!;
-  return sha256({
-    schemaVersion: 1,
-    scope,
-    sprint: { n: active.n, slug: active.slug },
-    task: {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      filesToTouch: task.files_to_touch,
-      context: task.context,
-      acceptanceCriteria: task.acceptance_criteria,
-      dependsOn: task.depends_on,
-      scenarioRefs: task.scenario_refs ?? [],
-      status: task.status,
-      evidence: task.evidence,
-      disposition: task.disposition ?? null,
-    },
-  });
 }
 
 function buildReviewRequestDigest(

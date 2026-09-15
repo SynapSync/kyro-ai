@@ -14,6 +14,9 @@ Enforced by `kyro analyze`:
 - `pass` verdicts are blocked while non-negotiable principle gates are violated.
 - Verdict timestamps must not predate evidence timestamps.
 - Self-review is blocked only when policy enables `maker_checker.requireSeparateChecker`.
+- For live verdicts carrying `reviewedMaterialDigest`, a material mismatch makes the pass stale.
+  Analyze/close refuse it; context-pack and status expose review debt. Legacy verdicts without a
+  digest remain readable, but a supported active-plan change still invalidates them before reuse.
 
 Always advisory:
 
@@ -86,6 +89,26 @@ kyro review T1.1 --kyro-scope demo --verdict fail --finding critical:"Missing te
 `review_task` defaults to `tool_owned`: the deterministic checker (coverage, evidence, self-review, principle vetoes) is the gate, and per-task review is reversible, so a pass does not need `--yes`. A project that wants a human confirmation on every review can set `review_task` to `confirm` in `policy.json`, after which CLI review needs `--yes` (the flag above is always safe to pass either way).
 
 When every phase and emergent task reaches `done` + `pass`, `kyro review` routes to `qa_or_close`, not directly to close. Forge then asks whether to invoke the existing read-only `kyro qa <scope>` command/skill or close without QA. A failed QA report materializes corrections through `review fail` or `add-emergent`; it does not write a second kind of task verdict.
+
+## Correcting active tasks
+
+`done` is reversible while the task belongs to the current unclosed sprint of an open scope:
+
+- Implementation defect, unchanged definition: `review --verdict fail`, correct, validate,
+  `record-evidence`, then fresh `review` on the same task ID.
+- Definition change: `plan --update-active` previews the exact change and atomically invalidates
+  affected approvals when applied with its digest and `--yes`. See [cli.md](cli.md#update-existing-active-tasks-plan---update-active).
+- Previous evidence remains reference material, not proof of the changed contract. Live task
+  records store the latest evidence/verdict; this is not an append-only per-task review history.
+- Repeating existing task review is required. Optional QA is repeated only when prior audited
+  material changed or policy requires it; no new optional certification is added solely for editing.
+- Closed/shipped/archived tasks remain immutable, including after scope reopen. Product source files
+  may still evolve for later work; the historical task records do not.
+
+Material digests cover task metadata and evidence, not source file contents or scenario bodies.
+The workflow must invalidate approval before implementation changes; active plan updates explicitly
+invalidate shared-spec consumers. Never reuse an old digest as a fresh review. An identical retry
+with unchanged material remains a no-op.
 
 ## Separate checker policy
 

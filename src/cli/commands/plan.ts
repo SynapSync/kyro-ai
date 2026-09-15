@@ -12,6 +12,8 @@ import { emitToolCommandRun } from '../core/trace';
 import { readProjectState, updateProjectStateLayers } from '../state';
 import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, ScopeAuthor, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
 import type { ValidationIssue } from '../artifacts/schema';
+import { applyActivePlan, parseActivePlanInput, prepareActivePlan } from '../core/active-plan';
+import { setCliMachineResult } from '../core/cli-envelope';
 
 const KEBAB_CASE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SPEC_REQUIREMENT_PRIORITIES = ['must', 'should', 'could'] as const;
@@ -21,6 +23,9 @@ export interface PlanArgs {
   scope: string | null;
   dryRun: boolean;
   help: boolean;
+  updateActive: boolean;
+  yes: boolean;
+  digest: string | null;
 }
 
 export interface LeanPlanInput {
@@ -89,6 +94,11 @@ export function runPlanCommand(rawArgs: string[]): void {
     'Lean plan file must contain a JSON object (init mode: { scope?, title, objective, successCriteria, spec?, roadmap }; sprint mode: { sprint, phases, definitionOfDone, scenarios? }).',
   );
   const scope = resolvePlanScope(record, args.scope);
+  if (args.updateActive) {
+    runActiveUpdate(raw, scope, args);
+    return;
+  }
+  if (args.yes || args.digest) throw new KyroCoreError('INVALID_INPUT', '--yes and --digest are only valid with --update-active.');
 
   const state = readProjectState();
   if (!state) {
@@ -128,6 +138,24 @@ export function runPlanCommand(rawArgs: string[]): void {
     );
   }
   runPlanSprintMode(raw, scope, currentSprint, args, state);
+}
+
+function runActiveUpdate(raw: unknown, scope: string, args: PlanArgs): void {
+  if (args.dryRun && (args.yes || args.digest)) throw new KyroCoreError('INVALID_INPUT', 'Preview with --dry-run, or apply with --digest and --yes; not both.');
+  if (!args.dryRun && (!args.yes || !args.digest)) {
+    throw new KyroCoreError('CONFIRMATION_REQUIRED', 'Active plan updates require a reviewed digest and --yes.', 'First run plan --update-active --from <file> --kyro-scope <scope> --dry-run --json.');
+  }
+  const input = parseActivePlanInput(raw);
+  const preview = args.dryRun ? prepareActivePlan(scope, input) : applyActivePlan(scope, input, args.digest!);
+  const phase = args.dryRun ? 'preview' : preview.changes.length ? 'applied' : 'noop';
+  const { projected, ...details } = preview;
+  setCliMachineResult(phase, { ...details, outcome: phase, mode: 'update-active',
+    requiresConfirmation: args.dryRun && preview.changes.length > 0,
+    affectedFiles: phase === 'applied' ? [sprintJsonPath(scope)] : [], nextAction: projected.handoff.nextAction });
+  console.log(`Active Sprint ${preview.sprint.n} update (${phase}): ${preview.changes.length} change(s).`);
+  for (const change of preview.changes) console.log(`${change.target}.${change.field}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`);
+  console.log(`Revalidate tasks: ${preview.affectedTaskIds.join(', ') || 'none'}. Digest: ${preview.digest}`);
+  if (args.dryRun) console.log('Dry run complete. No files changed.');
 }
 
 /**
@@ -731,6 +759,9 @@ function parsePlanArgs(rawArgs: string[]): PlanArgs {
   let scope: string | null = null;
   let dryRun = false;
   let help = false;
+  let updateActive = false;
+  let yes = false;
+  let digest: string | null = null;
   for (let i = 0; i < rawArgs.length; i += 1) {
     const arg = rawArgs[i];
     if (arg === '--help' || arg === '-h') help = true;
@@ -739,9 +770,14 @@ function parsePlanArgs(rawArgs: string[]): PlanArgs {
     else if (arg.startsWith('--from=')) from = arg.slice('--from='.length);
     else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
     else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
+    else if (arg === '--update-active') updateActive = true;
+    else if (arg === '--yes' || arg === '--confirm') yes = true;
+    else if (arg === '--digest') { digest = requireValue(rawArgs, i, arg); i += 1; }
+    else if (arg.startsWith('--digest=')) digest = arg.slice('--digest='.length);
     else throw new KyroCoreError('INVALID_INPUT', `Unknown plan option: ${arg}`);
   }
-  return { from, scope, dryRun, help };
+  if (digest !== null && !/^[a-f0-9]{64}$/.test(digest)) throw new KyroCoreError('INVALID_INPUT', '--digest must be a lowercase SHA-256 digest.');
+  return { from, scope, dryRun, help, updateActive, yes, digest };
 }
 
 function requireValue(args: string[], index: number, flag: string): string {
@@ -752,8 +788,21 @@ function requireValue(args: string[], index: number, flag: string): string {
 
 function printPlanHelp(): void {
   console.log(`Usage: kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]
+  kyro plan --update-active --from <file> --kyro-scope <scope> --dry-run --json
+  kyro plan --update-active --from <file> --kyro-scope <scope> --digest <sha256> --yes --json
 
-Two modes, auto-detected from the resolved scope's state (not from the --from file shape):
+Explicit --update-active edits existing tasks in the current unclosed sprint of an open scope.
+Preview first; apply requires the exact digest and --yes. Closed/archived tasks are immutable.
+Input: { scope?, sprint: { n, slug }, reason, tasks?: [{ id, title?, description?, context?,
+  acceptance_criteria?, files_to_touch?, depends_on?, scenario_refs? }],
+  requirements?: [{ id, statement, priority?, rationale? }],
+  scenarios?: [{ id, requirement, given, when, then }] }
+Arrays replace the complete field; no task additions/removals or lifecycle fields are accepted.
+Changes invalidate affected task/dependent verdicts atomically; previous evidence stays as reference.
+Revalidate, record new evidence and review; optional QA is not automatically introduced.
+A retry after a successful update needs a new preview (no persistent update receipts).
+
+Two default modes, auto-detected from the resolved scope's state (not from the --from file shape):
   - init mode: no sprint.json yet for the scope. Materializes the scope's initial sprint.json
     (spec + roadmap, activeSprint: null). Also registers the scope in the layered project state:
     project.json (scopes[]) and local.json (activeScope set to the initialized scope). When git user.name and/or a valid user.email is set, writes optional

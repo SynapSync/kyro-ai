@@ -32,7 +32,8 @@ Execute the active sprint task, recording evidence through the Kyro CLI.
 - Unknown `record-evidence` command → runtime too old: ABORT (Startup handshake). Never hand-write evidence.
 - Do not write `task.verdict` as the maker — tool-owned by `{{KYRO_CLI}} review`.
 - Do not invent project patterns without justification.
-- If the plan is wrong, block the task, note the mismatch, set `handoff.nextAction: "plan_sprint"`.
+- Active definition correction: load `../helpers/active-plan-update.md`; use `plan --update-active`, not next-sprint planning or manual edits.
+- Implementation-only correction: `review --verdict fail`, then repeat execution/evidence/review on the same active task, even if previously done.
 
 ## Telling the user how to continue
 

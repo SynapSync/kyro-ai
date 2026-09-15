@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.50.0] - 2026-09-15
+
+### Added
+
+- **Controlled updates to active task definitions through `plan --update-active`.** Read-only diff/digest preview and confirmed, locked atomic apply preserve task identities and closed history while invalidating affected reviews and transitive dependents. Active requirements/scenarios may evolve without direct edits to managed state; no new command or task state is introduced.
+
+### Fixed
+
+- Live reviews with changed material now appear as stale in analysis, task packs and status, block sprint close, and cannot be replayed as a current approval with an old digest. Unchanged legacy verdicts remain readable.
+- Dependency cycles are now reported by analysis and rejected by active-plan updates. Workflow instructions route active contract corrections through the existing planner rather than attempting next-sprint planning.
+
 ## [4.49.4] - 2026-09-14
 
 ### Fixed

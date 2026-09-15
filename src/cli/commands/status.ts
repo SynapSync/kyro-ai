@@ -5,6 +5,7 @@ import { formatScopeAuthor } from '../core/actor';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { unregisteredScopeFolders } from '../core/scopes';
 import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, isTaskVerifiedComplete } from '../core/status';
+import { hasStaleReview } from '../core/review-material';
 import { KyroCoreError } from '../core/errors';
 import { deriveScopeVerificationState } from '../remediation/plan';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
@@ -229,7 +230,7 @@ function readSprint(scope: string): SprintFile {
 
 function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusReport {
   const activeSprint = sprint.activeSprint;
-  const reviewDebt = collectReviewDebt(activeSprint);
+  const reviewDebt = collectReviewDebt(sprint);
   return {
     scope,
     status: deriveScopeStatus(sprint, Boolean(activeSprint)),
@@ -259,7 +260,7 @@ function buildFullStatusReport(scope: string, sprint: SprintFile): FullStatusRep
     ...brief,
     author: sprint.author ?? null,
     phaseSummary: activeSprint ? activeSprint.phases.map((phase) => {
-      const counts = countTasksByStatus(phase.tasks);
+      const counts = countTasksByStatus(phase.tasks, sprint);
       return {
         id: phase.id,
         title: phase.title,
@@ -271,8 +272,8 @@ function buildFullStatusReport(scope: string, sprint: SprintFile): FullStatusRep
         blockedTasks: counts.blocked,
       };
     }) : [],
-    taskSummary: countTasksByStatus(collectSprintTasks(activeSprint)),
-    reviewDebt: collectReviewDebt(activeSprint),
+    taskSummary: countTasksByStatus(collectSprintTasks(activeSprint), sprint),
+    reviewDebt: collectReviewDebt(sprint),
     adrSummary: summarizeAdrs(sprint.adrs ?? []),
     recentAdrs: recentAdrs(sprint.adrs ?? []),
   };
@@ -314,18 +315,21 @@ function resolveNextTask(activeSprint: ActiveSprint | null, nextTaskId: string |
   return { id: nextTaskId, title: null, status: null, phaseId: null, phaseTitle: null };
 }
 
-function collectReviewDebt(activeSprint: ActiveSprint | null): ReviewDebtItem[] {
+function collectReviewDebt(sprint: SprintFile): ReviewDebtItem[] {
+  const activeSprint = sprint.activeSprint;
   if (!activeSprint) return [];
   const items: ReviewDebtItem[] = [];
+  const needsReview = (task: Task): boolean => task.status === 'done'
+    && (asTaskVerdict(task.verdict)?.result !== 'pass' || hasStaleReview(sprint, task));
   for (const phase of activeSprint.phases) {
     for (const task of phase.tasks) {
-      if (task.status === 'done' && asTaskVerdict(task.verdict)?.result !== 'pass') {
+      if (needsReview(task)) {
         items.push({ id: task.id, title: task.title, status: task.status, phaseId: phase.id, phaseTitle: phase.title });
       }
     }
   }
   for (const task of activeSprint.emergentTasks) {
-    if (task.status === 'done' && asTaskVerdict(task.verdict)?.result !== 'pass') {
+    if (needsReview(task)) {
       items.push({ id: task.id, title: task.title, status: task.status, phaseId: null, phaseTitle: 'Emergent tasks' });
     }
   }
@@ -337,7 +341,7 @@ function collectSprintTasks(activeSprint: ActiveSprint | null): Task[] {
   return activeSprint.phases.flatMap((phase) => phase.tasks).concat(activeSprint.emergentTasks);
 }
 
-function countTasksByStatus(tasks: Task[]): TaskSummary {
+function countTasksByStatus(tasks: Task[], sprint: SprintFile): TaskSummary {
   const dispositions: DispositionSummary = { deferred: 0, blocked: 0, superseded: 0, cancelled: 0 };
   for (const task of tasks) {
     if (task.disposition) dispositions[task.disposition.kind] += 1;
@@ -348,7 +352,7 @@ function countTasksByStatus(tasks: Task[]): TaskSummary {
     inProgress: tasks.filter((task) => task.status === 'in_progress').length,
     blocked: tasks.filter((task) => task.status === 'blocked').length,
     done: tasks.filter((task) => task.status === 'done').length,
-    verified: tasks.filter((task) => isTaskVerifiedComplete(task)).length,
+    verified: tasks.filter((task) => isTaskVerifiedComplete(task) && !hasStaleReview(sprint, task)).length,
     dispositions,
   };
 }

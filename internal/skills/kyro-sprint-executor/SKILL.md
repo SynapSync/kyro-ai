@@ -57,6 +57,12 @@ Never infer routing from file presence. Never open the full `sprint.json` to rou
    - The CLI vetoes a pass on missing/malformed evidence, unchecked acceptance criteria, tampered timestamps, non-negotiable principle violations, or self-review policy (`CHECKER_FAILED`, `SELF_REVIEW_BLOCKED`). A veto is a blocking finding: return to stage 2 and fix the cause. Never argue with, retry unchanged, or route around the checker.
 6. Re-run Step 1 to route to the next task. One task at a time — never run stages in parallel, never skip or reorder them.
 
+## Existing task corrections
+
+- An implementation defect in an existing active task uses `review --verdict fail`, then the normal task loop on the same ID. `done` is not immutable while the sprint is still active.
+- A definition change uses the existing `plan --update-active` operation. Load `sprint-forge/assets/helpers/active-plan-update.md` from the Kyro runtime for the exact input/preview/digest/apply protocol; an explicit planning update may inspect the full sprint but only edits a temporary input file. Never hand-edit managed state. Unknown option → stop and request a runtime upgrade.
+- Closed/shipped/archived tasks stay immutable even under a reopened scope. Stop and explain the closed parent. Repeat affected prior QA when applicable; do not introduce optional certification merely because a task changed.
+
 ## Emergent work and debt
 
 - Required work discovered mid-sprint: `{{KYRO_CLI}} add-emergent --title <t> --description <d> --acceptance <a> [--acceptance ...] --kyro-scope <scope>` — the new task then enters the same task loop.
