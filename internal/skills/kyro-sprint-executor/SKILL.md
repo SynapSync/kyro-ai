@@ -49,7 +49,7 @@ Never infer routing from file presence. Never open the full `sprint.json` to rou
 4. **Record evidence** (maker):
    `{{KYRO_CLI}} record-evidence <task-id> --kyro-scope <scope> --summary "..." --validation "<check>" [--validation ...] [--file <path> ...] [--notes "..."]`
    - **No `--yes`/`--confirm` here** — those flags belong to `review`; passing them fails with `INVALID_INPUT`.
-   - After **three** failed correction rounds: rerun with `--status blocked`, then stop and report — do not grind further.
+   - After **three** failed correction rounds: rerun with `--status blocked`, then stop that task and report — do not grind further. Do **not** review it: this is temporary, and Kyro routes any independent dependency-satisfied task. Re-read `context-pack`; dependents stay pending but are reported as derived blocked. Resume only through fresh `done` evidence, then review.
 5. **Review** (checker):
    - Pass: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict pass [--by <actor>] --yes`
    - Fail: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict fail --finding critical:"..." --yes`

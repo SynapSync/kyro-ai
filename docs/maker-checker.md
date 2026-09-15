@@ -62,9 +62,15 @@ kyro record-evidence T1.1 --kyro-scope demo \
 No `--yes` / `--confirm` on `record-evidence` (those flags are for `kyro review` and similar confirm
 verbs). Passing `--yes` here fails with `INVALID_INPUT`.
 
-It writes `task.evidence`, sets `task.status` (`done` by default; `--status blocked` after repeated
-failures), and routes `handoff` to `review_task`. It never writes `task.verdict` — the checker owns
-that. Multiple `--validation`/`--file` flags are accepted; `--by` defaults to `maker`.
+It writes `task.evidence` and sets `task.status`. `done` (default) routes the same task to
+`review_task`; `--status blocked` is a temporary block that skips review and routes an independent,
+dependency-satisfied task when one exists. A blocked task resumes only after fresh `done` evidence,
+then follows normal review. It never writes `task.verdict` — the checker owns that. Multiple
+`--validation`/`--file` flags are accepted; `--by` defaults to `maker`.
+
+A checker review of a temporary blocked task is rejected. `status` and `context-pack` expose derived
+ready/waiting/blocked dependency state, so a blocked prerequisite never authorizes its dependents but
+also never stops unrelated ready work.
 
 `record-evidence` always stamps `recordedAt` with its own clock — evidence is safe by construction
 at write time. The checker enforces this at read time: a `recordedAt` more than 5 minutes ahead of

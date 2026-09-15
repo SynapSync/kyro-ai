@@ -635,11 +635,12 @@ Each target is either an exact `open_question` or a clarification `marker`. The 
 
 ## Tool-owned task evidence and disposition (`kyro record-evidence`)
 
-`kyro record-evidence <task> --summary <text> --validation <text> [--file <path> ...] [--status done|blocked] [--disposition deferred|blocked|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]]` is the single maker write onto a located task. It never hand-edits `sprint.json`.
+`kyro record-evidence <task> --summary <text> --validation <text> [--file <path> ...] [--status done|blocked] [--disposition deferred|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]]` is the single maker write onto a located task. It never hand-edits `sprint.json`.
 
 - Default `--status done` records evidence and routes to `review_task`. The checker verdict stays on `kyro review`.
-- `--status blocked` without `--disposition` is the in-sprint block (still reviewable).
-- `--disposition` records a typed terminal explanation for unfinished work. It requires a non-empty `--reason`. `deferred` and `superseded` also require `--target` (`debt:<id>` must exist in `debt[]`; `task:<id>` must be a different task in the sprint; `sprint:<n>` is a positive integer and may name a future sprint). Unknown kinds, blank reasons, `--status done`, and invalid targets fail with no write.
+- `--status blocked` is a **temporary** in-sprint block: it records why work stopped, skips checker review, and routes the first dependency-satisfied independent task. A blocked task resumes when fresh `done` evidence is recorded, followed by its ordinary review.
+- The scheduler executes only tasks whose dependencies have fresh `done + pass` verdicts. Dependents of a blocked/terminal prerequisite stay pending on disk but are reported as derived blocked; unrelated ready tasks continue. `status` and `context-pack` expose ready, waiting, review-pending and blocked task lists with blocker IDs.
+- `--disposition` records a typed terminal explanation for unfinished work. It requires a non-empty `--reason`. `deferred` and `superseded` also require `--target` (`debt:<id>` must exist in `debt[]`; `task:<id>` must be a different task in the sprint; `sprint:<n>` is a positive integer and may name a future sprint). New `--disposition blocked` writes are rejected; legacy blocked dispositions remain readable. Unknown kinds, blank reasons, `--status done`, and invalid targets fail with no write.
 - A disposition is not `done` and not `pass`. Historical tasks omit the field.
 
 See [adr-adaptive-sprint-lifecycle.md](plans/adr-adaptive-sprint-lifecycle.md) and [status-coherence.md](status-coherence.md).

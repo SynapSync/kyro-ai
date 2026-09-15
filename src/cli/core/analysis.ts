@@ -17,7 +17,7 @@ import type {
 import { KyroCoreError } from './errors';
 import { makerCheckerPolicy, policyIssues } from './policy';
 import { resolveScope } from './scope-resolution';
-import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, normalizeStoredPhaseStatus } from './status';
+import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, normalizeStoredPhaseStatus, taskExecutionInfo } from './status';
 import { emitBlockedReason, emitTraceEvent } from './trace';
 import { hasStaleReview } from './review-material';
 import { dependencyCycle } from './task-graph';
@@ -96,6 +96,13 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
     if (cycle.length) add('HIGH', 'dependencies', `dependency cycle affects ${cycle.join(', ')}`, 'Remove the cycle from the active plan before executing or closing.');
     const ids = new Set(tasks.map((t) => t.id));
     for (const t of tasks) for (const dep of t.depends_on ?? []) if (!ids.has(dep)) add('HIGH', 'dependencies', `task ${t.id} depends_on "${dep}" which does not exist`, 'Fix the depends_on reference or add the missing task.');
+    const execution = new Map(taskExecutionInfo(sprint).map((info) => [info.taskId, info]));
+    if (sprint.handoff.nextAction === 'execute_task') {
+      const routed = sprint.handoff.nextTaskId ? execution.get(sprint.handoff.nextTaskId) : null;
+      const ready = [...execution.values()].some((info) => info.state === 'ready');
+      if (routed && routed.state !== 'ready') add('MEDIUM', 'routing', `handoff nextTaskId ${routed.taskId} is ${routed.state}, not dependency-ready`, 'Run the routing writer that changed task state, or select a dependency-ready task.');
+      if (!routed && ready) add('MEDIUM', 'routing', 'handoff has ready work but no dependency-ready nextTaskId', 'Route execute_task to the first dependency-ready task.');
+    }
     const seen = new Set<string>();
     for (const t of tasks) { if (seen.has(t.id)) add('MEDIUM', 'consistency', `duplicate task id "${t.id}"`, 'Task ids must be unique within a sprint.'); seen.add(t.id); }
     for (const d of sprint.debt) if ((d.status === 'open' || d.status === 'in_progress') && typeof d.targetSprint === 'number' && d.targetSprint < active.n) add('HIGH', 'debt', `debt ${d.id} was due in sprint ${d.targetSprint} and is still ${d.status}`, 'Address it this sprint or re-target it explicitly with a reason.');

@@ -1,5 +1,6 @@
-import type { ActiveSprint, Phase, SprintFile, Task } from '../types';
+import type { ActiveSprint, Phase, SprintFile, Task, TaskBlockReason, TaskExecutionInfo, TaskExecutionState } from '../types';
 import type { KyroScopeStatus } from '../artifacts/schema';
+import { hasStaleReview } from './review-material';
 
 /**
  * Pure lifecycle-status derivation. These functions compute the *truth* of a phase/sprint/scope from
@@ -9,14 +10,112 @@ import type { KyroScopeStatus } from '../artifacts/schema';
 
 export type DerivedPhaseStatus = 'pending' | 'active' | 'blocked' | 'done';
 export type DerivedSprintStatus = 'planned' | 'executing' | 'complete';
+export type { TaskBlockReason, TaskExecutionInfo, TaskExecutionState } from '../types';
+
+/** All active task records in deterministic phase/emergent order. */
+export function collectSprintTasks(active: ActiveSprint): Task[] {
+  const out: Task[] = [];
+  for (const phase of active.phases ?? []) for (const task of phase.tasks ?? []) out.push(task);
+  for (const task of active.emergentTasks ?? []) out.push(task);
+  return out;
+}
+
+/** Verified completion: done + fresh pass, and never a disposition. */
+export function isTaskVerifiedComplete(task: Task): boolean {
+  return task.status === 'done' && task.verdict?.result === 'pass' && task.disposition === undefined;
+}
+
+function isFreshlyVerified(sprint: SprintFile, task: Task): boolean {
+  return isTaskVerifiedComplete(task) && !hasStaleReview(sprint, task);
+}
 
 /**
- * Precedence: no tasks → pending; any blocked → blocked; all done → done;
- * any in_progress or a mix of done/pending → active; otherwise (all pending) → pending.
+ * Computes dependency readiness without changing task records. Blockage propagates only as a derived
+ * read-model; siblings remain ready and a newly resolved prerequisite immediately unblocks descendants.
  */
-export function derivePhaseStatus(phase: Phase): DerivedPhaseStatus {
+export function taskExecutionInfo(sprint: SprintFile): TaskExecutionInfo[] {
+  const active = sprint.activeSprint;
+  if (!active) return [];
+  const tasks = collectSprintTasks(active);
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const memo = new Map<string, TaskExecutionInfo>();
+  const visiting = new Set<string>();
+
+  const classify = (task: Task): TaskExecutionInfo => {
+    const cached = memo.get(task.id);
+    if (cached) return cached;
+    // Schema/analysis own cycle reporting. Treat a malformed cycle as waiting so routing never runs it.
+    if (visiting.has(task.id)) return { taskId: task.id, state: 'waiting_on_dependency', blockedByTaskIds: [], blockReason: null };
+    visiting.add(task.id);
+    let info: TaskExecutionInfo;
+    if (task.disposition) {
+      info = { taskId: task.id, state: 'disposed', blockedByTaskIds: [], blockReason: null };
+    } else if (task.status === 'blocked') {
+      info = { taskId: task.id, state: 'blocked', blockedByTaskIds: [task.id], blockReason: 'self_blocked' };
+    } else if (task.status === 'done') {
+      info = isFreshlyVerified(sprint, task)
+        ? { taskId: task.id, state: 'verified', blockedByTaskIds: [], blockReason: null }
+        : { taskId: task.id, state: 'awaiting_review', blockedByTaskIds: [], blockReason: null };
+    } else {
+      const blockedBy = new Set<string>();
+      let terminalDependency = false;
+      let waiting = false;
+      for (const dependencyId of task.depends_on ?? []) {
+        const dependency = byId.get(dependencyId);
+        if (!dependency) { waiting = true; continue; }
+        const dependencyInfo = classify(dependency);
+        if (dependencyInfo.state === 'disposed') {
+          blockedBy.add(dependencyId);
+          terminalDependency = true;
+        } else if (dependencyInfo.state === 'blocked') {
+          for (const id of dependencyInfo.blockedByTaskIds) blockedBy.add(id);
+        } else if (dependencyInfo.state !== 'verified') {
+          waiting = true;
+        }
+      }
+      if (blockedBy.size > 0) {
+        info = { taskId: task.id, state: 'blocked', blockedByTaskIds: [...blockedBy].sort(), blockReason: terminalDependency ? 'terminal_dependency' : 'blocked_dependency' };
+      } else if (waiting) {
+        info = { taskId: task.id, state: 'waiting_on_dependency', blockedByTaskIds: [], blockReason: null };
+      } else {
+        info = { taskId: task.id, state: 'ready', blockedByTaskIds: [], blockReason: null };
+      }
+    }
+    visiting.delete(task.id);
+    memo.set(task.id, info);
+    return info;
+  };
+
+  return tasks.map(classify);
+}
+
+/** First dependency-satisfied task in stable phase/emergent order. */
+export function nextExecutableTaskId(sprint: SprintFile, skipId?: string): string | null {
+  const states = new Map(taskExecutionInfo(sprint).map((info) => [info.taskId, info]));
+  const next = sprint.activeSprint && collectSprintTasks(sprint.activeSprint).find((task) => (
+    task.id !== skipId && states.get(task.id)?.state === 'ready'
+  ));
+  return next?.id ?? null;
+}
+
+export function reviewPendingTaskIds(sprint: SprintFile): string[] {
+  return taskExecutionInfo(sprint).filter((info) => info.state === 'awaiting_review').map((info) => info.taskId);
+}
+
+/**
+ * With execution state supplied, a phase is active whenever it has a ready task or pending review;
+ * otherwise a true dependency/self block is surfaced. The fallback preserves legacy call sites.
+ */
+export function derivePhaseStatus(phase: Phase, execution?: ReadonlyMap<string, TaskExecutionInfo>): DerivedPhaseStatus {
   const tasks = phase.tasks ?? [];
   if (tasks.length === 0) return 'pending';
+  if (execution) {
+    const states = tasks.map((task) => execution.get(task.id)?.state);
+    if (states.every((state) => state === 'verified')) return 'done';
+    if (states.some((state) => state === 'ready' || state === 'awaiting_review')) return 'active';
+    if (states.some((state) => state === 'blocked' || state === 'waiting_on_dependency' || state === 'disposed')) return 'blocked';
+    return 'pending';
+  }
   if (tasks.some((t) => t.status === 'blocked')) return 'blocked';
   if (tasks.every((t) => t.status === 'done')) return 'done';
   if (tasks.some((t) => t.status === 'in_progress' || t.status === 'done')) return 'active';
@@ -33,56 +132,32 @@ export function deriveActiveSprintStatus(active: ActiveSprint): DerivedSprintSta
 }
 
 /**
- * With an active sprint: any blocked task OR non-empty handoff.blockers → blocked; else active.
- * Without one: an explicit `completion` or `retirement` record → completed/retired respectively;
- * `handoff.nextAction === 'done'` (legacy terminal read) → completed; else planning. Roadmap
- * exhaustion is not completion, and a plain `done` handoff without an explicit record remains
- * readable as completed for historical compatibility.
- *
- * A reopened scope reads as open again — `kyro scope reopen` clears `completion` and hands off to
- * `plan_sprint` — while `completionHistory` keeps the superseded completions. History is audit
- * evidence, never a status signal, so it deliberately takes no part in this derivation.
+ * A scope is active whenever work can be executed or reviewed. It is blocked only when unfinished,
+ * undisposed work remains but every route is blocked/waiting. Explicit handoff blockers remain a
+ * human-authored scope-wide stop signal.
  */
 export function deriveScopeStatus(sprint: SprintFile, hasActiveSprint: boolean): KyroScopeStatus {
   if (sprint.retirement) return 'retired';
   if (hasActiveSprint && sprint.activeSprint) {
-    const tasks = collectSprintTasks(sprint.activeSprint);
-    const blocked = tasks.some((t) => t.status === 'blocked') || (sprint.handoff.blockers ?? []).length > 0;
-    return blocked ? 'blocked' : 'active';
+    if ((sprint.handoff.blockers ?? []).length > 0) return 'blocked';
+    const execution = taskExecutionInfo(sprint);
+    if (execution.some((info) => info.state === 'ready' || info.state === 'awaiting_review')) return 'active';
+    if (execution.some((info) => info.state === 'blocked' || info.state === 'waiting_on_dependency')) return 'blocked';
+    return 'active';
   }
   if (sprint.completion || sprint.handoff?.nextAction === 'done') return 'completed';
   return 'planning';
 }
 
-/**
- * Map a stored phase.status onto the derived vocabulary so vocabulary drift is not read as real drift.
- * The codebase has historically written "executing" (and modes may write "in_progress"/"complete"); a
- * phase marked "executing" with mixed tasks is coherent with the derived "active". Only a genuine
- * mismatch (e.g. all tasks done but the phase is "executing" → "active" ≠ "done") remains flagged.
- */
+/** Map stored status vocabulary onto the derived vocabulary for legacy coherence checks. */
 export function normalizeStoredPhaseStatus(stored: string): DerivedPhaseStatus | string {
   switch (stored) {
     case 'executing':
-    case 'in_progress':
-      return 'active';
+    case 'in_progress': return 'active';
     case 'complete':
-    case 'completed':
-      return 'done';
-    default:
-      return stored;
+    case 'completed': return 'done';
+    default: return stored;
   }
-}
-
-export function collectSprintTasks(active: ActiveSprint): Task[] {
-  const out: Task[] = [];
-  for (const phase of active.phases ?? []) for (const task of phase.tasks ?? []) out.push(task);
-  for (const task of active.emergentTasks ?? []) out.push(task);
-  return out;
-}
-
-/** Verified completion: done + pass, and never a disposition. */
-export function isTaskVerifiedComplete(task: Task): boolean {
-  return task.status === 'done' && task.verdict?.result === 'pass' && task.disposition === undefined;
 }
 
 /** Unfinished tasks that still lack a typed disposition — close must refuse these. */
@@ -99,21 +174,4 @@ export function deriveSprintCloseOutcomeClass(active: ActiveSprint): 'completed'
   const tasks = collectSprintTasks(active);
   if (tasks.length === 0 || tasks.every((task) => isTaskVerifiedComplete(task))) return 'completed';
   return 'partial';
-}
-
-/**
- * Pure "next executable task" selector, shared by every routing writer so record-evidence and review
- * cannot drift apart. Returns the first task — in phase order then emergent order — that is pending
- * or in_progress and has no disposition. A disposed task is not executable regardless of its kind,
- * and a blocked task is neither pending nor in_progress, so it stays excluded as before. Returns
- * null when no executable task remains; closing semantics belong to the caller (never inferred here).
- */
-export function nextExecutableTaskId(active: ActiveSprint, skipId?: string): string | null {
-  const tasks = collectSprintTasks(active);
-  const next = tasks.find((task) => (
-    (skipId === undefined || task.id !== skipId)
-    && !task.disposition
-    && (task.status === 'pending' || task.status === 'in_progress')
-  ));
-  return next?.id ?? null;
 }

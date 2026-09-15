@@ -7,7 +7,7 @@ import { LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveScopeAuthorFromGit } from '../core/actor';
 import { KyroCoreError } from '../core/errors';
 import { countClarificationMarkers } from '../core/analysis';
-import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus } from '../core/status';
+import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, nextExecutableTaskId } from '../core/status';
 import { emitToolCommandRun } from '../core/trace';
 import { readProjectState, updateProjectStateLayers } from '../state';
 import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, ScopeAuthor, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
@@ -389,7 +389,7 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
 
   const markers = countClarificationMarkers(next);
   const nextAction: NextAction = markers > 0 ? 'clarify' : 'execute_task';
-  const nextTaskId = markers > 0 ? null : phases[0].tasks[0].id;
+  const nextTaskId = markers > 0 ? null : nextExecutableTaskId(next);
   const note = markers > 0
     ? `Sprint ${input.sprint.n} planned with ${markers} unresolved [NEEDS CLARIFICATION] marker(s); resolve them before executing.`
     : `Sprint ${input.sprint.n} planned; ready to execute.`;

@@ -4,13 +4,13 @@ import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { formatScopeAuthor } from '../core/actor';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { unregisteredScopeFolders } from '../core/scopes';
-import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, isTaskVerifiedComplete } from '../core/status';
+import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, isTaskVerifiedComplete, taskExecutionInfo } from '../core/status';
 import { hasStaleReview } from '../core/review-material';
 import { KyroCoreError } from '../core/errors';
 import { deriveScopeVerificationState } from '../remediation/plan';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
 import { ADR_STATUS } from '../types';
-import type { ActiveSprint, AdrRecord, AdrStatus, Debt, ScopeAuthor, ScopeRetirement, ScopeVerification, SprintFile, Task, TaskStatus } from '../types';
+import type { ActiveSprint, AdrRecord, AdrStatus, Debt, ScopeAuthor, ScopeRetirement, ScopeVerification, SprintFile, Task, TaskExecutionInfo, TaskStatus } from '../types';
 
 const STATUS_MODE = {
   BRIEF: 'brief',
@@ -69,6 +69,13 @@ interface RecentAdr {
   date: string;
 }
 
+interface ExecutionSummary {
+  readyTaskIds: string[];
+  awaitingReviewTaskIds: string[];
+  waitingOnDependencyTaskIds: string[];
+  blockedTasks: TaskExecutionInfo[];
+}
+
 interface BriefStatusReport {
   scope: string;
   status: string;
@@ -78,6 +85,7 @@ interface BriefStatusReport {
   nextAction: string;
   nextTask: TaskReference | null;
   blockers: string[];
+  execution: ExecutionSummary;
   openDebtCount: number;
   pendingReviewCount: number;
   /** Present when project layers/monolito are missing or disk scopes are unregistered (D7a). */
@@ -231,6 +239,13 @@ function readSprint(scope: string): SprintFile {
 function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusReport {
   const activeSprint = sprint.activeSprint;
   const reviewDebt = collectReviewDebt(sprint);
+  const executionInfo = taskExecutionInfo(sprint);
+  const execution: ExecutionSummary = {
+    readyTaskIds: executionInfo.filter((info) => info.state === 'ready').map((info) => info.taskId),
+    awaitingReviewTaskIds: executionInfo.filter((info) => info.state === 'awaiting_review').map((info) => info.taskId),
+    waitingOnDependencyTaskIds: executionInfo.filter((info) => info.state === 'waiting_on_dependency').map((info) => info.taskId),
+    blockedTasks: executionInfo.filter((info) => info.state === 'blocked'),
+  };
   return {
     scope,
     status: deriveScopeStatus(sprint, Boolean(activeSprint)),
@@ -246,6 +261,7 @@ function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusR
     nextAction: sprint.handoff.nextAction,
     nextTask: resolveNextTask(activeSprint, sprint.handoff.nextTaskId),
     blockers: sprint.handoff.blockers ?? [],
+    execution,
     openDebtCount: countOpenDebt(sprint.debt),
     pendingReviewCount: reviewDebt.length,
     bootstrapRemedy: resolveBootstrapRemedy(),
@@ -397,6 +413,8 @@ function printBriefStatus(report: BriefStatusReport): void {
   }
   console.log(`Open debt: ${report.openDebtCount}`);
   console.log(`Pending review: ${report.pendingReviewCount}`);
+  if (report.execution.readyTaskIds.length) console.log(`Ready tasks: ${report.execution.readyTaskIds.join(', ')}`);
+  if (report.execution.blockedTasks.length) console.log(`Blocked tasks: ${report.execution.blockedTasks.map((item) => `${item.taskId}${item.blockedByTaskIds.length ? ` ← ${item.blockedByTaskIds.join(', ')}` : ''}`).join(' | ')}`);
   if (report.verification) console.log(`Verification: ${report.verification.state} — ${report.verification.detail}`);
   if (report.blockers.length > 0) console.log(`Blockers: ${report.blockers.join(' | ')}`);
   if (report.bootstrapRemedy) console.log(`Bootstrap: ${report.bootstrapRemedy}`);

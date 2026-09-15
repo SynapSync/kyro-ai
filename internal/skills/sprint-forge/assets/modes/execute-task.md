@@ -12,8 +12,8 @@ Execute the active sprint task, recording evidence through the Kyro CLI.
 1. Understand the task from its fields. Make the smallest coherent change.
 2. Validate per `acceptance_criteria` (tsc, lint, tests, grep, manual), **scoped to the touched area**: only tests for changed files; cap searches (`-l`, `-m N`, `| head`, or a path). After three failed correction rounds, mark `blocked` with evidence.
 3. Record evidence via CLI — never hand-edit `sprint.json`:
-   `{{KYRO_CLI}} record-evidence <task-id> --kyro-scope {scope} --summary "..." --validation "<check>" [--validation ...] [--file <path> ...] [--notes "..."] [--status blocked] [--disposition deferred|blocked|superseded|cancelled --reason "..." [--target debt:<id>|task:<id>|sprint:<n>]]`
-   Writes `task.evidence`. Without `--disposition`, sets `task.status` (`done` default; `blocked` after three failed rounds) and routes `handoff` to `review_task`. With `--disposition`, records unfinished work as deferred/blocked/superseded/cancelled (never `done`/`pass`) and keeps routing on `execute_task`.
+   `{{KYRO_CLI}} record-evidence <task-id> --kyro-scope {scope} --summary "..." --validation "<check>" [--validation ...] [--file <path> ...] [--notes "..."] [--status blocked] [--disposition deferred|superseded|cancelled --reason "..." [--target debt:<id>|task:<id>|sprint:<n>]]`
+   `done` routes that task to `review_task`. Temporary `blocked` skips review; inspect `context-pack.execution` and continue only ready independent work. Dependents stay pending but computed blocked. Resume with fresh `done` evidence, then review. Terminal dispositions are deferred/superseded/cancelled; legacy `--disposition blocked` is read-only.
    **No `--yes` here** — that flag is for `review` (and similar confirm verbs), not `record-evidence`.
 4. Emergent work: `{{KYRO_CLI}} add-emergent --title <t> --description <d> --acceptance <a>` when it blocks the objective; new debt via `{{KYRO_CLI}} debt add`.
 

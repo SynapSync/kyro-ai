@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format is based on
 
 - Live reviews with changed material now appear as stale in analysis, task packs and status, block sprint close, and cannot be replayed as a current approval with an old digest. Unchanged legacy verdicts remain readable.
 - Dependency cycles are now reported by analysis and rejected by active-plan updates. Workflow instructions route active contract corrections through the existing planner rather than attempting next-sprint planning.
+- Temporary task blocks now skip checker review, preserve independent execution, and expose derived dependency blockers in status/context packs. New terminal `blocked` dispositions are rejected while legacy records remain readable.
 
 ## [4.49.4] - 2026-09-14
 

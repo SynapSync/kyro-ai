@@ -12,7 +12,7 @@ import { activeGraphIssues } from './task-graph';
 import { canonicalJson, sha256 } from './digest';
 import { KyroCoreError } from './errors';
 import { policyIssues, loadPolicy } from './policy';
-import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId } from './status';
+import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId, taskExecutionInfo } from './status';
 import { emitToolCommandRun } from './trace';
 import type { ActiveSprint, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
 
@@ -183,8 +183,9 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
     if (task.status === 'done') { change(task.id, 'status', 'done', 'pending'); task.status = 'pending'; }
   }
   if (changes.length) {
+    const execution = new Map(taskExecutionInfo(next).map((info) => [info.taskId, info]));
     for (const phase of next.activeSprint!.phases) {
-      const status = derivePhaseStatus(phase);
+      const status = derivePhaseStatus(phase, execution);
       change(`phase:${phase.id}`, 'status', phase.status, status);
       phase.status = status;
     }
@@ -192,7 +193,7 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
     change('activeSprint', 'status', next.activeSprint!.status, sprintStatus);
     next.activeSprint!.status = sprintStatus;
     // Keep the normal route; an affected task may still depend on an earlier pending task.
-    const nextTask = nextExecutableTaskId(next.activeSprint!);
+    const nextTask = nextExecutableTaskId(next);
     next.handoff = { ...next.handoff,
       ...(nextTask ? { nextAction: 'execute_task', nextTaskId: nextTask } : {}),
       note: `Active plan updated: ${input.reason}. Revalidate affected tasks: ${[...affected].sort().join(', ') || 'none'}. Previous evidence is retained for reference, not renewed approval.`,

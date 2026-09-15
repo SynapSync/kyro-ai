@@ -101,7 +101,7 @@ function withAddedEmergentTask(sprint: SprintFile, task: Task): SprintFile {
     handoff: {
       ...sprint.handoff,
       nextAction: 'execute_task',
-      nextTaskId: nextExecutableTaskId(nextActive),
+      nextTaskId: nextExecutableTaskId({ ...sprint, activeSprint: nextActive }),
       note: `Emergent task ${task.id} was added and routed to execution.`,
       lastUpdated: new Date().toISOString(),
     },

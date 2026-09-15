@@ -339,7 +339,7 @@ function addDebtAndReplacement(root) {
   }
 }
 
-// 13) cancelled and superseded write a non-success terminal record; blocked disposition sets status blocked.
+// 13) cancelled and superseded write non-success terminal records; new blocked dispositions are rejected.
 {
   const root = sandbox();
   try {
@@ -385,6 +385,7 @@ function addDebtAndReplacement(root) {
 {
   const root = sandbox();
   try {
+    const before = readFileSync(sprintPath(root), 'utf-8');
     const rec = run([
       'record-evidence', 'T1.1', '--kyro-scope', 'demo',
       '--summary', 'Still blocked on access.',
@@ -392,11 +393,8 @@ function addDebtAndReplacement(root) {
       '--disposition', 'blocked',
       '--reason', 'Cannot proceed without staging credentials.',
     ], root);
-    assert(rec.status === 0, `blocked disposition should succeed: ${rec.stdout}${rec.stderr}`);
-    const task = readSprint(root).activeSprint.phases[0].tasks[0];
-    assert(task.status === 'blocked', `blocked disposition should set status blocked, got ${task.status}`);
-    assert(task.disposition.kind === 'blocked', 'kind should be blocked');
-    assert(readSprint(root).handoff.nextAction === 'execute_task', 'blocked disposition must not route to review_task');
+    assert(rec.status === 1 && (rec.stdout + rec.stderr).includes('BLOCKED_DISPOSITION_DEPRECATED'), `new blocked disposition should be rejected: ${rec.stdout}${rec.stderr}`);
+    assert(readFileSync(sprintPath(root), 'utf-8') === before, 'rejected blocked disposition must not write sprint.json');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -582,8 +580,7 @@ for (const kind of ['superseded', 'cancelled']) {
   }
 }
 
-// 19) Compatibility: a blocked task without a disposition still routes to review_task (blocked is
-//     excluded as an executable state, but the handoff records it for checker review as before).
+// 19) Temporary blocked work skips checker review and routes independent ready work.
 {
   const root = sandbox();
   try {
@@ -605,7 +602,11 @@ for (const kind of ['superseded', 'cancelled']) {
     const rec = run(['record-evidence', 'T1.1', '--kyro-scope', 'demo', '--summary', 'Stuck.', '--validation', 'tsc', '--status', 'blocked'], root);
     assert(rec.status === 0, `blocked record should succeed: ${rec.stdout}${rec.stderr}`);
     const handoff = readSprint(root).handoff;
-    assert(handoff.nextAction === 'review_task' && handoff.nextTaskId === 'T1.1', `blocked without disposition routes to review_task for the task, got ${handoff.nextAction}/${handoff.nextTaskId}`);
+    assert(handoff.nextAction === 'execute_task' && handoff.nextTaskId === 'T1.2', `temporary block should route independent work, got ${handoff.nextAction}/${handoff.nextTaskId}`);
+    const beforeReview = readFileSync(sprintPath(root), 'utf-8');
+    const review = run(['review', 'T1.1', '--kyro-scope', 'demo', '--verdict', 'fail'], root);
+    assert(review.status === 1 && (review.stdout + review.stderr).includes('BLOCKED_TASK_NOT_REVIEWABLE'), `temporary blocked task must reject review: ${review.stdout}${review.stderr}`);
+    assert(readFileSync(sprintPath(root), 'utf-8') === beforeReview, 'blocked review rejection must not write sprint.json');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -642,6 +643,75 @@ for (const verdict of ['pass', 'fail']) {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  }
+}
+
+// 21) Reproduces the Momox routing failure: a temporary block skips review, routes an independent
+// task, and exposes transitive dependency blockage without rewriting dependent task statuses.
+{
+  const root = sandbox();
+  try {
+    const finish = (id) => {
+      const rec = run(['record-evidence', id, '--kyro-scope', 'demo', '--summary', `${id} complete.`, '--validation', 'tsc'], root);
+      assert(rec.status === 0, `${id} evidence should succeed: ${rec.stdout}${rec.stderr}`);
+      const review = run(['review', id, '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+      assert(review.status === 0, `${id} review should pass: ${review.stdout}${review.stderr}`);
+    };
+    finish('T1.1');
+    const sprint = readSprint(root);
+    const base = structuredClone(sprint.activeSprint.phases[0].tasks[0]);
+    const make = (id, dependsOn = []) => ({ ...structuredClone(base), id, title: id, description: `${id} work.`, depends_on: dependsOn, status: 'pending', evidence: null, verdict: null });
+    sprint.activeSprint.phases[0].tasks.push(make('T1.2', ['T1.1']), make('T1.3'), make('T1.4', ['T1.2']));
+    sprint.activeSprint.phases[0].status = 'active'; sprint.activeSprint.status = 'executing';
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+
+    const blocked = run(['record-evidence', 'T1.2', '--kyro-scope', 'demo', '--summary', 'Awaiting access.', '--validation', 'access request recorded', '--status', 'blocked'], root);
+    assert(blocked.status === 0, `temporary block should succeed: ${blocked.stdout}${blocked.stderr}`);
+    const afterBlock = readSprint(root);
+    assert(afterBlock.activeSprint.phases[0].tasks.find((task) => task.id === 'T1.4').status === 'pending', 'dependent must not be persistently rewritten to blocked');
+    assert(afterBlock.handoff.nextAction === 'execute_task' && afterBlock.handoff.nextTaskId === 'T1.3', `independent task should be routed, got ${afterBlock.handoff.nextAction}/${afterBlock.handoff.nextTaskId}`);
+
+    const status = run(['status', 'full', '--kyro-scope', 'demo', '--json'], root);
+    assert(status.status === 0, `status full should succeed: ${status.stdout}${status.stderr}`);
+    const report = JSON.parse(status.stdout).data;
+    assert(report.status === 'active', `scope should remain active with ready sibling: ${status.stdout}`);
+    assert(report.execution.readyTaskIds.includes('T1.3'), `T1.3 should be ready: ${status.stdout}`);
+    const downstream = report.execution.blockedTasks.find((item) => item.taskId === 'T1.4');
+    assert(downstream && downstream.blockReason === 'blocked_dependency' && downstream.blockedByTaskIds.includes('T1.2'), `T1.4 should report T1.2 as a derived blocker: ${status.stdout}`);
+
+    const pack = run(['context-pack', '--kyro-scope', 'demo', '--task', 'T1.4', '--json'], root);
+    assert(pack.status === 0, `dependent task pack should succeed: ${pack.stdout}${pack.stderr}`);
+    const taskPack = JSON.parse(pack.stdout).data;
+    assert(taskPack.taskExecution?.state === 'blocked' && taskPack.taskExecution.blockedByTaskIds.includes('T1.2'), `task pack should expose blocking dependency: ${pack.stdout}`);
+
+    const resume = run(['record-evidence', 'T1.2', '--kyro-scope', 'demo', '--summary', 'Access granted and work complete.', '--validation', 'tsc'], root);
+    assert(resume.status === 0 && readSprint(root).handoff.nextAction === 'review_task', `blocked task should resume via ordinary evidence/review: ${resume.stdout}${resume.stderr}`);
+    const pass = run(['review', 'T1.2', '--kyro-scope', 'demo', '--verdict', 'pass'], root);
+    assert(pass.status === 0, `resumed task review should pass: ${pass.stdout}${pass.stderr}`);
+    const resumed = JSON.parse(run(['status', '--kyro-scope', 'demo', '--json'], root).stdout).data;
+    assert(resumed.execution.readyTaskIds.includes('T1.4'), `dependent should become ready after prerequisite pass: ${JSON.stringify(resumed.execution)}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 22) Legacy terminal blocked dispositions remain readable and block dependents without any migration.
+{
+  const root = sandbox();
+  try {
+    const sprint = readSprint(root);
+    const base = structuredClone(sprint.activeSprint.phases[0].tasks[0]);
+    const legacy = { ...structuredClone(base), id: 'T1.2', title: 'Legacy blocked', depends_on: [], status: 'blocked', evidence: null, verdict: null,
+      disposition: { kind: 'blocked', reason: 'Historical hold.', by: 'maker', recordedAt: '2026-01-01T00:00:00.000Z' } };
+    const dependent = { ...structuredClone(base), id: 'T1.3', title: 'Dependent', depends_on: ['T1.2'], status: 'pending', evidence: null, verdict: null };
+    sprint.activeSprint.phases[0].tasks.push(legacy, dependent);
+    writeFileSync(sprintPath(root), `${JSON.stringify(sprint, null, 2)}\n`);
+    const status = run(['status', '--kyro-scope', 'demo', '--json'], root);
+    assert(status.status === 0, `legacy disposition should remain readable: ${status.stdout}${status.stderr}`);
+    const blocked = JSON.parse(status.stdout).data.execution.blockedTasks.find((item) => item.taskId === 'T1.3');
+    assert(blocked?.blockReason === 'terminal_dependency' && blocked.blockedByTaskIds.includes('T1.2'), `legacy terminal blocker must be derived: ${status.stdout}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 }
 
