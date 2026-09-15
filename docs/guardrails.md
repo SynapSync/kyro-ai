@@ -61,6 +61,14 @@ Adapters without MCP capability do not receive MCP config.
 
 Policy denials emit `blocked_reason`; approvals emit `gate_approved`. Trace is best-effort and never a source of truth.
 
+## Active task definitions
+
+`plan --update-active` uses the existing CLI writer boundary, not direct editor access. It requires
+an open scope, its current unclosed sprint, a read-only preview digest and explicit confirmation.
+The apply re-reads under the state-writer lease and atomically replaces the live sprint together
+with affected approval invalidation. Historical artifacts and parent lifecycle fields are not
+editable input. Existing Claude editor protections remain in place; no new host hook is required.
+
 ## Error codes
 
 - `CONFIRMATION_REQUIRED`: operation needs explicit approval.

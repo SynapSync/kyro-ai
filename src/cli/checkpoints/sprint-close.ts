@@ -9,7 +9,9 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { canonicalJson, sha256 } from '../core/digest';
+export { canonicalJson, sha256 } from '../core/digest';
 import { dirname } from 'node:path';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
@@ -75,15 +77,6 @@ export interface SprintCloseApplyResult {
   checkpointPath: string;
   checkpointId: string;
   resumed: boolean;
-}
-
-export function canonicalJson(value: unknown): string {
-  return JSON.stringify(sortJson(value));
-}
-
-export function sha256(value: unknown): string {
-  const input = typeof value === 'string' ? value : canonicalJson(value);
-  return createHash('sha256').update(input, 'utf8').digest('hex');
 }
 
 /**
@@ -739,13 +732,6 @@ function validateScopeEntry(value: unknown, path: string, issues: string[]): voi
 function assertSafePathSegmentForValidation(value: string, path: string, issues: string[]): void {
   try { assertSafePathSegment(value, path); }
   catch (error) { issues.push(error instanceof Error ? error.message : String(error)); }
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortJson);
-  const record = asRecord(value);
-  if (!record) return value;
-  return Object.fromEntries(Object.keys(record).sort().map((key) => [key, sortJson(record[key])]));
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

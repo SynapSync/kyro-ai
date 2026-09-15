@@ -8,7 +8,7 @@ The active sprint has completed task-level maker/checker review. Ask the user wh
 
 1. Read `.agents/kyro/scopes/{scope}/sprint.json` only after routing here. Confirm every phase and emergent task is `done` with a passing task verdict and no disposition.
 2. Run `{{KYRO_CLI}} analyze --kyro-scope {scope}`. Do not offer close while CRITICAL or HIGH findings remain.
-3. Keep the current-session flag `qaRemediationPending` in orchestration context only. It is deliberately not persisted in Kyro state.
+3. Keep the current-session flag `qaRemediationPending` in orchestration context only. It is deliberately not persisted in Kyro state. Also inspect existing handoff/evidence notes for a known re-QA obligation carried through an active-plan update; recover its prior report or ask when ambiguous. Notes are workflow provenance, not a stored QA certificate.
 
 ## Initial decision
 
@@ -34,6 +34,7 @@ If the report is missing a clear verdict or does not provide enough detail to wr
 For each coherent correction unit:
 
 - Finding clearly violates an existing task's acceptance criteria → run `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict fail --finding critical:"..." --yes` so that task returns to execution.
+- An approved change to the definition of an existing active task → load `../helpers/active-plan-update.md` and use `plan --update-active`; preserve the re-QA obligation in its reason and subsequent evidence notes. The tool updates the contract and invalidates affected approvals; task `done` or a previous QA approval alone does not freeze active work.
 - New, cross-cutting, or ambiguously owned work → run `{{KYRO_CLI}} add-emergent --kyro-scope <scope> --title "..." --description "..." --acceptance "..." [--file <path> ...] --context "Required by kyro qa: ..."`.
 - Non-blocking follow-up → use `{{KYRO_CLI}} debt add`; do not disguise it as completed work.
 
@@ -50,7 +51,7 @@ When all corrective tasks pass and routing returns to `qa_or_close` while `qaRem
 3. Repeat remediation and re-QA until the result is `APPROVED` or `APPROVED WITH NOTES`, or until blocked on a user decision.
 4. Clear the in-memory flag only after an approving result, then continue to `close-sprint.md`.
 
-If the session ends, the flag is lost by design. A fresh session presents the initial QA-or-close decision again; do not claim that QA history is persisted.
+If the session ends, the flag is lost by design; do not claim that QA history is persisted. A fresh session presents the initial QA-or-close decision again only when no prior re-QA obligation is known from the available report or existing notes. A known obligation must be resolved, not silently discarded. If an approval cannot be recovered, repeat the already-required QA or ask the user; do not invent one.
 
 ## Rules
 

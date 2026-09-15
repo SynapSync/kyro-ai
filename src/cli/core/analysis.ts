@@ -17,8 +17,10 @@ import type {
 import { KyroCoreError } from './errors';
 import { makerCheckerPolicy, policyIssues } from './policy';
 import { resolveScope } from './scope-resolution';
-import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, normalizeStoredPhaseStatus } from './status';
+import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, normalizeStoredPhaseStatus, taskExecutionInfo } from './status';
 import { emitBlockedReason, emitTraceEvent } from './trace';
+import { hasStaleReview } from './review-material';
+import { dependencyCycle } from './task-graph';
 
 const SEVERITY_ORDER: AnalysisSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const MAX_FINDINGS = 50;
@@ -90,8 +92,17 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
     const tasks = allTasks(active);
     if (tasks.length === 0) add('CRITICAL', 'coverage', 'active sprint has zero tasks', 'Generate tasks with plan-sprint, or this sprint cannot be executed or verified.');
     for (const t of tasks) if (!Array.isArray(t.acceptance_criteria) || t.acceptance_criteria.length === 0) add('CRITICAL', 'coverage', `task ${t.id} has no acceptance_criteria`, 'Every task must carry verifiable acceptance criteria (see plan-sprint).');
+    const cycle = dependencyCycle(tasks);
+    if (cycle.length) add('HIGH', 'dependencies', `dependency cycle affects ${cycle.join(', ')}`, 'Remove the cycle from the active plan before executing or closing.');
     const ids = new Set(tasks.map((t) => t.id));
     for (const t of tasks) for (const dep of t.depends_on ?? []) if (!ids.has(dep)) add('HIGH', 'dependencies', `task ${t.id} depends_on "${dep}" which does not exist`, 'Fix the depends_on reference or add the missing task.');
+    const execution = new Map(taskExecutionInfo(sprint).map((info) => [info.taskId, info]));
+    if (sprint.handoff.nextAction === 'execute_task') {
+      const routed = sprint.handoff.nextTaskId ? execution.get(sprint.handoff.nextTaskId) : null;
+      const ready = [...execution.values()].some((info) => info.state === 'ready');
+      if (routed && routed.state !== 'ready') add('MEDIUM', 'routing', `handoff nextTaskId ${routed.taskId} is ${routed.state}, not dependency-ready`, 'Run the routing writer that changed task state, or select a dependency-ready task.');
+      if (!routed && ready) add('MEDIUM', 'routing', 'handoff has ready work but no dependency-ready nextTaskId', 'Route execute_task to the first dependency-ready task.');
+    }
     const seen = new Set<string>();
     for (const t of tasks) { if (seen.has(t.id)) add('MEDIUM', 'consistency', `duplicate task id "${t.id}"`, 'Task ids must be unique within a sprint.'); seen.add(t.id); }
     for (const d of sprint.debt) if ((d.status === 'open' || d.status === 'in_progress') && typeof d.targetSprint === 'number' && d.targetSprint < active.n) add('HIGH', 'debt', `debt ${d.id} was due in sprint ${d.targetSprint} and is still ${d.status}`, 'Address it this sprint or re-target it explicitly with a reason.');
@@ -157,8 +168,9 @@ export interface SpecFindingsOptions {
 }
 
 export function collectSpecFindings(sprint: SprintFile, options: SpecFindingsOptions = {}): AnalysisFinding[] {
-  const spec = sprint.spec;
-  if (!spec) return [];
+  const tasks = sprint.activeSprint ? allTasks(sprint.activeSprint) : [];
+  if (!sprint.spec && !tasks.some((task) => (task.scenario_refs ?? []).length)) return [];
+  const spec = sprint.spec ?? { requirements: [], scenarios: [], openQuestions: [] };
 
   const out: AnalysisFinding[] = [];
   let n = 0;
@@ -169,7 +181,6 @@ export function collectSpecFindings(sprint: SprintFile, options: SpecFindingsOpt
 
   const requirementIds = new Set(spec.requirements.map((requirement) => requirement.id));
   const scenarioIds = new Set(spec.scenarios.map((scenario) => scenario.id));
-  const tasks = sprint.activeSprint ? allTasks(sprint.activeSprint) : [];
   const referencedRequirements = new Set<string>();
   const activeReferencedScenarios = new Set<string>();
   const historicalScenarioRefs = new Set(options.historicalScenarioRefs ?? []);
@@ -333,6 +344,9 @@ export function collectCheckerFindings(sprint: SprintFile, principles: Principle
       }
     }
     if (!verdict || verdict.result !== 'pass') continue;
+    if (hasStaleReview(sprint, task)) {
+      add('CRITICAL', `task ${task.id} pass verdict is stale: reviewed material changed`, 'Revalidate the current task, record fresh evidence and run a fresh review; do not reuse an old approval digest.');
+    }
     // A pass verdict is only meaningful on an executed task. Without this, a pass written onto a
     // still-pending task produces no finding (every check below is done-gated), so review's own gate
     // never fires and the sprint lands in the inconsistent state pass+pending+handoff-stuck.

@@ -6,10 +6,11 @@ import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
 import { listScopeNames } from '../artifacts/scopes';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
-import { deriveScopeStatus } from '../core/status';
+import { deriveScopeStatus, taskExecutionInfo } from '../core/status';
 import { emitTraceEvent } from '../core/trace';
 import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
+import { hasStaleReview } from '../core/review-material';
 import { getPersistedKyroInvocation } from '../invocation';
 import { scopeFindingsToTask } from './review';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
@@ -77,6 +78,14 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const adrs = selectAdrs(sprint, concise);
   const taskScenarios = resolveTaskScenarios(sprint, task);
   const { reviewPending, nextTaskReview } = resolveReviewDebt(sprint, task);
+  const executionInfo = taskExecutionInfo(sprint);
+  const selectedTaskExecution = task ? executionInfo.find((info) => info.taskId === task.id) ?? null : null;
+  const execution = {
+    readyTaskIds: executionInfo.filter((info) => info.state === 'ready').map((info) => info.taskId),
+    awaitingReviewTaskIds: executionInfo.filter((info) => info.state === 'awaiting_review').map((info) => info.taskId),
+    waitingOnDependencyTaskIds: executionInfo.filter((info) => info.state === 'waiting_on_dependency').map((info) => info.taskId),
+    blockedTasks: executionInfo.filter((info) => info.state === 'blocked'),
+  };
   // D7a: never create project state from context-pack; surface install remedy when layers missing.
   const bootstrapRemedy = detectProjectStateBootstrapNeed(unregisteredScopeFolders(projectState));
   if (bootstrapRemedy) warnings.push(bootstrapRemedy);
@@ -116,6 +125,8 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     taskScenarios,
     handoffNote: sprint.handoff.note || null,
     blockers: sprint.handoff.blockers ?? [],
+    execution,
+    taskExecution: selectedTaskExecution,
     reviewPending,
     nextTaskReview,
     conventions,
@@ -338,7 +349,7 @@ function resolveReviewDebt(sprint: SprintFile, task: Task | null): { reviewPendi
   const active = sprint.activeSprint;
   if (!active) return { reviewPending: [], nextTaskReview: null };
   const allTasks = active.phases.flatMap((phase) => phase.tasks).concat(active.emergentTasks);
-  const hasPass = (t: Task): boolean => asTaskVerdict(t.verdict)?.result === 'pass';
+  const hasPass = (t: Task): boolean => asTaskVerdict(t.verdict)?.result === 'pass' && !hasStaleReview(sprint, t);
   const reviewPending = allTasks.filter((t) => t.status === 'done' && !hasPass(t)).map((t) => t.id);
 
   if (!task) return { reviewPending, nextTaskReview: null };
@@ -369,7 +380,9 @@ function estimatePackTokens(pack: Omit<ContextPackOutput, 'estimatedTokens'>): n
     ...pack.specRequirements.map((requirement) => `${requirement.id} ${requirement.statement} ${requirement.rationale ?? ''}`),
     ...pack.specNonGoals, ...pack.specOpenQuestions,
     ...pack.taskScenarios.map((scenario) => `${scenario.id} ${scenario.given} ${scenario.when} ${scenario.then}`),
-    ...pack.blockers, ...pack.conventions.map((c) => c.rule),
+    ...pack.blockers, ...pack.execution.readyTaskIds, ...pack.execution.awaitingReviewTaskIds,
+    ...pack.execution.waitingOnDependencyTaskIds, ...pack.execution.blockedTasks.flatMap((item) => item.blockedByTaskIds),
+    ...pack.conventions.map((c) => c.rule),
     ...pack.adrs.map((adr) => `${adr.id} ${adr.title} ${adr.status} ${adr.context} ${adr.decision} ${adr.consequences.join(' ')} ${adr.alternatives.join(' ')}`),
     ...pack.cliRecipes.map((recipe) => `${recipe.id} ${recipe.purpose} ${recipe.command}`),
   ].filter(Boolean).join(' ');
@@ -386,6 +399,8 @@ function printContextPackText(pack: ContextPackOutput): void {
   if (pack.specNonGoals.length) console.log(`Non-goals: ${pack.specNonGoals.join(' | ')}`);
   if (pack.specOpenQuestions.length) console.log(`Open questions: ${pack.specOpenQuestions.join(' | ')}`);
   console.log(`Open debt: ${pack.openDebtCount}`);
+  if (pack.execution.readyTaskIds.length) console.log(`Ready tasks: ${pack.execution.readyTaskIds.join(', ')}`);
+  if (pack.execution.blockedTasks.length) console.log(`Blocked tasks: ${pack.execution.blockedTasks.map((item) => `${item.taskId}${item.blockedByTaskIds.length ? ` ← ${item.blockedByTaskIds.join(', ')}` : ''}`).join(' | ')}`);
   if (pack.packMode === 'task' && pack.taskId) {
     console.log(`\nTask ${pack.taskId}: ${pack.taskTitle ?? ''}`);
     if (pack.taskDescription) console.log(`  ${pack.taskDescription}`);

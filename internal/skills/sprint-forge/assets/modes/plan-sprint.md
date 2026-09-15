@@ -2,6 +2,10 @@
 
 Generate a lean sprint-plan input and let `{{KYRO_CLI}} plan` materialize the next `activeSprint`. The agent never writes `sprint.json`.
 
+## Existing active work
+
+Existing active-task changes: load `../helpers/active-plan-update.md`; do not close/replan merely to edit them.
+
 ## Inputs
 
 1. Read `.agents/kyro/scopes/{scope}/sprint.json` (single source of truth).
