@@ -635,11 +635,12 @@ Each target is either an exact `open_question` or a clarification `marker`. The 
 
 ## Tool-owned task evidence and disposition (`kyro record-evidence`)
 
-`kyro record-evidence <task> --summary <text> --validation <text> [--file <path> ...] [--status done|blocked] [--disposition deferred|blocked|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]]` is the single maker write onto a located task. It never hand-edits `sprint.json`.
+`kyro record-evidence <task> --summary <text> --validation <text> [--file <path> ...] [--status done|blocked] [--disposition deferred|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]]` is the single maker write onto a located task. It never hand-edits `sprint.json`.
 
 - Default `--status done` records evidence and routes to `review_task`. The checker verdict stays on `kyro review`.
-- `--status blocked` without `--disposition` is the in-sprint block (still reviewable).
-- `--disposition` records a typed terminal explanation for unfinished work. It requires a non-empty `--reason`. `deferred` and `superseded` also require `--target` (`debt:<id>` must exist in `debt[]`; `task:<id>` must be a different task in the sprint; `sprint:<n>` is a positive integer and may name a future sprint). Unknown kinds, blank reasons, `--status done`, and invalid targets fail with no write.
+- `--status blocked` is a **temporary** in-sprint block: it records why work stopped, skips checker review, and routes the first dependency-satisfied independent task. A blocked task resumes when fresh `done` evidence is recorded, followed by its ordinary review.
+- The scheduler executes only tasks whose dependencies have fresh `done + pass` verdicts. Dependents of a blocked/terminal prerequisite stay pending on disk but are reported as derived blocked; unrelated ready tasks continue. `status` and `context-pack` expose ready, waiting, review-pending and blocked task lists with blocker IDs.
+- `--disposition` records a typed terminal explanation for unfinished work. It requires a non-empty `--reason`. `deferred` and `superseded` also require `--target` (`debt:<id>` must exist in `debt[]`; `task:<id>` must be a different task in the sprint; `sprint:<n>` is a positive integer and may name a future sprint). New `--disposition blocked` writes are rejected; legacy blocked dispositions remain readable. Unknown kinds, blank reasons, `--status done`, and invalid targets fail with no write.
 - A disposition is not `done` and not `pass`. Historical tasks omit the field.
 
 See [adr-adaptive-sprint-lifecycle.md](plans/adr-adaptive-sprint-lifecycle.md) and [status-coherence.md](status-coherence.md).
@@ -768,6 +769,55 @@ Lean sprint-plan file shape (`--kyro-scope` is required — this file has no `"s
 
 `sprint.n` must equal `(max n in sprint.ledger[]) + 1`, or `1` if the ledger is empty. Phase and task `id`s must be unique within the sprint; `depends_on` entries must reference a task `id` that exists in the same file. `scenarios` is optional; each `requirement` must reference an existing `spec.requirements[].id`, and each task's `scenario_refs` must reference a scenario `id` that exists after merging (existing `spec.scenarios` ∪ this file's `scenarios`, merged by `id` — new entries added, existing ones replaced). `definitionOfDone` is required and non-empty. The matching `roadmap.sprints[]` entry (by `n`) is set to `state: 'active'`; `debt[]` is left untouched (not auto-transitioned).
 
+### Update existing active tasks (`plan --update-active`)
+
+Use the existing `plan` command in its explicit update mode. The agent edits an input file; Kyro
+writes the source of truth under its state-writer lock. Default init/next-sprint behavior is unchanged.
+Both the scope and target sprint must still be open. Task `done` or sprint status `complete` is not
+archival; an actual closed/shipped sprint is immutable even when its scope remains open or is reopened.
+
+```json
+{
+  "sprint": { "n": 1, "slug": "foundation" },
+  "reason": "Clarify the active authorization boundary.",
+  "tasks": [{ "id": "T1.1", "context": "Preparation and destructive actions need separate approvals." }]
+}
+```
+
+```bash
+kyro plan --update-active --from active-update.json --kyro-scope auth-refactor --dry-run --json
+kyro plan --update-active --from active-update.json --kyro-scope auth-refactor --digest <preview-digest> --yes --json
+```
+
+- Preview writes nothing and returns `digest`, `changes`, `affectedTaskIds`, `invalidatedTaskIds` and
+  `requiresConfirmation`. It shows before/after values, including removed criteria and derived
+  routing changes. `handoff.lastUpdated` is stamped at apply time, not during preview.
+- `--yes` confirms the reviewed update; it does not prove human identity or authorize execution of
+  the tasks' operational/destructive steps. A stale digest requires a fresh preview and approval.
+- Task updates accept `title`, `description`, `context`, `acceptance_criteria`, `files_to_touch`,
+  `depends_on`, `scenario_refs`. Arrays replace the complete field. IDs/membership, evidence, verdicts,
+  debt, lifecycle and archive fields cannot be supplied. Unknown/duplicate updates are rejected.
+- Optional `requirements: [{id, statement, priority?, rationale?}]` and
+  `scenarios: [{id, requirement, given, when, then}]` add/update active definitions. Existing scenario
+  requirement links are fixed. Historical definitions cannot be overwritten; retain them and use a
+  new active identity. Unverifiable historical consumers block shared-definition rewrites.
+- The tool validates the resulting graph (including cycles), schema, references and project gates.
+  It conservatively invalidates affected task verdicts and transitive dependents, returning affected
+  `done` tasks to `pending`. Pending/in-progress statuses and unaffected tasks are preserved. A
+  disposition is never removed or silently reactivated. Old evidence remains reference material.
+- Contract changes and invalidation are one durable atomic replacement of `sprint.json`; project
+  state and historical files are untouched. Diagnostics are best-effort trace, not a transactional
+  audit log. Active evidence/verdicts remain latest-value records, not a version history.
+- Revalidate changed work, use `record-evidence`, then obtain a fresh `review`. Repeat affected prior
+  optional QA when applicable; an edit alone does not introduce new QA or a `recertify` operation.
+- A retry after a successful apply requires a new preview; an input already matching current state
+  is a no-op. If an I/O error occurs after the rename, inspect/re-preview: the whole state may have
+  committed even though no success was reported. There is no durable update request receipt.
+
+Direct edits to `sprint.json` remain forbidden, and the existing Claude hook remains unchanged.
+For implementation-only corrections, use `review --verdict fail` on the same active task and repeat
+execution/evidence/review; no plan update or emergent task is needed solely because it was done.
+
 ## Spec traceability
 
 `kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces requirements for scope packs and resolved scenarios for task packs. See [spec-traceability.md](spec-traceability.md).
@@ -784,7 +834,7 @@ that leaves an immutable record of itself.
 | Runtime | Operations | Repairs |
 | --- | --- | --- |
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
-| **4.44.0 and later** (current: **4.49.4**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+| **4.44.0 and later** (current: **4.50.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

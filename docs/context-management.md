@@ -18,6 +18,14 @@ AI models have finite context windows. When your conversation approaches the lim
 
 ---
 
+## Existing active-task updates
+
+An explicit `plan --update-active` operation may read the relevant/full sprint definition to prepare
+its input. Ordinary execution still uses the lean task pack. Only the temporary input is agent-edited;
+the CLI owns managed-state changes. After apply, discard old task briefs and load fresh packs for
+all affected tasks. Carry known prior-QA follow-up in the update reason and subsequent evidence notes;
+if context loss makes prior QA unknown, recover the report or ask rather than silently assuming none.
+
 ## Compaction Strategies
 
 ### What is compaction?

@@ -49,13 +49,19 @@ Never infer routing from file presence. Never open the full `sprint.json` to rou
 4. **Record evidence** (maker):
    `{{KYRO_CLI}} record-evidence <task-id> --kyro-scope <scope> --summary "..." --validation "<check>" [--validation ...] [--file <path> ...] [--notes "..."]`
    - **No `--yes`/`--confirm` here** — those flags belong to `review`; passing them fails with `INVALID_INPUT`.
-   - After **three** failed correction rounds: rerun with `--status blocked`, then stop and report — do not grind further.
+   - After **three** failed correction rounds: rerun with `--status blocked`, then stop that task and report — do not grind further. Do **not** review it: this is temporary, and Kyro routes any independent dependency-satisfied task. Re-read `context-pack`; dependents stay pending but are reported as derived blocked. Resume only through fresh `done` evidence, then review.
 5. **Review** (checker):
    - Pass: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict pass [--by <actor>] --yes`
    - Fail: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict fail --finding critical:"..." --yes`
    - `--dry-run` and `--yes` are mutually exclusive.
    - The CLI vetoes a pass on missing/malformed evidence, unchecked acceptance criteria, tampered timestamps, non-negotiable principle violations, or self-review policy (`CHECKER_FAILED`, `SELF_REVIEW_BLOCKED`). A veto is a blocking finding: return to stage 2 and fix the cause. Never argue with, retry unchanged, or route around the checker.
 6. Re-run Step 1 to route to the next task. One task at a time — never run stages in parallel, never skip or reorder them.
+
+## Existing task corrections
+
+- An implementation defect in an existing active task uses `review --verdict fail`, then the normal task loop on the same ID. `done` is not immutable while the sprint is still active.
+- A definition change uses the existing `plan --update-active` operation. Load `sprint-forge/assets/helpers/active-plan-update.md` from the Kyro runtime for the exact input/preview/digest/apply protocol; an explicit planning update may inspect the full sprint but only edits a temporary input file. Never hand-edit managed state. Unknown option → stop and request a runtime upgrade.
+- Closed/shipped/archived tasks stay immutable even under a reopened scope. Stop and explain the closed parent. Repeat affected prior QA when applicable; do not introduce optional certification merely because a task changed.
 
 ## Emergent work and debt
 

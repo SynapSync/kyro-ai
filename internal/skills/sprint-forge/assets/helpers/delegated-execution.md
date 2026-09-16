@@ -31,7 +31,7 @@ Source from the task pack (`context-pack --task`), **not** the full `sprint.json
 | Expected validation | Derived from acceptance criteria |
 | **Prohibitions** | Worker must NOT mutate `sprint.json` / project layers; must NOT run `close-sprint`, `plan`, or hand-edit evidence/verdict; a missing CLI verb is an abort condition, never a license to hand-write state |
 
-Pass only what the worker needs.
+Pass only what the worker needs. If a worker finds a task-definition mismatch, it proposes the change; the orchestrator uses `active-plan-update.md` and the existing `plan --update-active` operation. Workers never edit the source of truth. Refresh the brief after any update invalidates its inputs.
 
 ## Status → CLI (execute)
 

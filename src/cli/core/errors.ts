@@ -42,6 +42,10 @@ export type KyroErrorCode =
   | 'REVIEW_REQUEST_DIVERGED'
   /** A task with a disposition is terminal for execution; no checker review path may reopen it. */
   | 'DISPOSED_TASK_NOT_REVIEWABLE'
+  /** A temporary blocked task must resume through fresh evidence, not a checker verdict. */
+  | 'BLOCKED_TASK_NOT_REVIEWABLE'
+  /** New terminal blocked dispositions are forbidden; legacy records remain readable. */
+  | 'BLOCKED_DISPOSITION_DEPRECATED'
   /** Close refused because an unfinished task has no typed disposition. */
   | 'UNDISPOSED_TASKS'
   /** A defined, parseable operation this runtime can prepare or preview but deliberately not apply. */

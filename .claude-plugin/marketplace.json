@@ -11,7 +11,7 @@
     {
       "name": "kyro-ai",
       "source": "./",
-      "description": "Claude Code adapter for Kyro: 6 public slash commands with internal workflow engines hidden from the command menu, markdown artifacts, formal debt tracking, runtime context-pack CLI with cliRecipes, human-gated scope retirement, tool-owned scenario/ADR/evidence/review/close verbs, deterministic evals, MCP typed tools, portable guardrails, maker/checker gates, and ledger-aware spec traceability.",
+      "description": "Claude Code adapter for Kyro: 6 public slash commands with internal workflow engines hidden from the command menu, markdown artifacts, formal debt tracking, runtime context-pack CLI with cliRecipes, human-gated scope retirement, tool-owned scenario/ADR/evidence/review/close verbs, digest-bound active-task updates, deterministic evals, MCP typed tools, portable guardrails, maker/checker gates, and ledger-aware spec traceability.",
       "author": {
         "name": "SynapSync"
       },
@@ -49,5 +49,5 @@
       ]
     }
   ],
-  "description": "Sprint-based multi-agent workflow with deterministic evals, typed MCP tools, trace events, portable guardrails, maker/checker gates, spec traceability, checkpoint gates, and persistent learning"
+  "description": "Sprint-based multi-agent workflow with deterministic evals, typed MCP tools, trace events, portable guardrails, maker/checker gates, spec traceability, checkpoint gates, digest-bound active-task updates, and persistent learning"
 }

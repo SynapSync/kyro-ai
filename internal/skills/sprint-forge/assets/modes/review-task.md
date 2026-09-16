@@ -17,7 +17,8 @@ Validate completed work and record the verdict through the Kyro checker tool.
    - Pass: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict pass --yes`
    - Fail: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict fail --finding critical:"…" --yes`
    - Use `--by <actor-id>` when known.
-5. Tool refuses a pass → treat as blocking finding; route back to execution.
+5. Tool refuses a pass → treat as blocking; return to execution. Never reuse a stale approval digest.
+6. Active definition correction: load `../helpers/active-plan-update.md`. Historical tasks remain immutable.
 
 ## Opt-in checker delegate
 

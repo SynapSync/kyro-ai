@@ -12,9 +12,10 @@ enforced by `check:status`.
 
 | Function | Rule |
 |---|---|
-| `derivePhaseStatus(phase)` | no tasks → `pending`; any task `blocked` → `blocked`; all `done` → `done`; any `in_progress` or a done/pending mix → `active`; else `pending` |
+| `taskExecutionInfo(sprint)` | derives `ready`, `awaiting_review`, `waiting_on_dependency`, `blocked`, `disposed` and `verified` from task state plus fresh dependency passes; it never rewrites dependent tasks. |
+| `derivePhaseStatus(phase)` | with execution info: `active` when a task is ready/reviewable; `blocked` only when no route remains; fallback preserves legacy leaf-only derivation. |
 | `deriveActiveSprintStatus(active)` | no tasks → `planned`; all tasks still `pending` → `planned`; all `done` → `complete`; else `executing` |
-| `deriveScopeStatus(sprint, hasActiveSprint)` | `retirement` → `retired`; active sprint with a blocked task or `handoff.blockers` → `blocked`; active sprint → `active`; an explicit `completion` record, or `handoff.nextAction === 'done'` (legacy terminal read) → `completed`; else `planning`. Exhausting the original roadmap yields `await_scope_completion`, still status `planning`, rather than completion. |
+| `deriveScopeStatus(sprint, hasActiveSprint)` | `retirement` → `retired`; explicit `handoff.blockers` → `blocked`; otherwise `active` while any task is ready or awaiting review, and `blocked` only when unfinished undisposed work has no route; completion/legacy `done` → `completed`; else `planning`. |
 
 These three signals answer different questions:
 
@@ -25,6 +26,14 @@ These three signals answer different questions:
 | `handoff.nextAction` | What the agent should do next (routing) |
 
 So `activeSprint.status: planned` with `nextAction: execute_task` is **coherent**: the sprint is materialised and ready, but no task has started yet. `kyro status` human output prints a short gloss in that case so agents do not treat it as a bug.
+
+## Dependency-aware blocking
+
+A temporary `--status blocked` does not enter checker review. It blocks only its own execution; its
+dependents remain unchanged in `sprint.json` but appear as derived blocked with root blocker IDs.
+Independent ready tasks continue. A blocked task resumes through fresh `done` evidence and normal
+review. New terminal `--disposition blocked` writes are rejected, while legacy disposition records
+remain readable and block their dependents derivatively.
 
 `normalizeStoredPhaseStatus` maps historical vocabulary (`executing`/`in_progress` → `active`,
 `complete`/`completed` → `done`) so vocabulary drift is not mistaken for real drift.

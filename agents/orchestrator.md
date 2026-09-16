@@ -26,7 +26,7 @@ Kyro preserves quality by loading the smallest contract needed for the current l
 7. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack: `nextAction`, `nextTaskId`, `reviewPending`, conventions, budget). Do not open full `sprint.json` to route. No `sprint.json` → INIT.
 8. Load `skills/sprint-forge/SKILL.md`, then the single mode named by the pack's `nextAction`.
 
-Open the full `sprint.json` only when `plan_sprint`/`qa_or_close`/`close_sprint`/status-full needs its planning or reporting context (see SKILL.md Read Path Contract). Agents never open it in order to write it.
+Open the full `sprint.json` only when an explicit active-plan update or `plan_sprint`/`qa_or_close`/`close_sprint`/status-full needs its planning or reporting context (see SKILL.md Read Path Contract). Agents never open it in order to write it.
 
 ## Routed Loading (route on `handoff.nextAction`)
 

@@ -218,6 +218,16 @@ export interface Clarification {
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
 export type DebtStatus = 'open' | 'in_progress' | 'resolved' | 'deferred';
 
+/** Derived only; never persisted on Task. Used by routing and read models. */
+export type TaskExecutionState = 'ready' | 'awaiting_review' | 'waiting_on_dependency' | 'blocked' | 'disposed' | 'verified';
+export type TaskBlockReason = 'self_blocked' | 'blocked_dependency' | 'terminal_dependency';
+export interface TaskExecutionInfo {
+  taskId: string;
+  state: TaskExecutionState;
+  blockedByTaskIds: string[];
+  blockReason: TaskBlockReason | null;
+}
+
 /** Terminal explanation for unfinished work. Not a success status and not a checker verdict. */
 export const TASK_DISPOSITION_KIND = {
   DEFERRED: 'deferred',
@@ -936,6 +946,13 @@ export interface ContextPackReopen {
   reason: string;
 }
 
+export interface ContextPackExecutionSummary {
+  readyTaskIds: string[];
+  awaitingReviewTaskIds: string[];
+  waitingOnDependencyTaskIds: string[];
+  blockedTasks: TaskExecutionInfo[];
+}
+
 export interface ContextPackOutput {
   schemaVersion: 4;
   packMode: ContextPackMode;
@@ -965,6 +982,10 @@ export interface ContextPackOutput {
   taskScenarios: SpecScenario[];
   handoffNote: string | null;
   blockers: string[];
+  /** Dependency-aware, read-only routing state for the active sprint. */
+  execution: ContextPackExecutionSummary;
+  /** Computed state of the selected task, if task pack mode is active. */
+  taskExecution: TaskExecutionInfo | null;
   reviewPending: string[];
   nextTaskReview: NextTaskReview | null;
   conventions: ContextPackConvention[];

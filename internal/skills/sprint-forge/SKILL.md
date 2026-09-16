@@ -86,7 +86,7 @@ is reinforcement only; the portable guarantee is this fail-closed CLI contract.
 
 ## Read Path Contract (context-pack first) — MANDATORY
 
-The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open the full file only when `plan_sprint`/`qa_or_close`/`close_sprint`/status-full needs its planning or reporting context; agents never open it in order to write it.
+The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/review or brief status — read the lean pack (`{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`; `--task[ <id>]` for execute/review). Open it only for active-plan updates or `plan_sprint`/`qa_or_close`/`close_sprint`/status-full planning/reporting context; never for manual writes.
 
 ## Artifact Write Contract (MANDATORY)
 

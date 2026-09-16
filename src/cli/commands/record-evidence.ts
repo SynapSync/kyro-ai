@@ -2,7 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId } from '../core/status';
+import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId, reviewPendingTaskIds, taskExecutionInfo } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { countClarificationMarkers } from '../core/analysis';
 import { resolveScope } from '../core/scope-resolution';
@@ -131,6 +131,9 @@ function buildDisposition(
   recordedAt: string,
 ): TaskDisposition {
   const kind = args.dispositionKind!;
+  if (kind === TASK_DISPOSITION_KIND.BLOCKED) {
+    throw new KyroCoreError('BLOCKED_DISPOSITION_DEPRECATED', '--disposition blocked is read-only for legacy records and cannot be created.', 'Use --status blocked for temporary blocked work; use deferred, superseded, or cancelled for a terminal disposition.');
+  }
   if (!args.reason || args.reason.trim() === '') {
     throw new KyroCoreError('INVALID_INPUT', '--reason is required and must be non-empty when --disposition is set.', 'Explain why the work is deferred, blocked, superseded, or cancelled.');
   }
@@ -241,31 +244,29 @@ function withRecordedEvidence(
   // The maker records evidence; the checker verdict is written later by `kyro review`. Recording
   // evidence never touches task.verdict.
 
-  // Keep phase.status and sprint.status coherent, exactly as the review gate does.
+  const candidate = { ...sprint, activeSprint: nextActive };
+  const execution = new Map(taskExecutionInfo(candidate).map((info) => [info.taskId, info]));
+  // Keep derived phase/sprint fields coherent while allowing independent ready work to continue.
   if (located.kind === 'phase') {
     const phase = nextActive.phases[located.phaseIndex!];
-    phase.status = derivePhaseStatus(phase);
+    phase.status = derivePhaseStatus(phase, execution);
   }
   nextActive.status = deriveActiveSprintStatus(nextActive);
 
-  const nextTaskId = disposition
-    ? nextExecutableTaskId(nextActive, task.id)
-    : task.id;
-  const nextAction = disposition ? 'execute_task' : 'review_task';
+  const nextReady = nextExecutableTaskId(candidate, task.id);
+  const nextReview = reviewPendingTaskIds(candidate).find((id) => id !== task.id) ?? null;
+  const temporaryBlock = !disposition && status === 'blocked';
+  const nextAction = disposition || temporaryBlock ? (nextReady ? 'execute_task' : nextReview ? 'review_task' : 'execute_task') : 'review_task';
+  const nextTaskId = disposition || temporaryBlock ? (nextReady ?? nextReview) : task.id;
   const note = disposition
     ? `Task ${task.id} disposed as ${disposition.kind}; evidence recorded. Scope remains open.`
-    : `Task ${task.id} executed and marked ${status}; evidence recorded. Ready for checker review.`;
+    : temporaryBlock
+      ? `Task ${task.id} is temporarily blocked; independent ready work continues when available.`
+      : `Task ${task.id} executed and marked ${status}; evidence recorded. Ready for checker review.`;
 
   return {
-    ...sprint,
-    activeSprint: nextActive,
-    handoff: {
-      ...sprint.handoff,
-      nextAction,
-      nextTaskId,
-      note,
-      lastUpdated: recordedAt,
-    },
+    ...candidate,
+    handoff: { ...sprint.handoff, nextAction, nextTaskId, note, lastUpdated: recordedAt },
   };
 }
 

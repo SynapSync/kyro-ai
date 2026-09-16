@@ -3,14 +3,15 @@ import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import { collectCheckerFindings, countClarificationMarkers, normalizeCriterion } from '../core/analysis';
-import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId } from '../core/status';
+import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId, taskExecutionInfo } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { setCliMachineResult } from '../core/cli-envelope';
 import { evaluateGuard } from '../core/policy';
 import { resolveScope } from '../core/scope-resolution';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun } from '../core/trace';
 import { readProjectState } from '../state';
-import { sha256 } from '../checkpoints/sprint-close';
+import { sha256 } from '../core/digest';
+import { reviewedMaterialDigest as materialDigest } from '../core/review-material';
 import type { AnalysisFinding, OperationPlan, SprintFile, Task, TaskVerdict, TaskVerdictFinding, TaskVerdictFindingSeverity, TaskVerdictResult, WaivedCriterion } from '../types';
 
 export interface ReviewArgs {
@@ -150,6 +151,9 @@ export function buildReviewPlan(scope: string, args: ReviewArgs): ReviewPreparat
       'A disposition is terminal for execution: record-evidence removed it from the executable routes and no implicit review path can reopen it. For replacement work in the active sprint, use kyro add-emergent; a true re-open requires a future explicit operation.',
     );
   }
+  if (located.task.status === 'blocked') {
+    throw new KyroCoreError('BLOCKED_TASK_NOT_REVIEWABLE', `Task ${located.task.id} is temporarily blocked and cannot take a checker review.`, 'Keep independent ready work moving. When this task is unblocked, record fresh completion evidence and then run kyro review.');
+  }
   const clarificationMarkers = countClarificationMarkers(sprint);
   if (clarificationMarkers > 0) {
     throw new KyroCoreError(
@@ -173,10 +177,12 @@ export function buildReviewPlan(scope: string, args: ReviewArgs): ReviewPreparat
   const waivedSet = new Set(args.waivedCriteria.map((w) => normalizeCriterion(w.criterion)));
   const autoChecked = [...acceptanceCriteria].filter((c) => !waivedSet.has(normalizeCriterion(c)));
   const checkedCriteria = args.checkedCriteria.length > 0 ? args.checkedCriteria : args.verdict === 'pass' ? autoChecked : [];
-  const reviewedMaterialDigest = buildReviewedMaterialDigest(scope, sprint, located.task);
+  const reviewedMaterialDigest = materialDigest(scope, sprint.activeSprint, located.task);
   const requestDigest = buildReviewRequestDigest(scope, sprint, located.task, args, checkedCriteria, reviewedMaterialDigest);
   const currentVerdict = located.task.verdict;
-  if (args.requestDigest && currentVerdict?.requestDigest === args.requestDigest) {
+  if (args.requestDigest && currentVerdict?.requestDigest === args.requestDigest
+    && currentVerdict.reviewedMaterialDigest === reviewedMaterialDigest
+    && args.requestDigest === requestDigest) {
     return {
       sprint,
       plan: [],
@@ -256,28 +262,6 @@ function assertReviewWrite(scope: string): void {
   throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Review wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
 }
 
-function buildReviewedMaterialDigest(scope: string, sprint: SprintFile, task: Task): string {
-  const active = sprint.activeSprint!;
-  return sha256({
-    schemaVersion: 1,
-    scope,
-    sprint: { n: active.n, slug: active.slug },
-    task: {
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      filesToTouch: task.files_to_touch,
-      context: task.context,
-      acceptanceCriteria: task.acceptance_criteria,
-      dependsOn: task.depends_on,
-      scenarioRefs: task.scenario_refs ?? [],
-      status: task.status,
-      evidence: task.evidence,
-      disposition: task.disposition ?? null,
-    },
-  });
-}
-
 function buildReviewRequestDigest(
   scope: string,
   sprint: SprintFile,
@@ -314,24 +298,24 @@ function withReviewedTask(sprint: SprintFile, located: LocatedTask, verdict: Tas
   task.verdict = verdict;
   if (verdict.result === 'fail') task.status = 'pending';
 
-  // Keep phase.status coherent at the gate that moves task state, so it never becomes an orphan field
-  // that says "pending" while its tasks are done. Emergent tasks have no phase to update.
+  const candidate = { ...sprint, activeSprint: nextActive };
+  const execution = new Map(taskExecutionInfo(candidate).map((info) => [info.taskId, info]));
+  // Keep phase.status coherent at the gate that moves task state. Emergent tasks have no phase.
   if (located.kind === 'phase') {
     const phase = nextActive.phases[located.phaseIndex!];
-    phase.status = derivePhaseStatus(phase);
+    phase.status = derivePhaseStatus(phase, execution);
   }
   nextActive.status = deriveActiveSprintStatus(nextActive);
 
   const tasks = nextActive.phases.flatMap((phase) => phase.tasks).concat(nextActive.emergentTasks);
-  const nextExecutable = nextExecutableTaskId(nextActive);
+  const nextExecutable = nextExecutableTaskId(candidate);
   const allDonePass = tasks.length > 0 && tasks.every((item) => item.status === 'done' && item.verdict?.result === 'pass');
   return {
-    ...sprint,
-    activeSprint: nextActive,
+    ...candidate,
     handoff: {
       ...sprint.handoff,
-      nextAction: verdict.result === 'fail' ? 'execute_task' : allDonePass ? 'qa_or_close' : 'execute_task',
-      nextTaskId: verdict.result === 'fail' ? task.id : nextExecutable,
+      nextAction: allDonePass ? 'qa_or_close' : 'execute_task',
+      nextTaskId: nextExecutable,
       note: verdict.result === 'pass' ? `Task ${task.id} passed checker review.` : `Task ${task.id} failed checker review and returned to execution.`,
       lastUpdated: reviewedAt,
     },
