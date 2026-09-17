@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "scope": "change-current-work",
   "title": "Cambiar el trabajo vigente sin congelarlo",
-  "status": "planning",
+  "status": "completed",
   "objective": "Permitir corregir trabajo vivo (requisito y tareas, regla local, roadmap futuro, discard de scope) sin congelarlo por la protección del historial, sin borrar evidencia y sin mentir el handoff.",
   "successCriteria": [
     "A person can correct a live requirement and the current tasks that depend on it in one authorized change, without losing prior evidence or stopping unrelated ready work.",
@@ -215,10 +215,10 @@
   "activeSprint": null,
   "debt": [],
   "handoff": {
-    "nextAction": "await_scope_completion",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
-    "note": "Sprint 2 (roadmap-discard-and-skill) closed as shipped. Roadmap exhausted; await explicit scope completion or an expansion decision.",
+    "note": "Scope explicitly completed.",
     "lastUpdated": "2026-09-17"
   },
   "author": {
@@ -226,5 +226,11 @@
     "email": "joisephdev@gmail.com",
     "source": "git",
     "capturedAt": "2026-09-17T14:13:10.419Z"
+  },
+  "completion": {
+    "completedAt": "2026-09-17T22:06:51.389Z",
+    "by": "maker",
+    "requestDigest": "273a82d6f885464c06c656b8fa953bebfc9dfbd38264a7c2c7c32a80c8f9b1a4",
+    "beforeEntryDigest": "55f7a23b49cb47ddc1df78467c5ee506bdfb89219cbf759541f1a2a5a1623c42"
   }
 }

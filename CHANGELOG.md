@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.51.0] - 2026-09-17
+
+### Added
+
+- **Honest live-work handoff.** Kyro never advertises `execute_task` without a dependency-ready task. Dead routes expose a structured `blocker` with a copy-pastable `remedyCommand` on `status`, `context-pack`, and error envelopes (`await_scope_completion` + `no_ready_work`).
+- **Live requirement and task correction in one `plan --update-active` request.** Remove a requirement or cancel a task atomically with relink/disposal of live consumers; previous evidence is kept and unrelated approvals survive.
+- **Scope-local `rule update|remove|replace`.** Replaced rules stop being effective while prior text stays in local history (typed and schema-validated). Project-wide `--global` mutation remains out of scope.
+- **Future-only `plan --roadmap`.** Retitle, add, cancel, or reorder `planned` roadmap entries without renumbering closed or active sprint identities.
+- **`scope discard`.** One informed approval (`--digest` + `--yes`) orchestrates cancel → abandoned close → retire through existing writers, resuming from the same digest if interrupted.
+- **Lazy `live-work.md` skill helper with doctor-after.** Agents apply a CLI-named remedy under existing work authority, then verify with `kyro doctor`.
+
 ## [4.50.0] - 2026-09-15
 
 ### Added

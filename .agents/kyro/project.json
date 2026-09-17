@@ -57,7 +57,13 @@
     {
       "id": "change-current-work",
       "title": "Cambiar el trabajo vigente sin congelarlo",
-      "status": "planning"
+      "status": "completed",
+      "completion": {
+        "completedAt": "2026-09-17T22:06:51.389Z",
+        "by": "maker",
+        "requestDigest": "273a82d6f885464c06c656b8fa953bebfc9dfbd38264a7c2c7c32a80c8f9b1a4",
+        "beforeEntryDigest": "55f7a23b49cb47ddc1df78467c5ee506bdfb89219cbf759541f1a2a5a1623c42"
+      }
     }
   ],
   "conventions": [
