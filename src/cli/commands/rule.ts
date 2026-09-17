@@ -5,6 +5,10 @@ import { PROJECT_STATE_PATH } from '../constants';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
+import { sha256 } from '../core/digest';
+import { atomicReplace } from '../checkpoints/sprint-close';
+import { withStateWriterLock } from '../pipeline/state-writer-lock';
+import { setCliMachineResult } from '../core/cli-envelope';
 import { applyPlan, printPlan } from '../fs';
 import { readSharedProjectState, sanitizeSharedForWrite } from '../state';
 import type { Convention, KyroSharedProjectState, OperationPlan, SprintFile } from '../types';
@@ -25,7 +29,11 @@ export function runRuleCommand(rawArgs: string[]): void {
     runRuleAdd(rawArgs.slice(1));
     return;
   }
-  throw new KyroCoreError('INVALID_INPUT', `Unknown rule subcommand "${sub}".`, 'Use: kyro rule add. Run kyro rule --help.');
+  if (sub === 'update' || sub === 'remove' || sub === 'replace') {
+    runLocalRuleMutation(sub, rawArgs.slice(1));
+    return;
+  }
+  throw new KyroCoreError('INVALID_INPUT', `Unknown rule subcommand "${sub}".`, 'Use: kyro rule add, update, remove, or replace. Run kyro rule --help.');
 }
 
 function runRuleAdd(rawArgs: string[]): void {
@@ -125,6 +133,89 @@ export function buildRuleAddPlan(scope: string, args: RuleAddArgs): RuleAddPlan 
     globalAdded,
     alreadyGlobal: args.global && matchingGlobal !== null,
   };
+}
+
+type LocalRuleMutation = 'update' | 'remove' | 'replace';
+interface LocalRuleArgs { id: string; newId: string | null; rule: string; tags: string[]; scope: string | null; dryRun: boolean; digest: string | null; yes: boolean; }
+
+function runLocalRuleMutation(kind: LocalRuleMutation, rawArgs: string[]): void {
+  const args = parseLocalRuleArgs(kind, rawArgs);
+  const scope = resolveScope(args.scope);
+  if (args.dryRun && (args.digest || args.yes)) throw new KyroCoreError('INVALID_INPUT', 'Preview with --dry-run, or apply with --digest and --yes; not both.');
+  if (!args.dryRun && (!args.digest || !args.yes)) throw new KyroCoreError('CONFIRMATION_REQUIRED', 'Local rule changes require a reviewed digest and --yes.', `First run: kyro rule ${kind} ${args.id} --kyro-scope ${scope} --dry-run --json`);
+  const preview = args.dryRun ? prepareLocalRuleMutation(scope, kind, args) : applyLocalRuleMutation(scope, kind, args, args.digest!);
+  const phase = args.dryRun ? 'preview' : 'applied';
+  setCliMachineResult(phase, { ...preview, outcome: phase, requiresConfirmation: args.dryRun });
+  console.log(`Local rule ${kind} ${args.id} (${phase}). Digest: ${preview.digest}`);
+  if (args.dryRun) console.log('Dry run complete. No files changed.');
+}
+
+function prepareLocalRuleMutation(scope: string, kind: LocalRuleMutation, args: LocalRuleArgs): { digest: string; changes: unknown[]; projected: SprintFile } {
+  const sprint = loadValidSprint(scope);
+  const index = sprint.conventions.findIndex((convention) => convention.id === args.id && !convention.retired);
+  if (index < 0) throw new KyroCoreError('INVALID_INPUT', `Effective local rule "${args.id}" was not found.`, 'Use kyro context-pack to inspect effective scope conventions.');
+  const next = JSON.parse(JSON.stringify(sprint)) as SprintFile;
+  const old = next.conventions[index];
+  const changes: unknown[] = [];
+  if (kind === 'update') {
+    const rule = normalizeRule(args.rule); if (!rule) throw new KyroCoreError('INVALID_INPUT', '--rule is required for rule update.');
+    // Keep the former text as retired local history; a new record is the only
+    // effective convention so context packs cannot surface stale guidance.
+    const retired: Convention = { ...old, retired: true, retiredReason: 'replaced', retiredAt: new Date().toISOString() };
+    const tags = normalizeTags(args.tags.length ? args.tags : old.tags);
+    const id = nextConventionId(next.conventions, tags[0]);
+    const replacement: Convention = { id, rule, tags, addedSprint: currentSprintNumber(next) };
+    next.conventions[index] = retired;
+    next.conventions.push(replacement);
+    changes.push({ id: args.id, before: old, after: retired }, { id, before: null, after: replacement });
+  } else {
+    const retired: Convention = { ...old, retired: true, retiredReason: kind === 'replace' ? 'replaced' : 'removed', retiredAt: new Date().toISOString() };
+    next.conventions[index] = retired; changes.push({ id: args.id, before: old, after: retired });
+    if (kind === 'replace') {
+      const rule = normalizeRule(args.rule); if (!rule) throw new KyroCoreError('INVALID_INPUT', '--rule is required for rule replace.');
+      const tags = normalizeTags(args.tags);
+      const id = args.newId ?? nextConventionId(next.conventions, tags[0]);
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(id) || next.conventions.some((convention) => convention.id === id)) throw new KyroCoreError('INVALID_INPUT', `Replacement rule id "${id}" is invalid or already exists.`);
+      const replacement: Convention = { id, rule, tags, addedSprint: currentSprintNumber(next) };
+      next.conventions.push(replacement); changes.push({ id, before: null, after: replacement });
+    }
+  }
+  const issues = validateSprintFile(next, sprintJsonPath(scope));
+  if (issues.length) throw new KyroCoreError('BLOCKING_FINDINGS', formatIssues(issues), 'Correct the local rule request; no state was written.');
+  const { digest: ignoredDigest, yes: ignoredYes, dryRun: ignoredDryRun, ...digestArgs } = args;
+  void ignoredDigest; void ignoredYes; void ignoredDryRun;
+  return { digest: sha256({ operation: 'local-rule-mutation', scope, mutation: kind, state: sprint, args: digestArgs }), changes, projected: next };
+}
+
+function applyLocalRuleMutation(scope: string, kind: LocalRuleMutation, args: LocalRuleArgs, digest: string) {
+  return withStateWriterLock(() => {
+    const preview = prepareLocalRuleMutation(scope, kind, args);
+    if (preview.digest !== digest) throw new KyroCoreError('STATE_DIVERGED', 'Local rule preview is stale or belongs to another input.', 'Re-run the --dry-run preview and approve its new digest.');
+    atomicReplace(sprintJsonPath(scope), `${JSON.stringify(preview.projected, null, 2)}\n`);
+    emitToolCommandRun(scope, 'cli', `rule ${kind}`, { id: args.id, digest });
+    return preview;
+  });
+}
+
+function parseLocalRuleArgs(kind: LocalRuleMutation, rawArgs: string[]): LocalRuleArgs {
+  const id = rawArgs[0];
+  if (!id || id.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `rule ${kind} requires an existing rule id.`);
+  const out: LocalRuleArgs = { id, newId: null, rule: '', tags: [], scope: null, dryRun: false, digest: null, yes: false };
+  for (let i = 1; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--dry-run') out.dryRun = true;
+    else if (arg === '--yes') out.yes = true;
+    else if (arg === '--global') throw new KyroCoreError('INVALID_INPUT', 'Local rule update/remove/replace never accept --global.', 'These operations write only the scope sprint.json.');
+    else if (arg === '--rule') out.rule = requireValue(rawArgs, i++, '--rule');
+    else if (arg === '--id') out.newId = requireValue(rawArgs, i++, '--id');
+    else if (arg === '--tag') out.tags.push(requireValue(rawArgs, i++, '--tag'));
+    else if (arg === '--kyro-scope') out.scope = requireValue(rawArgs, i++, '--kyro-scope');
+    else if (arg === '--digest') out.digest = requireValue(rawArgs, i++, '--digest');
+    else throw new KyroCoreError('INVALID_INPUT', `Unknown flag for rule ${kind}: ${arg}`);
+  }
+  if (out.digest && !/^[a-f0-9]{64}$/.test(out.digest)) throw new KyroCoreError('INVALID_INPUT', '--digest must be a lowercase SHA-256 digest.');
+  if ((kind === 'remove' && (out.rule || out.tags.length || out.newId)) || (kind === 'update' && out.newId)) throw new KyroCoreError('INVALID_INPUT', `Unexpected replacement fields for rule ${kind}.`);
+  return out;
 }
 
 function loadValidSprint(scope: string): SprintFile {
@@ -264,7 +355,11 @@ function requireValue(args: string[], index: number, flag: string): string {
 function printRuleHelp(): void {
   console.log(`Usage:
   kyro rule add --rule <text> [--tag <tag> ...] [--id <id>] [--global] [--kyro-scope <scope>] [--dry-run]
+  kyro rule update <id> --rule <text> [--tag <tag> ...] --kyro-scope <scope> --dry-run
+  kyro rule remove <id> --kyro-scope <scope> --dry-run
+  kyro rule replace <id> --rule <text> [--id <new-id>] [--tag <tag> ...] --kyro-scope <scope> --dry-run
 
+Update/remove/replace are scope-local and require the preview digest plus --yes to apply; they never accept --global.
 Registers an operational rule in the active scope's sprint.json conventions. Use --global only
 after the user confirms the rule should also be inherited by every scope through project.json.
 Tags default to process; --kyro-scope defaults to the active or only scope.

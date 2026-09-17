@@ -6,6 +6,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "check:close-policy-compatibility": "node scripts/check-close-policy-compatibility.mjs",
+    "check:change-current-work": "node scripts/check-change-current-work.mjs",
+    "check:change-current-work:red": "node scripts/check-change-current-work.mjs --expect-red --baseline-cli /home/rperaza/Projects/projects-worktrees/kyro-ai-36c3897/dist/cli.js",
     "build": "npm run clean && tsc && npm run build:chmod",
     "typecheck": "tsc --noEmit",
     "clean": "node scripts/clean-dist.mjs",

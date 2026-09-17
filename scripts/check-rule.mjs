@@ -187,7 +187,52 @@ function output(result) {
   }
 }
 
-// 7) Agent-facing instructions own the ambiguity: ask about global, then call the CLI; no hand-edit.
+// 7) Retired local-rule history is schema-validated, so doctor rejects malformed retirement metadata.
+{
+  const root = sandbox();
+  try {
+    const sprint = readSprint(root);
+    sprint.conventions = [{
+      id: 'process-1', rule: 'Retired local rule.', tags: ['process'], addedSprint: 1,
+      retired: true, retiredReason: 'invalid', retiredAt: 'not-a-timestamp',
+    }];
+    writeJson(sprintPath(root), sprint);
+    const doctor = run(['doctor', '--artifacts', '--kyro-scope', 'demo', '--json'], root);
+    assert(doctor.status !== 0, 'doctor --artifacts must reject malformed retired convention metadata');
+    assert(output(doctor).includes('retiredReason') && output(doctor).includes('retiredAt'), 'doctor must identify malformed retirement fields');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 8) Updating a local rule retires the former text and exposes only the replacement.
+{
+  const root = sandbox();
+  try {
+    const add = run(['rule', 'add', '--rule', 'Keep the former instruction.', '--tag', 'process'], root);
+    assert(add.status === 0, `rule add before update should succeed: ${output(add)}`);
+    const preview = run(['rule', 'update', 'process-1', '--rule', 'Use the replacement instruction.', '--kyro-scope', 'demo', '--dry-run', '--json'], root);
+    assert(preview.status === 0, `rule update preview should succeed: ${output(preview)}`);
+    const digest = JSON.parse(preview.stdout).data.digest;
+    const update = run(['rule', 'update', 'process-1', '--rule', 'Use the replacement instruction.', '--kyro-scope', 'demo', '--digest', digest, '--yes'], root);
+    assert(update.status === 0, `rule update should succeed: ${output(update)}`);
+    const sprint = readSprint(root);
+    const former = sprint.conventions.find((convention) => convention.id === 'process-1');
+    assert(former?.rule === 'Keep the former instruction.' && former.retired === true && former.retiredReason === 'replaced' && former.retiredAt, 'update must retain former rule text as retired history');
+    const current = sprint.conventions.find((convention) => convention.rule === 'Use the replacement instruction.');
+    assert(current && !current.retired && current.id !== former.id, 'update must create a distinct effective replacement');
+    const pack = run(['context-pack', '--kyro-scope', 'demo', '--json'], root);
+    assert(pack.status === 0, `context-pack after update should succeed: ${output(pack)}`);
+    const conventions = JSON.parse(pack.stdout).data.conventions;
+    assert(conventions.some((convention) => convention.id === current.id) && !conventions.some((convention) => convention.id === former.id), 'context-pack must omit retired former rule');
+    const doctor = run(['doctor', '--artifacts', '--kyro-scope', 'demo', '--json'], root);
+    assert(doctor.status === 0, `doctor must accept update history: ${output(doctor)}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// 9) Agent-facing instructions own the ambiguity: ask about global, then call the CLI; no hand-edit.
 {
   const learner = readFileSync(resolve(repo, 'internal/skills/sprint-forge/assets/helpers/learner.md'), 'utf-8');
   const executor = readFileSync(resolve(repo, 'internal/skills/kyro-sprint-executor/SKILL.md'), 'utf-8');

@@ -27,7 +27,7 @@ Run `{{KYRO_CLI}} capabilities --json`.
 
 ## Step 1 — Route
 
-Run `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` and obey `nextAction`:
+Run `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json`. If the pack exposes a blocker with `remedyCommand`, load `sprint-forge/assets/helpers/live-work.md` from the Kyro runtime. For an already-authorized local active-plan, scope-rule, or planned-roadmap remedy, consume it with the checkout `{{KYRO_CLI}}`, run `doctor --artifacts`, then obtain a fresh pack. Discard, project-policy, authority-expanding, or ambiguous remedies still require the user. Obey `nextAction` from that fresh pack:
 
 | nextAction | Do |
 |------------|----|
@@ -60,7 +60,7 @@ Never infer routing from file presence. Never open the full `sprint.json` to rou
 ## Existing task corrections
 
 - An implementation defect in an existing active task uses `review --verdict fail`, then the normal task loop on the same ID. `done` is not immutable while the sprint is still active.
-- A definition change uses the existing `plan --update-active` operation. Load `sprint-forge/assets/helpers/active-plan-update.md` from the Kyro runtime for the exact input/preview/digest/apply protocol; an explicit planning update may inspect the full sprint but only edits a temporary input file. Never hand-edit managed state. Unknown option → stop and request a runtime upgrade.
+- A definition change uses the existing `plan --update-active` operation. Load `sprint-forge/assets/helpers/live-work.md` and then `sprint-forge/assets/helpers/active-plan-update.md` from the Kyro runtime for the authority decision and exact input/preview/digest/apply protocol; an explicit planning update may inspect the full sprint but only edits a temporary input file. Never hand-edit managed state. Unknown option → stop and request a runtime upgrade.
 - Closed/shipped/archived tasks stay immutable even under a reopened scope. Stop and explain the closed parent. Repeat affected prior QA when applicable; do not introduce optional certification merely because a task changed.
 
 ## Emergent work and debt

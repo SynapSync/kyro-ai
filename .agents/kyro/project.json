@@ -53,6 +53,11 @@
       "id": "scoped-integrity-preflight",
       "title": "Scoped integrity preflight and trace relocation",
       "status": "completed"
+    },
+    {
+      "id": "change-current-work",
+      "title": "Cambiar el trabajo vigente sin congelarlo",
+      "status": "planning"
     }
   ],
   "conventions": [

@@ -4,13 +4,13 @@ import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { formatScopeAuthor } from '../core/actor';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { unregisteredScopeFolders } from '../core/scopes';
-import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, isTaskVerifiedComplete, taskExecutionInfo } from '../core/status';
+import { deriveActiveSprintStatus, deriveLiveWorkHandoff, derivePhaseStatus, deriveScopeStatus, isTaskVerifiedComplete, taskExecutionInfo } from '../core/status';
 import { hasStaleReview } from '../core/review-material';
 import { KyroCoreError } from '../core/errors';
 import { deriveScopeVerificationState } from '../remediation/plan';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
 import { ADR_STATUS } from '../types';
-import type { ActiveSprint, AdrRecord, AdrStatus, Debt, ScopeAuthor, ScopeRetirement, ScopeVerification, SprintFile, Task, TaskExecutionInfo, TaskStatus } from '../types';
+import type { ActiveSprint, AdrRecord, AdrStatus, Debt, HandoffBlocker, ScopeAuthor, ScopeRetirement, ScopeVerification, SprintFile, Task, TaskExecutionInfo, TaskStatus } from '../types';
 
 const STATUS_MODE = {
   BRIEF: 'brief',
@@ -84,7 +84,7 @@ interface BriefStatusReport {
   activeSprint: ActiveSprintStatusSummary | null;
   nextAction: string;
   nextTask: TaskReference | null;
-  blockers: string[];
+  blockers: Array<string | HandoffBlocker>;
   execution: ExecutionSummary;
   openDebtCount: number;
   pendingReviewCount: number;
@@ -239,6 +239,7 @@ function readSprint(scope: string): SprintFile {
 function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusReport {
   const activeSprint = sprint.activeSprint;
   const reviewDebt = collectReviewDebt(sprint);
+  const effectiveHandoff = activeSprint ? { ...sprint.handoff, ...deriveLiveWorkHandoff(sprint, scope) } : sprint.handoff;
   const executionInfo = taskExecutionInfo(sprint);
   const execution: ExecutionSummary = {
     readyTaskIds: executionInfo.filter((info) => info.state === 'ready').map((info) => info.taskId),
@@ -258,9 +259,9 @@ function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusR
       objective: activeSprint.objective,
       status: deriveActiveSprintStatus(activeSprint),
     } : null,
-    nextAction: sprint.handoff.nextAction,
-    nextTask: resolveNextTask(activeSprint, sprint.handoff.nextTaskId),
-    blockers: sprint.handoff.blockers ?? [],
+    nextAction: effectiveHandoff.nextAction,
+    nextTask: resolveNextTask(activeSprint, effectiveHandoff.nextTaskId),
+    blockers: effectiveHandoff.blockers ?? [],
     execution,
     openDebtCount: countOpenDebt(sprint.debt),
     pendingReviewCount: reviewDebt.length,
