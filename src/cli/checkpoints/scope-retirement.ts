@@ -270,6 +270,7 @@ function buildCheckpoint(request: ScopeRetirementRequest, preparation: ScopeReti
   if (retirementPlanDigest(request, observed) !== preparation.planDigest) throw diverged('State changed while acquiring the writer lock.');
   const createdAt = new Date().toISOString();
   const retirement: ScopeRetirement = {
+    status: 'retired',
     reason: request.reason,
     retiredAt: createdAt,
     ...(request.supersededBy ? { supersededBy: request.supersededBy } : {}),
@@ -477,6 +478,7 @@ function authorizedAfterImages(checkpoint: ScopeRetirementCheckpointV1): boolean
   if (!metadata || !entry?.retirement) return false;
   if (checkpoint.beforeSprint.activeSprint !== null) return false;
   const expectedRetirement: ScopeRetirement = {
+    status: 'retired',
     reason: checkpoint.request.reason,
     retiredAt: checkpoint.createdAt,
     ...(checkpoint.request.supersededBy ? { supersededBy: checkpoint.request.supersededBy } : {}),

@@ -12,19 +12,20 @@ import { activeGraphIssues } from './task-graph';
 import { canonicalJson, sha256 } from './digest';
 import { KyroCoreError } from './errors';
 import { policyIssues, loadPolicy } from './policy';
-import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId, taskExecutionInfo } from './status';
+import { deriveActiveSprintStatus, deriveLiveWorkHandoff, derivePhaseStatus, taskExecutionInfo } from './status';
 import { emitToolCommandRun } from './trace';
 import type { ActiveSprint, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
 
 const TASK_FIELDS = ['title', 'description', 'context', 'acceptance_criteria', 'files_to_touch', 'depends_on', 'scenario_refs'] as const;
 type TaskField = typeof TASK_FIELDS[number];
-type TaskUpdate = Pick<Task, 'id'> & Partial<Pick<Task, TaskField>>;
+type TaskUpdate = Pick<Task, 'id'> & (Partial<Pick<Task, TaskField>> | { action: 'cancel'; reason: string });
+type RequirementUpdate = SpecRequirement | { id: string; action: 'remove' };
 export interface ActivePlanInput {
   scope?: string;
   sprint: { n: number; slug: string };
   reason: string;
   tasks: TaskUpdate[];
-  requirements: SpecRequirement[];
+  requirements: RequirementUpdate[];
   scenarios: SpecScenario[];
 }
 export interface ActivePlanChange { target: string; field: string; before: unknown; after: unknown }
@@ -52,8 +53,15 @@ export function parseActivePlanInput(raw: unknown): ActivePlanInput {
     return (value as unknown[]).map(parse);
   };
   const tasks = rows(root.tasks, 'tasks', (value): TaskUpdate => {
-    const row = record(value, ['id', ...TASK_FIELDS], 'task');
-    const task: TaskUpdate = { id: text(row.id, 'task.id') };
+    const row = record(value, ['id', 'action', 'reason', ...TASK_FIELDS], 'task');
+    const id = text(row.id, 'task.id');
+    if ('action' in row) {
+      if (row.action !== 'cancel') invalid(`task ${id}.action must be cancel`);
+      if (Object.keys(row).some((key) => !['id', 'action', 'reason'].includes(key))) invalid(`task ${id} cancellation cannot include definition fields`);
+      return { id, action: 'cancel', reason: text(row.reason, `task ${id}.reason`) };
+    }
+    if ('reason' in row) invalid(`task ${id}.reason is only valid with action cancel`);
+    const task: TaskUpdate = { id };
     for (const key of TASK_FIELDS) {
       if (!(key in row)) continue;
       if (key === 'title' || key === 'description' || key === 'context') task[key] = text(row[key], `task.${key}`);
@@ -62,9 +70,14 @@ export function parseActivePlanInput(raw: unknown): ActivePlanInput {
     if (Object.keys(task).length === 1) invalid(`task ${task.id} has no definition changes`);
     return task;
   });
-  const requirements = rows(root.requirements, 'requirements', (value): SpecRequirement => {
-    const row = record(value, ['id', 'statement', 'priority', 'rationale'], 'requirement');
-    const result: SpecRequirement = { id: text(row.id, 'requirement.id'), statement: text(row.statement, 'requirement.statement') };
+  const requirements = rows(root.requirements, 'requirements', (value): RequirementUpdate => {
+    const row = record(value, ['id', 'action', 'statement', 'priority', 'rationale'], 'requirement');
+    const id = text(row.id, 'requirement.id');
+    if ('action' in row) {
+      if (row.action !== 'remove' || Object.keys(row).length !== 2) invalid(`requirement ${id}.action must be remove with no definition fields`);
+      return { id, action: 'remove' };
+    }
+    const result: SpecRequirement = { id, statement: text(row.statement, 'requirement.statement') };
     if ('priority' in row) {
       if (!['must', 'should', 'could'].includes(String(row.priority))) invalid('requirement.priority must be must, should or could');
       result.priority = row.priority as SpecRequirement['priority'];
@@ -128,6 +141,17 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   for (const update of input.tasks) {
     const task = tasks.find((item) => item.id === update.id);
     if (!task) throw new KyroCoreError('TASK_NOT_FOUND', `Task ${update.id} is not in the active sprint. Historical tasks cannot be updated.`);
+    if ('action' in update) {
+      if (task.status === 'done' || task.verdict?.result === 'pass') {
+        throw new KyroCoreError('INVALID_INPUT', `Task ${task.id} is already verified and cannot be cancelled.`, 'Only unfinished active tasks can be cancelled.');
+      }
+      const disposition = { kind: 'cancelled' as const, reason: update.reason, by: 'plan --update-active', recordedAt: new Date().toISOString() };
+      if (change(task.id, 'disposition', task.disposition, disposition)) {
+        task.disposition = disposition;
+        affected.add(task.id);
+      }
+      continue;
+    }
     for (const field of TASK_FIELDS) {
       if (field in update && change(task.id, field, task[field], update[field])) {
         Object.assign(task, { [field]: update[field] });
@@ -140,6 +164,25 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
     for (const requirement of input.requirements) {
       const index = next.spec.requirements.findIndex((item) => item.id === requirement.id);
       const previous = next.spec.requirements[index];
+      if ('action' in requirement) {
+        if (!previous) throw new KyroCoreError('INVALID_INPUT', `Requirement ${requirement.id} does not exist and cannot be removed.`);
+        if (history.requirements.has(requirement.id) || history.unknown) historical(requirement.id);
+        const liveScenarioIds = next.spec.scenarios.filter((scenario) => scenario.requirement === requirement.id).map((scenario) => scenario.id);
+        const liveConsumers = tasks.filter((task) => !task.disposition && (task.scenario_refs ?? []).some((ref) => liveScenarioIds.includes(ref)));
+        const unresolved = liveConsumers.filter((task) => !input.tasks.some((update) => update.id === task.id && 'action' in update && update.action === 'cancel'));
+        if (unresolved.length) invalid(`requirement ${requirement.id} still has live consumers: ${unresolved.map((task) => task.id).join(', ')}`);
+        if (change(requirement.id, 'requirement', previous, null)) next.spec.requirements.splice(index, 1);
+        for (let scenarioIndex = next.spec.scenarios.length - 1; scenarioIndex >= 0; scenarioIndex -= 1) {
+          const scenario = next.spec.scenarios[scenarioIndex];
+          if (scenario.requirement === requirement.id) {
+            change(scenario.id, 'scenario', scenario, null);
+            next.spec.scenarios.splice(scenarioIndex, 1);
+            changedScenarios.add(scenario.id);
+          }
+        }
+        changedRequirements.add(requirement.id);
+        continue;
+      }
       const merged = { ...previous, ...requirement };
       if (!change(requirement.id, 'requirement', previous, merged)) continue;
       if (history.requirements.has(requirement.id) || (previous && history.unknown)) historical(requirement.id);
@@ -193,12 +236,11 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
     change('activeSprint', 'status', next.activeSprint!.status, sprintStatus);
     next.activeSprint!.status = sprintStatus;
     // Keep the normal route; an affected task may still depend on an earlier pending task.
-    const nextTask = nextExecutableTaskId(next);
-    next.handoff = { ...next.handoff,
-      ...(nextTask ? { nextAction: 'execute_task', nextTaskId: nextTask } : {}),
+    const liveRoute = deriveLiveWorkHandoff(next, scope);
+    next.handoff = { ...next.handoff, ...liveRoute,
       note: `Active plan updated: ${input.reason}. Revalidate affected tasks: ${[...affected].sort().join(', ') || 'none'}. Previous evidence is retained for reference, not renewed approval.`,
     };
-    for (const field of ['nextAction', 'nextTaskId', 'note'] as const) change('handoff', field, current.handoff[field], next.handoff[field]);
+    for (const field of ['nextAction', 'nextTaskId', 'blockers', 'note'] as const) change('handoff', field, current.handoff[field], next.handoff[field]);
   }
   const graphIssues = activeGraphIssues(next);
   const shapeIssues = validateSprintFile(next, path);

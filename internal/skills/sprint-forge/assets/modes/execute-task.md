@@ -4,10 +4,12 @@ Execute the active sprint task, recording evidence through the Kyro CLI.
 
 ## Inputs
 
-1. Read the task pack: `{{KYRO_CLI}} context-pack --kyro-scope {scope} --task --json` — self-contained next task (`taskDescription`, `taskFiles`, `taskContext`, `taskAcceptanceCriteria`, `taskScenarios`) plus `conventions`. Do NOT open full `sprint.json` to execute; the CLI records evidence (step 3).
-2. Work the pack's task (respect `depends_on`). All executor inputs are in the pack.
+1. Read the self-contained task pack: `{{KYRO_CLI}} context-pack --kyro-scope {scope} --task --json`. Do NOT open full `sprint.json`; the CLI records evidence (step 3).
+2. Work the pack's task (respect `depends_on`).
 
 ## Workflow
+
+For a `remedyCommand` blocker, load `../helpers/live-work.md`, follow it, then resume from its refreshed pack.
 
 1. Understand the task from its fields. Make the smallest coherent change.
 2. Validate per `acceptance_criteria` (tsc, lint, tests, grep, manual), **scoped to the touched area**: only tests for changed files; cap searches (`-l`, `-m N`, `| head`, or a path). After three failed correction rounds, mark `blocked` with evidence.
@@ -32,8 +34,8 @@ Execute the active sprint task, recording evidence through the Kyro CLI.
 - Unknown `record-evidence` command → runtime too old: ABORT (Startup handshake). Never hand-write evidence.
 - Do not write `task.verdict` as the maker — tool-owned by `{{KYRO_CLI}} review`.
 - Do not invent project patterns without justification.
-- Active definition correction: load `../helpers/active-plan-update.md`; use `plan --update-active`, not next-sprint planning or manual edits.
-- Implementation-only correction: `review --verdict fail`, then repeat execution/evidence/review on the same active task, even if previously done.
+- Active definition correction: load `../helpers/live-work.md`, then `../helpers/active-plan-update.md`; use `plan --update-active`.
+- Implementation-only correction: fail review, then re-execute, record evidence, and review the same task.
 
 ## Telling the user how to continue
 

@@ -13,6 +13,9 @@ import { readProjectState, updateProjectStateLayers } from '../state';
 import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, ScopeAuthor, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
 import type { ValidationIssue } from '../artifacts/schema';
 import { applyActivePlan, parseActivePlanInput, prepareActivePlan } from '../core/active-plan';
+import { canonicalJson, sha256 } from '../core/digest';
+import { atomicReplace } from '../checkpoints/sprint-close';
+import { assertSafePathSegment, withStateWriterLock } from '../pipeline/state-writer-lock';
 import { setCliMachineResult } from '../core/cli-envelope';
 
 const KEBAB_CASE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -24,6 +27,7 @@ export interface PlanArgs {
   dryRun: boolean;
   help: boolean;
   updateActive: boolean;
+  roadmap: boolean;
   yes: boolean;
   digest: string | null;
 }
@@ -94,11 +98,16 @@ export function runPlanCommand(rawArgs: string[]): void {
     'Lean plan file must contain a JSON object (init mode: { scope?, title, objective, successCriteria, spec?, roadmap }; sprint mode: { sprint, phases, definitionOfDone, scenarios? }).',
   );
   const scope = resolvePlanScope(record, args.scope);
+  if (args.updateActive && args.roadmap) throw new KyroCoreError('INVALID_INPUT', '--roadmap and --update-active cannot be combined.', 'Use the dedicated planned-roadmap writer separately from active-plan updates.');
   if (args.updateActive) {
     runActiveUpdate(raw, scope, args);
     return;
   }
-  if (args.yes || args.digest) throw new KyroCoreError('INVALID_INPUT', '--yes and --digest are only valid with --update-active.');
+  if (args.roadmap) {
+    runRoadmapUpdate(raw, scope, args);
+    return;
+  }
+  if (args.yes || args.digest) throw new KyroCoreError('INVALID_INPUT', '--yes and --digest are only valid with --update-active or --roadmap.');
 
   const state = readProjectState();
   if (!state) {
@@ -162,6 +171,93 @@ function runActiveUpdate(raw: unknown, scope: string, args: PlanArgs): void {
  * A completed scope is not a dead end: reopening it is the lawful, auditable route back to planning,
  * so the remedy names that route instead of leaving the user to a manual edit or a recovery flow.
  */
+interface RoadmapPlanInput {
+  scope?: string;
+  reason: string;
+  updates: Array<{ n: number; title: string }>;
+  add: Array<{ slug: string; title: string }>;
+  cancel: number[];
+  order?: number[];
+}
+
+interface RoadmapPlanPreview { digest: string; changes: Array<{ target: string; field: string; before: unknown; after: unknown }>; projected: SprintFile }
+
+function runRoadmapUpdate(raw: unknown, scope: string, args: PlanArgs): void {
+  if (args.dryRun && (args.yes || args.digest)) throw new KyroCoreError('INVALID_INPUT', 'Preview with --dry-run, or apply with --digest and --yes; not both.');
+  if (!args.dryRun && (!args.yes || !args.digest)) {
+    throw new KyroCoreError('CONFIRMATION_REQUIRED', 'Roadmap updates require a reviewed digest and --yes.', 'First run plan --roadmap --from <file> --kyro-scope <scope> --dry-run --json.');
+  }
+  const input = parseRoadmapPlanInput(raw);
+  const preview = args.dryRun ? prepareRoadmapPlan(scope, input) : applyRoadmapPlan(scope, input, args.digest!);
+  const phase = args.dryRun ? 'preview' : preview.changes.length ? 'applied' : 'noop';
+  setCliMachineResult(phase, { digest: preview.digest, changes: preview.changes, outcome: phase, mode: 'roadmap',
+    requiresConfirmation: args.dryRun && preview.changes.length > 0, affectedFiles: phase === 'applied' ? [sprintJsonPath(scope)] : [] });
+  console.log(`Roadmap update (${phase}): ${preview.changes.length} change(s). Digest: ${preview.digest}`);
+  if (args.dryRun) console.log('Dry run complete. No files changed.');
+}
+
+function parseRoadmapPlanInput(raw: unknown): RoadmapPlanInput {
+  const root = requireRecord(raw, '<root>', 'Roadmap input must be an object { scope?, reason, updates?, add?, cancel?, order? }.');
+  for (const key of Object.keys(root)) if (!['scope', 'reason', 'updates', 'add', 'cancel', 'order'].includes(key)) throw new KyroCoreError('INVALID_INPUT', `Roadmap input field "${key}" is not editable.`);
+  const scope = root.scope === undefined ? undefined : requireNonEmptyString(root.scope, 'scope');
+  const reason = requireNonEmptyString(root.reason, 'reason');
+  const positiveN = (value: unknown, field: string): number => {
+    if (!Number.isSafeInteger(value) || (value as number) < 1) throw new KyroCoreError('INVALID_INPUT', `${field} must be a positive integer.`);
+    return value as number;
+  };
+  const updates = root.updates === undefined ? [] : (() => {
+    if (!Array.isArray(root.updates)) throw new KyroCoreError('INVALID_INPUT', 'updates must be an array.');
+    return root.updates.map((value, index) => { const row = requireRecord(value, `updates[${index}]`, 'Each update must be { n, title }.');
+      if (Object.keys(row).some((key) => !['n', 'title'].includes(key))) throw new KyroCoreError('INVALID_INPUT', `updates[${index}] may only contain n and title.`);
+      return { n: positiveN(row.n, `updates[${index}].n`), title: requireNonEmptyString(row.title, `updates[${index}].title`) }; });
+  })();
+  const add = root.add === undefined ? [] : (() => {
+    if (!Array.isArray(root.add)) throw new KyroCoreError('INVALID_INPUT', 'add must be an array.');
+    return root.add.map((value, index) => { const row = requireRecord(value, `add[${index}]`, 'Each add must be { slug, title }.');
+      if (Object.keys(row).some((key) => !['slug', 'title'].includes(key))) throw new KyroCoreError('INVALID_INPUT', `add[${index}] may only contain slug and title.`);
+      const slug = requireNonEmptyString(row.slug, `add[${index}].slug`); assertSafePathSegment(slug, 'Roadmap slug');
+      return { slug, title: requireNonEmptyString(row.title, `add[${index}].title`) }; });
+  })();
+  const list = (value: unknown, field: string): number[] => { if (!Array.isArray(value)) throw new KyroCoreError('INVALID_INPUT', `${field} must be an array of positive sprint numbers.`); return value.map((n, index) => positiveN(n, `${field}[${index}]`)); };
+  const cancel = root.cancel === undefined ? [] : list(root.cancel, 'cancel');
+  const order = root.order === undefined ? undefined : list(root.order, 'order');
+  for (const [label, values] of [['updates', updates.map((entry) => entry.n)], ['cancel', cancel], ['order', order ?? []]] as const) {
+    if (new Set(values).size !== values.length) throw new KyroCoreError('INVALID_INPUT', `${label} contains duplicate sprint numbers.`);
+  }
+  if (!updates.length && !add.length && !cancel.length && !order?.length) throw new KyroCoreError('INVALID_INPUT', 'Roadmap update must include updates, add, cancel, or order.');
+  return { ...(scope === undefined ? {} : { scope }), reason, updates, add, cancel, ...(order === undefined ? {} : { order }) };
+}
+
+function prepareRoadmapPlan(scope: string, input: RoadmapPlanInput): RoadmapPlanPreview {
+  assertSafePathSegment(scope, 'Scope');
+  if (input.scope !== undefined && input.scope !== scope) throw new KyroCoreError('INVALID_INPUT', 'Roadmap input scope does not match --kyro-scope.');
+  const path = sprintJsonPath(scope); const read = readJsonSafely(path);
+  const issues = read.exists && !read.error ? validateSprintFile(read.value, path) : [];
+  const current = read.exists && !read.error && issues.length === 0 ? asSprintFile(read.value) : null;
+  if (!current) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot update roadmap: ${read.error ?? (issues.map((issue) => `${issue.field} ${issue.message}`).join('; ') || 'missing sprint.json')}.`, 'Run doctor; do not edit managed state by hand.');
+  if (current.retirement || current.completion || current.handoff.nextAction === 'done') throw new KyroCoreError('NOT_READY_TO_PLAN', `Scope ${scope} is closed or retired; its roadmap is immutable.`);
+  const next = JSON.parse(JSON.stringify(current)) as SprintFile;
+  const changes: RoadmapPlanPreview['changes'] = [];
+  const change = (target: string, field: string, before: unknown, after: unknown): boolean => { if (canonicalJson(before) === canonicalJson(after)) return false; changes.push({ target, field, before, after }); return true; };
+  const byN = new Map(next.roadmap.sprints.map((entry) => [entry.n, entry]));
+  const planned = (n: number, action: string) => { const entry = byN.get(n); if (!entry) throw new KyroCoreError('INVALID_INPUT', `Roadmap sprint ${n} does not exist.`); if (entry.state !== 'planned') throw new KyroCoreError('INVALID_INPUT', `Roadmap sprint ${n} is ${entry.state}, so ${action} is allowed only for planned entries.`, 'Closed and active sprint identities are immutable.'); return entry; };
+  for (const update of input.updates) { const entry = planned(update.n, 'retitle'); if (change(`roadmap.sprints[n=${entry.n}]`, 'title', entry.title, update.title)) entry.title = update.title; }
+  for (const n of input.cancel) { const entry = planned(n, 'cancel'); if (change(`roadmap.sprints[n=${entry.n}]`, 'state', entry.state, 'cancelled')) entry.state = 'cancelled'; }
+  let nextN = Math.max(0, ...next.roadmap.sprints.map((entry) => entry.n)) + 1;
+  for (const item of input.add) { if (next.roadmap.sprints.some((entry) => entry.slug === item.slug)) throw new KyroCoreError('INVALID_INPUT', `Roadmap slug "${item.slug}" already exists.`); const entry = { n: nextN++, slug: item.slug, title: item.title, state: 'planned' }; next.roadmap.sprints.push(entry); byN.set(entry.n, entry); changes.push({ target: 'roadmap.sprints', field: 'add', before: null, after: entry }); }
+  const remainingPlanned = next.roadmap.sprints.filter((entry) => entry.state === 'planned');
+  if (input.order) { if (input.order.length !== remainingPlanned.length || input.order.some((n) => !remainingPlanned.some((entry) => entry.n === n))) throw new KyroCoreError('INVALID_INPUT', 'order must contain each remaining planned sprint exactly once.'); const ordered = input.order.map((n) => byN.get(n)!); const stable = next.roadmap.sprints.filter((entry) => entry.state !== 'planned'); const reordered = [...stable, ...ordered]; if (change('roadmap.sprints', 'presentationOrder', next.roadmap.sprints, reordered)) next.roadmap.sprints = reordered; }
+  const count = next.roadmap.sprints.filter((entry) => entry.state !== 'cancelled').length;
+  if (change('roadmap', 'plannedSprintCount', next.roadmap.plannedSprintCount, count)) next.roadmap.plannedSprintCount = count;
+  const shapeIssues = validateSprintFile(next, path); if (shapeIssues.length) throw new KyroCoreError('BLOCKING_FINDINGS', shapeIssues.map((issue) => `${issue.field}: ${issue.message}`).join('; '), 'Correct the roadmap input; no state was written.');
+  const project = readProjectState();
+  return { digest: sha256({ kind: 'roadmap-plan-update', state: current, input, project: project?.scopes.find((entry) => entry.id === scope) ?? null }), changes, projected: next };
+}
+
+function applyRoadmapPlan(scope: string, input: RoadmapPlanInput, digest: string): RoadmapPlanPreview {
+  return withStateWriterLock(() => { const preview = prepareRoadmapPlan(scope, input); if (preview.digest !== digest) throw new KyroCoreError('STATE_DIVERGED', 'Roadmap preview is stale or belongs to another input.', 'Re-run plan --roadmap --dry-run and approve the new digest.'); if (!preview.changes.length) return preview; preview.projected.handoff.lastUpdated = new Date().toISOString(); atomicReplace(sprintJsonPath(scope), `${JSON.stringify(preview.projected, null, 2)}\n`); const written = readJsonSafely(sprintJsonPath(scope)); if (!written.exists || written.error || sha256(written.value) !== sha256(preview.projected)) throw new KyroCoreError('STATE_DIVERGED', 'Roadmap update failed post-write verification.', 'Inspect the current state before retrying.'); emitToolCommandRun(scope, 'cli', 'plan', { mode: 'roadmap', digest, reason: input.reason }); return preview; });
+}
+
 function planRemedy(sprint: SprintFile, scope: string): string {
   if (sprint.retirement) return 'This scope is retired and terminal. Plan the follow-on work in a new scope.';
   if (sprint.completion) return `This scope is explicitly completed. Run kyro scope reopen --kyro-scope ${scope} --reason "<why>" --yes to return it to planning.`;
@@ -381,7 +477,7 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
       title: input.sprint.title,
       state: 'active',
     });
-    next.roadmap.plannedSprintCount = Math.max(next.roadmap.plannedSprintCount, next.roadmap.sprints.length);
+    next.roadmap.plannedSprintCount = next.roadmap.sprints.filter((entry) => entry.state !== 'cancelled').length;
   }
   // Deliberate scope cut for this increment: sprint mode does not auto-transition debt[] items (e.g.
   // marking due debt "in_progress" the way the plan-sprint workflow does by hand). Debt is left as-is;
@@ -600,7 +696,11 @@ function parseLeanSprintInput(raw: unknown, current: SprintFile): LeanSprintInpu
 
   const sprint = parseLeanSprintHeader(record.sprint);
 
-  const expectedN = current.ledger.length === 0 ? 1 : Math.max(...current.ledger.map((entry) => entry.n)) + 1;
+  const closedN = current.ledger.length === 0 ? 0 : Math.max(...current.ledger.map((entry) => entry.n));
+  let expectedN = closedN + 1;
+  // A cancelled planned identity is retained as roadmap history but must never be resurrected by
+  // sprint materialization. Skip each cancelled slot while preserving every other sprint number.
+  while (current.roadmap.sprints.some((entry) => entry.n === expectedN && entry.state === 'cancelled')) expectedN += 1;
   if (sprint.n !== expectedN) {
     throw new KyroCoreError(
       'INVALID_INPUT',
@@ -760,6 +860,7 @@ function parsePlanArgs(rawArgs: string[]): PlanArgs {
   let dryRun = false;
   let help = false;
   let updateActive = false;
+  let roadmap = false;
   let yes = false;
   let digest: string | null = null;
   for (let i = 0; i < rawArgs.length; i += 1) {
@@ -771,13 +872,14 @@ function parsePlanArgs(rawArgs: string[]): PlanArgs {
     else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
     else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
     else if (arg === '--update-active') updateActive = true;
+    else if (arg === '--roadmap') roadmap = true;
     else if (arg === '--yes' || arg === '--confirm') yes = true;
     else if (arg === '--digest') { digest = requireValue(rawArgs, i, arg); i += 1; }
     else if (arg.startsWith('--digest=')) digest = arg.slice('--digest='.length);
     else throw new KyroCoreError('INVALID_INPUT', `Unknown plan option: ${arg}`);
   }
   if (digest !== null && !/^[a-f0-9]{64}$/.test(digest)) throw new KyroCoreError('INVALID_INPUT', '--digest must be a lowercase SHA-256 digest.');
-  return { from, scope, dryRun, help, updateActive, yes, digest };
+  return { from, scope, dryRun, help, updateActive, roadmap, yes, digest };
 }
 
 function requireValue(args: string[], index: number, flag: string): string {
@@ -790,17 +892,24 @@ function printPlanHelp(): void {
   console.log(`Usage: kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]
   kyro plan --update-active --from <file> --kyro-scope <scope> --dry-run --json
   kyro plan --update-active --from <file> --kyro-scope <scope> --digest <sha256> --yes --json
+  kyro plan --roadmap --from <file> --kyro-scope <scope> (--dry-run | --digest <sha256> --yes) --json
 
 Explicit --update-active edits existing tasks in the current unclosed sprint of an open scope.
 Preview first; apply requires the exact digest and --yes. Closed/archived tasks are immutable.
 Input: { scope?, sprint: { n, slug }, reason, tasks?: [{ id, title?, description?, context?,
-  acceptance_criteria?, files_to_touch?, depends_on?, scenario_refs? }],
-  requirements?: [{ id, statement, priority?, rationale? }],
+  acceptance_criteria?, files_to_touch?, depends_on?, scenario_refs? } | { id, action: "cancel", reason }],
+  requirements?: [{ id, statement, priority?, rationale? } | { id, action: "remove" }],
   scenarios?: [{ id, requirement, given, when, then }] }
-Arrays replace the complete field; no task additions/removals or lifecycle fields are accepted.
-Changes invalidate affected task/dependent verdicts atomically; previous evidence stays as reference.
+Removing a requirement automatically removes its live scenarios and requires the same request to cancel every live task consuming them. No task additions or lifecycle fields are accepted.
+Changes invalidate affected task/dependent verdicts atomically; cancellations retain any prior evidence as history.
 Revalidate, record new evidence and review; optional QA is not automatically introduced.
 A retry after a successful update needs a new preview (no persistent update receipts).
+
+--roadmap is a separate digest-protected writer for planned roadmap entries only. Input:
+{ reason, updates?: [{ n, title }], add?: [{ slug, title }], cancel?: [n], order?: [n] }.
+It never changes closed or active entries; additions receive the next unused n. The order field contains
+exactly the remaining planned n values and controls only their presentation. Cancelled entries remain
+as cancelled history and are excluded from plannedSprintCount and future materialization.
 
 Two default modes, auto-detected from the resolved scope's state (not from the --from file shape):
   - init mode: no sprint.json yet for the scope. Materializes the scope's initial sprint.json

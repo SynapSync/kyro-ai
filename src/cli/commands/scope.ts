@@ -1,11 +1,18 @@
 import { existsSync } from 'node:fs';
 import { ARTIFACT_ROOT, KYRO_PROJECT_ROOT } from '../constants';
 import { readJsonSafely } from '../artifacts/json';
-import { sprintJsonPath } from '../artifacts/paths';
+import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { formatScopeAuthor } from '../core/actor';
 import { resolveManagedPath } from '../fs';
 import { readProjectState, updateProjectStateLayers } from '../state';
+import { applyPlan } from '../fs';
+import { sha256 } from '../core/digest';
+import { setCliMachineResult } from '../core/cli-envelope';
+import { buildRecordEvidencePlan, type RecordEvidenceArgs } from './record-evidence';
+import { buildClosePlan } from './close-sprint';
+import { applySprintCloseTransaction, readSprintCloseCheckpoint } from '../checkpoints/sprint-close';
+import { undisposedCloseTasks } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved } from '../core/trace';
@@ -18,6 +25,7 @@ import {
   applyScopeRetirement,
   buildScopeRetirementPreparation,
   readScopeRetirementCheckpoint,
+  scopeRetirementCheckpointPath,
   type ScopeRetirementRequest,
 } from '../checkpoints/scope-retirement';
 import {
@@ -59,6 +67,15 @@ export function runScopeCommand(args: string[]): void {
     const parsed = parseSetActiveArgs(args.slice(1));
     if (!parsed.scope) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope set-active <scope> [--yes] [--dry-run]');
     setActiveScope(parsed.scope, parsed.yes, parsed.dryRun);
+    return;
+  }
+  if (subcommand === 'discard') {
+    const parsed = parseDiscardArgs(args.slice(1));
+    if (parsed.help) {
+      printScopeDiscardHelp();
+      return;
+    }
+    runScopeDiscard(parsed);
     return;
   }
   if (subcommand === 'retire') {
@@ -193,6 +210,124 @@ function parseSetActiveArgs(args: string[]): { scope: string; yes: boolean; dryR
     else throw new KyroCoreError('INVALID_INPUT', `Unknown scope set-active option: ${arg}`);
   }
   return { scope, yes, dryRun };
+}
+
+interface ScopeDiscardArgs {
+  scope: string;
+  reason: string;
+  digest: string | null;
+  yes: boolean;
+  dryRun: boolean;
+  help: boolean;
+}
+
+/**
+ * One externally approved lifecycle operation.  It deliberately composes the existing evidence,
+ * close, and retirement builders rather than introducing a second journal/WAL.  The close
+ * checkpoint is the durable after-image for a interrupted cancellation/close stage; the existing
+ * retirement checkpoint owns the final stage.
+ */
+function runScopeDiscard(args: ScopeDiscardArgs): void {
+  if (args.dryRun && (args.digest || args.yes)) {
+    throw new KyroCoreError('INVALID_INPUT', '--dry-run cannot be combined with --digest or --yes.', 'Preview with --dry-run, then apply the reviewed digest with --yes.');
+  }
+  const prepared = prepareScopeDiscard(args.scope, args.reason);
+  printScopeDiscardPlan(prepared);
+  if (args.dryRun) {
+    setCliMachineResult('preview', { outcome: 'preview', scope: args.scope, digest: prepared.digest, resumed: prepared.resumed, affectedFiles: prepared.affectedFiles, requiresConfirmation: true, nextAction: 'done' });
+    console.log('Dry run complete. No files changed.');
+    return;
+  }
+  if (!args.digest || !args.yes) {
+    throw new KyroCoreError('CONFIRMATION_REQUIRED', `Discarding scope "${args.scope}" requires the reviewed --digest and --yes.`, 'Run kyro scope discard --kyro-scope <scope> --reason "..." --dry-run, present the complete plan to a human, then rerun with its exact --digest and --yes.');
+  }
+  if (args.digest !== prepared.digest) {
+    throw new KyroCoreError('DIVERGED', 'The supplied discard digest does not match the prepared lifecycle plan.', 'Prepare the discard again and apply only the newly reviewed digest with --yes.');
+  }
+
+  const closeNote = `scope-discard:${prepared.digest}`;
+  const closeSummary = `Scope discarded: ${args.reason}`;
+  let sprint = prepared.sprint;
+  if (sprint.activeSprint) {
+    for (const task of undisposedCloseTasks(sprint.activeSprint)) {
+      const evidenceArgs: RecordEvidenceArgs = {
+        taskId: task.id, scope: args.scope, summary: closeSummary,
+        validation: ['scope discard lifecycle operation'], files: [], notes: null, by: 'scope discard',
+        status: 'done', statusExplicit: false, dispositionKind: 'cancelled', reason: args.reason,
+        targetRaw: null, dryRun: false, help: false,
+      };
+      const result = buildRecordEvidencePlan(args.scope, evidenceArgs);
+      applyPlan(result.plan);
+      sprint = result.sprint;
+    }
+  }
+
+  // The close builder's immutable checkpoint freezes the cancellation after-image.  Retrying this
+  // exact external digest replays the same frozen close inputs before continuing to retirement.
+  if (!sprint.retirement) {
+    const close = buildClosePlan(args.scope, {
+      scope: args.scope, outcome: 'abandoned', outcomeExplicit: true, note: closeNote,
+      summary: closeSummary, recommendations: [], learnings: [], dryRun: false, yes: true, help: false,
+    });
+    applySprintCloseTransaction(close.transaction);
+  }
+
+  const retirementRequest: ScopeRetirementRequest = { scope: args.scope, reason: closeSummary, supersededBy: null };
+  const retirement = buildScopeRetirementPreparation(retirementRequest);
+  applyScopeRetirement(retirementRequest, retirement.planDigest);
+  setCliMachineResult('applied', { outcome: 'applied', scope: args.scope, digest: prepared.digest, resumed: prepared.resumed, affectedFiles: prepared.affectedFiles, requiresConfirmation: false, nextAction: 'done' });
+  console.log(`Scope "${args.scope}" discarded. Sprint closed as abandoned and scope retired.`);
+}
+
+function prepareScopeDiscard(scope: string, reason: string): { sprint: SprintFile; digest: string; resumed: boolean; affectedFiles: string[] } {
+  if (reason.trim() === '') throw new KyroCoreError('INVALID_INPUT', '--reason must be non-empty.', 'Explain why this live scope is being discarded.');
+  const read = readJsonSafely(sprintJsonPath(scope));
+  if (!read.exists || read.error) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no readable sprint.json.`, 'Select an existing scope and run kyro doctor --artifacts first.');
+  const sprint = asSprintFile(read.value);
+  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Scope "${scope}" does not have a valid v4 sprint.json.`, 'Run kyro doctor --artifacts before discarding.');
+  let digest: string;
+  let resumed = false;
+  if (sprint.activeSprint) {
+    digest = sha256({ kind: 'scope-discard', schemaVersion: 4, scope, reason: reason.trim(), beforeSprint: sha256(sprint) });
+  } else {
+    const checkpointPath = sprint.ledger[sprint.ledger.length - 1]?.checkpoint;
+    const checkpoint = checkpointPath ? readSprintCloseCheckpoint(`${scopeRoot(scope)}/${checkpointPath}`) : null;
+    const note = checkpoint?.close.note ?? '';
+    const match = /^scope-discard:([a-f0-9]{64})$/.exec(note);
+    if (!match || checkpoint?.close.outcome !== 'abandoned' || checkpoint.close.summary !== `Scope discarded: ${reason}`) {
+      throw new KyroCoreError('DIVERGED', `Scope "${scope}" is not at a resumable discard checkpoint.`, 'Prepare a discard only from an active scope, or retry with the exact original reason and digest.');
+    }
+    digest = match[1];
+    resumed = true;
+  }
+  return { sprint, digest, resumed, affectedFiles: [sprintJsonPath(scope), `${archiveDir(scope)}/`, scopeRetirementCheckpointPath(scope), '.agents/kyro/project.json'] };
+}
+
+function parseDiscardArgs(args: string[]): ScopeDiscardArgs {
+  let scope = ''; let reason = ''; let digest: string | null = null; let yes = false; let dryRun = false; let help = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--help' || arg === '-h') help = true;
+    else if (arg === '--yes' || arg === '-y') yes = true;
+    else if (arg === '--dry-run') dryRun = true;
+    else if (arg === '--kyro-scope') scope = requiredValue(args, ++index, arg);
+    else if (arg === '--reason') reason = requiredValue(args, ++index, arg);
+    else if (arg === '--digest') digest = requiredValue(args, ++index, arg);
+    else throw new KyroCoreError('INVALID_INPUT', `Unknown scope discard option: ${arg}`, 'Run kyro scope discard --help.');
+  }
+  if (!help && (!scope || !reason)) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope discard --kyro-scope <scope> --reason <reason> [--dry-run | --digest <sha256> --yes].');
+  return { scope, reason, digest, yes, dryRun, help };
+}
+
+function printScopeDiscardPlan(prepared: ReturnType<typeof prepareScopeDiscard>): void {
+  console.log(`Scope discard ${prepared.resumed ? 'resume' : 'plan'}: ${prepared.sprint.scope}`);
+  console.log('Stages: cancel undisposed active tasks → close-sprint --outcome abandoned → scope retire.');
+  console.log('Archive policy: existing archives are immutable; no WAL is created.');
+  console.log(`Plan digest: ${prepared.digest}`);
+}
+
+function printScopeDiscardHelp(): void {
+  console.log(`Usage:\n  kyro scope discard --kyro-scope <scope> --reason <reason> --dry-run\n  kyro scope discard --kyro-scope <scope> --reason <reason> --digest <sha256> --yes\n\nPrepares one informed lifecycle operation that cancels undisposed work, closes the active sprint as abandoned, and retires the scope. Retry an interrupted operation with the same reason and digest.`);
 }
 
 function scopeExists(scope: string, state: KyroProjectState): boolean {
@@ -511,6 +646,7 @@ function printScopeHelp(): void {
   kyro scope set-active <scope> --yes|--confirm
   kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes]
   kyro scope reopen --kyro-scope <scope> --reason <reason> [--yes]
+  kyro scope discard --kyro-scope <scope> --reason <reason> [--dry-run | --digest <sha256> --yes]
   kyro scope retire --kyro-scope <scope> --reason <reason> [--superseded-by <scope>]
 `);
 }

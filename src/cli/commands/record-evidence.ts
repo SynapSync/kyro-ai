@@ -2,7 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId, reviewPendingTaskIds, taskExecutionInfo } from '../core/status';
+import { deriveActiveSprintStatus, deriveLiveWorkHandoff, derivePhaseStatus, taskExecutionInfo } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { countClarificationMarkers } from '../core/analysis';
 import { resolveScope } from '../core/scope-resolution';
@@ -253,11 +253,10 @@ function withRecordedEvidence(
   }
   nextActive.status = deriveActiveSprintStatus(nextActive);
 
-  const nextReady = nextExecutableTaskId(candidate, task.id);
-  const nextReview = reviewPendingTaskIds(candidate).find((id) => id !== task.id) ?? null;
   const temporaryBlock = !disposition && status === 'blocked';
-  const nextAction = disposition || temporaryBlock ? (nextReady ? 'execute_task' : nextReview ? 'review_task' : 'execute_task') : 'review_task';
-  const nextTaskId = disposition || temporaryBlock ? (nextReady ?? nextReview) : task.id;
+  const liveRoute = deriveLiveWorkHandoff(candidate, sprint.scope, Boolean(disposition) || temporaryBlock);
+  const nextAction = disposition || temporaryBlock ? liveRoute.nextAction : 'review_task';
+  const nextTaskId = disposition || temporaryBlock ? liveRoute.nextTaskId : task.id;
   const note = disposition
     ? `Task ${task.id} disposed as ${disposition.kind}; evidence recorded. Scope remains open.`
     : temporaryBlock
@@ -266,7 +265,7 @@ function withRecordedEvidence(
 
   return {
     ...candidate,
-    handoff: { ...sprint.handoff, nextAction, nextTaskId, note, lastUpdated: recordedAt },
+    handoff: { ...sprint.handoff, nextAction, nextTaskId, blockers: disposition || temporaryBlock ? liveRoute.blockers : [], note, lastUpdated: recordedAt },
   };
 }
 

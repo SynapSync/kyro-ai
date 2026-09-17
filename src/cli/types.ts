@@ -39,6 +39,8 @@ export interface KyroScopeEntry {
 
 /** Human-authorized, state-bound reason a scope left the active work lifecycle. */
 export interface ScopeRetirement {
+  /** Redundant lifecycle marker makes inspectable terminal state explicit in the record. */
+  status: 'retired';
   reason: string;
   retiredAt: string;
   supersededBy?: string;
@@ -270,11 +272,20 @@ export const TASK_VERDICT_FINDING_SEVERITY = {
 } as const;
 export type TaskVerdictFindingSeverity = (typeof TASK_VERDICT_FINDING_SEVERITY)[keyof typeof TASK_VERDICT_FINDING_SEVERITY];
 
+export type ConventionRetirementReason = 'removed' | 'replaced';
+
+/** A scope-local operational rule; retired rules remain as validated local history. */
 export interface Convention {
   id: string;
   rule: string;
   tags: string[];
   addedSprint: number;
+  /** Present only for an inactive rule retained for local audit history. */
+  retired?: true;
+  /** Why this retired local rule ceased to be effective. Required with `retired`. */
+  retiredReason?: ConventionRetirementReason;
+  /** CLI-stamped retirement time. Required with `retired`. */
+  retiredAt?: string;
 }
 
 export const ADR_STATUS = {
@@ -662,10 +673,17 @@ export interface ScopeRecertificationV1 {
   createdAt: string;
 }
 
+export interface HandoffBlocker {
+  code: string;
+  object: string;
+  reason: string;
+  remedyCommand: string;
+}
+
 export interface Handoff {
   nextAction: NextAction;
   nextTaskId: string | null;
-  blockers: string[];
+  blockers: Array<string | HandoffBlocker>;
   note: string;
   lastUpdated: string;
 }
@@ -981,7 +999,7 @@ export interface ContextPackOutput {
   specOpenQuestions: string[];
   taskScenarios: SpecScenario[];
   handoffNote: string | null;
-  blockers: string[];
+  blockers: Array<string | HandoffBlocker>;
   /** Dependency-aware, read-only routing state for the active sprint. */
   execution: ContextPackExecutionSummary;
   /** Computed state of the selected task, if task pack mode is active. */
