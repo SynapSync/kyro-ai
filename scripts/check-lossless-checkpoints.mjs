@@ -1003,7 +1003,11 @@ for (const mode of ['corrupt', 'unsupported']) {
     const oldMainGate = join(root, 'old-main-gate');
     const oldHeartbeatGate = join(root, 'old-heartbeat-gate');
     const oldHolder = runAsync(root, closeArgs, {
-      KYRO_TEST_LOCK_LEASE_MS: '300',
+      // CI-safe lease for acquisition: the worker pauses after its first renewal until
+      // oldHeartbeatGate appears, so the lease still expires for the successor reclaim.
+      // A 300ms lease expired during Worker startup on loaded Windows Node 22 runners
+      // (fail-stop before the ready file, seen as "old holder never acquired lock").
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
       KYRO_TEST_LOCK_READY_FILE: oldReady,
       KYRO_TEST_LOCK_RELEASE_GATE: oldMainGate,
       KYRO_TEST_LOCK_HEARTBEAT_PAUSE_FILE: oldHeartbeatGate,
@@ -1067,7 +1071,10 @@ for (const mode of ['corrupt', 'unsupported']) {
     const ready = join(root, 'unexpected-worker-ready');
     const mainGate = join(root, 'unexpected-worker-main-gate');
     const holder = runAsync(root, closeArgs, {
-      KYRO_TEST_LOCK_LEASE_MS: '500',
+      // CI-safe lease: the injected exception fires after the 2nd renewal, so the
+      // lease length cannot mask it — but a 500ms lease can lapse during Worker
+      // startup on loaded Windows runners before the first renewal.
+      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
       KYRO_TEST_LOCK_READY_FILE: ready,
       KYRO_TEST_LOCK_RELEASE_GATE: mainGate,
       KYRO_TEST_LOCK_HEARTBEAT_UNEXPECTED_AFTER: '2',
