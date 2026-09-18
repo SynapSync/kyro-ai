@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Máquina de estados NextAction de Kyro",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 600],
+    "views": [
+      { "id": "ciclo-principal", "label": "Ciclo principal", "focus": ["init", "clarify", "plan-sprint", "execute-task", "review-task"], "note": "routing.ts carga los modos que acompañan la preparación, ejecución y revisión." },
+      { "id": "rutas-derivadas", "label": "Rutas derivadas", "focus": ["execute-task", "review-task", "qa-or-close", "await-scope-completion"], "note": "core/status.ts deriva la siguiente acción desde el estado verificable de las tareas." },
+      { "id": "cierre", "label": "Cierre", "focus": ["qa-or-close", "close-sprint", "done"], "note": "La ruta de cierre termina cuando el alcance se marca completo." }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "Orquestación del sprint" },
+    { "id": "resolucion", "label": "Resolución y cierre" },
+    { "id": "terminal", "label": "Resultado terminal" }
+  ],
+  "states": [
+    { "id": "init", "type": "start", "label": "init", "sublabel": "carga INIT.md", "tag": "inicio", "step": "01", "lane": "main", "col": 0 },
+    { "id": "clarify", "type": "decision", "label": "clarify", "sublabel": "aclara el alcance", "tag": "decisión", "step": "02", "lane": "main", "col": 1 },
+    { "id": "plan-sprint", "type": "active", "label": "plan_sprint", "sublabel": "plan-sprint.md", "tag": "plan", "step": "03", "lane": "main", "col": 2 },
+    { "id": "execute-task", "type": "active", "label": "execute_task", "sublabel": "tarea lista", "tag": "trabajo", "step": "04", "lane": "main", "col": 3 },
+    { "id": "review-task", "type": "decision", "label": "review_task", "sublabel": "revisión pendiente", "tag": "control", "step": "05", "lane": "main", "col": 4 },
+    { "id": "qa-or-close", "type": "decision", "label": "qa_or_close", "sublabel": "todas verificadas", "tag": "decisión", "lane": "resolucion", "col": 0 },
+    { "id": "close-sprint", "type": "active", "label": "close_sprint", "sublabel": "cierra el sprint", "tag": "cierre", "lane": "resolucion", "col": 1, "yOffset": 80 },
+    { "id": "await-scope-completion", "type": "waiting", "label": "await_scope_completion", "sublabel": "sin tarea lista", "tag": "espera", "lane": "resolucion", "col": 2, "width": 140, "yOffset": -80 },
+    { "id": "done", "type": "success", "label": "done", "sublabel": "alcance completo", "tag": "terminal", "lane": "terminal", "col": 2, "yOffset": -40 }
+  ],
+  "transitions": [
+    { "id": "iniciar-aclaracion", "from": "init", "to": "clarify", "variant": "emphasis" },
+    { "id": "aclarar-planificar", "from": "clarify", "to": "plan-sprint", "variant": "emphasis" },
+    { "id": "planificar-ejecutar", "from": "plan-sprint", "to": "execute-task", "variant": "emphasis" },
+    { "id": "ejecutar-revisar", "from": "execute-task", "to": "review-task", "variant": "default" },
+    { "id": "revisar-ejecutar", "from": "review-task", "to": "execute-task", "label": "siguiente lista", "variant": "default", "route": "top-channel" },
+    { "id": "ejecutar-qa", "from": "execute-task", "to": "qa-or-close", "label": "todas verificadas", "labelAt": [480, 230], "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "via": [[556, 240], [402, 240]] },
+    { "id": "qa-cerrar", "from": "qa-or-close", "to": "close-sprint", "variant": "emphasis", "route": "bottom-channel" },
+    { "id": "cerrar-hecho", "from": "close-sprint", "to": "done", "label": "alcance completado", "variant": "emphasis", "route": "bottom-channel" },
+    { "id": "sin-trabajo-listo", "from": "execute-task", "to": "await-scope-completion", "label": "sin ruta ejecutable", "labelAt": [630, 270], "variant": "dashed", "route": "drop" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Fuente de enrutamiento", "items": ["routing.ts asocia cada NextAction con sus modos; await_scope_completion y done no cargan ninguno.", "init usa INIT.md; los estados operativos usan SPRINT.md con un modo específico."] },
+    { "dot": "emerald", "title": "Verdad derivada en core/status.ts", "items": ["Tarea lista → execute_task; revisión pendiente → review_task.", "Todas verificadas → qa_or_close; sin ruta ejecutable → await_scope_completion."] }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/home/rperaza/joisephdev/my-projects/kyro-ecosistem/kyro-ai/docs/diagrams/kyro-definir-trabajo.workflow.json",
+  "output": "/home/rperaza/joisephdev/my-projects/kyro-ecosistem/kyro-ai/docs/diagrams/kyro-definir-trabajo.html",
+  "specification": {
+    "sha256": "18954cd2e2b496afc3cb42aa84eca09bed6a3e82e9b477ececcf3246ab9e6f21",
+    "bytes": 2843
+  },
+  "artifact": {
+    "sha256": "801eccf95b56ccfda7ec5822a43fb194b3d86d4a2a1946c29b5c9517202fa4d8",
+    "bytes": 807041
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

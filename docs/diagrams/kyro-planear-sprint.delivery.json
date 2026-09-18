@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/home/rperaza/joisephdev/my-projects/kyro-ecosistem/kyro-ai/docs/diagrams/kyro-planear-sprint.workflow.json",
+  "output": "/home/rperaza/joisephdev/my-projects/kyro-ecosistem/kyro-ai/docs/diagrams/kyro-planear-sprint.html",
+  "specification": {
+    "sha256": "cb8fd4c195c777bcd57ded93972b86e752805b1c262be3cffe1e7a25739814c8",
+    "bytes": 4627
+  },
+  "artifact": {
+    "sha256": "bc254a6a30ef02d1c30e905d0db7332e8e3fea5d4712074dacb3669b0ea60a49",
+    "bytes": 813975
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

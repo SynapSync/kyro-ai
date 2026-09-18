@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kyro AI · Mapa navegable del código",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/SynapSync/kyro-ai",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "fac04cb0f232ac3c1dc14ed266cad76b07dbe8f4"
+    },
+    "viewBox": [1220, 540],
+    "views": [
+      {
+        "id": "ejecucion-cli",
+        "label": "Ejecución CLI",
+        "focus": ["cli-entry", "cli-app", "command-handlers", "core-services", "artifact-state"],
+        "note": "Del binario a los comandos, la lógica de dominio y el estado persistente."
+      },
+      {
+        "id": "ruteo-sprint",
+        "label": "Ruteo del sprint",
+        "focus": ["public-commands", "orchestrator", "routing", "sprint-modes", "artifact-state"],
+        "note": "Los routers públicos cargan un modo mínimo según el siguiente paso del scope."
+      },
+      {
+        "id": "cierre-auditable",
+        "label": "Cierre auditable",
+        "focus": ["command-handlers", "checkpoint-close", "artifact-state"],
+        "note": "El cierre publica checkpoint inmutable, snapshots y transiciones verificadas."
+      },
+      {
+        "id": "proyeccion-host",
+        "label": "Proyección a hosts",
+        "focus": ["adapter-registry", "command-projection", "public-commands", "sprint-modes"],
+        "note": "Adaptadores proyectan comandos y el ejecutor completo hacia los hosts de agentes."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "cli-entry",
+      "type": "external",
+      "label": "CLI kyro",
+      "sublabel": "src/cli.ts · bin kyro / kyro-ai",
+      "tag": "entrada",
+      "pos": [30, 235],
+      "size": [160, 68],
+      "sources": [{ "path": "src/cli.ts", "label": "entrada CLI" }]
+    },
+    {
+      "id": "cli-app",
+      "type": "backend",
+      "label": "Dispatcher CLI",
+      "sublabel": "runCli · lock para mutaciones",
+      "tag": "app",
+      "pos": [220, 235],
+      "size": [175, 68],
+      "sources": [{ "path": "src/cli/app.ts", "label": "runCli" }]
+    },
+    {
+      "id": "command-handlers",
+      "type": "backend",
+      "label": "Comandos CLI",
+      "sublabel": "plan · review · close · status · MCP",
+      "tag": "handlers",
+      "pos": [430, 235],
+      "size": [185, 68],
+      "sources": [{ "path": "src/cli/commands/index.ts", "label": "catálogo" }]
+    },
+    {
+      "id": "core-services",
+      "type": "backend",
+      "label": "Core y pipeline",
+      "sublabel": "políticas · estado · orquestación",
+      "tag": "dominio",
+      "pos": [660, 235],
+      "size": [180, 68],
+      "sources": [
+        { "path": "src/cli/core/policy.ts", "label": "políticas" },
+        { "path": "src/cli/pipeline/orchestrator.ts", "label": "pipeline" }
+      ]
+    },
+    {
+      "id": "artifact-state",
+      "type": "database",
+      "label": "Artefactos del scope",
+      "sublabel": ".agents/kyro · project.json · sprint.json",
+      "tag": "estado vivo",
+      "pos": [935, 235],
+      "size": [205, 68],
+      "sources": [
+        { "path": "src/cli/artifacts/paths.ts", "label": "rutas" },
+        { "path": "src/cli/artifacts/schema.ts", "label": "esquemas" }
+      ]
+    },
+    {
+      "id": "checkpoint-close",
+      "type": "security",
+      "label": "Checkpoint de cierre",
+      "sublabel": "inmutable · SHA-256 · CAS · fsync",
+      "tag": "evidencia",
+      "pos": [935, 380],
+      "size": [205, 68],
+      "sources": [{ "path": "src/cli/checkpoints/sprint-close.ts", "label": "cierre seguro" }]
+    },
+    {
+      "id": "public-commands",
+      "type": "frontend",
+      "label": "Comandos públicos",
+      "sublabel": "/kyro:forge · status · qa · idea",
+      "tag": "routers",
+      "pos": [30, 45],
+      "size": [185, 68],
+      "sources": [{ "path": "commands/forge.md", "label": "router Forge" }]
+    },
+    {
+      "id": "orchestrator",
+      "type": "backend",
+      "label": "Orchestrator",
+      "sublabel": "gates · contexto mínimo · contrato",
+      "tag": "agente",
+      "pos": [260, 45],
+      "size": [185, 68],
+      "sources": [{ "path": "agents/orchestrator.md", "label": "contrato" }]
+    },
+    {
+      "id": "routing",
+      "type": "backend",
+      "label": "Tabla de ruteo",
+      "sublabel": "nextAction → modos de sprint",
+      "tag": "routing",
+      "pos": [490, 45],
+      "size": [185, 68],
+      "sources": [{ "path": "src/cli/routing.ts", "label": "ROUTING_TABLE" }]
+    },
+    {
+      "id": "sprint-modes",
+      "type": "cloud",
+      "label": "Skills y modos",
+      "sublabel": "sprint-forge · INIT · execute · close",
+      "tag": "runtime",
+      "pos": [720, 45],
+      "size": [205, 68],
+      "sources": [{ "path": "internal/skills/sprint-forge/SKILL.md", "label": "skill base" }]
+    },
+    {
+      "id": "adapter-registry",
+      "type": "external",
+      "label": "Adaptadores de host",
+      "sublabel": "standard · OpenCode · Codex · Claude",
+      "tag": "instalación",
+      "pos": [965, 45],
+      "size": [205, 68],
+      "sources": [{ "path": "src/cli/adapters/registry.ts", "label": "registro" }]
+    },
+    {
+      "id": "command-projection",
+      "type": "messagebus",
+      "label": "Proyección de skills",
+      "sublabel": "stubs de comando + ejecutor completo",
+      "tag": "sync",
+      "pos": [965, 140],
+      "size": [205, 68],
+      "sources": [{ "path": "src/cli/adapters/command-skills.ts", "label": "proyección" }]
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Runtime CLI · TypeScript", "wraps": ["cli-entry", "cli-app", "command-handlers", "core-services", "artifact-state", "checkpoint-close"], "pad": 28 },
+    { "kind": "region", "label": "Superficie de agentes y skills", "wraps": ["public-commands", "orchestrator", "routing", "sprint-modes", "adapter-registry", "command-projection"], "pad": 28 }
+  ],
+  "connections": [
+    { "from": "cli-entry", "to": "cli-app", "label": "invoca", "variant": "emphasis", "labelDy": 63 },
+    { "from": "cli-app", "to": "command-handlers", "label": "despacha verbos", "variant": "emphasis", "labelDy": 63 },
+    { "from": "command-handlers", "to": "core-services", "label": "aplica políticas y pipeline", "variant": "emphasis", "labelDy": -26 },
+    { "from": "core-services", "to": "artifact-state", "label": "lee y actualiza estado", "variant": "emphasis", "labelDy": 63 },
+    { "from": "command-handlers", "to": "checkpoint-close", "label": "close-sprint", "variant": "security", "fromSide": "right", "toSide": "left" },
+    { "from": "checkpoint-close", "to": "artifact-state", "label": "snapshot + CAS verificado", "variant": "security", "fromSide": "top", "toSide": "bottom" },
+    { "from": "public-commands", "to": "orchestrator", "label": "activa router", "variant": "emphasis", "labelDy": 63 },
+    { "from": "orchestrator", "to": "routing", "label": "resuelve nextAction", "variant": "emphasis", "labelDy": 63 },
+    { "from": "routing", "to": "sprint-modes", "label": "carga modo mínimo", "variant": "emphasis", "labelDy": 63 },
+    { "from": "sprint-modes", "to": "artifact-state", "label": "CLI gestiona el scope", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelDy": 21 },
+    { "from": "adapter-registry", "to": "command-projection", "label": "selecciona host", "variant": "dashed", "labelDy": 24 },
+    { "from": "command-projection", "to": "sprint-modes", "label": "proyecta ejecutor", "variant": "dashed", "fromSide": "left", "toSide": "right", "labelDy": 10 }
+  ]
+}

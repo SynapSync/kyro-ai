@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kyro — Microciclo de una tarea",
+    "quality_profile": "showcase",
+    "legend": { "mode": "hidden" },
+    "views": [
+      {
+        "id": "camino-pass",
+        "label": "Camino PASS",
+        "focus": ["contextPack", "executeTask", "tests", "evidence", "reviewTask", "pass"],
+        "note": "Contexto verificable, implementación, pruebas, evidencia y revisión concluyen la tarea."
+      },
+      {
+        "id": "retorno-fail",
+        "label": "Retorno FAIL",
+        "focus": ["tests", "evidence", "reviewTask", "fail", "executeTask"],
+        "note": "Un fallo de pruebas o review devuelve la tarea a implementación."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "ejecucion", "label": "Ejecución de tarea" },
+    { "id": "verificacion", "label": "Verificación y evidencia" },
+    { "id": "resultado", "label": "Decisión" }
+  ],
+  "phases": [
+    { "id": "preparar", "label": "Preparar", "fromCol": 0, "toCol": 0 },
+    { "id": "ejecutar", "label": "Ejecutar", "fromCol": 1, "toCol": 1, "variant": "emphasis" },
+    { "id": "certificar", "label": "Certificar", "fromCol": 2, "toCol": 3, "variant": "dashed" },
+    { "id": "decidir", "label": "Decidir / retornar", "fromCol": 4, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["contextPack", "executeTask", "tests", "evidence", "reviewTask", "pass"],
+  "semanticChecks": {
+    "allowedRoots": ["contextPack"],
+    "allowedTerminals": ["pass"],
+    "requiredPaths": [
+      { "from": "contextPack", "to": "pass" },
+      { "from": "fail", "to": "executeTask" }
+    ]
+  },
+  "nodes": [
+    { "id": "contextPack", "lane": "ejecucion", "col": 0, "type": "database", "label": "context-pack", "sublabel": "contexto de tarea", "tag": "CLI", "width": 130 },
+    { "id": "executeTask", "lane": "ejecucion", "col": 1, "type": "backend", "label": "Implementación", "sublabel": "modo execute-task", "tag": "agente", "width": 130 },
+    { "id": "tests", "lane": "verificacion", "col": 2, "type": "security", "label": "Pruebas", "sublabel": "valida el resultado", "tag": "PASS requerido", "width": 120 },
+    { "id": "evidence", "lane": "verificacion", "col": 3, "type": "database", "label": "record-evidence", "sublabel": "evidencia de checks", "tag": "CLI", "width": 130 },
+    { "id": "reviewTask", "lane": "ejecucion", "col": 4, "type": "backend", "label": "Revisión", "sublabel": "modo review-task", "tag": "checker", "width": 140 },
+    { "id": "pass", "lane": "resultado", "col": 5, "type": "cloud", "label": "PASS", "sublabel": "veredicto CLI", "width": 120 },
+    { "id": "fail", "lane": "resultado", "col": 1, "type": "security", "label": "FAIL", "sublabel": "corrección requerida", "tag": "retorno", "width": 120 }
+  ],
+  "edges": [
+    { "id": "context-execute", "from": "contextPack", "to": "executeTask", "label": "context-pack --task", "variant": "emphasis", "role": "main" },
+    { "id": "execute-tests", "from": "executeTask", "to": "tests", "label": "validación por criterios", "variant": "default", "role": "main" },
+    { "id": "tests-evidence", "from": "tests", "to": "evidence", "label": "checks de área tocada", "variant": "emphasis", "role": "main" },
+    { "id": "evidence-review", "from": "evidence", "to": "reviewTask", "label": "evidencia CLI", "variant": "dashed", "role": "main" },
+    { "id": "review-pass", "from": "reviewTask", "to": "pass", "label": "review --verdict pass", "variant": "emphasis", "role": "main" },
+    { "id": "tests-fail", "from": "tests", "to": "fail", "label": "checks fallan", "variant": "security", "role": "error" },
+    { "id": "review-fail", "from": "reviewTask", "to": "fail", "label": "review --verdict fail", "variant": "security", "role": "error" },
+    { "id": "fail-return", "from": "fail", "to": "executeTask", "label": "corregir y revalidar", "variant": "security", "role": "return" }
+  ]
+}

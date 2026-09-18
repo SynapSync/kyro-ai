@@ -1,0 +1,84 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kyro · cambiar el trabajo vigente",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "agente", "label": "Agente · routing" },
+    { "id": "cambio", "label": "Cambio tool-owned" },
+    { "id": "verificacion", "label": "Verificación" },
+    { "id": "humano", "label": "Decisión humana", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "detectar", "label": "Detectar y clasificar", "fromCol": 0, "toCol": 1 },
+    { "id": "transaccion", "label": "Preview vinculado y apply", "fromCol": 2, "toCol": 4, "variant": "emphasis" },
+    { "id": "reencauzar", "label": "Comprobar y reencauzar", "fromCol": 5, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["pack", "remedy", "local", "preview", "apply", "doctor", "refreshed"],
+  "semanticChecks": {
+    "allowedRoots": ["pack"],
+    "allowedTerminals": ["refreshed", "esperar"],
+    "requiredPaths": [
+      { "from": "pack", "to": "refreshed" },
+      { "from": "remedy", "to": "esperar" }
+    ]
+  },
+  "nodes": [
+    { "id": "pack", "lane": "agente", "col": 0, "type": "backend", "label": "context-pack", "sublabel": "Bloqueador + remedyCommand", "width": 146 },
+    { "id": "remedy", "lane": "agente", "col": 1, "type": "backend", "label": "Clasificar remedy", "sublabel": "Autoridad y alcance", "width": 146 },
+    { "id": "local", "lane": "cambio", "col": 2, "type": "database", "label": "Cambio local vigente", "sublabel": "update-active · rule · roadmap", "width": 164 },
+    { "id": "preview", "lane": "cambio", "col": 3, "type": "security", "label": "Preview completo", "sublabel": "Diff + digest", "width": 146 },
+    { "id": "apply", "lane": "cambio", "col": 4, "type": "database", "label": "Apply del CLI", "sublabel": "Mismo input + digest", "width": 146 },
+    { "id": "doctor", "lane": "verificacion", "col": 5, "type": "security", "label": "doctor --artifacts", "sublabel": "Gate obligatorio", "width": 154 },
+    { "id": "refreshed", "lane": "agente", "col": 5, "type": "backend", "label": "context-pack fresco", "sublabel": "Reencauzar desde estado actual", "width": 164 },
+    { "id": "discard", "lane": "humano", "col": 2, "type": "security", "label": "Scope discard", "sublabel": "Irreversible", "width": 146 },
+    { "id": "approval", "lane": "humano", "col": 3, "type": "external", "label": "Consentimiento informado", "sublabel": "Humano explícito", "width": 176 },
+    { "id": "discardPreview", "lane": "humano", "col": 4, "type": "security", "label": "Preview + digest", "sublabel": "scope discard", "width": 146 },
+    { "id": "esperar", "lane": "humano", "col": 5, "type": "external", "label": "Esperar", "sublabel": "Sin write ni bypass", "width": 146 }
+  ],
+  "edges": [
+    { "from": "pack", "to": "remedy", "label": "Lee el handoff", "role": "main" },
+    { "from": "remedy", "to": "local", "label": "Caso local autorizado", "role": "main", "variant": "emphasis" },
+    { "from": "local", "to": "preview", "label": "Prepara y revisa", "role": "main" },
+    { "from": "preview", "to": "apply", "label": "Digest aprobado", "role": "main", "variant": "emphasis" },
+    { "from": "apply", "to": "doctor", "label": "Tras apply exitoso", "role": "main", "variant": "security", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "from": "doctor", "to": "refreshed", "label": "PASS", "role": "main", "variant": "emphasis" },
+    { "from": "remedy", "to": "discard", "label": "Descartar scope", "role": "branch", "variant": "security", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "from": "discard", "to": "approval", "label": "Siempre consulta", "role": "branch", "variant": "security" },
+    { "from": "approval", "to": "discardPreview", "label": "Sí explícito", "role": "branch", "variant": "security" },
+    { "from": "discardPreview", "to": "doctor", "label": "Apply con digest + --yes", "role": "branch", "variant": "security" },
+    { "from": "approval", "to": "esperar", "label": "Ambiguo, no o sin respuesta", "role": "error", "variant": "security" },
+    { "from": "doctor", "to": "esperar", "label": "FAIL: bloquear routing", "role": "error", "variant": "security" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Tres remedios locales",
+      "items": [
+        "plan --update-active corrige requisitos o tareas del sprint activo.",
+        "rule update|remove|replace cambia una convención local del scope.",
+        "plan --roadmap modifica únicamente el trabajo futuro planificado."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Límites de autoridad",
+      "items": [
+        "El agente usa el {{KYRO_CLI}} resuelto, nunca edita JSON gestionado.",
+        "El preview completo, su diff y el digest vinculan el apply.",
+        "Significado o alcance ambiguo, política de proyecto o autoridad expandida: esperar al humano."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Gate posterior",
+      "items": [
+        "Cada apply exitoso exige doctor --artifacts --kyro-scope antes de continuar.",
+        "Doctor FAIL bloquea el routing; no se repite ni se repara el estado a mano.",
+        "Con PASS se relee context-pack y se continúa solo desde el pack refrescado."
+      ]
+    }
+  ]
+}
