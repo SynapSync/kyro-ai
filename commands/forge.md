@@ -13,7 +13,7 @@ Continue Kyro work without loading the whole workflow upfront.
 2. Resolve the active scope from `$ARGUMENTS`, `local.json.activeScope`, or the only directory under `.agents/kyro/scopes/`. Ambiguous or none → ask the user before continuing.
 3. A scope that does not exist yet — neither in `project.json` nor on disk — is creation, not corruption: skip `repair` and `context-pack`, load `skills/sprint-forge/assets/modes/INIT.md`, and never route it to recovery.
 4. Only for an existing scope, silently run `{{KYRO_CLI}} repair integrity prepare --kyro-scope <scope> --json` *before* `context-pack`. Never omit `--kyro-scope` — it isolates this scope from unrelated drift. Findings/blockers → load `skills/sprint-forge/assets/modes/recover.md` and stop. None → discard and continue; do not ask.
-5. Resolve routing with `kyro context-pack --kyro-scope <scope> --json` (lean pack). Do not open the full `sprint.json`, archive Markdown, findings, templates, or helpers to route. Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint`.
+5. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack). For a blocker with `remedyCommand`, load and follow `skills/sprint-forge/assets/helpers/live-work.md`, then resolve its fresh pack. Do not open the full `sprint.json`, archive Markdown, findings, templates, or helpers to route except as that helper requires. Open the full `sprint.json` only to write, or in `plan_sprint`/`close_sprint`.
 
 ## User intent (before `nextAction`)
 

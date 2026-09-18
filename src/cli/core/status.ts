@@ -1,4 +1,4 @@
-import type { ActiveSprint, Phase, SprintFile, Task, TaskBlockReason, TaskExecutionInfo, TaskExecutionState } from '../types';
+import type { ActiveSprint, Handoff, HandoffBlocker, Phase, SprintFile, Task, TaskBlockReason, TaskExecutionInfo, TaskExecutionState } from '../types';
 import type { KyroScopeStatus } from '../artifacts/schema';
 import { hasStaleReview } from './review-material';
 
@@ -100,6 +100,39 @@ export function nextExecutableTaskId(sprint: SprintFile, skipId?: string): strin
 
 export function reviewPendingTaskIds(sprint: SprintFile): string[] {
   return taskExecutionInfo(sprint).filter((info) => info.state === 'awaiting_review').map((info) => info.taskId);
+}
+
+/** One routing truth for writers and read models: an active sprint with no ready/review task is not executable. */
+export function deriveLiveWorkHandoff(
+  sprint: SprintFile,
+  scope: string,
+  recomputeExecutionRoute = false,
+): Pick<Handoff, 'nextAction' | 'nextTaskId' | 'blockers'> {
+  // Lifecycle transitions are authored state. Only an execute_task handoff is a
+  // claim about current task readiness and therefore needs live correction.
+  // Writers opt in after a task disposition/block changes execution truth.
+  if (!recomputeExecutionRoute && sprint.handoff.nextAction !== 'execute_task') {
+    return { nextAction: sprint.handoff.nextAction, nextTaskId: sprint.handoff.nextTaskId ?? null, blockers: sprint.handoff.blockers ?? [] };
+  }
+
+  const nextTaskId = nextExecutableTaskId(sprint);
+  if (nextTaskId) return { nextAction: 'execute_task', nextTaskId, blockers: [] };
+  const review = reviewPendingTaskIds(sprint)[0] ?? null;
+  if (review) return { nextAction: 'review_task', nextTaskId: review, blockers: [] };
+
+  // A fully verified sprint is no longer live work. Its completion lifecycle
+  // must route through QA or close rather than advertising dead execution.
+  const execution = taskExecutionInfo(sprint);
+  if (execution.length > 0 && execution.every((info) => info.state === 'verified')) {
+    return { nextAction: 'qa_or_close', nextTaskId: null, blockers: [] };
+  }
+
+  const blocker: HandoffBlocker = {
+    code: 'no_ready_work', object: 'active_sprint',
+    reason: 'No dependency-ready task remains in the active sprint.',
+    remedyCommand: `node dist/cli.js plan --update-active --kyro-scope ${scope} --from <approved-input.json> --dry-run --json`,
+  };
+  return { nextAction: 'await_scope_completion', nextTaskId: null, blockers: [blocker] };
 }
 
 /**

@@ -640,6 +640,16 @@ function validateConvention(value: unknown, path: string, prefix: string, issues
   requireString(value, 'rule', path, issues, `${prefix}.rule`);
   requireStringArrayField(value, 'tags', path, issues, `${prefix}.tags`);
   requireNumber(value, 'addedSprint', path, issues, `${prefix}.addedSprint`);
+  const hasRetirementMetadata = 'retiredReason' in value || 'retiredAt' in value;
+  if ('retired' in value && value.retired !== true) {
+    issues.push({ path, field: `${prefix}.retired`, message: 'must be true when present' });
+  }
+  if (value.retired === true) {
+    requireLiteralSet(value, 'retiredReason', ['removed', 'replaced'], path, issues, `${prefix}.retiredReason`);
+    requireIsoString(value, 'retiredAt', path, issues, `${prefix}.retiredAt`);
+  } else if (hasRetirementMetadata) {
+    issues.push({ path, field: prefix, message: 'retiredReason and retiredAt require retired: true' });
+  }
 }
 
 function validateOptionalConventions(value: Record<string, unknown>, path: string, issues: ValidationIssue[]): void {

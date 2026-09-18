@@ -6,7 +6,7 @@ import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
 import { listScopeNames } from '../artifacts/scopes';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
-import { deriveScopeStatus, taskExecutionInfo } from '../core/status';
+import { deriveLiveWorkHandoff, deriveScopeStatus, taskExecutionInfo } from '../core/status';
 import { emitTraceEvent } from '../core/trace';
 import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
@@ -60,13 +60,14 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const packMode: ContextPackMode = resolvePackMode(taskOption, sprint, warnings);
   const task = packMode === 'task' ? resolveTask(sprint, taskOption, warnings) : null;
 
-  const routing = resolveRoute(sprint.handoff.nextAction, packMode);
+  const effectiveHandoff = sprint.activeSprint ? { ...sprint.handoff, ...deriveLiveWorkHandoff(sprint, scope) } : sprint.handoff;
+  const routing = resolveRoute(effectiveHandoff.nextAction, packMode);
   emitTraceEvent({
     v: 1,
     ts: new Date().toISOString(),
     scope,
     type: 'route_selected',
-    nextAction: sprint.handoff.nextAction,
+    nextAction: effectiveHandoff.nextAction,
     packMode,
     budgetClass: routing.budgetClass,
     reasoningTier: routing.reasoningTier,
@@ -108,8 +109,8 @@ export function buildContextPack(scope: string, taskOption: string | null = null
       completedAt: record.completion.completedAt,
       reason: record.reason,
     })),
-    nextAction: sprint.handoff.nextAction,
-    nextTaskId: sprint.handoff.nextTaskId,
+    nextAction: effectiveHandoff.nextAction,
+    nextTaskId: effectiveHandoff.nextTaskId,
     activeSprintSlug: sprint.activeSprint?.slug ?? null,
     activeSprintObjective: sprint.activeSprint?.objective ?? null,
     openDebtCount,
@@ -124,7 +125,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     specOpenQuestions: sprint.spec?.openQuestions ?? [],
     taskScenarios,
     handoffNote: sprint.handoff.note || null,
-    blockers: sprint.handoff.blockers ?? [],
+    blockers: effectiveHandoff.blockers ?? [],
     execution,
     taskExecution: selectedTaskExecution,
     reviewPending,
@@ -164,8 +165,9 @@ export function buildCliRecipes(scope: string, sprint: SprintFile, task: Task | 
     },
   ];
 
-  const nextAction = sprint.handoff.nextAction;
-  const taskId = task?.id ?? sprint.handoff.nextTaskId;
+  const effectiveHandoff = sprint.activeSprint ? { ...sprint.handoff, ...deriveLiveWorkHandoff(sprint, scope) } : sprint.handoff;
+  const nextAction = effectiveHandoff.nextAction;
+  const taskId = task?.id ?? effectiveHandoff.nextTaskId;
 
   switch (nextAction) {
     case 'execute_task':
@@ -306,6 +308,8 @@ function selectConventions(
   const seenIds = new Set<string>();
   const seenRules = new Set<string>();
   const merged = [...sprint.conventions, ...globalConventions].filter((convention) => {
+    // Retired scope-local rules remain in sprint.json as local history but are never effective.
+    if (convention.retired) return false;
     const normalizedRule = convention.rule.trim().replace(/\s+/g, ' ').toLowerCase();
     if (seenIds.has(convention.id) || seenRules.has(normalizedRule)) return false;
     seenIds.add(convention.id);

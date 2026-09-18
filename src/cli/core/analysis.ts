@@ -168,7 +168,9 @@ export interface SpecFindingsOptions {
 }
 
 export function collectSpecFindings(sprint: SprintFile, options: SpecFindingsOptions = {}): AnalysisFinding[] {
-  const tasks = sprint.activeSprint ? allTasks(sprint.activeSprint) : [];
+  // Disposed work is historical explanation, not a live spec consumer. Its retained references
+  // must not prevent an authorized active-plan removal from becoming internally consistent.
+  const tasks = sprint.activeSprint ? allTasks(sprint.activeSprint).filter((task) => !task.disposition) : [];
   if (!sprint.spec && !tasks.some((task) => (task.scenario_refs ?? []).length)) return [];
   const spec = sprint.spec ?? { requirements: [], scenarios: [], openQuestions: [] };
 

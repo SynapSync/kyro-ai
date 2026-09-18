@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/home/rperaza/joisephdev/my-projects/kyro-ecosistem/kyro-ai/docs/diagrams/kyro-ciclo-tarea.workflow.json",
+  "output": "/home/rperaza/joisephdev/my-projects/kyro-ecosistem/kyro-ai/docs/diagrams/kyro-ciclo-tarea.html",
+  "specification": {
+    "sha256": "a70f733ada0738b6a64948affa95fcb98f847f483e140db59024c03067daae67",
+    "bytes": 3902
+  },
+  "artifact": {
+    "sha256": "485e6a993f0adcdf32025e53df44697a56ec45b7ac2bd13df2e5f11a91e40d40",
+    "bytes": 807642
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

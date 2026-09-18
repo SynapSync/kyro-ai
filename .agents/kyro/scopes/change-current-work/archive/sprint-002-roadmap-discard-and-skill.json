@@ -1,0 +1,285 @@
+{
+  "n": 2,
+  "slug": "roadmap-discard-and-skill",
+  "title": "Roadmap, discard y excepción de skill",
+  "objective": "Permitir reorganizar entradas planned del roadmap, descartar un scope vivo orquestando writers existentes con un consentimiento, y hacer que el skill consuma remedyCommand + doctor, sin schema 5 ni journal Plan 15.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P0",
+      "title": "Fixtures rojos de roadmap, discard y skill",
+      "objective": "Fijar en sandboxes las regresiones de plan --roadmap, scope discard y la excepción de skill antes de cambiar escritores.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T2.1",
+          "title": "Crear fixtures rojos de roadmap, discard y skill",
+          "description": "Extender los fixtures table-driven de change-current-work para reproducir: (1) la imposibilidad de retitular/añadir/cancelar/reordenar entradas planned del roadmap, (2) la cadena de aprobación para descartar un scope vivo (retire rehúsa con activeSprint), y (3) la ausencia de un helper de skill que aplique remedyCommand y luego doctor. Registrar que fallan contra 36c3897 antes de implementar. Los probes que muten estado deben pasar exclusivamente por scripts/lib/guarded-cli-probe.mjs y ejecutar node dist/cli.js de este checkout, nunca PATH kyro ni plan --revise.",
+          "files_to_touch": [
+            "scripts/check-change-current-work.mjs",
+            "scripts/lib/guarded-cli-probe.mjs",
+            "package.json"
+          ],
+          "context": "Sprint 1 no dejó recomendaciones en ledger. Convención process-1: las transiciones post-cierre se prueban rejugando builders, no fabricando estado. Finding 04/05/06: roadmap congelado, retire rehúsa activeSprint, y las pruebas deben usar este checkout (no Plan 15 en PATH). No-goals: plan --revise, schema 5, journal, --global. Tarea de fixtures: no implementa writers.",
+          "acceptance_criteria": [
+            "npm run check:change-current-work:red registra casos rojos 36c3897 para planned-roadmap, discard de scope vivo y skill/doctor-after.",
+            "Los probes mutantes usan createGuardedProbeRoot/runGuardedCliProbe y un dist/cli.js absoluto; rechazan el workspace real y un CLI que no sea este checkout.",
+            "Ningún fixture invoca plan --revise, escribe revision records, ni usa --global.",
+            "schemaVersion permanece 4 en los sandboxes."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S9",
+            "S10",
+            "S11",
+            "S12"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added guarded 36c3897 red fixtures for planned-roadmap edits, active-scope discard, and live-work remedy/doctor helper; probes pin an explicit checkout CLI.",
+            "validation": [
+              "npm run check:change-current-work:red (passed: all S1-S6 fixtures recorded as red against 36c3897)",
+              "node --check scripts/check-change-current-work.mjs && node --check scripts/lib/guarded-cli-probe.mjs && git diff --check (passed)",
+              "test -z \"\" (passed: no staged files)"
+            ],
+            "files_changed": [
+              "scripts/check-change-current-work.mjs",
+              "scripts/lib/guarded-cli-probe.mjs",
+              "package.json"
+            ],
+            "notes": "No Kyro-managed state was edited directly; guarded probes use synthetic roots and explicit absolute dist/cli.js paths.",
+            "by": "maker",
+            "recordedAt": "2026-09-17T21:00:03.514Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "npm run check:change-current-work:red registra casos rojos 36c3897 para planned-roadmap, discard de scope vivo y skill/doctor-after.",
+              "Los probes mutantes usan createGuardedProbeRoot/runGuardedCliProbe y un dist/cli.js absoluto; rechazan el workspace real y un CLI que no sea este checkout.",
+              "Ningún fixture invoca plan --revise, escribe revision records, ni usa --global.",
+              "schemaVersion permanece 4 en los sandboxes."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-17T21:00:09.209Z",
+            "requestDigest": "8b4d3bbdaa7e2e0187f9b056a5d90b57be35f1937afaa48a5817612e03c9f17e",
+            "reviewedMaterialDigest": "e5fe0d5e2877ef3f0c5ca290bcd1b2611d1334ab714210bf1069386e28563a28"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P1",
+      "title": "plan --roadmap solo planned",
+      "objective": "Editar el futuro del roadmap sin tocar identidades closed o active y sin mezclarlo con --update-active.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T2.2",
+          "title": "Añadir plan --roadmap para entradas planned",
+          "description": "Implementar un escritor dedicado kyro plan --roadmap (preview digest / apply --yes) que permita retitular, añadir, cancelar o reordenar en presentación sólo entradas con state planned. Rechazar renumerar o mutar identidades closed/active. No mezclar con --update-active. Reutilizar writer lock y atomicReplace de Plan 14. Cancelled planned se omiten en materialización, no se resucitan. Schema 4; sin plan --revise ni journal.",
+          "files_to_touch": [
+            "src/cli/commands/plan.ts",
+            "src/cli/help.ts",
+            "src/cli/types.ts",
+            "src/cli/artifacts/schema.ts",
+            "scripts/check-change-current-work.mjs"
+          ],
+          "context": "R3 / decisión cerrada 3 / finding 04. Convención process-1: no reescribir archives; el close-sprint sigue leyendo roadmap.sprints[].n/state/title. plannedSprintCount se actualiza de forma coherente con entradas no canceladas. Probes mutantes sólo con guarded-cli-probe + node dist/cli.js. No-goals: plan --revise, schema 5, mezclar roadmap en --update-active, --global.",
+          "acceptance_criteria": [
+            "Preview --dry-run --json no escribe; apply exige digest exacto y --yes.",
+            "Retitle/add/cancel/reorder afectan sólo state planned; cancelar planned n no cambia n/slug de un sprint closed o active ni el hash de archives ajenos.",
+            "Intentos sobre closed/active fallan sin escribir (p. ej. cancel planned n=1 cerrado o renumerar active).",
+            "Tras apply, node dist/cli.js doctor --artifacts --json queda limpio, schemaVersion es 4 y no existen live-revision ni project-convention-transaction records."
+          ],
+          "depends_on": [
+            "T2.1"
+          ],
+          "scenario_refs": [
+            "S9",
+            "S10",
+            "S6",
+            "S8"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Implemented dedicated digest-protected plan --roadmap writer for planned-only retitle, add, cancel, and presentation reorder operations.",
+            "validation": [
+              "npm run typecheck (passed)",
+              "npm run build (passed)",
+              "node scripts/check-change-current-work.mjs --roadmap-only (passed: S4 planned-only writer, preview/apply, immutable active rejection, doctor)",
+              "git diff --check && git diff --cached --check (passed)"
+            ],
+            "files_changed": [
+              "src/cli/commands/plan.ts",
+              "scripts/check-change-current-work.mjs"
+            ],
+            "notes": "Uses writer lock and atomic replace; schema remains 4 and cancelled roadmap entries are excluded from materialization count.",
+            "by": "maker",
+            "recordedAt": "2026-09-17T21:04:34.365Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Preview --dry-run --json no escribe; apply exige digest exacto y --yes.",
+              "Retitle/add/cancel/reorder afectan sólo state planned; cancelar planned n no cambia n/slug de un sprint closed o active ni el hash de archives ajenos.",
+              "Intentos sobre closed/active fallan sin escribir (p. ej. cancel planned n=1 cerrado o renumerar active).",
+              "Tras apply, node dist/cli.js doctor --artifacts --json queda limpio, schemaVersion es 4 y no existen live-revision ni project-convention-transaction records."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-17T21:04:39.852Z",
+            "requestDigest": "8bcef6ef4730b0133e18c621951576b9221d14e94d233c3c0ad3ea02eb6e9b54",
+            "reviewedMaterialDigest": "98029cfadf67ccce2d7f15cdd0c3d9043ef0d5438c54494413dd5f814f5a5005"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Discard de scope con un consentimiento",
+      "objective": "Descartar un scope vivo orquestando writers existentes bajo un digest/yes, sin WAL nuevo.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T2.3",
+          "title": "Orquestar scope discard con un consentimiento",
+          "description": "Añadir kyro scope discard --dry-run / --digest --yes que prepare un plan sobre verbos existentes: cancelar tareas undisposed (disposition cancelled + razón de discard), close-sprint --outcome abandoned, y scope retire. Un consentimiento informado autoriza las etapas. Interrupt → reintentar el mismo digest; cada etapa es el writer idempotente ya existente. No crear WAL multi-archivo. close-sprint y scope retire standalone no cambian. --yes es mecánico; el discard en sí es consentimiento humano (CONFIRMATION_REQUIRED sin --yes).",
+          "files_to_touch": [
+            "src/cli/commands/scope.ts",
+            "src/cli/checkpoints/scope-retirement.ts",
+            "src/cli/checkpoints/sprint-close.ts",
+            "src/cli/commands/close-sprint.ts",
+            "src/cli/help.ts",
+            "src/cli/app.ts",
+            "scripts/check-change-current-work.mjs"
+          ],
+          "context": "R4 / decisión cerrada 4 / finding 05. Convención process-1: la transición se rejuega desde el after-image del checkpoint con los mismos builders (cancel, close-abandoned, retire); los records de lifecycle son evidencia, no autoridad. No-goals: WAL nuevo, tratar --yes como identidad humana, hand-edit de sprint.json, Plan 15. Probes mutantes: guarded-cli-probe + dist/cli.js de este checkout.",
+          "acceptance_criteria": [
+            "Discard sin --yes/--digest es CONFIRMATION_REQUIRED y no escribe.",
+            "Discard aplicado sobre un scope vivo con tareas undisposed deja inspect: close abandoned + scope retired; doctor --artifacts limpio; schema 4.",
+            "Un apply interrumpido se reanuda con el mismo digest sin divergir ni reescribir archives ajenos.",
+            "Los writers standalone close-sprint y scope retire conservan su contrato (retire sigue rehusando activeSprint fuera de discard)."
+          ],
+          "depends_on": [
+            "T2.1"
+          ],
+          "scenario_refs": [
+            "S11",
+            "S6",
+            "S8"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Implemented digest-protected scope discard orchestration using existing cancellation, abandoned-close, and retirement writers.",
+            "validation": [
+              "npm run typecheck (passed)",
+              "npm run check:scope-retire (passed)",
+              "npm run check:change-current-work exercised S5 successfully; later S6 fails only because T2.4 helper is intentionally pending"
+            ],
+            "files_changed": [
+              "src/cli/commands/scope.ts",
+              "src/cli/checkpoints/scope-retirement.ts",
+              "src/cli/types.ts",
+              "src/cli/app.ts",
+              "scripts/check-change-current-work.mjs"
+            ],
+            "notes": "Schema remains 4; mutating fixture probes used guarded-cli-probe and this checkout dist/cli.js.",
+            "by": "maker",
+            "recordedAt": "2026-09-17T21:10:43.734Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Discard sin --yes/--digest es CONFIRMATION_REQUIRED y no escribe.",
+              "Discard aplicado sobre un scope vivo con tareas undisposed deja inspect: close abandoned + scope retired; doctor --artifacts limpio; schema 4.",
+              "Un apply interrumpido se reanuda con el mismo digest sin divergir ni reescribir archives ajenos.",
+              "Los writers standalone close-sprint y scope retire conservan su contrato (retire sigue rehusando activeSprint fuera de discard)."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-17T21:10:48.071Z",
+            "requestDigest": "c2c0680fd6f3b19a070a7ce9ceb147483854acfa34622d8ccfb3d18338541cc4",
+            "reviewedMaterialDigest": "40bd506901f0ca5f71f31536b47f9d90ab15cd796b48d5825bccd0177715de1a"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Helper de skill + doctor",
+      "objective": "Que forge/executor aplique remedyCommand de trabajo vivo ya autorizado y corra doctor, pidiendo usuario sólo para discard u autoridad ambigua.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T2.4",
+          "title": "Añadir helper de skill que consume remedyCommand y corre doctor",
+          "description": "Añadir un helper de trabajo vivo (no live-revision de Plan 15) y cablearlo en forge/executor: si el pack expone remedyCommand y el cambio está dentro de trabajo vigente ya autorizado (casos 1–3: --update-active, rule local, plan --roadmap), aplicarlo y luego doctor --artifacts con el CLI de este checkout. Pedir usuario sólo para discard, política de proyecto o significado ambiguo. Proyección clean-HOME: el helper shipped no enseña plan --revise, schema 5 ni journal. Reglas siguen local-only.",
+          "files_to_touch": [
+            "internal/skills/sprint-forge/assets/helpers/live-work.md",
+            "internal/skills/sprint-forge/assets/helpers/active-plan-update.md",
+            "internal/skills/sprint-forge/assets/modes/execute-task.md",
+            "internal/skills/kyro-sprint-executor/SKILL.md",
+            "commands/forge.md"
+          ],
+          "context": "Plan 16 slice S6. Convención process-1 no aplica a docs, pero doctor-after sí es la red de integridad (R6). Finding 06: nunca documentar PATH kyro ni Plan 15 como SoT. El live-revision.md instalado en ~/.agents/kyro/current enseña plan --revise/schema 5 — este checkout no debe proyectarlo ni copiarlo. No-goals: --global, journal, nuevo NextAction enum (decisión 6: el skill usa remedyCommand).",
+          "acceptance_criteria": [
+            "El helper shipped nombra remedyCommand, apply y doctor-after para casos 1–3 sin turno extra de usuario.",
+            "Discard, política de proyecto y ambigüedad siguen pidiendo consentimiento humano; --yes no se trata como identidad.",
+            "Ningún asset proyectado de este checkout enseña plan --revise, schema 5, live-revision journal ni --global.",
+            "La prueba de proyección/clean-HOME (o el check de fixtures T2.1/S12) usa este dist/cli.js y queda verde en el checkout, roja en 36c3897."
+          ],
+          "depends_on": [
+            "T2.2",
+            "T2.3"
+          ],
+          "scenario_refs": [
+            "S12",
+            "S5",
+            "S8"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Moved live-work protocol detail to the lazy helper and trimmed execute routing; all live-work acceptance checks remain green.",
+            "validation": [
+              "npm run check:token-budgets (54 assertions passed; 3 warnings)",
+              "npm run check (passed)",
+              "npm run check:change-current-work (live-work fixtures passed)",
+              "npm run check:change-current-work:red (36c3897 red fixtures recorded)"
+            ],
+            "files_changed": [
+              "commands/forge.md",
+              "internal/skills/sprint-forge/assets/modes/execute-task.md",
+              "internal/skills/sprint-forge/assets/helpers/live-work.md"
+            ],
+            "notes": "No runtimeForge*Tokens ceiling changed; schema remains 4; no --global or Plan 15.",
+            "by": "maker",
+            "recordedAt": "2026-09-17T21:36:21.902Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "El helper shipped nombra remedyCommand, apply y doctor-after para casos 1–3 sin turno extra de usuario.",
+              "Discard, política de proyecto y ambigüedad siguen pidiendo consentimiento humano; --yes no se trata como identidad.",
+              "Ningún asset proyectado de este checkout enseña plan --revise, schema 5, live-revision journal ni --global.",
+              "La prueba de proyección/clean-HOME (o el check de fixtures T2.1/S12) usa este dist/cli.js y queda verde en el checkout, roja en 36c3897."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-17T21:36:22.043Z",
+            "requestDigest": "329de1951022098811913dff93f36a60962278f37f366c5a77e7b31a57725c77",
+            "reviewedMaterialDigest": "90de5724e5bc3d8b7a475ac3cdfe717e78da5b9e620b1556aa5ca6017f6b1409"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "Entradas planned del roadmap se retitulan, añaden, cancelan o reordenan con plan --roadmap sin cambiar identidades closed/active.",
+    "scope discard, con un consentimiento informado, cancela trabajo undisposed, cierra abandoned y retira el scope reusando writers existentes; el mismo digest es reanudable.",
+    "El skill aplica remedyCommand de trabajo vivo ya autorizado y corre doctor; discard sigue pidiendo usuario.",
+    "Schema 4; sin plan --revise, sin journal Plan 15, reglas local-only; probes mutantes con guarded-cli-probe y node dist/cli.js.",
+    "Cada tarea tiene evidencia y veredicto pass; analyze y doctor --artifacts limpios antes de cierre."
+  ]
+}

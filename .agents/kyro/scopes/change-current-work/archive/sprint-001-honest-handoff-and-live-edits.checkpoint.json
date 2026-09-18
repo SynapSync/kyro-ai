@@ -1,0 +1,690 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "f952f3ae9d4e4fbee65371b2ba03dfa207e8ca584b6cb82fe242056484749ace",
+  "createdAt": "2026-09-17T20:39:35.932Z",
+  "identity": {
+    "scope": "change-current-work",
+    "sprintN": 1,
+    "sprintSlug": "honest-handoff-and-live-edits"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": null,
+    "summary": null,
+    "recommendations": [],
+    "learnings": []
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/change-current-work/archive/sprint-001-honest-handoff-and-live-edits.json",
+    "narrative": ".agents/kyro/scopes/change-current-work/archive/sprint-001-honest-handoff-and-live-edits.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "change-current-work",
+    "title": "Cambiar el trabajo vigente sin congelarlo",
+    "status": "planning",
+    "objective": "Permitir corregir trabajo vivo (requisito y tareas, regla local, roadmap futuro, discard de scope) sin congelarlo por la protección del historial, sin borrar evidencia y sin mentir el handoff.",
+    "successCriteria": [
+      "A person can correct a live requirement and the current tasks that depend on it in one authorized change, without losing prior evidence or stopping unrelated ready work.",
+      "A local process rule can be replaced so only the new rule is treated as effective, without opening a new sprint or filing debt as a workaround.",
+      "Upcoming planned sprints can be reorganized without changing the identity of sprints already closed or active.",
+      "A live scope that is no longer needed can be discarded with one informed approval, leaving an abandoned close and a retired scope.",
+      "Kyro never instructs executing a task when none is ready; after a live change, doctor reports managed state intact."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "One authorized active-plan update can change a live requirement together with its current tasks, including removing the requirement or cancelling a task when the same request relinks or disposes live consumers.",
+          "priority": "must",
+          "rationale": "Everyday case 1. Extends Plan 14 preview/digest/apply (E1, E10); does not add a revision journal (decision 2). Validation: one --update-active request; evidence kept; unrelated pass survives; remove without relink writes nothing."
+        },
+        {
+          "id": "R2",
+          "statement": "A scope-local convention can be updated, removed, or replaced so the old rule is no longer effective while its text remains in local history.",
+          "priority": "must",
+          "rationale": "Everyday case 2. Closed decision 5: local only in v1; --global/mirrors excluded because that path exploded Plan 15 (H2, E4). Validation: rule replace; packs omit old id; doctor clean."
+        },
+        {
+          "id": "R3",
+          "statement": "Future roadmap entries in planned state can be retitled, added, cancelled, or reordered in presentation without renumbering closed or active sprint identities.",
+          "priority": "must",
+          "rationale": "Everyday case 3. Closed decision 3: dedicated plan --roadmap, not mixed into --update-active, so current-sprint edits stay scoped (E5). Validation: cancel planned n; closed archive identity unchanged."
+        },
+        {
+          "id": "R4",
+          "statement": "A live scope can be discarded under one informed approval that cancels undisposed current work, closes the sprint as abandoned, and retires the scope, resuming from the same digest if interrupted.",
+          "priority": "must",
+          "rationale": "Everyday case 4. Closed decision 4: orchestrate existing close-abandoned and retire writers (E6); no new WAL. --yes is mechanical; discard itself is human consent (I8). Validation: inspect abandoned+retired; retry digest; prior archives unchanged."
+        },
+        {
+          "id": "R5",
+          "statement": "Kyro never advertises execute_task without a dependency-ready next task, and a dead route exposes a structured blocker with a copy-pastable remedy command.",
+          "priority": "must",
+          "rationale": "Prevents independent work from freezing (I3, E3, E8). Closed decision 6: no new NextAction enum; skill uses remedyCommand. Validation: dispose last unfinished; status/context-pack JSON."
+        },
+        {
+          "id": "R6",
+          "statement": "After a successful live-work write in this scope, doctor reports intact managed state, sprint schema remains 4, and no live-revision or project-convention-transaction records are created.",
+          "priority": "must",
+          "rationale": "Doctor is the integrity net (I6, E9); schema 4 (I7, decision 1 base 36c3897). Finding 06: proofs must use this checkout CLI, not PATH Plan 15. Validation: doctor --json/--artifacts; tree has no revision journal."
+        },
+        {
+          "id": "R7",
+          "statement": "Closed sprints, close checkpoints, completion and retirement records, evidence blobs, and pass verdicts stay immutable while open-scope current work remains editable.",
+          "priority": "must",
+          "rationale": "Invariant live≠archive (I1). Prevents history protection from rewriting archives. Validation: discard/update does not change hashes of unrelated archives."
+        },
+        {
+          "id": "R8",
+          "statement": "Changing one live part keeps prior evidence on the task as history, clears only affected current approval, and does not block unrelated ready work.",
+          "priority": "must",
+          "rationale": "Invariant evidence-is-not-a-lock (I2) plus independent continuation. Plan 14 already invalidates affected verdicts; this scope must not erase blobs. Validation: case 1 fixture with an unrelated pass task."
+        },
+        {
+          "id": "R9",
+          "statement": "Live-work changes are tool-owned CLI writes under the existing writer lock; agents do not hand-edit managed JSON; discard and retire still require informed human approval.",
+          "priority": "must",
+          "rationale": "Invariants I4 and I8. Closed decision 2: Plan 14 ceremony, not a journal. Validation: no agent-written sprint.json; discard without --yes is CONFIRMATION_REQUIRED."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R5",
+          "given": "un sprint activo con una tarea independiente lista",
+          "when": "otra tarea se bloquea o se dispone",
+          "then": "el handoff conserva la tarea lista como nextTaskId y no anuncia un bloqueo falso"
+        },
+        {
+          "id": "S2",
+          "requirement": "R5",
+          "given": "un sprint activo sin tareas dependency-ready tras disponer la última tarea",
+          "when": "se recalcula status o context-pack",
+          "then": "no se anuncia execute_task con nextTaskId nulo y se expone blocker no_ready_work con remedyCommand"
+        },
+        {
+          "id": "S3",
+          "requirement": "R1",
+          "given": "un requisito vivo con escenarios y tareas consumidoras",
+          "when": "una solicitud --update-active relinka o cancela los consumidores y elimina el requisito",
+          "then": "el cambio se prepara por digest y se aplica atómicamente sin dejar referencias vivas"
+        },
+        {
+          "id": "S4",
+          "requirement": "R2",
+          "given": "una convención local efectiva",
+          "when": "se ejecuta rule update, remove o replace local con el digest aprobado",
+          "then": "sólo la regla resultante sigue efectiva y el texto anterior queda en historia local"
+        },
+        {
+          "id": "S5",
+          "requirement": "R6",
+          "given": "una escritura viva exitosa de Sprint 1",
+          "when": "se ejecuta doctor --artifacts",
+          "then": "el managed state es íntegro, el schema es 4 y no existe registro de live revision ni transacción de convención de proyecto"
+        },
+        {
+          "id": "S6",
+          "requirement": "R7",
+          "given": "evidencia, veredictos pass y archivos de sprint previos",
+          "when": "se aplica una edición de trabajo vivo",
+          "then": "las evidencias y archivos históricos permanecen inmutables"
+        },
+        {
+          "id": "S7",
+          "requirement": "R8",
+          "given": "una tarea afectada y una tarea pass no relacionada",
+          "when": "se actualiza el consumidor afectado",
+          "then": "se conserva la evidencia, se borra sólo la aprobación afectada y la tarea no relacionada sigue aprobada"
+        },
+        {
+          "id": "S8",
+          "requirement": "R9",
+          "given": "un cambio de trabajo vivo autorizado",
+          "when": "se previsualiza y aplica mediante el CLI",
+          "then": "el writer lock y el digest son obligatorios y ningún agente edita JSON gestionado"
+        }
+      ],
+      "nonGoals": [
+        "Project-wide --global convention or principle mutation, legacy mirrors, or provenance ledgers",
+        "plan --revise, schema 5, revision records, pending-revision writer fences, or close-blocking applicability obligations",
+        "Accepted-ADR link maintenance, question resolve/withdraw, and debt cancel unless a later red fixture proves a dead end with no v1 verb",
+        "Lens, MCP, whole-product W7 certification, or a new multi-file discard storage protocol",
+        "Hand-editing sprint.json or treating --yes as human identity"
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 2,
+      "sizingRationale": "Two sprints, not one: Sprint 1 is the daily live-edit path (honest handoff + requirement/task updates + local rules) and must be reviewable without mixing irreversible discard. Sprint 2 changes the future (roadmap) and the whole scope (discard) plus the skill exception that consumes remedyCommand. Not three: S2 and S3 share Plan 14 digest/lock and can ship with S1 as one public-edit unit. Split trigger: after Sprint 1 a user can correct current work and rules; they still cannot reorganize planned sprints or discard a live scope. S0 red fixtures belong in Sprint 1 before writers. Closed delivery decisions: origin/develop base; S2/S3/S4 may proceed in parallel after S1 within a sprint; S5 prefers in-band cancel from S2 but may use record-evidence --disposition.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "honest-handoff-and-live-edits",
+          "title": "Handoff honesto y ediciones vivas",
+          "state": "active"
+        },
+        {
+          "n": 2,
+          "slug": "roadmap-discard-and-skill",
+          "title": "Roadmap, discard y excepción de skill",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [],
+    "previousSprint": null,
+    "activeSprint": {
+      "n": 1,
+      "slug": "honest-handoff-and-live-edits",
+      "title": "Handoff honesto y ediciones vivas",
+      "objective": "Convertir los bloqueos de edición del trabajo vivo en cambios locales, verificables y con un handoff que nunca anuncia ejecución inexistente.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P0",
+          "title": "Fixtures rojos de trabajo vivo",
+          "objective": "Fijar en sandboxes las regresiones de handoff, edición activa y reglas antes de cambiar escritores.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.1",
+              "title": "Crear fixtures rojos y guardia de probes mutantes",
+              "description": "Añadir fixtures table-driven que reproduzcan el handoff execute_task sin tarea lista, la eliminación de requisito y cancelación de tarea en la misma actualización activa, y update/remove/replace de regla local. Registrar que fallan contra 36c3897 antes de implementar; los probes que muten estado deben pasar exclusivamente por la guardia dedicada y ejecutar el CLI construido de este checkout.",
+              "files_to_touch": [
+                "scripts/check-change-current-work.mjs",
+                "scripts/lib/guarded-cli-probe.mjs",
+                "package.json"
+              ],
+              "context": "Base obligatoria: plan/agent-unblock @ 36c3897 (origin/develop), schema 4. No usar PATH kyro si expone Plan 15; los tests invocan node dist/cli.js del checkout. La guardia debe aislar mutaciones en sandboxes temporales y rechazar un root no permitido. No introducir plan --revise, journals schema 5, reglas globales ni cambios de roadmap/discard (Sprint 2).",
+              "acceptance_criteria": [
+                "Los fixtures cubren en sandbox los casos S1--S3 de este sprint y demuestran que 36c3897 no satisface cada nueva conducta antes del cambio de implementación.",
+                "Todo probe mutante de los nuevos fixtures usa scripts/lib/guarded-cli-probe.mjs y node dist/cli.js de este checkout; ningún probe toca el scope de trabajo real.",
+                "El script se registra en package.json y puede ejecutarse de forma determinista tras npm run build."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S1",
+                "S2",
+                "S3",
+                "S4",
+                "S5",
+                "S6",
+                "S7",
+                "S8"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Made baseline-red fixtures execute and verify a built 36c3897 CLI through an explicit absolute worktree path.",
+                "validation": [
+                  "npm run build (passed)",
+                  "npm -C /home/rperaza/Projects/projects-worktrees/kyro-ai-36c3897 run build (passed)",
+                  "npm run check:change-current-work:red (passed; baseline 36c3897 red cases)",
+                  "npm run check:change-current-work (passed; current checkout green)"
+                ],
+                "files_changed": [
+                  "scripts/check-change-current-work.mjs",
+                  "package.json"
+                ],
+                "notes": "Baseline worktree is /home/rperaza/Projects/projects-worktrees/kyro-ai-36c3897 at 36c3897b2d2fbd074fde5e44849b0dc6fa30b533; probes remain guarded sandbox invocations.",
+                "by": "maker",
+                "recordedAt": "2026-09-17T19:15:15.012Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Los fixtures cubren en sandbox los casos S1--S3 de este sprint y demuestran que 36c3897 no satisface cada nueva conducta antes del cambio de implementación.",
+                  "Todo probe mutante de los nuevos fixtures usa scripts/lib/guarded-cli-probe.mjs y node dist/cli.js de este checkout; ningún probe toca el scope de trabajo real.",
+                  "El script se registra en package.json y puede ejecutarse de forma determinista tras npm run build."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-17T19:15:15.251Z",
+                "requestDigest": "1ccbd92dde0b617016ab99fee0f77fb1808456a0d748f2eaae1ea82905d1dcbe",
+                "reviewedMaterialDigest": "803a6888f6a072fd146721f904b48a7f55d847a27fb1092d4eb68b7d52393d1a"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P1",
+          "title": "Handoff honesto",
+          "objective": "Derivar una ruta ejecutable real o un bloqueo accionable tras disponer trabajo vivo.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.2",
+              "title": "Emitir blocker y remedyCommand cuando no hay trabajo listo",
+              "description": "Centralizar el cálculo del handoff para que status y context-pack nunca anuncien execute_task sin nextTaskId listo. Cuando no exista trabajo ejecutable, exponer un blocker estructurado no_ready_work con objeto, motivo y remedyCommand copy-pastable, preservando la selección de trabajo independiente cuando sí exista.",
+              "files_to_touch": [
+                "src/cli/core/status.ts",
+                "src/cli/commands/record-evidence.ts",
+                "src/cli/commands/status.ts",
+                "src/cli/commands/context-pack.ts",
+                "scripts/check-change-current-work.mjs"
+              ],
+              "context": "Mantener el enum NextAction actual; no añadir un enum nuevo. Derivar la ruta de una única fuente compartida para escritores y lectores. El remedio describe plan --update-active para trabajo vigente autorizado; no convierte --yes en consentimiento humano ni abre la excepción de discard. Conservar compatibilidad de disposiciones y dependencias existentes.",
+              "acceptance_criteria": [
+                "Después de disponer la última tarea no se publica execute_task con nextTaskId null; status --json y context-pack --json concuerdan sobre el blocker no_ready_work y su remedyCommand.",
+                "Cuando una tarea independiente está lista, sigue siendo nextTaskId y no se emite el bloqueo de ausencia de trabajo listo.",
+                "Los fixtures S1/S2 pasan y npm run check:status, npm run check:record-evidence y el nuevo check pasan con el CLI construido."
+              ],
+              "depends_on": [
+                "T1.1"
+              ],
+              "scenario_refs": [
+                "S1",
+                "S2",
+                "S5",
+                "S7"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "F5 preserves persisted lifecycle handoffs while recomputing task execution only after a writer changes execution state; stale execute_task remains corrected and verified work routes to qa_or_close.",
+                "validation": [
+                  "npm run check (passed: full repository suite)",
+                  "npm run check:change-current-work (passed: S1/S2 live-work routing fixtures)",
+                  "npm run check:qa-or-close (passed)",
+                  "npm run check:eval (passed: 31/31 behavioral evals)",
+                  "node dist/cli.js doctor --artifacts --kyro-scope change-current-work --json (passed)"
+                ],
+                "files_changed": [
+                  "src/cli/core/status.ts",
+                  "src/cli/commands/record-evidence.ts",
+                  "scripts/check-change-current-work.mjs"
+                ],
+                "notes": "Round 3 F5 correction. Built CLI used for all post-build checks; no lifecycle enum or schema change.",
+                "by": "maker",
+                "recordedAt": "2026-09-17T19:48:18.930Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Después de disponer la última tarea no se publica execute_task con nextTaskId null; status --json y context-pack --json concuerdan sobre el blocker no_ready_work y su remedyCommand.",
+                  "Cuando una tarea independiente está lista, sigue siendo nextTaskId y no se emite el bloqueo de ausencia de trabajo listo.",
+                  "Los fixtures S1/S2 pasan y npm run check:status, npm run check:record-evidence y el nuevo check pasan con el CLI construido."
+                ],
+                "findings": [],
+                "by": "kyro-sprint-executor",
+                "reviewedAt": "2026-09-17T19:48:19.158Z",
+                "requestDigest": "f39adf3f51afe41b83d0c9b15c86c3f5cd6c3edc11eadc6324c5a0d11a2d1586",
+                "reviewedMaterialDigest": "d6f3555a31e6492543d20b186d560db68f010ac45d6b8df0f7f48ce61d4f26af"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Edición activa de requisitos y tareas",
+          "objective": "Extender el digest/apply existente sin crear un journal para retirar consumidores vivos de forma atómica.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.3",
+              "title": "Permitir remove/cancel en --update-active",
+              "description": "Extender el contrato de plan --update-active para eliminar un requisito solo cuando la misma petición relinka o dispone todos sus consumidores vivos, y para cancelar una tarea en banda con razón. Reutilizar digest, lock, atomic replace, invalidación selectiva y doctor de Plan 14; mantener evidencia histórica y aprobaciones no afectadas.",
+              "files_to_touch": [
+                "src/cli/commands/plan.ts",
+                "src/cli/core/active-plan.ts",
+                "src/cli/artifacts/schema.ts",
+                "scripts/check-active-plan.mjs",
+                "scripts/check-change-current-work.mjs"
+              ],
+              "context": "Schema permanece 4. Prohibido plan --revise, revision journal, pending-revision fences o edición manual. Una previsualización debe rechazar remove que deje escenarios/tareas vivas sin relink o cancelación y no escribir nada; apply requiere el digest exacto y --yes. Recalcular el handoff mediante P1; conservar blobs de evidencia, invalidar sólo veredictos afectados y no cambiar hashes de archivo/cierre ajenos.",
+              "acceptance_criteria": [
+                "Un único --update-active preview/digest/apply puede corregir requisito y tareas, incluyendo remove y cancel con razón, sin escribir en preview y rechazando consumidores vivos no resueltos.",
+                "La evidencia previa permanece como historia; tareas afectadas pierden sólo aprobación vigente, mientras una tarea pass no relacionada permanece intacta y ejecutable.",
+                "Tras apply, kyro doctor --artifacts --json es limpio, el scope sigue schemaVersion 4 y no aparecen registros de live revision ni project-convention transaction.",
+                "Los fixtures S3/S5--S7, npm run check:active-plan y el nuevo check pasan con node dist/cli.js."
+              ],
+              "depends_on": [
+                "T1.2"
+              ],
+              "scenario_refs": [
+                "S3",
+                "S5",
+                "S6",
+                "S7",
+                "S8"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Added digest-protected active requirement removal with same-request task cancellation.",
+                "validation": [
+                  "npm run check:active-plan (16 groups passed)",
+                  "node scripts/check-change-current-work.mjs --active-plan-only (S1-S3 passed)",
+                  "node dist/cli.js doctor --artifacts --kyro-scope change-current-work --json (clean)",
+                  "git diff --check (passed)"
+                ],
+                "files_changed": [
+                  "src/cli/core/active-plan.ts",
+                  "src/cli/core/analysis.ts",
+                  "src/cli/commands/plan.ts",
+                  "scripts/check-change-current-work.mjs"
+                ],
+                "notes": "Uses schema 4 atomic update-active digest/apply; cancelled task references are preserved as historical rather than live consumers.",
+                "by": "maker",
+                "recordedAt": "2026-09-17T18:21:24.905Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Un único --update-active preview/digest/apply puede corregir requisito y tareas, incluyendo remove y cancel con razón, sin escribir en preview y rechazando consumidores vivos no resueltos.",
+                  "La evidencia previa permanece como historia; tareas afectadas pierden sólo aprobación vigente, mientras una tarea pass no relacionada permanece intacta y ejecutable.",
+                  "Tras apply, kyro doctor --artifacts --json es limpio, el scope sigue schemaVersion 4 y no aparecen registros de live revision ni project-convention transaction.",
+                  "Los fixtures S3/S5--S7, npm run check:active-plan y el nuevo check pasan con node dist/cli.js."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-17T18:21:25.112Z",
+                "requestDigest": "ae3b5b612aade90523c9a32bfc5cf9623b275e73d7f606a416e4bb8ef8edc0e0",
+                "reviewedMaterialDigest": "6999224e049c6272488ac4c2a8807c38756045e97a26324ae18315e27fb4dc78"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P3",
+          "title": "Reglas locales editables",
+          "objective": "Hacer que una convención local pueda cambiar o desaparecer sin que la regla vieja siga efectiva.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T1.4",
+              "title": "Añadir rule update, remove y replace locales",
+              "description": "Implementar update, remove y replace para convenciones del scope; replace elimina la regla efectiva antigua y añade la nueva dentro de un único digest/apply, dejando el texto anterior disponible en historia local. Actualizar lectores y ayuda para que reglas retiradas no aparezcan como efectivas.",
+              "files_to_touch": [
+                "src/cli/commands/rule.ts",
+                "src/cli/commands/context-pack.ts",
+                "src/cli/artifacts/schema.ts",
+                "scripts/check-rule.mjs",
+                "scripts/check-change-current-work.mjs"
+              ],
+              "context": "Caso local únicamente: no aceptar ni escribir --global, project.json, mirrors o principios. Seguir el patrón Plan 14 digest/apply + writer lock + doctor, no una transacción de convenciones de proyecto. Los lectores de convenciones deben omitir el id retirado pero la historia local debe conservar el texto antiguo para auditoría.",
+              "acceptance_criteria": [
+                "rule update cambia una regla local existente, rule remove deja de presentarla como efectiva y rule replace sustituye old-id por new-id mediante preview/digest/apply atómico.",
+                "Los comandos locales no mutan project.json ni aceptan una ruta --global para estas operaciones; los packs omiten reglas removidas y la historia local conserva el texto previo.",
+                "Preview/refusal no escribe; apply exitoso deja doctor --artifacts limpio y schemaVersion 4.",
+                "Los fixtures S4/S5/S8, npm run check:rule y el nuevo check pasan con node dist/cli.js."
+              ],
+              "depends_on": [
+                "T1.1"
+              ],
+              "scenario_refs": [
+                "S4",
+                "S5",
+                "S8"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Changed local rule update into an atomic retire-and-replace operation, preserving the former text as validated retired history while exposing only a newly allocated effective convention.",
+                "validation": [
+                  "npm run check:rule (passed)",
+                  "npm run check:change-current-work (passed)",
+                  "node dist/cli.js doctor --artifacts --kyro-scope change-current-work --json (passed)"
+                ],
+                "files_changed": [
+                  "src/cli/commands/rule.ts",
+                  "scripts/check-rule.mjs"
+                ],
+                "notes": "Regression covers preview/digest/apply update, retained retired text, effective-pack filtering, and doctor validation; no global path is accepted or written.",
+                "by": "maker",
+                "recordedAt": "2026-09-17T19:28:12.844Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "rule update cambia una regla local existente, rule remove deja de presentarla como efectiva y rule replace sustituye old-id por new-id mediante preview/digest/apply atómico.",
+                  "Los comandos locales no mutan project.json ni aceptan una ruta --global para estas operaciones; los packs omiten reglas removidas y la historia local conserva el texto previo.",
+                  "Preview/refusal no escribe; apply exitoso deja doctor --artifacts limpio y schemaVersion 4.",
+                  "Los fixtures S4/S5/S8, npm run check:rule y el nuevo check pasan con node dist/cli.js."
+                ],
+                "findings": [],
+                "by": "qa",
+                "reviewedAt": "2026-09-17T19:28:13.250Z",
+                "requestDigest": "8e251b1415b4d4e15ba9a32803ba62d634e80f9dcacdbcc2630827edbf8c991c",
+                "reviewedMaterialDigest": "5f3ab1ca62ed2f9fca0c86e62dfb417fd55028acaeb04e4776e8a5aa6d29078a"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [],
+      "definitionOfDone": [
+        "Los fixtures de Sprint 1 cubren los casos de handoff, --update-active y reglas locales con el CLI construido de este checkout.",
+        "No se anuncia execute_task sin una tarea dependency-ready; la alternativa bloqueada expone remedyCommand estructurado.",
+        "Las ediciones activas y reglas locales usan digest/apply, writer lock y doctor, conservan schema 4 y no crean un revision journal.",
+        "Cada tarea tiene evidencia y veredicto pass; analyze y doctor --artifacts están limpios antes de cierre."
+      ]
+    },
+    "debt": [],
+    "handoff": {
+      "nextAction": "qa_or_close",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task T1.2 passed checker review.",
+      "lastUpdated": "2026-09-17T19:48:19.158Z"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-09-17T14:13:10.419Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "change-current-work",
+    "title": "Cambiar el trabajo vigente sin congelarlo",
+    "status": "planning",
+    "objective": "Permitir corregir trabajo vivo (requisito y tareas, regla local, roadmap futuro, discard de scope) sin congelarlo por la protección del historial, sin borrar evidencia y sin mentir el handoff.",
+    "successCriteria": [
+      "A person can correct a live requirement and the current tasks that depend on it in one authorized change, without losing prior evidence or stopping unrelated ready work.",
+      "A local process rule can be replaced so only the new rule is treated as effective, without opening a new sprint or filing debt as a workaround.",
+      "Upcoming planned sprints can be reorganized without changing the identity of sprints already closed or active.",
+      "A live scope that is no longer needed can be discarded with one informed approval, leaving an abandoned close and a retired scope.",
+      "Kyro never instructs executing a task when none is ready; after a live change, doctor reports managed state intact."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "One authorized active-plan update can change a live requirement together with its current tasks, including removing the requirement or cancelling a task when the same request relinks or disposes live consumers.",
+          "priority": "must",
+          "rationale": "Everyday case 1. Extends Plan 14 preview/digest/apply (E1, E10); does not add a revision journal (decision 2). Validation: one --update-active request; evidence kept; unrelated pass survives; remove without relink writes nothing."
+        },
+        {
+          "id": "R2",
+          "statement": "A scope-local convention can be updated, removed, or replaced so the old rule is no longer effective while its text remains in local history.",
+          "priority": "must",
+          "rationale": "Everyday case 2. Closed decision 5: local only in v1; --global/mirrors excluded because that path exploded Plan 15 (H2, E4). Validation: rule replace; packs omit old id; doctor clean."
+        },
+        {
+          "id": "R3",
+          "statement": "Future roadmap entries in planned state can be retitled, added, cancelled, or reordered in presentation without renumbering closed or active sprint identities.",
+          "priority": "must",
+          "rationale": "Everyday case 3. Closed decision 3: dedicated plan --roadmap, not mixed into --update-active, so current-sprint edits stay scoped (E5). Validation: cancel planned n; closed archive identity unchanged."
+        },
+        {
+          "id": "R4",
+          "statement": "A live scope can be discarded under one informed approval that cancels undisposed current work, closes the sprint as abandoned, and retires the scope, resuming from the same digest if interrupted.",
+          "priority": "must",
+          "rationale": "Everyday case 4. Closed decision 4: orchestrate existing close-abandoned and retire writers (E6); no new WAL. --yes is mechanical; discard itself is human consent (I8). Validation: inspect abandoned+retired; retry digest; prior archives unchanged."
+        },
+        {
+          "id": "R5",
+          "statement": "Kyro never advertises execute_task without a dependency-ready next task, and a dead route exposes a structured blocker with a copy-pastable remedy command.",
+          "priority": "must",
+          "rationale": "Prevents independent work from freezing (I3, E3, E8). Closed decision 6: no new NextAction enum; skill uses remedyCommand. Validation: dispose last unfinished; status/context-pack JSON."
+        },
+        {
+          "id": "R6",
+          "statement": "After a successful live-work write in this scope, doctor reports intact managed state, sprint schema remains 4, and no live-revision or project-convention-transaction records are created.",
+          "priority": "must",
+          "rationale": "Doctor is the integrity net (I6, E9); schema 4 (I7, decision 1 base 36c3897). Finding 06: proofs must use this checkout CLI, not PATH Plan 15. Validation: doctor --json/--artifacts; tree has no revision journal."
+        },
+        {
+          "id": "R7",
+          "statement": "Closed sprints, close checkpoints, completion and retirement records, evidence blobs, and pass verdicts stay immutable while open-scope current work remains editable.",
+          "priority": "must",
+          "rationale": "Invariant live≠archive (I1). Prevents history protection from rewriting archives. Validation: discard/update does not change hashes of unrelated archives."
+        },
+        {
+          "id": "R8",
+          "statement": "Changing one live part keeps prior evidence on the task as history, clears only affected current approval, and does not block unrelated ready work.",
+          "priority": "must",
+          "rationale": "Invariant evidence-is-not-a-lock (I2) plus independent continuation. Plan 14 already invalidates affected verdicts; this scope must not erase blobs. Validation: case 1 fixture with an unrelated pass task."
+        },
+        {
+          "id": "R9",
+          "statement": "Live-work changes are tool-owned CLI writes under the existing writer lock; agents do not hand-edit managed JSON; discard and retire still require informed human approval.",
+          "priority": "must",
+          "rationale": "Invariants I4 and I8. Closed decision 2: Plan 14 ceremony, not a journal. Validation: no agent-written sprint.json; discard without --yes is CONFIRMATION_REQUIRED."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R5",
+          "given": "un sprint activo con una tarea independiente lista",
+          "when": "otra tarea se bloquea o se dispone",
+          "then": "el handoff conserva la tarea lista como nextTaskId y no anuncia un bloqueo falso"
+        },
+        {
+          "id": "S2",
+          "requirement": "R5",
+          "given": "un sprint activo sin tareas dependency-ready tras disponer la última tarea",
+          "when": "se recalcula status o context-pack",
+          "then": "no se anuncia execute_task con nextTaskId nulo y se expone blocker no_ready_work con remedyCommand"
+        },
+        {
+          "id": "S3",
+          "requirement": "R1",
+          "given": "un requisito vivo con escenarios y tareas consumidoras",
+          "when": "una solicitud --update-active relinka o cancela los consumidores y elimina el requisito",
+          "then": "el cambio se prepara por digest y se aplica atómicamente sin dejar referencias vivas"
+        },
+        {
+          "id": "S4",
+          "requirement": "R2",
+          "given": "una convención local efectiva",
+          "when": "se ejecuta rule update, remove o replace local con el digest aprobado",
+          "then": "sólo la regla resultante sigue efectiva y el texto anterior queda en historia local"
+        },
+        {
+          "id": "S5",
+          "requirement": "R6",
+          "given": "una escritura viva exitosa de Sprint 1",
+          "when": "se ejecuta doctor --artifacts",
+          "then": "el managed state es íntegro, el schema es 4 y no existe registro de live revision ni transacción de convención de proyecto"
+        },
+        {
+          "id": "S6",
+          "requirement": "R7",
+          "given": "evidencia, veredictos pass y archivos de sprint previos",
+          "when": "se aplica una edición de trabajo vivo",
+          "then": "las evidencias y archivos históricos permanecen inmutables"
+        },
+        {
+          "id": "S7",
+          "requirement": "R8",
+          "given": "una tarea afectada y una tarea pass no relacionada",
+          "when": "se actualiza el consumidor afectado",
+          "then": "se conserva la evidencia, se borra sólo la aprobación afectada y la tarea no relacionada sigue aprobada"
+        },
+        {
+          "id": "S8",
+          "requirement": "R9",
+          "given": "un cambio de trabajo vivo autorizado",
+          "when": "se previsualiza y aplica mediante el CLI",
+          "then": "el writer lock y el digest son obligatorios y ningún agente edita JSON gestionado"
+        }
+      ],
+      "nonGoals": [
+        "Project-wide --global convention or principle mutation, legacy mirrors, or provenance ledgers",
+        "plan --revise, schema 5, revision records, pending-revision writer fences, or close-blocking applicability obligations",
+        "Accepted-ADR link maintenance, question resolve/withdraw, and debt cancel unless a later red fixture proves a dead end with no v1 verb",
+        "Lens, MCP, whole-product W7 certification, or a new multi-file discard storage protocol",
+        "Hand-editing sprint.json or treating --yes as human identity"
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 2,
+      "sizingRationale": "Two sprints, not one: Sprint 1 is the daily live-edit path (honest handoff + requirement/task updates + local rules) and must be reviewable without mixing irreversible discard. Sprint 2 changes the future (roadmap) and the whole scope (discard) plus the skill exception that consumes remedyCommand. Not three: S2 and S3 share Plan 14 digest/lock and can ship with S1 as one public-edit unit. Split trigger: after Sprint 1 a user can correct current work and rules; they still cannot reorganize planned sprints or discard a live scope. S0 red fixtures belong in Sprint 1 before writers. Closed delivery decisions: origin/develop base; S2/S3/S4 may proceed in parallel after S1 within a sprint; S5 prefers in-band cancel from S2 but may use record-evidence --disposition.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "honest-handoff-and-live-edits",
+          "title": "Handoff honesto y ediciones vivas",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "roadmap-discard-and-skill",
+          "title": "Roadmap, discard y excepción de skill",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "honest-handoff-and-live-edits",
+        "outcome": "shipped",
+        "closedAt": "2026-09-17",
+        "archive": "archive/sprint-001-honest-handoff-and-live-edits.md",
+        "snapshot": "archive/sprint-001-honest-handoff-and-live-edits.json",
+        "checkpoint": "archive/sprint-001-honest-handoff-and-live-edits.checkpoint.json",
+        "checkpointSha256": "9cb252b54721632814eac3c2c6b372a9815202626628edd55c6c1526f2212551"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "honest-handoff-and-live-edits",
+      "outcome": "shipped",
+      "summary": "Convertir los bloqueos de edición del trabajo vivo en cambios locales, verificables y con un handoff que nunca anuncia ejecución inexistente."
+    },
+    "activeSprint": null,
+    "debt": [],
+    "handoff": {
+      "nextAction": "plan_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Sprint 1 (honest-handoff-and-live-edits) closed as shipped. Scope remains open for planning.",
+      "lastUpdated": "2026-09-17"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-09-17T14:13:10.419Z"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "change-current-work",
+    "title": "Cambiar el trabajo vigente sin congelarlo",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "change-current-work",
+    "title": "Cambiar el trabajo vigente sin congelarlo",
+    "status": "planning"
+  },
+  "digests": {
+    "beforeClose": "a4510cfd4d1951c127651cbc30ef96e8c0594130b32a8f7e9481ad155251ece4",
+    "intendedAfterClose": "2ed2bf73090526f467c02fe7ba07a60fca4cc2977818111098049cece49a5775",
+    "projectScopeBefore": "4d9f1b020da6443bb67cc7928bb1460a3055c004be992e359d4a7e6729bc1489",
+    "projectScopeAfter": "d9e9666ca032ebff29b513db14c958ab0b31beb0e5cef274c6e3786b68baa9ac",
+    "legacySnapshot": "4bf4829628e4052d7dcfedf45c62416af30adcdc1aa685b67f78d3751012723a",
+    "narrative": "f244e4129329f5c6df5d236df5af1ab14c5aa794ece55c9e228e2ac0ec40ab46"
+  }
+}

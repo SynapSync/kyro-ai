@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kyro · Cierre y archivo de sprint",
+    "quality_profile": "showcase",
+    "output": "docs/diagrams/kyro-cierre-archivo.html"
+  },
+  "lanes": [
+    { "id": "orquestador", "label": "Orquestador Kyro" },
+    { "id": "archivo", "label": "Checkpoint y archivo" },
+    { "id": "estado", "label": "Estado y decisión" }
+  ],
+  "phases": [
+    { "id": "congelar", "label": "Congelar", "fromCol": 0, "toCol": 1, "variant": "emphasis" },
+    { "id": "publicar", "label": "Publicar evidencia", "fromCol": 2, "toCol": 3, "variant": "security" },
+    { "id": "transicionar", "label": "Transicionar", "fromCol": 4, "toCol": 5, "variant": "emphasis" }
+  ],
+  "groups": [
+    { "id": "compromiso", "label": "Compromiso verificable", "lane": "archivo", "fromCol": 1, "toCol": 2, "variant": "security" },
+    { "id": "cas", "label": "Aplicación y decisión", "lane": "estado", "fromCol": 4, "toCol": 5, "variant": "emphasis" }
+  ],
+  "mainPath": ["cerrar", "derivar", "checkpoint_inmutable", "publicar_snapshot", "publicar_archivo", "actualizar_estado", "verificar_decidir"],
+  "semanticChecks": {
+    "allowedRoots": ["cerrar"],
+    "allowedTerminals": ["planificar_siguiente", "esperar_decision"],
+    "requiredPaths": [
+      { "from": "cerrar", "to": "planificar_siguiente" },
+      { "from": "cerrar", "to": "esperar_decision" }
+    ]
+  },
+  "nodes": [
+    { "id": "cerrar", "lane": "orquestador", "col": 0, "type": "frontend", "label": "Cerrar sprint", "sublabel": "datos de cierre", "tag": "close-sprint" },
+    { "id": "derivar", "lane": "orquestador", "col": 1, "type": "backend", "label": "Derivar cierre", "sublabel": "antes → después", "tag": "activeSprint = null" },
+    { "id": "checkpoint_inmutable", "lane": "archivo", "col": 2, "type": "security", "label": "Checkpoint", "sublabel": "ledger · estado", "tag": "SHA-256" },
+    { "id": "publicar_snapshot", "lane": "archivo", "col": 3, "type": "database", "label": "Snapshot", "sublabel": "sprint-NNN-slug.json", "tag": "verificar digest" },
+    { "id": "publicar_archivo", "lane": "archivo", "col": 4, "type": "database", "label": "Narrativa", "sublabel": "sprint-NNN-slug.md", "tag": "verificar digest" },
+    { "id": "actualizar_estado", "lane": "estado", "col": 4, "type": "backend", "label": "CAS doble", "sublabel": "sprint + project", "tag": "antes o después" },
+    { "id": "verificar_decidir", "lane": "estado", "col": 5, "type": "security", "label": "Validar cierre", "sublabel": "digest + roadmap", "tag": "gate explícito" },
+    { "id": "planificar_siguiente", "lane": "orquestador", "col": 5, "type": "messagebus", "label": "Planificar", "sublabel": "plan_sprint", "tag": "scope abierto" },
+    { "id": "esperar_decision", "lane": "archivo", "col": 5, "type": "external", "label": "Decidir scope", "sublabel": "completar o ampliar", "tag": "espera decisión" }
+  ],
+  "edges": [
+    { "from": "cerrar", "to": "derivar", "role": "main", "label": "captura cierre" },
+    { "from": "derivar", "to": "checkpoint_inmutable", "role": "main", "label": "construye compromiso", "variant": "security" },
+    { "from": "checkpoint_inmutable", "to": "publicar_snapshot", "role": "main", "label": "publica primero", "variant": "security" },
+    { "from": "publicar_snapshot", "to": "publicar_archivo", "role": "main", "label": "publica después", "variant": "security" },
+    { "from": "publicar_archivo", "to": "actualizar_estado", "role": "main", "label": "evidencia lista" },
+    { "from": "actualizar_estado", "to": "verificar_decidir", "role": "main", "label": "post-escritura" },
+    { "from": "verificar_decidir", "to": "planificar_siguiente", "role": "branch", "label": "quedan sprints" },
+    { "from": "verificar_decidir", "to": "esperar_decision", "role": "branch", "label": "roadmap agotado", "variant": "emphasis" }
+  ]
+}
