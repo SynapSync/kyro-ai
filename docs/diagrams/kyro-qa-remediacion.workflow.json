@@ -1,0 +1,65 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kyro · QA, remediación y cierre",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "qa", "label": "QA independiente", "focus": ["ready", "decision", "qa", "verdict"], "note": "La QA es opcional antes de la primera decisión de cierre." },
+      { "id": "remediation", "label": "Remediación", "focus": ["verdict", "materialize", "correct", "reqa"], "note": "Un resultado bloqueante se convierte en trabajo verificable y vuelve a QA." },
+      { "id": "close", "label": "Cierre seguro", "focus": ["verdict", "close", "closed"], "note": "Solo un resultado aprobatorio habilita el cierre operado por el CLI." }
+    ]
+  },
+  "lanes": [
+    { "id": "user", "label": "Usuario" },
+    { "id": "orchestrator", "label": "Orquestación sprint-forge" },
+    { "id": "kyro", "label": "Kyro CLI / tareas" },
+    { "id": "guardrail", "label": "Guardas de calidad", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "ready-phase", "label": "Precondiciones", "fromCol": 0, "toCol": 1 },
+    { "id": "qa-phase", "label": "QA independiente", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "remediation-phase", "label": "Remediación + re-QA", "fromCol": 4, "toCol": 4, "variant": "security" },
+    { "id": "close-phase", "label": "Cierre", "fromCol": 5, "toCol": 5, "variant": "emphasis" }
+  ],
+  "groups": [
+    { "id": "blocking", "label": "Hallazgos bloqueantes", "lane": "kyro", "fromCol": 3, "toCol": 4, "variant": "security" }
+  ],
+  "mainPath": ["ready", "decision", "qa", "verdict", "close", "closed"],
+  "semanticChecks": {
+    "allowedRoots": ["ready"],
+    "allowedTerminals": ["closed"],
+    "requiredPaths": [
+      { "from": "ready", "to": "closed" },
+      { "from": "verdict", "to": "materialize" },
+      { "from": "correct", "to": "reqa" },
+      { "from": "reqa", "to": "verdict" }
+    ]
+  },
+  "nodes": [
+    { "id": "ready", "lane": "orchestrator", "col": 0, "width": 154, "type": "backend", "label": "Validar sprint", "sublabel": "tareas pass; analyze limpio", "tag": "precondición" },
+    { "id": "decision", "lane": "user", "col": 1, "width": 146, "type": "external", "label": "Decisión inicial", "sublabel": "ejecutar QA o cerrar sin QA", "tag": "gate humano" },
+    { "id": "qa", "lane": "orchestrator", "col": 2, "width": 156, "type": "security", "label": "kyro qa <scope>", "sublabel": "certificación independiente", "tag": "solo lectura" },
+    { "id": "verdict", "lane": "orchestrator", "col": 3, "width": 168, "type": "database", "label": "Veredicto QA", "sublabel": "aprobado o bloqueado", "tag": "informe" },
+    { "id": "materialize", "lane": "kyro", "col": 3, "width": 130, "type": "messagebus", "label": "Crear tareas", "sublabel": "CLI crea trabajo", "tag": "bloqueante" },
+    { "id": "correct", "lane": "kyro", "col": 4, "width": 164, "type": "backend", "label": "Corregir y revisar", "sublabel": "evidencia y verdict pass", "tag": "ciclo de tareas" },
+    { "id": "reqa", "lane": "orchestrator", "col": 4, "width": 164, "type": "security", "label": "Re-QA obligatoria", "sublabel": "sin alternativa de cierre", "tag": "en memoria" },
+    { "id": "close", "lane": "kyro", "col": 5, "width": 164, "type": "cloud", "label": "close-sprint", "sublabel": "checkpoint y reconciliación", "tag": "CLI" },
+    { "id": "closed", "lane": "user", "col": 5, "width": 150, "type": "external", "label": "Cierre publicado", "sublabel": "checkpoint disponible", "tag": "fin" }
+  ],
+  "edges": [
+    { "from": "ready", "to": "decision", "label": "listo", "variant": "emphasis", "role": "main" },
+    { "from": "decision", "to": "qa", "label": "Run QA", "variant": "emphasis", "role": "main" },
+    { "from": "qa", "to": "verdict", "label": "informe", "variant": "emphasis", "role": "main" },
+    { "from": "verdict", "to": "close", "label": "APPROVED o NOTES", "variant": "emphasis", "role": "main" },
+    { "from": "verdict", "to": "materialize", "label": "REQUIRED o REJECTED", "variant": "security", "role": "error" },
+    { "from": "materialize", "to": "correct", "label": "tareas verificables", "variant": "security", "role": "main" },
+    { "from": "correct", "to": "reqa", "label": "todas pass", "variant": "emphasis", "role": "main" },
+    { "from": "reqa", "to": "verdict", "label": "QA inmediata", "variant": "security", "role": "return" },
+    { "from": "close", "to": "closed", "label": "publicar", "variant": "emphasis", "role": "main" }
+  ],
+  "cards": [
+    { "dot": "rose", "title": "Remediación trazable", "items": ["Un hallazgo bloqueante se materializa en tareas del CLI.", "Sin veredicto claro o criterios verificables, se detiene y se pide aclaración."] },
+    { "dot": "emerald", "title": "Re-QA y cierre", "items": ["Tras un fallo, la re-QA es obligatoria en la sesión.", "Solo un resultado aprobatorio permite close-sprint; el CLI publica el checkpoint."] }
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Arquitectura operativa de Kyro",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/SynapSync/kyro-ai",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "fac04cb0f232ac3c1dc14ed266cad76b07dbe8f4"
+    },
+    "views": [
+      {
+        "id": "ruta-principal",
+        "label": "Ruta operativa",
+        "focus": ["comandos", "skills", "cli", "estado", "historial"],
+        "note": "Del comando del agente al estado gestionado y su historial inmutable."
+      },
+      {
+        "id": "superficie-adaptada",
+        "label": "Superficie de adaptadores",
+        "focus": ["adaptadores", "comandos", "orquestador", "skills"],
+        "note": "Los adaptadores publican la misma operación para el host compatible."
+      },
+      {
+        "id": "integridad",
+        "label": "Integridad y checkpoints",
+        "focus": ["cli", "estado", "checkpoints", "historial"],
+        "note": "La CLI es la única vía de mutación y el cierre preserva checkpoints."
+      }
+    ],
+    "viewBox": [1390, 780]
+  },
+  "components": [
+    {
+      "id": "comandos",
+      "type": "frontend",
+      "label": "Comandos Kyro",
+      "sublabel": "6 routers públicos",
+      "tag": "Intención del usuario",
+      "pos": [55, 315],
+      "size": [225, 94],
+      "sources": [
+        {"path": "commands/forge.md", "label": "forge"},
+        {"path": "commands/qa.md", "label": "qa"},
+        {"path": "AGENTS.md", "label": "superficie"}
+      ]
+    },
+    {
+      "id": "orquestador",
+      "type": "backend",
+      "label": "Orquestador",
+      "sublabel": "enrutamiento y gates",
+      "tag": "Contrato de ejecución",
+      "pos": [325, 130],
+      "size": [205, 82],
+      "sources": [
+        {"path": "agents/orchestrator.md", "label": "contrato"}
+      ]
+    },
+    {
+      "id": "skills",
+      "type": "backend",
+      "label": "Skills internos",
+      "sublabel": "forge · seedbed · QA · executor",
+      "tag": "Protocolos cargados bajo demanda",
+      "pos": [325, 315],
+      "size": [205, 94],
+      "sources": [
+        {"path": "package.json", "label": "skills"},
+        {"path": "internal/skills/sprint-forge/SKILL.md", "label": "forge"}
+      ]
+    },
+    {
+      "id": "adaptadores",
+      "type": "cloud",
+      "label": "Adaptadores de host",
+      "sublabel": "wrappers públicos para Claude Code",
+      "tag": "Capa de distribución",
+      "pos": [325, 530],
+      "size": [205, 82],
+      "sources": [
+        {"path": "providers/claude/commands/forge.md", "label": "wrapper Claude"},
+        {"path": ".claude-plugin/plugin.json", "label": "plugin"}
+      ]
+    },
+    {
+      "id": "cli",
+      "type": "security",
+      "label": "CLI kyro",
+      "sublabel": "verbos de estado y evidencia",
+      "tag": "Única vía de escritura",
+      "pos": [620, 315],
+      "size": [235, 94],
+      "sources": [
+        {"path": "agents/orchestrator.md", "label": "política de escritura"},
+        {"path": "package.json", "label": "bin kyro"}
+      ]
+    },
+    {
+      "id": "estado",
+      "type": "database",
+      "label": ".agents/kyro",
+      "sublabel": "project, local y sprint por scope",
+      "tag": "Estado vivo del proyecto",
+      "pos": [945, 315],
+      "size": [235, 94],
+      "sources": [
+        {"path": "commands/forge.md", "label": "estado y scope"},
+        {"path": "agents/orchestrator.md", "label": "fuente de verdad"}
+      ]
+    },
+    {
+      "id": "checkpoints",
+      "type": "database",
+      "label": "Checkpoints de sprint",
+      "sublabel": "snapshot y ledger al cerrar", 
+      "tag": "Recuperación verificable",
+      "pos": [1225, 160],
+      "size": [160, 84],
+      "sources": [
+        {"path": "agents/orchestrator.md", "label": "close-sprint"},
+        {"path": "scripts/check-lossless-checkpoints.mjs", "label": "verificación"}
+      ]
+    },
+    {
+      "id": "historial",
+      "type": "database",
+      "label": "Archivo inmutable",
+      "sublabel": "archive/ y evidencia",
+      "tag": "Trazabilidad",
+      "pos": [1225, 455],
+      "size": [160, 84],
+      "sources": [
+        {"path": "commands/forge.md", "label": "archive"},
+        {"path": "agents/orchestrator.md", "label": "historia"}
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Superficie de integración",
+      "wraps": ["comandos", "adaptadores"],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    {"id": "comando-orquestador", "from": "comandos", "to": "orquestador", "label": "intención → ruta", "variant": "emphasis", "fromSide": "right", "toSide": "left"},
+    {"id": "orquestador-skills", "from": "orquestador", "to": "skills", "label": "carga mínima por nextAction", "fromSide": "bottom", "toSide": "top", "labelAt": [428, 226]},
+    {"id": "skills-cli", "from": "skills", "to": "cli", "label": "invoca verbos gestionados", "variant": "emphasis", "fromSide": "right", "toSide": "left", "labelAt": [575, 423]},
+    {"id": "cli-estado", "from": "cli", "to": "estado", "label": "lee y muta mediante CLI", "variant": "security", "fromSide": "right", "toSide": "left", "labelAt": [900, 423]},
+    {"id": "estado-checkpoints", "from": "estado", "to": "checkpoints", "label": "close-sprint conserva snapshot", "fromSide": "right", "toSide": "left"},
+    {"id": "estado-historial", "from": "estado", "to": "historial", "label": "cierre escribe historia", "fromSide": "right", "toSide": "left"},
+    {"id": "adaptadores-comandos", "from": "adaptadores", "to": "comandos", "label": "publica wrappers", "variant": "dashed", "fromSide": "top", "toSide": "bottom"}
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Ruta principal",
+      "items": [
+        "Los comandos traducen intención en una ruta concreta.",
+        "Las skills aplican el protocolo mínimo que pide el estado actual."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Contrato de estado",
+      "items": [
+        "sprint.json es la fuente viva de verdad dentro del scope.",
+        "Los agentes no editan el estado de Kyro directamente: usan la CLI."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Continuidad",
+      "items": [
+        "Los adaptadores llevan los routers al host compatible.",
+        "El cierre crea checkpoints e historial inmutable para trazabilidad."
+      ]
+    }
+  ]
+}

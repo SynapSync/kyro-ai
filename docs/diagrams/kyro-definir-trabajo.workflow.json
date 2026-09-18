@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kyro · definir el trabajo",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "pedido", "label": "Pedido" },
+    { "id": "init", "label": "INIT · análisis" },
+    { "id": "estado", "label": "Estado tool-owned" },
+    { "id": "ambiguo", "label": "Clarificar", "variant": "exception" }
+  ],
+  "mainPath": ["pedido", "tipo", "hallazgos", "plancli", "verificar", "sprint"],
+  "nodes": [
+    { "id": "pedido", "lane": "pedido", "col": 0, "type": "external", "label": "Pedido", "sublabel": "Idea o scope", "width": 146 },
+    { "id": "idea", "lane": "pedido", "col": 1, "type": "external", "label": "Idea madura", "sublabel": "Opcional", "width": 146 },
+    { "id": "tipo", "lane": "init", "col": 1, "type": "backend", "label": "Clasificar", "sublabel": "Tipo de trabajo", "width": 146 },
+    { "id": "hallazgos", "lane": "init", "col": 2, "type": "backend", "label": "Hallazgos", "sublabel": "Sizing del roadmap", "width": 146 },
+    { "id": "plancli", "lane": "estado", "col": 3, "type": "database", "label": "kyro plan", "sublabel": "--from lean JSON", "width": 146 },
+    { "id": "verificar", "lane": "estado", "col": 4, "type": "database", "label": "Registrar", "sublabel": "sprint.json vivo", "width": 146 },
+    { "id": "sprint", "lane": "init", "col": 5, "type": "backend", "label": "Planear sprint", "sublabel": "Siguiente etapa", "width": 146 },
+    { "id": "clarify", "lane": "ambiguo", "col": 4, "type": "security", "label": "Clarify", "sublabel": "Una pregunta", "width": 146 }
+  ],
+  "edges": [
+    { "from": "pedido", "to": "tipo" },
+    { "from": "pedido", "to": "idea", "label": "Si hay brief", "role": "branch", "variant": "dashed" },
+    { "from": "idea", "to": "tipo" },
+    { "from": "tipo", "to": "hallazgos" },
+    { "from": "hallazgos", "to": "plancli" },
+    { "from": "plancli", "to": "verificar" },
+    { "from": "verificar", "to": "sprint", "label": "Sin unknowns" },
+    { "from": "verificar", "to": "clarify", "label": "Hay unknowns", "variant": "security", "role": "error" },
+    { "from": "clarify", "to": "sprint", "label": "Resuelto" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Quién escribe",
+      "items": [
+        "El agente escribe findings y un lean JSON temporal.",
+        "Solo kyro plan materializa sprint.json, project.json y local.json."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Gates",
+      "items": [
+        "Si queda un unknown de diseño, nextAction es clarify.",
+        "No se inventan tareas ni se edita el estado a mano."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Salida",
+      "items": [
+        "Scope en planning, roadmap sized, activeSprint aún null.",
+        "La siguiente etapa es planear el sprint activo."
+      ]
+    }
+  ]
+}

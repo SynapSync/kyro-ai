@@ -1,0 +1,81 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kyro · planear el siguiente sprint",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "orquestador", "label": "Orquestador" },
+    { "id": "fuentes", "label": "Fuente de verdad" },
+    { "id": "cli", "label": "CLI tool-owned" },
+    { "id": "bloqueo", "label": "Clarificación", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "leer", "label": "Leer y decidir", "fromCol": 0, "toCol": 1 },
+    { "id": "disenar", "label": "Diseñar el plan", "fromCol": 2, "toCol": 3 },
+    { "id": "materializar", "label": "Materializar", "fromCol": 4, "toCol": 5, "variant": "emphasis" }
+  ],
+  "mainPath": ["ruta", "estado", "siguiente", "plan", "generador", "aplicar", "actualizar", "ejecutar"],
+  "semanticChecks": {
+    "allowedRoots": ["ruta"],
+    "allowedTerminals": ["ejecutar", "clarify"],
+    "requiredPaths": [
+      { "from": "ruta", "to": "ejecutar" },
+      { "from": "estado", "to": "clarify" }
+    ]
+  },
+  "nodes": [
+    { "id": "ruta", "lane": "orquestador", "col": 0, "type": "backend", "label": "Ruta plan_sprint", "sublabel": "Planificación", "width": 120 },
+    { "id": "estado", "lane": "fuentes", "col": 1, "type": "database", "label": "Leer sprint.json", "sublabel": "Roadmap · ledger · deuda", "width": 120 },
+    { "id": "siguiente", "lane": "orquestador", "col": 2, "type": "backend", "label": "Resolver Sprint N", "sublabel": "N−1 cerrado si N > 1", "width": 120 },
+    { "id": "principios", "lane": "fuentes", "col": 2, "type": "security", "label": "Revisar principios", "sublabel": "project.json.principles[]", "width": 120 },
+    { "id": "plan", "lane": "orquestador", "col": 3, "type": "backend", "label": "Preparar plan lean", "sublabel": "Fases y tareas", "width": 120 },
+    { "id": "clarify", "lane": "bloqueo", "col": 3, "type": "security", "label": "Clarify primero", "sublabel": "Sin marcadores", "width": 120 },
+    { "id": "generador", "lane": "orquestador", "col": 4, "type": "backend", "label": "Crear activeSprint", "sublabel": "Título del roadmap", "width": 120 },
+    { "id": "aplicar", "lane": "cli", "col": 4, "type": "database", "label": "kyro plan", "sublabel": "--from plan · scope", "width": 120 },
+    { "id": "actualizar", "lane": "cli", "col": 5, "type": "database", "label": "Aplicar estado", "sublabel": "Sprint, deuda y handoff", "width": 120 },
+    { "id": "ejecutar", "lane": "orquestador", "col": 5, "type": "backend", "label": "Ejecutar tarea", "sublabel": "Primera tarea del sprint", "width": 120 }
+  ],
+  "edges": [
+    { "from": "ruta", "to": "estado", "label": "abre fuente de verdad", "role": "main" },
+    { "from": "estado", "to": "siguiente", "label": "roadmap + ledger", "role": "main" },
+    { "from": "estado", "to": "principios", "label": "consulta", "role": "branch" },
+    { "from": "siguiente", "to": "plan", "label": "foco y fases sugeridas", "role": "main" },
+    { "from": "principios", "to": "plan", "label": "sin violaciones", "role": "branch" },
+    { "from": "plan", "to": "generador", "label": "sin marcadores", "role": "main" },
+    { "from": "plan", "to": "clarify", "label": "detalle de diseño desconocido", "variant": "security", "role": "error" },
+    { "from": "generador", "to": "aplicar", "label": "archivo lean temporal", "role": "main" },
+    { "from": "aplicar", "to": "actualizar", "label": "único escritor", "role": "main" },
+    { "from": "actualizar", "to": "ejecutar", "label": "primera tarea", "role": "main" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Cobertura obligatoria",
+      "items": [
+        "Las recomendaciones previas reciben una disposición explícita; nada se descarta en silencio.",
+        "La deuda debida se marca in_progress y nunca se elimina ni se reinicia.",
+        "Las convenciones relevantes entran al contexto de cada tarea."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Gates antes de aplicar",
+      "items": [
+        "Los principios non-negotiable no se pueden violar; analyze falla los principios con check.",
+        "Cada requisito puede refinarse en escenarios Given/When/Then y cada tarea enlaza scenario_refs.",
+        "Con NEEDS CLARIFICATION no se generan ni finalizan tareas."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Límite de escritura",
+      "items": [
+        "El agente solo escribe el archivo lean temporal.",
+        "kyro plan materializa el estado; no hay edición directa de sprint.json ni de archivos gestionados.",
+        "El handoff queda listo para execute_task y apunta a la primera tarea."
+      ]
+    }
+  ]
+}

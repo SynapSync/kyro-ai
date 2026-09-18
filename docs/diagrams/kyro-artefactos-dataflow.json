@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Kyro — flujo de datos y artefactos",
+    "quality_profile": "showcase",
+    "viewBox": [1068, 520],
+    "views": [
+      {
+        "id": "estado-vivo",
+        "label": "Estado vivo",
+        "focus": ["orquestador", "cli", "proyecto", "local", "sprint"],
+        "note": "Los routers leen el estado por capas; la CLI es la única escritora del estado gestionado."
+      },
+      {
+        "id": "evidencia-veredictos",
+        "label": "Evidencia y veredictos",
+        "focus": ["ejecutor", "revisor", "cli", "sprint"],
+        "note": "La ejecución aporta evidencia y la revisión registra el veredicto en sprint.json mediante la CLI."
+      },
+      {
+        "id": "cierre-inmutable",
+        "label": "Cierre inmutable",
+        "focus": ["cli", "sprint", "checkpoint", "archivo", "ledger"],
+        "note": "close-sprint publica el checkpoint, conserva el archivo y deja ledger[] como índice del cierre."
+      },
+      {
+        "id": "fuentes",
+        "label": "Fuentes reales",
+        "focus": ["cli", "sprint", "checkpoint", "archivo", "ledger"],
+        "note": "Fuentes: internal/skills/sprint-forge/{SKILL.md, assets/modes/{execute-task,review-task,close-sprint}.md}."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Actores lectores" },
+    { "label": "Frontera de escritura" },
+    { "label": "Estado vivo" },
+    { "label": "Historia de cierre" },
+    { "label": "Consulta y recuperación" }
+  ],
+  "nodes": [
+    { "id": "ejecutor", "type": "frontend", "label": "Ejecutor de tarea", "sublabel": "implementa · valida", "tag": "aporta", "stage": 0, "row": 0 },
+    { "id": "orquestador", "type": "frontend", "label": "Orquestador y routers", "sublabel": "forge · status · contexto", "tag": "lee", "stage": 0, "row": 1, "width": 145 },
+    { "id": "revisor", "type": "frontend", "label": "Revisor de tarea", "sublabel": "comprueba criterios", "tag": "dictamina", "stage": 0, "row": 2 },
+    { "id": "cli", "type": "security", "label": "Kyro CLI", "sublabel": "único escritor", "tag": "CLI", "stage": 1, "row": 1 },
+    { "id": "proyecto", "type": "database", "label": "project.json", "sublabel": "registro · principios", "tag": "lee / escribe", "stage": 2, "row": 0, "width": 145 },
+    { "id": "local", "type": "database", "label": "local.json", "sublabel": "scope activo", "tag": "lee / escribe", "stage": 2, "row": 1 },
+    { "id": "sprint", "type": "database", "label": "sprint.json", "sublabel": "fuente de verdad", "tag": "lee / escribe", "stage": 2, "row": 2 },
+    { "id": "checkpoint", "type": "database", "label": "checkpoint", "sublabel": "antes / después", "tag": "inmutable", "stage": 3, "row": 0 },
+    { "id": "archivo", "type": "database", "label": "archives", "sublabel": "JSON + MD", "tag": "solo escritura", "stage": 3, "row": 1 },
+    { "id": "ledger", "type": "database", "label": "ledger[]", "sublabel": "índice de cierre", "tag": "en sprint.json", "stage": 3, "row": 2 },
+    { "id": "doctor", "type": "backend", "label": "doctor / recover", "sublabel": "verifica · recupera", "tag": "lee", "stage": 4, "row": 1 }
+  ],
+  "flows": [
+    { "id": "router-pack", "from": "orquestador", "to": "cli", "label": "pide pack", "classification": "enrutamiento", "variant": "emphasis", "labelAt": [208, 465] },
+    { "id": "executor-evidence", "from": "ejecutor", "to": "cli", "label": "record-evidence", "classification": "evidencia validada", "variant": "emphasis", "labelAt": [208, 104] },
+    { "id": "reviewer-verdict", "from": "revisor", "to": "cli", "label": "review: pass / fail", "classification": "veredicto", "variant": "security", "labelAt": [208, 424] },
+    { "id": "cli-project", "from": "cli", "to": "proyecto", "label": "lee y actualiza", "classification": "project.json", "variant": "security", "labelAt": [425, 110] },
+    { "id": "cli-local", "from": "cli", "to": "local", "label": "actualiza scope", "classification": "local.json", "variant": "security", "labelAt": [423, 465] },
+    { "id": "cli-sprint", "from": "cli", "to": "sprint", "label": "evidencia y verdict", "classification": "fuente de verdad", "variant": "security", "labelAt": [425, 440] },
+    { "id": "sprint-checkpoint", "from": "sprint", "to": "checkpoint", "label": "publica checkpoint", "classification": "cierre sin pérdida", "variant": "emphasis", "labelAt": [638, 105] },
+    { "id": "sprint-archive", "from": "sprint", "to": "archivo", "label": "snapshot + narrativa", "classification": "solo escritura", "variant": "emphasis", "labelAt": [638, 470] },
+    { "id": "sprint-ledger", "from": "sprint", "to": "ledger", "label": "anexa ledger[]", "classification": "índice del cierre", "variant": "emphasis", "route": "straight", "labelAt": [638, 440] },
+    { "id": "doctor-checkpoint", "from": "doctor", "to": "checkpoint", "label": "verifica digest", "classification": "integridad", "variant": "default", "labelAt": [853, 105] },
+    { "id": "doctor-archive", "from": "doctor", "to": "archivo", "label": "lee para recuperar", "classification": "recuperación", "variant": "dashed", "route": "straight", "labelAt": [853, 330] }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/home/rperaza/joisephdev/my-projects/kyro-ecosistem/kyro-ai/docs/diagrams/kyro-lifecycle.workflow.json",
+  "output": "/home/rperaza/joisephdev/my-projects/kyro-ecosistem/kyro-ai/docs/diagrams/kyro-lifecycle.html",
+  "specification": {
+    "sha256": "3b7967c3beba1f7fdc94b48837c43629aa46e34fd72f60596c17e3b5af097d4e",
+    "bytes": 4242
+  },
+  "artifact": {
+    "sha256": "80e7d17325048b37bb362d4935ba21112915672dd28049510fbfe5d823eafb54",
+    "bytes": 811687
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

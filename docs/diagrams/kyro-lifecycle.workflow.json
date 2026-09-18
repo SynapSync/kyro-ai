@@ -1,0 +1,208 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kyro · ciclo de vida / happy path",
+    "quality_profile": "showcase",
+    "animation": "trace"
+  },
+  "lanes": [
+    {
+      "id": "definir",
+      "label": "01 · Definir el trabajo"
+    },
+    {
+      "id": "construir",
+      "label": "02 · Iterar por tarea"
+    },
+    {
+      "id": "entregar",
+      "label": "03 · Entregar y decidir"
+    }
+  ],
+  "mainPath": [
+    "idea",
+    "scope",
+    "plan",
+    "execute",
+    "review",
+    "decision",
+    "close",
+    "complete"
+  ],
+  "nodes": [
+    {
+      "id": "idea",
+      "lane": "definir",
+      "col": 0,
+      "type": "external",
+      "label": "Idea opcional",
+      "sublabel": "Necesidad",
+      "width": 146
+    },
+    {
+      "id": "scope",
+      "lane": "definir",
+      "col": 1,
+      "type": "backend",
+      "label": "Crear scope",
+      "sublabel": "Requisitos y roadmap",
+      "width": 146
+    },
+    {
+      "id": "plan",
+      "lane": "definir",
+      "col": 2,
+      "type": "backend",
+      "label": "Planear sprint",
+      "sublabel": "Tareas y aprobación",
+      "width": 146
+    },
+    {
+      "id": "execute",
+      "lane": "construir",
+      "col": 2,
+      "type": "backend",
+      "label": "Ejecutar tarea",
+      "sublabel": "Código y pruebas",
+      "width": 146
+    },
+    {
+      "id": "review",
+      "lane": "construir",
+      "col": 3,
+      "type": "security",
+      "label": "Revisar tarea",
+      "sublabel": "Evidencia y pass",
+      "width": 146
+    },
+    {
+      "id": "decision",
+      "lane": "construir",
+      "col": 4,
+      "type": "security",
+      "label": "QA o cierre",
+      "sublabel": "Elección humana",
+      "width": 146
+    },
+    {
+      "id": "qa",
+      "lane": "construir",
+      "col": 5,
+      "type": "security",
+      "label": "QA independiente",
+      "sublabel": "Opcional al inicio",
+      "width": 146
+    },
+    {
+      "id": "close",
+      "lane": "entregar",
+      "col": 4,
+      "type": "database",
+      "label": "Cerrar sprint",
+      "sublabel": "Gate y checkpoint",
+      "width": 146
+    },
+    {
+      "id": "complete",
+      "lane": "entregar",
+      "col": 5,
+      "type": "external",
+      "label": "Completar scope",
+      "sublabel": "Decisión humana",
+      "width": 146
+    },
+    {
+      "id": "next",
+      "lane": "entregar",
+      "col": 2,
+      "type": "backend",
+      "label": "Siguiente sprint",
+      "sublabel": "Volver a planificar",
+      "width": 146
+    }
+  ],
+  "edges": [
+    {
+      "from": "idea",
+      "to": "scope"
+    },
+    {
+      "from": "scope",
+      "to": "plan"
+    },
+    {
+      "from": "plan",
+      "to": "execute"
+    },
+    {
+      "from": "execute",
+      "to": "review"
+    },
+    {
+      "from": "review",
+      "to": "decision",
+      "label": "Todo pass"
+    },
+    {
+      "from": "review",
+      "to": "execute",
+      "label": "Siguiente tarea",
+      "role": "return",
+      "variant": "dashed"
+    },
+    {
+      "from": "decision",
+      "to": "qa",
+      "label": "Con QA"
+    },
+    {
+      "from": "decision",
+      "to": "close",
+      "label": "Sin QA"
+    },
+    {
+      "from": "qa",
+      "to": "close",
+      "label": "Aprobado"
+    },
+    {
+      "from": "close",
+      "to": "complete",
+      "label": "Terminado"
+    },
+    {
+      "from": "close",
+      "to": "next",
+      "label": "Más trabajo",
+      "role": "return",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Contrato vivo",
+      "items": [
+        "Scope → sprints → tareas; la idea previa es opcional.",
+        "Context-pack y nextAction indican qué hacer; el CLI escribe el estado."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Historial y continuidad",
+      "items": [
+        "El cierre archiva evidencia; no completa automáticamente el scope.",
+        "Roadmap pendiente → plan_sprint; agotado → await_scope_completion."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Límites de este primer mapa",
+      "items": [
+        "QA inicial opcional; si falla, corregir y repetir QA antes de cerrar.",
+        "Clarificación, remedios, reopen y discard se desglosarán después."
+      ]
+    }
+  ]
+}
