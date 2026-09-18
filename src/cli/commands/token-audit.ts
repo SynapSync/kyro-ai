@@ -45,8 +45,9 @@ const TOKEN_BUDGET = {
   // keep the old ceiling would leave recovery unreachable on the execute route.
   // CI measures projected runtime paths. The creation-flow existence gate (present in forge.md,
   // orchestrator.md and SKILL.md on every path) measures init=5283, init-seedbed=5613, plan=5373,
-  // execute=4841, review=4998, close=5906; retain 7–9 tokens of headroom.
-  runtimeForgeExecuteTokens: 4850,
+  // execute=4851, review=4998, close=5906. Execute grew by 10 tokens in 4.51.0 as its
+  // live-work routing gained the blocker/remedy contract, so its ceiling is 5000.
+  runtimeForgeExecuteTokens: 5000,
   runtimeForgeReviewTokens: 5005,
   runtimeForgePlanTokens: 5380,
   runtimeForgeCloseTokens: 5915,
