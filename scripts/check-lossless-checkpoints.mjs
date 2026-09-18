@@ -25,6 +25,15 @@ const LEASE_EVENT_BUDGET_MS = 20_000;
  */
 const CI_SAFE_TEST_LEASE_MS = '5000';
 /**
+ * Lease for transient-retry behaviour tests. A retry is only attempted while the
+ * published lease retains more than one worker interval of margin, so the 5000ms
+ * lease plus injected failures plus slow Worker startup on loaded Windows runners
+ * could exhaust the margin and fail-stop (seen as "Injected transient heartbeat
+ * renewal failure" on Windows Node 18). 15000ms keeps the retry semantics while
+ * leaving ~10000ms of margin after each interval wait.
+ */
+const TRANSIENT_RETRY_LEASE_MS = '15000';
+/**
  * Lease for cases that must OBSERVE a specific heartbeat event before the lease may expire.
  *
  * The worker renews every `lease/3`, so waiting on the Nth heartbeat burns `N/3` of the lease
@@ -1286,7 +1295,7 @@ async function waitForRenewals(runState, root, count, message) {
     const ready = join(root, 'transient-ready');
     const gate = join(root, 'transient-gate');
     const holder = runAsync(root, closeArgs, {
-      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
+      KYRO_TEST_LOCK_LEASE_MS: TRANSIENT_RETRY_LEASE_MS,
       KYRO_TEST_LOCK_READY_FILE: ready,
       KYRO_TEST_LOCK_RELEASE_GATE: gate,
       KYRO_TEST_LOCK_WIN32_POLICY: '1',
@@ -1311,7 +1320,7 @@ async function waitForRenewals(runState, root, count, message) {
     const ready = join(root, 'first-renew-ready');
     const gate = join(root, 'first-renew-gate');
     const holder = runAsync(root, closeArgs, {
-      KYRO_TEST_LOCK_LEASE_MS: CI_SAFE_TEST_LEASE_MS,
+      KYRO_TEST_LOCK_LEASE_MS: TRANSIENT_RETRY_LEASE_MS,
       KYRO_TEST_LOCK_READY_FILE: ready,
       KYRO_TEST_LOCK_RELEASE_GATE: gate,
       KYRO_TEST_LOCK_WIN32_POLICY: '1',
