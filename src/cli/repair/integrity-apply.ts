@@ -99,6 +99,7 @@ function applyIntegrityPlanUnlocked(
 
   if (existingWarrant) {
     operations = existingWarrant.operations;
+    assertNoLegacyRegistryOperations(operations);
     resumed = true;
     digest = existingWarrant.digest;
   } else {
@@ -118,6 +119,7 @@ function applyIntegrityPlanUnlocked(
         plan.blockers.map((blocker) => `[${blocker.code ?? 'blocker'}] ${blocker.summary}`).join(' '),
       );
     }
+    assertNoLegacyRegistryOperations(plan.operations);
     if (plan.operations.length === 0) {
       return { digest: plan.digest, resumed: false, applied: [], skipped: [] };
     }
@@ -162,6 +164,15 @@ function applyIntegrityPlanUnlocked(
     else skipped.push(label);
   }
   return { digest, resumed, applied, skipped };
+}
+
+function assertNoLegacyRegistryOperations(operations: IntegrityOperation[]): void {
+  if (!operations.some((operation) => operation.kind === 'registry.register-on-disk' || operation.kind === 'registry.unregister-orphan')) return;
+  throw new KyroCoreError(
+    'CHECKPOINT_UNSUPPORTED_VERSION',
+    'This integrity plan contains registry operations that no longer write scope entries.',
+    'Run kyro install --init-workspace --yes to migrate project state, then prepare a new integrity plan.',
+  );
 }
 
 function applyUnregister(operation: Extract<IntegrityOperation, { kind: 'registry.unregister-orphan' }>, actor: string, now: string): boolean {
