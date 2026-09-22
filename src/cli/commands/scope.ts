@@ -1,10 +1,8 @@
-import { existsSync } from 'node:fs';
-import { ARTIFACT_ROOT, KYRO_PROJECT_ROOT } from '../constants';
+import { KYRO_PROJECT_ROOT } from '../constants';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { formatScopeAuthor } from '../core/actor';
-import { resolveManagedPath } from '../fs';
 import { readProjectState, updateProjectStateLayers } from '../state';
 import { applyPlan } from '../fs';
 import { sha256 } from '../core/digest';
@@ -19,7 +17,6 @@ import { emitBlockedReason, emitGateApproved } from '../core/trace';
 import { emitToolCommandRun } from '../core/trace';
 import { collectFindings } from '../core/analysis';
 import { inspectScope, inspectSprintCloseCheckpoints } from './artifact-doctor';
-import { listScopeNames } from '../artifacts/scopes';
 import type { KyroProjectState, SprintFile, Task } from '../types';
 import {
   applyScopeRetirement,
@@ -110,7 +107,7 @@ export function runScopeCommand(args: string[]): void {
 
 function listScopes(): void {
   const state = readProjectState();
-  const scopes = listScopeNames();
+  const scopes = state?.scopes.map((entry) => entry.id) ?? [];
   if (scopes.length === 0) {
     console.log('No Kyro scopes found.');
     return;
@@ -177,25 +174,12 @@ function setActiveScope(scope: string, yes: boolean, dryRun: boolean): void {
     emitBlockedReason(scope, guard.message, guard.code);
     throw new KyroCoreError(guard.code ?? 'CONFIRMATION_REQUIRED', guard.message, guard.remedy);
   }
-  const scopes = [...state.scopes];
-  let scopesChanged = false;
-  if (!scopes.some((entry) => entry.id === scope)) {
-    scopes.push({ id: scope, title: scope, status: 'active' });
-    scopes.sort((a, b) => a.id.localeCompare(b.id));
-    scopesChanged = true;
-  }
   if (dryRun) {
     console.log(`Would set active Kyro scope to: ${scope}`);
     return;
   }
   emitGateApproved(scope, 'scope_set_active');
-  // Layer-targeted: activeScope → local only; scopes registry → shared only when the entry was added.
-  // Monolito-only workspaces migrate to layers on first personal write.
-  if (scopesChanged) {
-    updateProjectStateLayers({ scopes, activeScope: scope });
-  } else {
-    updateProjectStateLayers({ activeScope: scope });
-  }
+  updateProjectStateLayers({ activeScope: scope });
   console.log(`Active Kyro scope set to: ${scope}`);
 }
 
@@ -331,8 +315,7 @@ function printScopeDiscardHelp(): void {
 }
 
 function scopeExists(scope: string, state: KyroProjectState): boolean {
-  if (state.scopes.some((entry) => entry.id === scope) || state.activeScope === scope) return true;
-  return existsSync(resolveManagedPath(`${ARTIFACT_ROOT}/${scope}`));
+  return state.scopes.some((entry) => entry.id === scope);
 }
 
 function runScopeRetire(args: ScopeRetireArgs): void {

@@ -413,6 +413,8 @@ function assertPreExistingContaminationIsCleanable() {
       writeFileSync(join(foreign, 'README.md'), 'do not touch\n');
       writeFileSync(join(foreign, 'drafts/idea.md'), 'do not touch this either\n');
       registerScopes(sandbox, [{ id: 'notes-backup', title: 'notes-backup', status: 'planning' }]);
+      const migrated = spawnCli(['install', '--scope', 'workspace', '--init-workspace', '--yes'], sandbox);
+      assert(migrated.status === 0, `legacy migration failed: ${migrated.stdout}${migrated.stderr}`);
       const before = hashTree(foreign);
 
       // The digest must be structural, not file-only: an empty directory is part of what "preserved
@@ -424,31 +426,17 @@ function assertPreExistingContaminationIsCleanable() {
 
       const scopeArgs = mode === 'scoped' ? ['--kyro-scope', 'notes-backup'] : [];
       const prepare = spawnCli(['repair', 'integrity', 'prepare', ...scopeArgs, '--json'], sandbox);
-      assert(prepare.status === 0, `${mode} prepare should succeed: ${prepare.stderr}`);
-      const plan = machineData(prepare.stdout);
-      assert(
-        plan.targets.unregister.includes('notes-backup'),
-        `${mode}: a registry entry pointing at a foreign directory must be an unregister target, not a blocker: ${prepare.stdout}`,
-      );
-
-      // apply re-derives the plan, so it must be given the same scope the digest was computed under.
-      const apply = spawnCli(['repair', 'integrity', 'apply', ...scopeArgs, '--digest', plan.digest, '--yes'], sandbox);
-      assert(apply.status === 0, `${mode} apply should clean the contaminated entry: ${apply.stderr || apply.stdout}`);
-
-      assert(hashTree(foreign) === before, `${mode}: unregister must not modify a byte of the foreign directory tree`);
-
-      assert(
-        !readRegistry(sandbox).scopes.some((entry) => entry.id === 'notes-backup'),
-        `${mode}: the contaminated entry must be gone from the registry: ${JSON.stringify(readRegistry(sandbox).scopes)}`,
-      );
-
-      // Once unregistered, the same id is an ordinary wrong name again.
-      const after = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'notes-backup', '--json'], sandbox);
-      assert(after.status !== 0, `${mode}: an unregistered foreign directory must not be addressable: ${after.stdout}`);
-      assert(
-        `${after.stdout}${after.stderr}`.includes('SCOPE_NOT_FOUND'),
-        `${mode}: an unregistered foreign directory must report SCOPE_NOT_FOUND: ${after.stdout}${after.stderr}`,
-      );
+      if (mode === 'global') {
+        assert(prepare.status === 0, `global prepare should succeed: ${prepare.stderr}`);
+        const plan = machineData(prepare.stdout);
+        assert(!plan.targets.unregister.includes('notes-backup'), 'foreign directory is not a derived scope');
+      } else {
+        assert(prepare.status !== 0 && `${prepare.stdout}${prepare.stderr}`.includes('SCOPE_NOT_FOUND'),
+          `foreign directory must not be addressable: ${prepare.stdout}${prepare.stderr}`);
+      }
+      assert(hashTree(foreign) === before, `${mode}: inspection must preserve the foreign directory`);
+      const listed = spawnCli(['scope', 'list'], sandbox);
+      assert(listed.status === 0 && !listed.stdout.includes('notes-backup'), `${mode}: stale shared entry must not grant scope identity`);
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
     }

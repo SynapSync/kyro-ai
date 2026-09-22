@@ -404,7 +404,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const sharedAfterSync = JSON.parse(readFileSync(sharedPath, 'utf-8'));
   const localAfterSync = JSON.parse(readFileSync(localPath, 'utf-8'));
   assert(JSON.stringify(sharedAfterSync.principles) === JSON.stringify(principles), 'sync: principles were not preserved');
-  assert(JSON.stringify(sharedAfterSync.scopes) === JSON.stringify(scopes), 'sync: scopes were not preserved');
+  assert(!Object.hasOwn(sharedAfterSync, 'scopes'), 'sync: removes legacy shared scopes[]');
   assert(localAfterSync.activeScope === 'upgrade-scope', 'sync: activeScope was not preserved');
   assert(!Object.hasOwn(sharedAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed from shared');
   assert(!Object.hasOwn(sharedAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from shared');
@@ -429,7 +429,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const reinstalledCodex = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
   const reinstalledStandard = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
   assert(JSON.stringify(sharedAfterReinstall.principles) === JSON.stringify(principles), 'reinstall: principles were not preserved');
-  assert(JSON.stringify(sharedAfterReinstall.scopes) === JSON.stringify(scopes), 'reinstall: scopes were not preserved');
+  assert(!Object.hasOwn(sharedAfterReinstall, 'scopes'), 'reinstall: shared scopes[] must remain absent');
   assert(localAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
   assert(!Object.hasOwn(sharedAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed from shared');
   assert(!Object.hasOwn(sharedAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from shared');

@@ -445,7 +445,7 @@ function readRegisteredProject(scope: string): KyroProjectState {
   const issues = validateProjectStateShape(project, '.agents/kyro/(effective project state)');
   if (issues.length > 0) throw new KyroCoreError('INVALID_PROJECT_STATE', `Project state is invalid: ${issues.map(formatIssue).join('; ')}.`, 'Run kyro doctor and repair the project-state layers with supported tooling.');
   if (!project.scopes.some((entry) => entry.id === scope)) {
-    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" exists on disk but is not registered in project state.`, 'Run kyro install --init-workspace --yes to rehydrate the registry, then prepare retirement again.');
+    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no valid matching sprint.json.`, 'Run kyro doctor --artifacts to inspect the scope before retirement.');
   }
   return clone(project);
 }

@@ -6,8 +6,9 @@ import { asSprintFile, validateLocalProjectStateShape, validateSharedProjectStat
 import { LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveScopeAuthorFromGit } from '../core/actor';
 import { KyroCoreError } from '../core/errors';
+import { scopeEntryFromDisk } from '../core/scope-entries';
 import { countClarificationMarkers } from '../core/analysis';
-import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, nextExecutableTaskId } from '../core/status';
+import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId } from '../core/status';
 import { emitToolCommandRun } from '../core/trace';
 import { readProjectState, updateProjectStateLayers } from '../state';
 import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, ScopeAuthor, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
@@ -285,7 +286,7 @@ function runPlanInitMode(raw: unknown, scope: string, args: PlanArgs, state: Kyr
     throw new KyroCoreError('INVALID_SPRINT_SHAPE', `plan wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
   }
 
-  registerScopeInProjectState(input.scope, sprint.title, state);
+  registerScopeInProjectState(input.scope);
 
   const requirementCount = sprint.spec?.requirements.length ?? 0;
   console.log(`Scope "${input.scope}" initialized: ${requirementCount} requirement(s), ${sprint.roadmap.sprints.length} sprint(s) planned. Next action: ${sprint.handoff.nextAction}.`);
@@ -311,11 +312,6 @@ function runPlanSprintMode(raw: unknown, scope: string, currentSprint: SprintFil
     const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
     throw new KyroCoreError('INVALID_SPRINT_SHAPE', `plan wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
   }
-
-  // Planning a sprint makes the scope active; reconcile the kyro.json status cache so the freshly
-  // written artifact is coherent (otherwise every sprint-mode run leaves a stale-status analyze
-  // finding). This mirrors what `kyro repair` does — the derived status is the source of truth.
-  reconcileScopeStatusInProjectState(scope, sprint, state);
 
   const active = sprint.activeSprint!;
   const phaseCount = active.phases.length;
@@ -509,13 +505,11 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
  * Now the shape is verified on every run, whether or not a scope was added, and a bad state fails
  * the command instead of riding along under a success message.
  */
-function registerScopeInProjectState(scope: string, title: string, state: KyroProjectState): void {
-  if (!state.scopes.some((entry) => entry.id === scope)) {
-    const scopes = [...state.scopes, { id: scope, title, status: 'planning' as const }];
-    // Initializing a new scope is an explicit selection. Keep the registry shared and the
-    // selection local; sprint-mode planning never calls this helper.
-    updateProjectStateLayers({ scopes, activeScope: scope });
+function registerScopeInProjectState(scope: string): void {
+  if (!scopeEntryFromDisk(scope)) {
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `The new scope "${scope}" has no valid matching sprint.json.`);
   }
+  updateProjectStateLayers({ activeScope: scope });
   assertProjectStateIsValid();
 }
 
@@ -546,16 +540,6 @@ function assertProjectStateIsValid(): void {
     `sprint.json was written, but project state failed validation — ${detail}.`,
     'Run: npx kyro-ai install --scope workspace --init-workspace --yes to rewrite the managed fields. Do NOT hand-edit project.json or local.json — Kyro owns their shape.',
   );
-}
-
-/** Reconcile the shared scopes[] status cache with the derived scope status (mirrors kyro repair). */
-function reconcileScopeStatusInProjectState(scope: string, sprint: SprintFile, state: KyroProjectState): void {
-  const entry = state.scopes.find((s) => s.id === scope);
-  if (!entry) return;
-  const derived = deriveScopeStatus(sprint, Boolean(sprint.activeSprint));
-  if (entry.status === derived) return;
-  const scopes = state.scopes.map((s) => (s.id === scope ? { ...s, status: derived } : s));
-  updateProjectStateLayers({ scopes });
 }
 
 function readLeanPlanFile(path: string): unknown {
@@ -913,8 +897,8 @@ as cancelled history and are excluded from plannedSprintCount and future materia
 
 Two default modes, auto-detected from the resolved scope's state (not from the --from file shape):
   - init mode: no sprint.json yet for the scope. Materializes the scope's initial sprint.json
-    (spec + roadmap, activeSprint: null). Also registers the scope in the layered project state:
-    project.json (scopes[]) and local.json (activeScope set to the initialized scope). When git user.name and/or a valid user.email is set, writes optional
+    (spec + roadmap, activeSprint: null). The sprint file defines the scope, and local.json sets
+    activeScope to the initialized scope. When git user.name and/or a valid user.email is set, writes optional
     sprint.json.author { name?, email?, source: "git", capturedAt } with usable fields only
     (malformed email dropped). Omits author when nothing usable remains. Never blocks init —
     author is best-effort only. Not accepted from the lean file (machine identity at write time).

@@ -10,6 +10,7 @@ import {
 } from './constants';
 import { readJsonFromManagedPath, readJsonFromWorkspace, resolveManagedPath } from './fs';
 import { KyroCoreError } from './core/errors';
+import { scopeEntriesFromDisk } from './core/scope-entries';
 import { assertSafeManagedPath, assertStateWriterLeaseHealthy, withStateWriterLock } from './pipeline/state-writer-lock';
 import type {
   KyroLocalProjectState,
@@ -67,7 +68,7 @@ export function hasPersistedProjectStateOnDisk(): boolean {
  * Read-only commands surface this string; they never create the files themselves.
  */
 export const PROJECT_STATE_BOOTSTRAP_REMEDY =
-  'Run: npx kyro-ai install --init-workspace --yes  (writes project.json + local.json; rehydrates on-disk scopes).';
+  'Run: npx kyro-ai install --init-workspace --yes  (writes project.json + local.json; reads on-disk scopes).';
 
 /**
  * Format a one-line actionable bootstrap remedy. Optional reason prefixes the install line.
@@ -84,10 +85,9 @@ export function formatBootstrapRemedy(reason?: string): string {
 
 /**
  * Detect whether a read-only command should surface a bootstrap remedy.
- * Callers pass unregistered on-disk scope ids (from unregisteredScopeFolders) so this module
- * stays free of scopes imports. Never writes.
+ * Callers pass on-disk scope ids when project state is absent. Never writes.
  *
- * @returns one-line remedy, or null when persisted state exists and all listed scopes are registered
+ * @returns one-line remedy, or null when persisted state exists
  */
 export function detectProjectStateBootstrapNeed(unregisteredScopeIds: string[] = []): string | null {
   if (!hasPersistedProjectStateOnDisk()) {
@@ -112,7 +112,7 @@ export function detectProjectStateBootstrapNeed(unregisteredScopeIds: string[] =
  * 2. Else if legacy monolito exists → return sanitized monolito as effective state.
  * 3. Else → null.
  *
- * Disk scope rehydrate is NOT applied here (D7a); install/sync/bootstrap own that.
+ * Layered state derives its effective scopes from disk without writing files.
  */
 export function readProjectState(): KyroProjectState | null {
   const sharedRaw = readSharedProjectState();
@@ -146,7 +146,7 @@ export function mergeProjectLayers(
   const effective: KyroProjectState = {
     schemaVersion: 4,
     artifactRoot: shared.artifactRoot,
-    scopes: shared.scopes,
+    scopes: scopeEntriesFromDisk(),
     activeScope: local.activeScope,
     runtimePath: local.runtimePath ?? KYRO_ROOT,
     installedAdapters: local.installedAdapters,
@@ -183,14 +183,13 @@ export interface SplitMonolitoResult {
 
 /**
  * Pure split of a legacy effective/monolito state into layer payloads.
- * v1: scopes registry cache lives on **shared** (team-visible); personal fields on local.
+ * Shared scopes are omitted; each sprint file is authoritative.
  */
 export function splitMonolitoToLayers(monolito: KyroProjectState): SplitMonolitoResult {
   const effective = effectiveFromMonolito(monolito);
   const shared: KyroSharedProjectState = {
     schemaVersion: 4,
     artifactRoot: effective.artifactRoot,
-    scopes: effective.scopes.map(cloneScopeEntry),
   };
   if (effective.principles !== undefined) {
     shared.principles = effective.principles.map(clonePrinciple);
@@ -351,8 +350,7 @@ export function updateProjectStateLayersUnlocked(update: ProjectStateLayerUpdate
   };
 
   const touchShared =
-    update.scopes !== undefined
-    || update.principles !== undefined
+    update.principles !== undefined
     || update.conventions !== undefined
     || update.team !== undefined
     || update.artifactRoot !== undefined;
@@ -371,10 +369,7 @@ export function updateProjectStateLayersUnlocked(update: ProjectStateLayerUpdate
 
   if (touchShared) writeSharedProjectStateUnlocked(shared);
   if (touchLocal) writeLocalProjectStateUnlocked(local);
-  // If update is empty, still a no-op; callers always pass at least one field.
-  if (!touchShared && !touchLocal) {
-    writeProjectLayersUnlocked({ shared, local });
-  }
+  // A scopes-only update is obsolete: the sprint file already defines the scope.
 }
 
 function archiveMonolitoIfPresentUnlocked(): void {
@@ -392,7 +387,6 @@ export function sanitizeSharedForWrite(shared: KyroSharedProjectState): KyroShar
   const cleaned = stripLegacyProjectFields({
     schemaVersion: 4 as const,
     artifactRoot: shared.artifactRoot || ARTIFACT_ROOT,
-    scopes: Array.isArray(shared.scopes) ? shared.scopes.map(cloneScopeEntry) : [],
     ...(shared.principles !== undefined ? { principles: shared.principles.map(clonePrinciple) } : {}),
     ...(shared.conventions !== undefined ? { conventions: shared.conventions.map(cloneConvention) } : {}),
     ...(shared.team !== undefined ? { team: cloneTeamPolicy(shared.team) } : {}),
@@ -405,7 +399,6 @@ export function sanitizeSharedForWrite(shared: KyroSharedProjectState): KyroShar
   return {
     schemaVersion: 4,
     artifactRoot: cleaned.artifactRoot,
-    scopes: cleaned.scopes,
     ...(cleaned.principles !== undefined ? { principles: cleaned.principles as Principle[] } : {}),
     ...(cleaned.conventions !== undefined ? { conventions: cleaned.conventions as Convention[] } : {}),
     ...(cleaned.team !== undefined ? { team: cleaned.team as TeamPolicy } : {}),
@@ -457,7 +450,7 @@ export function stripLegacyProjectFields<T extends object>(value: T): T {
 
 function normalizeShared(raw: KyroSharedProjectState | null): KyroSharedProjectState {
   if (!raw) {
-    return { schemaVersion: 4, artifactRoot: ARTIFACT_ROOT, scopes: [] };
+    return { schemaVersion: 4, artifactRoot: ARTIFACT_ROOT };
   }
   const stripped = stripLegacyProjectFields({ ...raw }) as KyroSharedProjectState & {
     activeScope?: unknown;
@@ -470,7 +463,6 @@ function normalizeShared(raw: KyroSharedProjectState | null): KyroSharedProjectS
     artifactRoot: typeof stripped.artifactRoot === 'string' && stripped.artifactRoot
       ? stripped.artifactRoot
       : ARTIFACT_ROOT,
-    scopes: Array.isArray(stripped.scopes) ? stripped.scopes : [],
     ...(stripped.principles !== undefined ? { principles: stripped.principles } : {}),
     ...(stripped.conventions !== undefined ? { conventions: stripped.conventions } : {}),
     ...(stripped.team !== undefined ? { team: stripped.team } : {}),

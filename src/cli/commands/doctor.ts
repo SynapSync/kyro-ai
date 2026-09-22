@@ -410,7 +410,7 @@ function checkForeignScopeDirectories(): CheckResult[] {
   }];
 }
 
-/** Advisory: scope folders on disk that never made it into the project registry. */
+/** Advisory when workspace state has not been initialized. */
 function checkUnregisteredScopes(): CheckResult {
   const state = readProjectState();
   if (!state || !Array.isArray(state.scopes)) {
@@ -425,7 +425,7 @@ function checkUnregisteredScopes(): CheckResult {
     return {
       status: 'pass',
       name: 'scope registry',
-      detail: 'all on-disk scopes are registered in project state',
+      detail: 'scope entries are derived from valid sprint files',
     };
   }
   return {

@@ -79,7 +79,7 @@ export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResu
         checks.push(fail(
           'project.json',
           formatIssues(sharedIssues),
-          'Fix project.json so scopes[] are objects { id, title, status }, schemaVersion is 4, and activeScope is never present. Or run kyro install to repopulate.',
+          'Fix project.json so schemaVersion is 4 and activeScope is absent. Or run kyro install to rewrite managed fields.',
         ));
         return checks;
       }

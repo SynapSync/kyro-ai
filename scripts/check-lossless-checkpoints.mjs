@@ -210,19 +210,12 @@ function paths(root) {
 function readProjectStateFiles(root) {
   const p = paths(root);
   if (existsSync(p.shared) || existsSync(p.local)) {
-    const shared = existsSync(p.shared) ? readJson(p.shared) : { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [] };
-    const local = existsSync(p.local) ? readJson(p.local) : { schemaVersion: 4, activeScope: null, installedAdapters: [] };
-    return {
-      schemaVersion: 4,
-      artifactRoot: shared.artifactRoot ?? '.agents/kyro/scopes',
-      scopes: Array.isArray(shared.scopes) ? shared.scopes : [],
-      activeScope: local.activeScope ?? null,
-      installedAdapters: Array.isArray(local.installedAdapters) ? local.installedAdapters : [],
-      runtimePath: local.runtimePath,
-      principles: shared.principles,
-      team: shared.team,
-      layered: true,
-    };
+    const stateModule = join(repo, 'dist/cli/state.js');
+    const result = spawnSync(process.execPath,
+      ['-e', `process.stdout.write(JSON.stringify(require(${JSON.stringify(stateModule)}).readProjectState()))`],
+      { cwd: root, encoding: 'utf8' });
+    assert(result.status === 0, `effective state read failed: ${result.stderr}`);
+    return { ...JSON.parse(result.stdout), layered: true };
   }
   if (existsSync(p.project)) {
     return { ...readJson(p.project), layered: false };
@@ -1156,6 +1149,10 @@ for (const mode of ['corrupt', 'unsupported']) {
 {
   const root = makeSandbox();
   try {
+    const unrelatedSprint = readJson(paths(root).sprint);
+    mkdirSync(join(root, '.agents/kyro/scopes/unrelated'), { recursive: true });
+    writeJson(join(root, '.agents/kyro/scopes/unrelated/sprint.json'),
+      { ...unrelatedSprint, scope: 'unrelated', title: 'Unrelated' });
     // Full standard-adapter install is hundreds of durable writes under one lease. Default 5s is
     // fine on unloaded Linux, but Windows CI runners under matrix load can delay Worker heartbeats
     // long enough for assertStateWriterLeaseHealthy to fail mid-apply ("lease lost") — seen as
@@ -1173,8 +1170,8 @@ for (const mode of ['corrupt', 'unsupported']) {
     assert(state.layered === true, 'set-active/install should leave layered project state');
     assert(state.activeScope === 'unrelated', 'TUI install applied a stale plan and clobbered activeScope');
     assert(
-      state.scopes.some((scope) => scope.id === 'unrelated' && scope.status === 'blocked'),
-      'TUI install clobbered unrelated scope registry entry',
+      state.scopes.some((scope) => scope.id === 'unrelated'),
+      'TUI install lost the unrelated disk scope',
     );
     assert(
       state.scopes.some((scope) => scope.id === 'demo'),
@@ -1183,15 +1180,18 @@ for (const mode of ['corrupt', 'unsupported']) {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
-// Layered-only workspace: close-sprint CAS updates project.json (not monolito).
+// Layered-only workspace: close-sprint updates its sprint without a shared registry write.
 {
   const root = makeSandbox();
   try {
     const mono = readJson(paths(root).project);
+    const unrelatedSprint = readJson(paths(root).sprint);
+    mkdirSync(join(root, '.agents/kyro/scopes/unrelated'), { recursive: true });
+    writeJson(join(root, '.agents/kyro/scopes/unrelated/sprint.json'),
+      { ...unrelatedSprint, scope: 'unrelated', title: 'Unrelated' });
     writeJson(paths(root).shared, {
       schemaVersion: 4,
       artifactRoot: mono.artifactRoot ?? '.agents/kyro/scopes',
-      scopes: mono.scopes.map(({ id, title, status }) => ({ id, title, status })),
     });
     writeJson(paths(root).local, {
       schemaVersion: 4,
@@ -1205,8 +1205,10 @@ for (const mode of ['corrupt', 'unsupported']) {
     assert(existsSync(paths(root).shared), 'layered close must keep project.json');
     assert(!existsSync(paths(root).project), 'layered close must not recreate live monolito kyro.json');
     const shared = readJson(paths(root).shared);
-    assert(shared.scopes.find((scope) => scope.id === 'demo')?.status === 'planning', 'layered close must mark demo planning on project.json');
-    assert(shared.scopes.some((scope) => scope.id === 'unrelated'), 'layered close must preserve unrelated scopes on project.json');
+    const effective = readProjectStateFiles(root);
+    assert(effective.scopes.find((scope) => scope.id === 'demo')?.status === 'planning', 'layered close must derive demo planning from sprint.json');
+    assert(effective.scopes.some((scope) => scope.id === 'unrelated'), 'layered close must preserve unrelated scope on disk');
+    assert(!Object.hasOwn(shared, 'scopes'), 'layered close must not add shared scopes[]');
     assert(!('activeScope' in shared), 'shared project.json must never gain activeScope on close');
   } finally { rmSync(root, { recursive: true, force: true }); }
 }

@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-09-22
+
+### Changed
+
+- Scope identity, title, status, completion, reopen history, and retirement are read from each valid matching `scopes/<id>/sprint.json`. Shared `project.json` writes omit `scopes[]`, so different scopes created in separate clones merge without a registry conflict.
+- Install and sync remove the legacy shared `scopes[]` cache. Upgrade every writer before syncing an existing team workspace; older runtimes cannot enforce the disk-derived contract.
+
 ## [4.51.0] - 2026-09-17
 
 ### Added

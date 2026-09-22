@@ -213,47 +213,13 @@ function main() {
     assert(prep.status === 0, `prepare failed: ${prep.stderr}\n${prep.stdout}`);
     const plan = JSON.parse(prep.stdout).data;
     assert(typeof plan.digest === 'string' && plan.digest.length === 64, 'prepare digest');
-    assert(plan.targets.register.includes('disk-only'), 'register target');
-    assert(plan.targets.unregister.includes('ghost'), 'unregister target');
-    assert(Array.isArray(plan.blockers) && plan.blockers.length === 0, 'registry sandbox has no blockers');
+    assert(plan.targets.register.length === 0 && plan.targets.unregister.length === 0,
+      'disk-derived identity needs no shared registry repair');
+    assert(plan.blockers.length === 0, 'valid disk scopes have no registry blockers');
     assert(readFileSync(join(root, '.agents/kyro/project.json')).equals(beforeProject), 'prepare is read-only');
-
-    const noYes = run(root, ['repair', 'integrity', 'apply', '--digest', plan.digest, '--reason', 'directory absent']);
-    assert(noYes.status !== 0 && /HUMAN_APPROVAL_REQUIRED/.test(`${noYes.stderr}\n${noYes.stdout}`), 'apply without --yes');
-
-    const stale = run(root, ['repair', 'integrity', 'apply', '--digest', '0'.repeat(64), '--yes', '--reason', 'directory absent']);
-    assert(stale.status !== 0 && /DIVERGED/.test(`${stale.stderr}\n${stale.stdout}`), 'stale digest');
-
-    const apply = run(root, ['repair', 'integrity', 'apply', '--digest', plan.digest, '--yes', '--reason', 'directory absent']);
-    assert(apply.status === 0, `apply failed: ${apply.stderr}\n${apply.stdout}`);
-    const project = JSON.parse(readFileSync(join(root, '.agents/kyro/project.json'), 'utf8'));
-    assert(project.scopes.some((s) => s.id === 'disk-only'), 'registered disk-only');
-    assert(!project.scopes.some((s) => s.id === 'ghost'), 'unregistered ghost');
-    assert(project.scopes.some((s) => s.id === 'present'), 'preserved present');
-    const local = JSON.parse(readFileSync(join(root, '.agents/kyro/local.json'), 'utf8'));
-    assert(local.activeScope === '' || local.activeScope === null, `cleared activeScope, got ${JSON.stringify(local.activeScope)}`);
-
-    const retry = run(root, ['repair', 'integrity', 'apply', '--digest', plan.digest, '--yes', '--reason', 'directory absent']);
-    assert(retry.status === 0, `retry must be idempotent, got ${retry.status}: ${retry.stderr}\n${retry.stdout}`);
-    assert(!/DIVERGED/.test(`${retry.stderr}\n${retry.stdout}`), 'retry must not report DIVERGED');
-
-    const warrantDir = join(root, '.agents/kyro/integrity-repairs');
-    const warrantPath = join(warrantDir, readdirSync(warrantDir)[0]);
-    const warrant = JSON.parse(readFileSync(warrantPath, 'utf8'));
-    const tamperedWarrant = JSON.parse(JSON.stringify(warrant));
-    const registerOperation = tamperedWarrant.operations.find((operation) => operation.kind === 'registry.register-on-disk');
-    registerOperation.entry.title = 'Tampered title';
-    writeJson(warrantPath, tamperedWarrant);
-    const projectBeforeTamperedWarrant = readFileSync(join(root, '.agents/kyro/project.json'));
-    const rejectedWarrant = run(root, ['repair', 'integrity', 'apply', '--digest', plan.digest, '--yes', '--reason', 'directory absent']);
-    assert(rejectedWarrant.status !== 0 && /DIVERGED/.test(`${rejectedWarrant.stdout}\n${rejectedWarrant.stderr}`), 'tampered warrant must diverge');
-    assert(readFileSync(join(root, '.agents/kyro/project.json')).equals(projectBeforeTamperedWarrant), 'tampered warrant writes nothing');
-    writeJson(warrantPath, warrant);
-
-    mkdirSync(join(root, '.agents/kyro/scopes/ghost'), { recursive: true });
-    writeFileSync(join(root, '.agents/kyro/scopes/ghost/sprint.json'), readFileSync(join(root, '.agents/kyro/scopes/present/sprint.json')));
-    const ghostGone = run(root, ['repair', 'integrity', 'apply', '--digest', plan.digest, '--yes', '--reason', 'directory absent']);
-    assert(ghostGone.status !== 0 && /DIVERGED/.test(`${ghostGone.stderr}\n${ghostGone.stdout}`), `reappeared dir must diverge: ${ghostGone.stdout}\n${ghostGone.stderr}`);
+    const listed = run(root, ['scope', 'list']);
+    assert(listed.status === 0 && listed.stdout.includes('disk-only') && !listed.stdout.includes('ghost'),
+      'valid disk scope is visible and stale shared-only scope is absent');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
