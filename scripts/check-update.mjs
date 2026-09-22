@@ -13,8 +13,9 @@ import { createRequire } from 'node:module';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repo = resolve(new URL('..', import.meta.url).pathname);
+const repo = fileURLToPath(new URL('..', import.meta.url));
 const require = createRequire(import.meta.url);
 const {
   UPDATE_PACKAGE,
