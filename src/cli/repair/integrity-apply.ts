@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, readdirSync } from 'node:fs';
-import { ARTIFACT_ROOT } from '../constants';
+import { ARTIFACT_ROOT, KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
@@ -11,6 +11,7 @@ import {
 } from '../checkpoints/discovery';
 import {
   canonicalJson,
+  atomicReplace,
   publishExclusive,
   sha256,
 } from '../checkpoints/sprint-close';
@@ -33,6 +34,7 @@ import {
   REGISTRY_CLASS,
   registryReconciliationPath,
   registryReconciliationsDir,
+  validateRegistryReconciliationRecord,
 } from '../project/reconcile';
 import { type RemediationOperation } from '../remediation/protocol';
 import {
@@ -152,7 +154,8 @@ function applyIntegrityPlanUnlocked(
       continue;
     }
     const label = operationLabel(operation);
-    if (operation.kind === 'registry.unregister-orphan' ? applyUnregister(operation, actor, now)
+    if (operation.kind === 'legacy-scope.discard' ? applyLegacyDiscard(operation, actor, now)
+      : operation.kind === 'registry.unregister-orphan' ? applyUnregister(operation, actor, now)
       : operation.kind === 'registry.register-on-disk' ? applyRegister(operation)
         : applyCanonicalize(operation, actor, now)) {
       applied.push(label);
@@ -173,6 +176,98 @@ function assertNoLegacyRegistryOperations(operations: IntegrityOperation[]): voi
     'This integrity plan contains registry operations that no longer write scope entries.',
     'Run kyro install --init-workspace --yes to migrate project state, then prepare a new integrity plan.',
   );
+}
+
+function applyLegacyDiscard(operation: Extract<IntegrityOperation, { kind: 'legacy-scope.discard' }>, actor: string, now: string): boolean {
+  if (operation.sourcePath !== PROJECT_STATE_PATH && operation.sourcePath !== KYRO_STATE_PATH) {
+    throw new KyroCoreError('DIVERGED', 'Legacy discard targets an unsupported state file.', 'Prepare a new integrity plan.');
+  }
+  const root = resolveManagedPath(`${ARTIFACT_ROOT}/${operation.scope}`);
+  if (pathEntryExists(root)) {
+    const directory = classifyScopeDirectory(operation.scope);
+    if (directory.class !== SCOPE_DIR_CLASS.FOREIGN || directory.issues.length > 0) {
+      throw new KyroCoreError('DIVERGED', `${operation.scope} now has Kyro artifacts (${directory.detail}).`, 'Restore or investigate the scope; discard is no longer safe.');
+    }
+  }
+  const read = readJsonSafely(operation.sourcePath);
+  if (!read.exists || read.error || !read.value || typeof read.value !== 'object' || Array.isArray(read.value)) {
+    throw new KyroCoreError('DIVERGED', `${operation.sourcePath} is missing or unreadable.`, 'Prepare a new integrity plan.');
+  }
+  const source = read.value as Record<string, unknown>;
+  const currentDigest = sha256(source);
+  const alreadyApplied = currentDigest === operation.afterSha256;
+  if (!alreadyApplied && currentDigest !== operation.sourceSha256) {
+    throw new KyroCoreError('DIVERGED', `${operation.sourcePath} changed after approval.`, 'Prepare and approve a new digest.');
+  }
+  if (!alreadyApplied) {
+    if (!Array.isArray(source.scopes)) throw new KyroCoreError('DIVERGED', `${operation.sourcePath}.scopes is missing.`, 'Prepare a new integrity plan.');
+    const matching = source.scopes.filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry) && (entry as { id?: unknown }).id === operation.scope);
+    if (matching.length !== 1 || canonicalJson(matching[0]) !== canonicalJson(operation.entry)) {
+      throw new KyroCoreError('DIVERGED', `${operation.scope} no longer matches its approved legacy entry.`, 'Prepare and approve a new digest.');
+    }
+  }
+  const records = validatedRegistryReconciliations();
+  const matchingEvidence = records.filter((record) => {
+    return record.sourcePath === operation.sourcePath
+      && record.beforeDigest === operation.sourceSha256
+      && record.afterDigest === operation.afterSha256
+      && canonicalJson(record.retiredEntry) === canonicalJson(operation.entry);
+  });
+  if (matchingEvidence.length > 1) throw new KyroCoreError('DIVERGED', `Multiple reconciliation records claim the same discard for ${operation.scope}.`, 'Inspect the evidence chain before retrying.');
+  const alreadyEvidenced = matchingEvidence.length === 1;
+  if (!alreadyEvidenced) {
+    const evidenceId = nextSequentialId(registryReconciliationsDir(), 'reconciliation');
+    const evidence = {
+      schemaVersion: REGISTRY_RECONCILIATION_SCHEMA_VERSION,
+      kind: REGISTRY_RECONCILIATION_KIND,
+      id: evidenceId,
+      sourcePath: operation.sourcePath,
+      retiredEntry: operation.entry,
+      beforeDigest: operation.sourceSha256,
+      afterDigest: operation.afterSha256,
+      reason: operation.reason,
+      actor,
+      kyroVersion: readPackageVersion(),
+      createdAt: now,
+      previousChainHead: records.length > 0 ? sha256(records[records.length - 1]) : null,
+    };
+    publishExclusive(registryReconciliationPath(evidenceId), `${JSON.stringify(evidence, null, 2)}\n`, 'registry reconciliation');
+  }
+  if (!alreadyApplied) {
+    const scopes = (source.scopes as unknown[]).filter((entry) => !(entry && typeof entry === 'object' && !Array.isArray(entry) && (entry as { id?: unknown }).id === operation.scope));
+    const after = { ...source, scopes, ...(operation.sourcePath === KYRO_STATE_PATH && source.activeScope === operation.scope ? { activeScope: '' } : {}) };
+    if (sha256(after) !== operation.afterSha256) throw new KyroCoreError('DIVERGED', 'The approved after-image no longer matches.', 'Prepare a new integrity plan.');
+    atomicReplace(operation.sourcePath, `${JSON.stringify(after, null, 2)}\n`);
+  }
+  if (operation.sourcePath === PROJECT_STATE_PATH) {
+    const local = readJsonSafely(LOCAL_STATE_PATH);
+    if (local.exists && !local.error && local.value && typeof local.value === 'object' && !Array.isArray(local.value)) {
+      const value = local.value as Record<string, unknown>;
+      if (value.activeScope === operation.scope) atomicReplace(LOCAL_STATE_PATH, `${JSON.stringify({ ...value, activeScope: '' }, null, 2)}\n`);
+    }
+  }
+  return !alreadyApplied || !alreadyEvidenced;
+}
+
+function validatedRegistryReconciliations(): Array<Record<string, unknown>> {
+  const directory = registryReconciliationsDir();
+  const absolute = resolveManagedPath(directory);
+  if (!existsSync(absolute)) return [];
+  const records: Array<Record<string, unknown>> = [];
+  for (const file of readdirSync(absolute).filter((name) => name.endsWith('.json')).sort()) {
+    const path = `${directory}/${file}`;
+    const read = readJsonSafely(path);
+    if (!read.exists || read.error) throw new KyroCoreError('DIVERGED', `Reconciliation evidence ${path} is missing or invalid.`, read.error ?? 'Restore the original record before retrying.');
+    const issues = validateRegistryReconciliationRecord(read.value, path);
+    if (issues.length > 0) throw new KyroCoreError('DIVERGED', `Reconciliation evidence ${path} is invalid.`, issues.join('; '));
+    const record = read.value as Record<string, unknown>;
+    const expectedPrevious = records.length > 0 ? sha256(records[records.length - 1]) : null;
+    if (record.previousChainHead !== expectedPrevious) {
+      throw new KyroCoreError('DIVERGED', `Reconciliation evidence chain diverged at ${path}.`, 'Restore the original record before retrying.');
+    }
+    records.push(record);
+  }
+  return records;
 }
 
 function applyUnregister(operation: Extract<IntegrityOperation, { kind: 'registry.unregister-orphan' }>, actor: string, now: string): boolean {
@@ -433,6 +528,7 @@ function toRemediationOperation(operation: Extract<IntegrityOperation, { kind: '
 }
 
 function operationLabel(operation: IntegrityOperation): string {
+  if (operation.kind === 'legacy-scope.discard') return `discard ${operation.scope} from ${operation.sourcePath}`;
   if (operation.kind === 'registry.register-on-disk') return `register ${operation.scope}`;
   if (operation.kind === 'registry.unregister-orphan') return `unregister ${operation.scope}`;
   if (operation.kind === 'checkpoint.canonicalize') return `canonicalize ${operation.scope}#${operation.sprintN}`;

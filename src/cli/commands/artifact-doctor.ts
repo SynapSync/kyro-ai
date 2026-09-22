@@ -623,8 +623,10 @@ function resolveScopeNames(scopes: KyroScopeEntry[], activeScope: string | null,
     assertNotForeignDirectory(requestedScope);
     return [requestedScope];
   }
-  if (activeScope) return [activeScope];
   const names = new Set<string>(scopes.map((s) => s.id));
+  // A personal active selection must not narrow a project-wide audit. Include it even when its
+  // directory has gone missing so Doctor reports the stale selection rather than hiding it.
+  if (activeScope) names.add(activeScope);
   for (const scope of listScopeFolders()) names.add(scope);
   return [...names].sort();
 }

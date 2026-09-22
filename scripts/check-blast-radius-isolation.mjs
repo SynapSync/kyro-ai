@@ -148,6 +148,12 @@ function assertHealthyScopeIsolatedFromBrokenSibling() {
     const doctorScoped = spawnCli(['doctor', '--artifacts', '--kyro-scope', 'demo'], sandbox);
     assert(doctorScoped.status === 0, `scoped doctor --artifacts must pass for the healthy scope despite the broken sibling: ${doctorScoped.stdout}`);
 
+    // The fixture selects demo as active. An unscoped audit still has to inspect the corrupt,
+    // Kyro-owned sibling; the active selection is only a personal default for scoped commands.
+    const doctorGlobal = spawnCli(['doctor', '--artifacts'], sandbox);
+    assert(doctorGlobal.status !== 0, `global doctor --artifacts must fail for the broken sibling: ${doctorGlobal.stdout}`);
+    assert(doctorGlobal.stdout.includes('broken/sprint.json'), `global doctor --artifacts must name the broken sibling: ${doctorGlobal.stdout}`);
+
     const global = spawnCli(['repair', 'integrity', 'prepare', '--json'], sandbox);
     assert(global.status === 0, `global prepare should still succeed (report, not crash): ${global.stderr}`);
     const globalPlan = machineData(global.stdout);
@@ -204,6 +210,9 @@ function assertForeignDirectoryIsNeverAScope() {
     assert(/\[WARN\] scope directories/.test(doctor.stdout), `global doctor should warn about ignored directories: ${doctor.stdout}`);
     const scopedDoctor = spawnCli(['doctor', '--kyro-scope', 'demo'], sandbox);
     assert(!/\[WARN\] scope directories/.test(scopedDoctor.stdout), `a scoped doctor must not report unrelated directories: ${scopedDoctor.stdout}`);
+    const artifactDoctor = spawnCli(['doctor', '--artifacts'], sandbox);
+    assert(artifactDoctor.status === 0, `foreign directories must not fail the global artifact audit: ${artifactDoctor.stdout}`);
+    assert(!artifactDoctor.stdout.includes('notes-backup/sprint.json'), `foreign directories must not become artifact scopes: ${artifactDoctor.stdout}`);
 
     // An explicit --kyro-scope must not be a way around discovery.
     for (const args of [['status'], ['context-pack'], ['repair', 'integrity', 'prepare'], ['doctor', '--artifacts']]) {
@@ -485,6 +494,12 @@ function assertRegistryMatrixIsClassifiedByBothAxes() {
     assert(codeFor('reg-foreign') === 'legacy-registered-orphan' && codeFor('reg-absent') === 'legacy-registered-orphan',
       `registered + foreign and registered + absent must remain visible blockers: ${prepare.stdout}`);
     assert(plan.targets.unregister.length === 0, 'legacy orphan cleanup is not automatic');
+    const recoverableDiscard = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--reason', 'discard', '--json'], sandbox);
+    assert(recoverableDiscard.status === 0, `recoverable prepare should diagnose: ${recoverableDiscard.stderr}`);
+    const recoverablePlan = machineData(recoverableDiscard.stdout);
+    assert(recoverablePlan.blockers.some((blocker) => blocker.code === 'recoverable-no-sprint')
+      && recoverablePlan.operations.every((operation) => operation.kind !== 'legacy-scope.discard'),
+    'an explicit discard reason cannot retire a recoverable scope');
     assert(
       !prepare.stdout.includes('stray'),
       `an unregistered foreign directory must be invisible to integrity entirely: ${prepare.stdout}`,

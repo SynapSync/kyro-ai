@@ -195,6 +195,16 @@ export function validateRegistryReconciliationRecord(value: unknown, path: strin
   for (const key of ['id', 'beforeDigest', 'afterDigest', 'reason', 'actor', 'kyroVersion', 'createdAt'] as const) {
     if (typeof record[key] !== 'string' || record[key].length === 0) issues.push(`${path}:${key} must be a non-empty string`);
   }
-  if (typeof record.retiredEntry !== 'object' || record.retiredEntry === null) issues.push(`${path}:retiredEntry must be an object`);
+  if (record.id !== path.split('/').pop()?.replace(/\.json$/, '')) issues.push(`${path}:id must match filename`);
+  for (const key of ['beforeDigest', 'afterDigest'] as const) {
+    if (typeof record[key] === 'string' && !/^[0-9a-f]{64}$/.test(record[key])) issues.push(`${path}:${key} must be a SHA-256 digest`);
+  }
+  if (record.previousChainHead !== null && (typeof record.previousChainHead !== 'string' || !/^[0-9a-f]{64}$/.test(record.previousChainHead))) {
+    issues.push(`${path}:previousChainHead must be null or a SHA-256 digest`);
+  }
+  if (record.sourcePath !== undefined && record.sourcePath !== '.agents/kyro/project.json' && record.sourcePath !== '.agents/kyro/kyro.json') {
+    issues.push(`${path}:sourcePath must name a legacy project state file`);
+  }
+  if (typeof record.retiredEntry !== 'object' || record.retiredEntry === null || Array.isArray(record.retiredEntry)) issues.push(`${path}:retiredEntry must be an object`);
   return issues;
 }

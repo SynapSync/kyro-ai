@@ -2,7 +2,7 @@ import { lstatSync } from 'node:fs';
 import { ARTIFACT_ROOT } from '../constants';
 import { SCOPE_DIR_CLASS, classifyScopeDirectory, listScopeFolders } from '../artifacts/scopes';
 import { resolveManagedPath } from '../fs';
-import { readProjectState } from '../state';
+import { readMonolitoProjectState, readProjectState, readSharedProjectState } from '../state';
 import { KyroCoreError } from './errors';
 
 /**
@@ -37,7 +37,8 @@ export function assertNotForeignDirectory(scope: string): void {
 }
 
 function isRegisteredScope(scope: string): boolean {
-  return (readProjectState()?.scopes ?? []).some((entry) => entry.id === scope);
+  return [readProjectState(), readSharedProjectState(), readMonolitoProjectState()]
+    .some((state) => Array.isArray(state?.scopes) && state.scopes.some((entry) => entry?.id === scope));
 }
 
 export function resolveScope(explicit: string | null): string {

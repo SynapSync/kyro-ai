@@ -193,7 +193,7 @@ function registrySandbox() {
   const root = mkdtempSync(join(tmpdir(), 'kyro-integrity-'));
   writeProject(root, [
     { id: 'present', title: 'Present', status: 'completed' },
-    { id: 'ghost', title: 'Ghost', status: 'completed' },
+    { id: 'ghost', title: 'Ghost', status: 'completed', legacyOnly: { owner: 'historical' } },
   ], 'ghost');
   const demo = JSON.parse(readFileSync(join(repo, 'fixtures/evals/close-sprint-happy/state/.agents/kyro/scopes/demo/sprint.json'), 'utf8'));
   writeJson(join(root, '.agents/kyro/scopes/present/sprint.json'), { ...demo, scope: 'present', title: 'Present' });
@@ -221,8 +221,101 @@ function main() {
     const listed = run(root, ['scope', 'list']);
     assert(listed.status === 0 && listed.stdout.includes('disk-only') && !listed.stdout.includes('ghost'),
       'valid disk scope is visible and stale shared-only scope is absent');
+    const reason = 'scope was permanently removed outside Kyro';
+    const explicit = run(root, ['repair', 'integrity', 'prepare', '--kyro-scope', 'ghost', '--reason', reason, '--json']);
+    assert(explicit.status === 0, `explicit legacy discard prepare failed: ${explicit.stderr}\n${explicit.stdout}`);
+    const discard = JSON.parse(explicit.stdout).data;
+    const operation = discard.operations.find((item) => item.kind === 'legacy-scope.discard');
+    assert(operation?.sourcePath === '.agents/kyro/project.json' && operation.entry.legacyOnly.owner === 'historical',
+      'preview binds the raw source and complete custom legacy entry');
+    const denied = run(root, ['repair', 'integrity', 'apply', '--kyro-scope', 'ghost', '--reason', reason, '--digest', discard.digest]);
+    assert(denied.status !== 0 && readFileSync(join(root, '.agents/kyro/project.json')).equals(beforeProject),
+      'discard requires explicit --yes');
+    const changed = JSON.parse(beforeProject.toString('utf8'));
+    changed.scopes[1].legacyOnly.owner = 'changed';
+    writeJson(join(root, '.agents/kyro/project.json'), changed);
+    const stale = run(root, ['repair', 'integrity', 'apply', '--kyro-scope', 'ghost', '--reason', reason, '--digest', discard.digest, '--yes']);
+    assert(stale.status !== 0 && readFileSync(join(root, '.agents/kyro/project.json'), 'utf8').includes('changed'),
+      'approved digest rejects changes to raw legacy metadata');
+    writeFileSync(join(root, '.agents/kyro/project.json'), beforeProject);
+    const applied = run(root, ['repair', 'integrity', 'apply', '--kyro-scope', 'ghost', '--reason', reason, '--digest', discard.digest, '--yes']);
+    assert(applied.status === 0, `explicit legacy discard apply failed: ${applied.stderr}\n${applied.stdout}`);
+    const afterProject = JSON.parse(readFileSync(join(root, '.agents/kyro/project.json'), 'utf8'));
+    const afterLocal = JSON.parse(readFileSync(join(root, '.agents/kyro/local.json'), 'utf8'));
+    assert(afterProject.scopes.length === 1 && afterProject.scopes[0].id === 'present' && afterLocal.activeScope === '',
+      'discard removes only the approved raw entry and clears stale personal selection');
+    const evidenceDir = join(root, '.agents/kyro/registry-reconciliations');
+    const evidence = JSON.parse(readFileSync(join(evidenceDir, readdirSync(evidenceDir)[0]), 'utf8'));
+    assert(evidence.retiredEntry.legacyOnly.owner === 'historical' && evidence.sourcePath === operation.sourcePath,
+      'immutable reconciliation evidence preserves the full retired entry');
+    const retry = run(root, ['repair', 'integrity', 'apply', '--kyro-scope', 'ghost', '--reason', reason, '--digest', discard.digest, '--yes']);
+    assert(retry.status === 0 && readdirSync(evidenceDir).length === 1,
+      `approved discard retry is idempotent: ${retry.stderr}\n${retry.stdout}`);
+    writeText(join(evidenceDir, 'reconciliation-001.json'), '{broken');
+    const brokenEvidenceRetry = run(root, ['repair', 'integrity', 'apply', '--kyro-scope', 'ghost', '--reason', reason, '--digest', discard.digest, '--yes']);
+    assert(brokenEvidenceRetry.status !== 0 && /DIVERGED/.test(`${brokenEvidenceRetry.stdout}\n${brokenEvidenceRetry.stderr}`)
+      && readdirSync(evidenceDir).length === 1, 'corrupt reconciliation evidence fails closed without publishing another record');
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+
+  const damagedRoot = registrySandbox();
+  try {
+    writeText(join(damagedRoot, '.agents/kyro/scopes/ghost/sprint.json'), '{broken');
+    const prep = run(damagedRoot, ['repair', 'integrity', 'prepare', '--kyro-scope', 'ghost', '--reason', 'discard', '--json']);
+    assert(prep.status === 0, `damaged scope prepare failed: ${prep.stderr}\n${prep.stdout}`);
+    const plan = JSON.parse(prep.stdout).data;
+    assert(plan.operations.every((item) => item.kind !== 'legacy-scope.discard') && plan.blockers.length > 0,
+      'Kyro-owned damaged scope cannot be discarded');
+  } finally {
+    rmSync(damagedRoot, { recursive: true, force: true });
+  }
+
+  const forgedRoot = registrySandbox();
+  try {
+    const reason = 'scope permanently removed';
+    const prep = run(forgedRoot, ['repair', 'integrity', 'prepare', '--kyro-scope', 'ghost', '--reason', reason, '--json']);
+    assert(prep.status === 0, `forged-evidence prepare failed: ${prep.stderr}\n${prep.stdout}`);
+    const plan = JSON.parse(prep.stdout).data;
+    const operation = plan.operations.find((item) => item.kind === 'legacy-scope.discard');
+    writeJson(join(forgedRoot, '.agents/kyro/registry-reconciliations/reconciliation-001.json'), {
+      schemaVersion: 1, kind: 'unrelated.record', id: 'reconciliation-001',
+      sourcePath: operation.sourcePath, beforeDigest: operation.sourceSha256, afterDigest: operation.afterSha256,
+      retiredEntry: operation.entry, reason, actor: 'forger', kyroVersion: '5.0.0',
+      createdAt: '2026-01-01T00:00:00.000Z', previousChainHead: null,
+    });
+    const apply = run(forgedRoot, ['repair', 'integrity', 'apply', '--kyro-scope', 'ghost', '--reason', reason, '--digest', plan.digest, '--yes']);
+    assert(apply.status !== 0 && /DIVERGED/.test(`${apply.stdout}\n${apply.stderr}`)
+      && readdirSync(join(forgedRoot, '.agents/kyro/registry-reconciliations')).length === 1,
+    'wrong-kind JSON cannot masquerade as discard evidence');
+  } finally {
+    rmSync(forgedRoot, { recursive: true, force: true });
+  }
+
+  const monolithRoot = mkdtempSync(join(tmpdir(), 'kyro-legacy-monolith-'));
+  try {
+    const statePath = join(monolithRoot, '.agents/kyro/kyro.json');
+    writeJson(statePath, {
+      schemaVersion: 4,
+      artifactRoot: '.agents/kyro/scopes',
+      scopes: [{ id: 'ghost', title: 'Ghost', status: 'completed', originalNote: 'preserve this' }],
+      activeScope: 'ghost',
+      installedAdapters: [],
+    });
+    writeText(join(monolithRoot, '.agents/kyro/scopes/ghost/README.txt'), 'unrelated directory');
+    const reason = 'foreign directory contains no Kyro artifacts';
+    const prep = run(monolithRoot, ['repair', 'integrity', 'prepare', '--kyro-scope', 'ghost', '--reason', reason, '--json']);
+    assert(prep.status === 0, `foreign legacy prepare failed: ${prep.stderr}\n${prep.stdout}`);
+    const plan = JSON.parse(prep.stdout).data;
+    assert(plan.operations.some((item) => item.kind === 'legacy-scope.discard' && item.sourcePath === '.agents/kyro/kyro.json'),
+      'foreign directory does not hide raw monolith orphan');
+    const apply = run(monolithRoot, ['repair', 'integrity', 'apply', '--kyro-scope', 'ghost', '--reason', reason, '--digest', plan.digest, '--yes']);
+    assert(apply.status === 0, `foreign legacy apply failed: ${apply.stderr}\n${apply.stdout}`);
+    const after = JSON.parse(readFileSync(statePath, 'utf8'));
+    assert(after.scopes.length === 0 && after.activeScope === '' && existsSync(join(monolithRoot, '.agents/kyro/scopes/ghost/README.txt')),
+      'monolith cache and active selection are updated without deleting a foreign directory');
+  } finally {
+    rmSync(monolithRoot, { recursive: true, force: true });
   }
 
   const ckRoot = mkdtempSync(join(tmpdir(), 'kyro-ck-family-'));

@@ -196,9 +196,11 @@ function printRepairHelp(): void {
   console.log(`Usage:
   kyro repair [--kyro-scope <scope>] [--dry-run] [--yes]
   kyro repair integrity prepare [--kyro-scope <scope>] [--reason <text>] [--json]
-  kyro repair integrity apply --digest <sha256> --yes [--kyro-scope <scope>] [--json]
+  kyro repair integrity apply --digest <sha256> --yes [--kyro-scope <scope>] [--reason <text>] [--json]
 
 The first form normalizes derived status fields. The integrity form is a read-only
 prepare plus a digest-bound apply for registry, checkpoint compatibility, and
-explained post-close live evolution.`);
+explained post-close live evolution. To discard an irrecoverable legacy scopes[] entry,
+prepare with --kyro-scope <scope> --reason <text>, review the complete entry and digest,
+then apply that exact digest with --yes, repeating --kyro-scope and --reason. No scope directory is deleted.`);
 }

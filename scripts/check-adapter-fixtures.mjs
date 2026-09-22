@@ -380,6 +380,11 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
     },
   ];
   const scopes = [{ id: 'upgrade-scope', title: 'Upgrade Scope', status: 'active' }];
+  // Migration may discard a legacy cache only when the scope is recoverable from its sprint file.
+  const upgradeSprint = JSON.parse(readFileSync(join(repo, 'fixtures/evals/close-sprint-happy/state/.agents/kyro/scopes/demo/sprint.json'), 'utf-8'));
+  const upgradeScopeDir = join(installDir, '.agents/kyro/scopes/upgrade-scope');
+  mkdirSync(upgradeScopeDir, { recursive: true });
+  writeFileSync(join(upgradeScopeDir, 'sprint.json'), `${JSON.stringify({ ...upgradeSprint, scope: 'upgrade-scope', title: 'Upgrade Scope' }, null, 2)}\n`, 'utf-8');
   sharedBeforeUpgrade.principles = principles;
   sharedBeforeUpgrade.scopes = scopes;
   // Inject retired fields that install/sync must strip from layers.

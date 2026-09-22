@@ -276,6 +276,8 @@ They do not create per-scope files. Each scope's `sprint.json` (the single sourc
 
 **Read from disk:** scopes come from valid matching `.agents/kyro/scopes/{id}/sprint.json` files. Title and status come from each sprint file. Install/sync removes legacy `project.json.scopes[]` only when every old ID has a valid matching sprint file and no lifecycle or custom metadata would be lost; otherwise it stops before writing and names the unresolved entries. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
 
+If an old `scopes[]` entry has no recoverable scope on disk, inspect it with `kyro repair integrity prepare --kyro-scope <id> --reason "<reason>"`. Review the full entry, source path, and digest before running `kyro repair integrity apply --kyro-scope <id> --reason "<same reason>" --digest <sha256> --yes`. Apply records the original entry as reconciliation evidence and removes only that approved cache entry; it never deletes a scope directory. Damaged or recoverable Kyro artifacts block this discard.
+
 For the 5.0.0 upgrade, update every writer in a shared workspace before running sync. An older runtime can write the legacy cache again.
 
 Bare interactive install (`npx kyro-ai@latest install`) asks whether to initialize the workspace; when scopes already exist on disk, the prompt lists them.
@@ -381,7 +383,7 @@ kyro doctor --tokens --artifacts
 kyro doctor --artifacts --kyro-scope auth-refactor
 ```
 
-The audit validates project state, scoped `sprint.json` shape including ADR records, versioned lossless checkpoints, legacy ActiveSprint snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. It also reports resumable and divergent close transactions. Managed scope roots, `sprint.json`, `archive/` directories and checkpoint candidates must be real paths inside the workspace: Doctor never follows symlinks, fails them for registered or Kyro-owned scopes, and reports unregistered foreign entries only as a global WARN.
+Without `--kyro-scope`, the artifact audit inspects every scope in project state and every Kyro-owned scope directory, even when a personal active scope is selected. `--kyro-scope` limits the audit to that scope. The audit validates project state, `sprint.json` shape including ADR records, versioned lossless checkpoints, legacy ActiveSprint snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. It also reports resumable and divergent close transactions. Managed scope roots, `sprint.json`, `archive/` directories and checkpoint candidates must be real paths inside the workspace: Doctor never follows symlinks, fails them for registered or Kyro-owned scopes, and reports unregistered foreign entries only as a global WARN.
 
 Repair and normalize a scope's `sprint.json` without rewriting user-authored archives:
 

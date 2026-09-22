@@ -40,6 +40,9 @@ jobs:
       - name: Verify idempotent install
         run: npm run check:windows-install-smoke
 
+      - name: Verify update on Windows
+        run: npm run check:update
+
   validate:
     runs-on: ubuntu-latest
     outputs:

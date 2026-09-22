@@ -492,6 +492,40 @@ function installLegacyIntermediateFixture(root, { liveScopeStatus = 'planning' }
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
+// Layered retries accept only the exact normalized after-image of the frozen v1 intermediate close.
+for (const liveTitle of [null, 'Tampered']) {
+  const root = makeSandbox({ intermediate: true });
+  try {
+    const { checkpointBytes, checkpointPath } = installLegacyIntermediateFixture(root, { liveScopeStatus: 'planning' });
+    const monolith = readJson(paths(root).project);
+    writeJson(paths(root).shared, {
+      schemaVersion: 4,
+      artifactRoot: monolith.artifactRoot ?? '.agents/kyro/scopes',
+    });
+    writeJson(paths(root).local, {
+      schemaVersion: 4,
+      activeScope: 'demo',
+      installedAdapters: monolith.installedAdapters ?? [],
+    });
+    unlinkSync(paths(root).project);
+    if (liveTitle) {
+      const sprint = readJson(paths(root).sprint);
+      sprint.title = liveTitle;
+      writeJson(paths(root).sprint, sprint);
+    }
+    const retry = run(root, closeArgs);
+    if (liveTitle) {
+      assert(retry.status === 1 && output(retry).includes('diverged'), `layered title drift must fail closed:\n${output(retry)}`);
+    } else {
+      assert(retry.status === 0, `layered historical retry must succeed:\n${output(retry)}`);
+      const again = run(root, closeArgs);
+      assert(again.status === 0, `layered historical retry must be idempotent:\n${output(again)}`);
+      assert(readProjectStateFiles(root).scopes.find((scope) => scope.id === 'demo')?.status === 'planning', 'retry must keep the canonical planning status');
+    }
+    assert(readFileSync(checkpointPath).equals(checkpointBytes), 'layered retry must preserve frozen checkpoint bytes');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
 // CLI dry run performs no writes.
 {
   const root = makeSandbox();

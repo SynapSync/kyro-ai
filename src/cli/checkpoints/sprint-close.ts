@@ -569,9 +569,16 @@ function compareAndSwapProjectScopeLayers(checkpoint: SprintCloseCheckpointV1): 
   const state = readProjectState();
   if (!state) throw diverged(path, 'missing');
   const entry = state.scopes.find((scope) => scope.id === checkpoint.identity.scope);
-  if (!entry || sha256(entry) !== checkpoint.digests.projectScopeAfter) {
+  if (!entry || !matchesLayeredProjectScopeAfter(entry, checkpoint)) {
     throw diverged(sprintJsonPath(checkpoint.identity.scope), 'derived scope entry does not match the checkpoint after-state');
   }
+}
+
+/** A layered scope is derived from sprint.json, which normalizes this exact historical v1 residual. */
+function matchesLayeredProjectScopeAfter(entry: KyroScopeEntry, checkpoint: SprintCloseCheckpointV1): boolean {
+  if (sha256(entry) === checkpoint.digests.projectScopeAfter) return true;
+  const normalized = legacyNormalizedProjectScopeAfter(checkpoint);
+  return normalized !== null && sha256(entry) === sha256(normalized);
 }
 
 function compareAndSwapProjectScopeMonolito(checkpoint: SprintCloseCheckpointV1): void {
@@ -603,7 +610,12 @@ function verifyApplied(checkpoint: SprintCloseCheckpointV1): void {
   const project = readProjectState();
   const scopeEntry = project?.scopes.find((entry) => entry.id === checkpoint.identity.scope);
   const projectPath = projectScopeWritePath();
-  if (!project || !scopeEntry || sha256(scopeEntry) !== checkpoint.digests.projectScopeAfter) {
+  const afterMatches = scopeEntry && (
+    hasLayeredProjectStateOnDisk() || !hasMonolitoProjectStateOnDisk()
+      ? matchesLayeredProjectScopeAfter(scopeEntry, checkpoint)
+      : sha256(scopeEntry) === checkpoint.digests.projectScopeAfter
+  );
+  if (!project || !afterMatches) {
     throw diverged(projectPath, 'project scope post-write verification failed');
   }
   verifyArtifact(checkpoint.paths.legacySnapshot, checkpoint.digests.legacySnapshot, 'legacy snapshot');
