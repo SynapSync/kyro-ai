@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   windows_state_writer_lock:
@@ -77,6 +77,7 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Verify release version is new
+        if: github.event_name == 'push' || github.base_ref == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
