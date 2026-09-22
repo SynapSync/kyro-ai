@@ -274,7 +274,7 @@ They do not create per-scope files. Each scope's `sprint.json` (the single sourc
 
 **Effective state** is a deterministic merge of shared + local (see [Teams](teams.md) for the pre-layered migration path). Readers use one façade (`readProjectState`); writers target the correct layer only.
 
-**Read from disk:** scopes come from valid matching `.agents/kyro/scopes/{id}/sprint.json` files. Title and status come from each sprint file. Install/sync removes legacy `project.json.scopes[]`. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
+**Read from disk:** scopes come from valid matching `.agents/kyro/scopes/{id}/sprint.json` files. Title and status come from each sprint file. Install/sync removes legacy `project.json.scopes[]` only when every old ID has a valid matching sprint file and no lifecycle or custom metadata would be lost; otherwise it stops before writing and names the unresolved entries. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
 
 For the 5.0.0 upgrade, update every writer in a shared workspace before running sync. An older runtime can write the legacy cache again.
 
@@ -466,9 +466,10 @@ Behavior notes:
   (required outside interactive terminals), `--dry-run` previews the steps, and
   `kyro update --check` only reports the status.
 - The registry query fails soft when offline: `--check` reports the status as unknown, and a
-  real run retries against the `@latest` tag so npm itself reports any network error.
+  real run normally retries against the `@latest` tag so npm itself reports any network error.
+  When a legacy scope cache is present, it first plans a local workspace refresh.
 - It works from the projected runtime CLI too (the check needs no full package); only the
-  stale-runtime refresh from this package requires the full npm layout.
+  direct local refresh uses the full npm layout. A projected runtime invokes the full package via npx.
 - `update` is operator surface like `install` and `sync`: it is not a tool-owned verb, so the
   capability handshake is untouched and agents never self-update mid-sprint.
 

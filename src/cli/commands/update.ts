@@ -10,7 +10,7 @@ import { isDurableKyroOnPath } from '../invocation';
 import { assertWorkspaceScope } from '../options';
 import { detectPackageRootMode } from '../package-root-mode';
 import { PACKAGE_ROOT } from '../constants';
-import { readManifest, readProjectState, readSharedProjectState } from '../state';
+import { assertPersistedLegacyScopeCachesMigratable, readManifest, readProjectState, readSharedProjectState } from '../state';
 import type { CliOptions } from '../types';
 import { compareSemverLike } from './doctor';
 
@@ -298,6 +298,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     durableGlobal: isDurableKyroOnPath(),
   };
   const plan = buildUpdatePlan(facts);
+  if (facts.hasWorkspace) assertPersistedLegacyScopeCachesMigratable();
 
   if (options.check) {
     printPlan(plan);

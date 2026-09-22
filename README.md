@@ -311,7 +311,7 @@ npx kyro-ai@latest sync --scope workspace --yes
 
 Details: [Teams multi-dev contract](docs/teams.md) · [CLI project state](docs/cli.md).
 
-For the 5.0.0 upgrade, update every writer before syncing a shared workspace. Install/sync removes the old `project.json.scopes[]` cache; older runtimes can write it again.
+For the 5.0.0 upgrade, update every writer before syncing a shared workspace. Install/sync removes the old `project.json.scopes[]` cache after confirming every old ID has a valid matching `sprint.json` and no lifecycle or custom metadata would be lost; otherwise it stops and reports the unresolved entries without changing shared state. Older runtimes can write the cache again.
 
 ---
 

@@ -10,7 +10,8 @@ import {
 } from './constants';
 import { readJsonFromManagedPath, readJsonFromWorkspace, resolveManagedPath } from './fs';
 import { KyroCoreError } from './core/errors';
-import { scopeEntriesFromDisk } from './core/scope-entries';
+import { canonicalJson } from './core/digest';
+import { scopeEntriesFromDisk, scopeEntryFromDisk } from './core/scope-entries';
 import { assertSafeManagedPath, assertStateWriterLeaseHealthy, withStateWriterLock } from './pipeline/state-writer-lock';
 import type {
   KyroLocalProjectState,
@@ -48,6 +49,47 @@ export function resolveDelegationEnabled(): boolean {
 /** Raw legacy monolito file only — does not merge layers. */
 export function readMonolitoProjectState(): KyroProjectState | null {
   return readJsonFromWorkspace<KyroProjectState>(KYRO_STATE_PATH);
+}
+
+/** Refuse to discard the only persisted identity of a legacy scope during migration. */
+export function assertLegacyScopeCacheMigratable(source: unknown, path: string): void {
+  if (!source || typeof source !== 'object' || !Object.prototype.hasOwnProperty.call(source, 'scopes')) return;
+  const cache = (source as { scopes?: unknown }).scopes;
+  if (!Array.isArray(cache)) {
+    throw new KyroCoreError('INVALID_INPUT', `${path}.scopes is not an array.`,
+      'Repair the legacy scope registry before migrating project state. No files were changed.');
+  }
+  const unresolved = cache.flatMap((entry: unknown, index: number) => {
+    const id = entry && typeof entry === 'object' ? (entry as { id?: unknown }).id : null;
+    if (typeof id !== 'string' || !id) return [`entry ${index} has no valid id`];
+    try {
+      const disk = scopeEntryFromDisk(id);
+      if (!disk) return [id];
+      const legacy = entry as Record<string, unknown>;
+      const unknownFields = Object.keys(legacy).filter((key) => !['id', 'title', 'status', 'completion', 'completionHistory', 'retirement'].includes(key));
+      if (unknownFields.length > 0) return [`${id} (unmigrated fields: ${unknownFields.join(', ')})`];
+      for (const field of ['completion', 'completionHistory', 'retirement'] as const) {
+        if (legacy[field] !== undefined && canonicalJson(legacy[field]) !== canonicalJson(disk[field])) {
+          return [`${id} (${field} differs from sprint.json)`];
+        }
+      }
+      return [];
+    } catch {
+      return [id];
+    }
+  });
+  if (unresolved.length > 0) {
+    throw new KyroCoreError(
+      'INVALID_INPUT',
+      `Cannot remove ${path}.scopes: unresolved legacy entries ${unresolved.join(', ')}.`,
+      'Restore missing sprint.json files or reconcile metadata against them, then retry. Keep the legacy state for investigation; no files were changed.',
+    );
+  }
+}
+
+export function assertPersistedLegacyScopeCachesMigratable(): void {
+  assertLegacyScopeCacheMigratable(readSharedProjectState(), PROJECT_STATE_PATH);
+  assertLegacyScopeCacheMigratable(readMonolitoProjectState(), KYRO_STATE_PATH);
 }
 
 export function hasLayeredProjectStateOnDisk(): boolean {
@@ -242,6 +284,7 @@ export function migrateMonolitoToLayersUnlocked(options: MigrateMonolitoOptions 
       'Run kyro install --init-workspace or provide monolito state to migrateMonolitoToLayers.',
     );
   }
+  assertLegacyScopeCacheMigratable(source, KYRO_STATE_PATH);
   const { shared, local } = splitMonolitoToLayers(source);
   writeProjectLayersUnlocked({ shared, local });
   let archivedMonolitoPath: string | null = null;
@@ -287,6 +330,7 @@ export function writeProjectLayers(layers: ProjectLayerWrite): void {
 
 export function writeSharedProjectStateUnlocked(shared: KyroSharedProjectState): void {
   assertStateWriterLeaseHealthy();
+  assertPersistedLegacyScopeCachesMigratable();
   writeJsonManaged(PROJECT_STATE_PATH, sanitizeSharedForWrite(shared));
 }
 

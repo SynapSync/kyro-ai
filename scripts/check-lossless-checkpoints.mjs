@@ -136,9 +136,12 @@ function makeSandbox({ intermediate = false } = {}) {
     sprint.roadmap.sprints.push({ n: 2, slug: 'next', title: 'Next', state: 'planned' });
   }
   writeJson(sprintPath, sprint);
+  mkdirSync(join(root, '.agents/kyro/scopes/unrelated'), { recursive: true });
+  writeJson(join(root, '.agents/kyro/scopes/unrelated/sprint.json'),
+    { ...sprint, scope: 'unrelated', title: 'Unrelated' });
   const statePath = join(root, '.agents/kyro/kyro.json');
   const state = readJson(statePath);
-  state.scopes.push({ id: 'unrelated', title: 'Unrelated', status: 'blocked', custom: 'preserve-me' });
+  state.scopes.push({ id: 'unrelated', title: 'Unrelated', status: 'blocked' });
   state.runtimeExtension = { keep: true };
   writeJson(statePath, state);
   return root;
@@ -233,6 +236,9 @@ function closeSuccessfully(root) {
 {
   const root = makeSandbox();
   try {
+    const seeded = readJson(paths(root).project);
+    seeded.scopes.find((scope) => scope.id === 'unrelated').custom = 'preserve-me';
+    writeJson(paths(root).project, seeded);
     const before = readJson(paths(root).sprint);
     const projectBefore = readJson(paths(root).project);
     const checkpoint = closeSuccessfully(root);
@@ -260,7 +266,8 @@ function closeSuccessfully(root) {
     assert(JSON.stringify(projectAfter.runtimeExtension) === JSON.stringify(projectBefore.runtimeExtension), 'unrelated top-level project state changed');
     assert(existsSync(paths(root).snapshot) && existsSync(paths(root).narrative), 'dual-write artifacts missing');
     const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
-    assert(doctor.status === 0 && output(doctor).includes('APPLIED:'), `doctor must classify applied checkpoint:\n${output(doctor)}`);
+    assert(doctor.status === 1 && output(doctor).includes('APPLIED:') && output(doctor).includes('unmigrated fields: custom'),
+      `doctor must classify applied checkpoint and preserve legacy metadata warning:\n${output(doctor)}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -602,6 +609,9 @@ for (const mode of ['corrupt', 'unsupported']) {
 {
   const root = makeSandbox();
   try {
+    const seeded = readJson(paths(root).project);
+    seeded.scopes.find((scope) => scope.id === 'unrelated').custom = 'preserve-me';
+    writeJson(paths(root).project, seeded);
     run(root, closeArgs, { KYRO_TEST_CLOSE_FAIL_AFTER: 'checkpoint' });
     const checkpoint = readJson(paths(root).checkpoint);
     unlinkSync(paths(root).sprint);
@@ -1150,6 +1160,9 @@ for (const mode of ['corrupt', 'unsupported']) {
   const root = makeSandbox();
   try {
     const unrelatedSprint = readJson(paths(root).sprint);
+    const project = readJson(paths(root).project);
+    delete project.scopes.find((scope) => scope.id === 'unrelated').custom;
+    writeJson(paths(root).project, project);
     mkdirSync(join(root, '.agents/kyro/scopes/unrelated'), { recursive: true });
     writeJson(join(root, '.agents/kyro/scopes/unrelated/sprint.json'),
       { ...unrelatedSprint, scope: 'unrelated', title: 'Unrelated' });

@@ -21,6 +21,7 @@ import {
 import { managedPathExists, readJsonFromPackage, readPackageText, resolveManagedPath } from '../fs';
 import { readPackageVersion } from '../help';
 import {
+  assertPersistedLegacyScopeCachesMigratable,
   formatBootstrapRemedy,
   hasLayeredProjectStateOnDisk,
   hasMonolitoProjectStateOnDisk,
@@ -418,6 +419,17 @@ function checkUnregisteredScopes(): CheckResult {
       status: 'pass',
       name: 'scope registry',
       detail: 'skipped (no project state)',
+    };
+  }
+  try {
+    assertPersistedLegacyScopeCachesMigratable();
+  } catch (error) {
+    if (!(error instanceof KyroCoreError)) throw error;
+    return {
+      status: 'fail',
+      name: 'scope registry',
+      detail: error.message,
+      remedy: error.remedy,
     };
   }
   const missing = unregisteredScopeFolders(state);

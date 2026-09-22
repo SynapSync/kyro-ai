@@ -11,7 +11,7 @@ import {
   type ScopeDirectory,
 } from '../artifacts/scopes';
 import { deriveScopeStatus } from '../core/status';
-import { readProjectState } from '../state';
+import { readMonolitoProjectState, readProjectState, readSharedProjectState } from '../state';
 import type { KyroScopeEntry } from '../types';
 
 export const REGISTRY_CLASS = {
@@ -64,7 +64,14 @@ export function registryReconciliationPath(id: string): string {
 
 export function classifyRegistry(requestedScope: string | null = null): RegistryClassification[] {
   const state = readProjectState();
-  const registered = state?.scopes ?? [];
+  const registeredById = new Map((state?.scopes ?? []).map((entry) => [entry.id, entry]));
+  for (const source of [readSharedProjectState(), readMonolitoProjectState()]) {
+    if (!Array.isArray(source?.scopes)) continue;
+    for (const entry of source.scopes) {
+      if (entry && typeof entry.id === 'string') registeredById.set(entry.id, entry);
+    }
+  }
+  const registered = [...registeredById.values()];
   const folders = listScopeFolders();
   const ids = new Set<string>([...registered.map((entry) => entry.id), ...folders]);
   if (requestedScope) {

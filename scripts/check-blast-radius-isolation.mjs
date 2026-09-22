@@ -398,12 +398,10 @@ function assertGenericArchiveContentIsNotOwnership() {
 }
 
 /**
- * Installs upgraded from before this rule may already carry a junk registry entry. Cleaning it must
- * be possible — globally AND scoped — and must not touch a single byte of the directory Kyro does
- * not own. Registry membership is the second axis: only UNREGISTERED + FOREIGN is a wrong name, so
- * rejecting every foreign directory at the guard would leave scoped repair with no way to clean up.
+ * A legacy registry entry pointing at a foreign directory may be junk or the only remaining clue
+ * to a damaged scope. Migration must stop before dropping that entry and must not touch the directory.
  */
-function assertPreExistingContaminationIsCleanable() {
+function assertPreExistingContaminationIsProtected() {
   for (const mode of ['global', 'scoped']) {
     const sandbox = makeSandbox();
     try {
@@ -414,7 +412,9 @@ function assertPreExistingContaminationIsCleanable() {
       writeFileSync(join(foreign, 'drafts/idea.md'), 'do not touch this either\n');
       registerScopes(sandbox, [{ id: 'notes-backup', title: 'notes-backup', status: 'planning' }]);
       const migrated = spawnCli(['install', '--scope', 'workspace', '--init-workspace', '--yes'], sandbox);
-      assert(migrated.status === 0, `legacy migration failed: ${migrated.stdout}${migrated.stderr}`);
+      assert(migrated.status !== 0 && `${migrated.stdout}${migrated.stderr}`.includes('notes-backup'),
+        `legacy migration must name unresolved entry: ${migrated.stdout}${migrated.stderr}`);
+      assert(!existsSync(join(sandbox, '.agents/kyro/project.json')), 'refused migration must not write shared state');
       const before = hashTree(foreign);
 
       // The digest must be structural, not file-only: an empty directory is part of what "preserved
@@ -430,13 +430,16 @@ function assertPreExistingContaminationIsCleanable() {
         assert(prepare.status === 0, `global prepare should succeed: ${prepare.stderr}`);
         const plan = machineData(prepare.stdout);
         assert(!plan.targets.unregister.includes('notes-backup'), 'foreign directory is not a derived scope');
+        assert(plan.blockers.some((blocker) => blocker.code === 'legacy-registered-orphan'),
+          'legacy entry stays visible as a blocker');
       } else {
-        assert(prepare.status !== 0 && `${prepare.stdout}${prepare.stderr}`.includes('SCOPE_NOT_FOUND'),
-          `foreign directory must not be addressable: ${prepare.stdout}${prepare.stderr}`);
+        assert(prepare.status === 0 && machineData(prepare.stdout).blockers.some((blocker) => blocker.code === 'legacy-registered-orphan'),
+          `scoped prepare must name the unresolved legacy entry: ${prepare.stdout}${prepare.stderr}`);
       }
       assert(hashTree(foreign) === before, `${mode}: inspection must preserve the foreign directory`);
       const listed = spawnCli(['scope', 'list'], sandbox);
-      assert(listed.status === 0 && !listed.stdout.includes('notes-backup'), `${mode}: stale shared entry must not grant scope identity`);
+      assert(listed.status === 0 && listed.stdout.includes('notes-backup'),
+        `${mode}: refused migration keeps legacy entry visible for investigation`);
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
     }
@@ -479,11 +482,9 @@ function assertRegistryMatrixIsClassifiedByBothAxes() {
 
     assert(codeFor('demo') === 'recoverable-no-sprint', `registered + recoverable must report recoverable-no-sprint: ${prepare.stdout}`);
     assert(codeFor('reg-corrupt') === 'irreconcilable', `registered + corrupt sprint.json must report irreconcilable: ${prepare.stdout}`);
-    assert(
-      plan.targets.unregister.includes('reg-foreign') && plan.targets.unregister.includes('reg-absent'),
-      `registered + foreign and registered + absent are both orphan registry entries: ${prepare.stdout}`,
-    );
-    assert(codeFor('reg-foreign') === undefined, `a registered foreign directory must be an unregister target, not a blocker: ${prepare.stdout}`);
+    assert(codeFor('reg-foreign') === 'legacy-registered-orphan' && codeFor('reg-absent') === 'legacy-registered-orphan',
+      `registered + foreign and registered + absent must remain visible blockers: ${prepare.stdout}`);
+    assert(plan.targets.unregister.length === 0, 'legacy orphan cleanup is not automatic');
     assert(
       !prepare.stdout.includes('stray'),
       `an unregistered foreign directory must be invisible to integrity entirely: ${prepare.stdout}`,
@@ -617,7 +618,7 @@ function assertUnreadableArchiveNeverCollapsesToClean() {
   }
 }
 
-/** A prepare-approved unregister becomes invalid as soon as its path stops being safely foreign. */
+/** A legacy orphan cannot be applied, even if its path changes after preparation. */
 function assertUnregisterDivergesOnUnsafePathRace() {
   for (const race of ['symlink', 'owned-evidence']) {
     const sandbox = makeSandbox();
@@ -627,9 +628,10 @@ function assertUnregisterDivergesOnUnsafePathRace() {
       writeFileSync(join(foreign, 'README.md'), 'do not touch\n');
       registerScopes(sandbox, [{ id: 'notes-backup', title: 'notes-backup', status: 'planning' }]);
       const prepare = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'notes-backup', '--json'], sandbox);
-      assert(prepare.status === 0, `${race}: prepare should approve safe foreign cleanup: ${prepare.stderr}`);
+      assert(prepare.status === 0, `${race}: prepare should diagnose the orphan: ${prepare.stderr}`);
       const plan = machineData(prepare.stdout);
-      assert(plan.targets.unregister.includes('notes-backup'), `${race}: expected unregister target: ${prepare.stdout}`);
+      assert(plan.targets.unregister.length === 0 && plan.blockers.some((blocker) => blocker.code === 'legacy-registered-orphan'),
+        `${race}: orphan must be a blocker, not an unregister target: ${prepare.stdout}`);
 
       if (race === 'symlink') {
         const external = join(sandbox, 'external-race');
@@ -647,7 +649,7 @@ function assertUnregisterDivergesOnUnsafePathRace() {
         'repair', 'integrity', 'apply', '--kyro-scope', 'notes-backup', '--digest', plan.digest, '--yes',
       ], sandbox);
       assert(apply.status !== 0, `${race}: apply must reject drift after prepare: ${apply.stdout}`);
-      assert(/DIVERGED/.test(`${apply.stdout}${apply.stderr}`), `${race}: apply must report DIVERGED: ${apply.stdout}${apply.stderr}`);
+      assert(/DIVERGED|BLOCKED|blocker|blocking/i.test(`${apply.stdout}${apply.stderr}`), `${race}: apply must report a blocker or drift: ${apply.stdout}${apply.stderr}`);
       assert(JSON.stringify(readRegistry(sandbox)) === beforeRegistry, `${race}: divergent apply must not write registry state`);
       assert(
         hashTree(race === 'symlink' ? join(sandbox, 'external-race') : foreign) === beforeTree,
@@ -767,7 +769,7 @@ function main() {
   assertRecoverableAndDamagedAreDistinguished();
   assertSymlinkCheckpointNeverClaimsRecovery();
   assertGenericArchiveContentIsNotOwnership();
-  assertPreExistingContaminationIsCleanable();
+  assertPreExistingContaminationIsProtected();
   assertRegistryMatrixIsClassifiedByBothAxes();
   assertManagedAncestorSymlinksAreScopeBound();
   assertUnsafeForeignEntriesAreWarnOnly();

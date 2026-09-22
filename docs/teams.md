@@ -64,7 +64,9 @@ What install does:
 1. Writes or refreshes **`project.json` + `local.json`** (not a live monolito SoT).
 2. Ensures **`.agents/kyro/.gitignore`** ignores `local.json`, legacy `kyro.json` / `kyro.json.migrated`, and lock files — and **never** ignores `project.json` or `scopes/`.
 3. Reads scopes from valid matching `sprint.json` files under safe managed directories. Foreign,
-   corrupt, and incomplete directories do not become scopes. Removes legacy `project.json.scopes[]`.
+   corrupt, and incomplete directories do not become scopes. Removes legacy `project.json.scopes[]`
+   only when every old ID has a valid matching sprint file and no legacy metadata would be lost;
+   otherwise installation stops without changing the shared state and names the unresolved entries.
 4. Sets `activeScope` automatically only when it is null and **exactly one** scope is known.
 
 You do **not** need to gitignore the entire `.agents/kyro/` directory.

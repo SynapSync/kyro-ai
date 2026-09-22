@@ -191,6 +191,9 @@ withWorkspace('kyro-layered-migrate-', (cwd) => {
   } = loadState();
 
   writeJson(cwd, KYRO_STATE_PATH, monolitoFixture());
+  for (const id of ['alpha', 'beta']) {
+    writeJson(cwd, `.agents/kyro/scopes/${id}/sprint.json`, minimalSprint(id));
+  }
   const split = splitMonolitoToLayers(monolitoFixture());
   assert(!('activeScope' in split.shared), 'split shared must omit activeScope');
   assert(split.shared.principles[0].id === 'p-quality', 'split principles on shared');
@@ -215,9 +218,38 @@ withWorkspace('kyro-layered-migrate-', (cwd) => {
   const effective = readProjectState();
   assert(effective.activeScope === 'alpha', 'post-migrate activeScope');
   assert(effective.principles[0].id === 'p-quality', 'post-migrate principles');
-  assert(effective.scopes.length === 0, 'no valid sprint.json means no derived scopes');
+  assert(effective.scopes.map((scope) => scope.id).join(',') === 'alpha,beta', 'migration keeps disk-backed scopes');
   assert(effective.installedAdapters[0].agent === 'standard', 'post-migrate adapters');
   console.log('ok migration');
+});
+
+// --- migration refuses to discard the only record of a legacy scope ---
+withWorkspace('kyro-layered-migrate-orphan-', (cwd) => {
+  const { KYRO_STATE_PATH, PROJECT_STATE_PATH } = loadConstants();
+  const { migrateMonolitoToLayers } = loadState();
+  writeJson(cwd, KYRO_STATE_PATH, monolitoFixture());
+  let refused = false;
+  try {
+    migrateMonolitoToLayers();
+  } catch (error) {
+    refused = error?.code === 'INVALID_INPUT' && String(error.message).includes('alpha, beta');
+  }
+  assert(refused, 'migration must name legacy scopes without valid sprint files');
+  assert(existsSync(join(cwd, KYRO_STATE_PATH)), 'refusal preserves monolito');
+  assert(!existsSync(join(cwd, PROJECT_STATE_PATH)), 'refusal does not write layers');
+  for (const id of ['alpha', 'beta']) {
+    writeJson(cwd, `.agents/kyro/scopes/${id}/sprint.json`, minimalSprint(id));
+  }
+  const legacy = readJson(cwd, KYRO_STATE_PATH);
+  legacy.scopes[0].custom = 'keep this metadata';
+  writeJson(cwd, KYRO_STATE_PATH, legacy);
+  let metadataRefused = false;
+  try {
+    migrateMonolitoToLayers();
+  } catch (error) {
+    metadataRefused = error?.code === 'INVALID_INPUT' && String(error.message).includes('unmigrated fields: custom');
+  }
+  assert(metadataRefused && !existsSync(join(cwd, PROJECT_STATE_PATH)), 'migration must preserve unknown legacy metadata');
 });
 
 // --- write targeting: local-only leaves shared principles byte-stable ---

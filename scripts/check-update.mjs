@@ -186,15 +186,54 @@ assert(UPDATE_PACKAGE === 'kyro-ai', 'package constant');
     writeFileSync(projectPath, `${JSON.stringify({ schemaVersion: 4, scopes: [{ id: 'legacy', title: 'Legacy', status: 'planning' }] }, null, 2)}\n`);
     writeFileSync(join(projectDir, 'local.json'), `${JSON.stringify({ schemaVersion: 4, activeScope: null, installedAdapters: [] })}\n`);
     const npmPath = join(fakeBin, 'npm');
-    writeFileSync(npmPath, `#!/bin/sh\nprintf '%s\\n' '"${version}"'\n`);
+    writeFileSync(npmPath, `#!/bin/sh\n[ "$1" = view ] || exit 90\nprintf '%s\\n' '"${version}"'\n`);
     chmodSync(npmPath, 0o755);
-    const env = { ...process.env, HOME: join(root, 'home'), PATH: `${fakeBin}${delimiter}${process.env.PATH ?? ''}` };
+    writeFileSync(join(fakeBin, 'npm.cmd'), `@echo off\r\nif not "%1"=="view" exit /b 90\r\necho "${version}"\r\n`);
+    writeFileSync(join(fakeBin, 'npx'), '#!/bin/sh\nexit 90\n');
+    chmodSync(join(fakeBin, 'npx'), 0o755);
+    writeFileSync(join(fakeBin, 'npx.cmd'), '@echo off\r\nexit /b 90\r\n');
+    const env = {
+      ...process.env,
+      HOME: join(root, 'home'),
+      USERPROFILE: join(root, 'home'),
+      APPDATA: join(root, 'home', 'appdata'),
+      LOCALAPPDATA: join(root, 'home', 'localappdata'),
+      PATH: `${fakeBin}${delimiter}${process.env.PATH ?? ''}`,
+    };
     const cli = resolve(repo, 'dist/cli.js');
     for (const flag of ['--check', '--dry-run']) {
       const result = spawnSync(process.execPath, [cli, 'update', flag], { cwd: root, env, encoding: 'utf8' });
-      assert(result.status === 0, `${flag} failed: ${result.stderr}`);
-      assert(result.stdout.includes('legacy scopes[] cache'), `${flag} must report migration`);
+      assert(result.status !== 0 && result.stderr.includes('unresolved legacy entries legacy'),
+        `${flag} must report blocked migration: ${result.stderr}`);
       assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${flag} must not change project.json`);
+    }
+    const blocked = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
+    assert(blocked.status !== 0 && blocked.stderr.includes('unresolved legacy entries legacy'),
+      `update must refuse to discard orphaned legacy scope: ${blocked.stderr}\n${blocked.stdout}`);
+    assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'refused update preserves shared scopes[]');
+    const scopeDir = join(projectDir, 'scopes', 'legacy');
+    mkdirSync(scopeDir, { recursive: true });
+    writeFileSync(join(scopeDir, 'sprint.json'), `${JSON.stringify({
+      schemaVersion: 4,
+      scope: 'legacy',
+      title: 'Legacy',
+      status: 'planning',
+      objective: 'Keep legacy scope.',
+      successCriteria: ['Scope survives migration.'],
+      clarifications: [],
+      conventions: [],
+      adrs: [],
+      roadmap: { plannedSprintCount: 1, sizingRationale: 'One sprint.', sprints: [{ n: 1, slug: 's1', title: 'Sprint 1', state: 'planned' }] },
+      ledger: [],
+      previousSprint: null,
+      activeSprint: null,
+      debt: [],
+      handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-09-22' },
+    }, null, 2)}\n`);
+    for (const flag of ['--check', '--dry-run']) {
+      const preview = spawnSync(process.execPath, [cli, 'update', flag], { cwd: root, env, encoding: 'utf8' });
+      assert(preview.status === 0 && preview.stdout.includes('legacy scopes[] cache'), `${flag} previews safe migration`);
+      assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${flag} remains read-only`);
     }
     const result = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
     assert(result.status === 0, `update --yes failed: ${result.stderr}\n${result.stdout}`);

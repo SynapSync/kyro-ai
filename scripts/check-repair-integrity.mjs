@@ -215,7 +215,8 @@ function main() {
     assert(typeof plan.digest === 'string' && plan.digest.length === 64, 'prepare digest');
     assert(plan.targets.register.length === 0 && plan.targets.unregister.length === 0,
       'disk-derived identity needs no shared registry repair');
-    assert(plan.blockers.length === 0, 'valid disk scopes have no registry blockers');
+    assert(plan.blockers.some((blocker) => blocker.code === 'legacy-registered-orphan' && blocker.summary.includes('ghost')),
+      'orphaned legacy scope remains a visible blocker');
     assert(readFileSync(join(root, '.agents/kyro/project.json')).equals(beforeProject), 'prepare is read-only');
     const listed = run(root, ['scope', 'list']);
     assert(listed.status === 0 && listed.stdout.includes('disk-only') && !listed.stdout.includes('ghost'),

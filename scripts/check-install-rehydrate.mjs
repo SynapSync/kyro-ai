@@ -324,10 +324,25 @@ withWorkspace('kyro-rehydrate-preserve-', (cwd) => {
   assert(state.principles?.[0]?.id === 'p1', 'preserve: principles kept on shared layer');
   assert(state.scopes.some((s) => s.id === 'orphan' && s.title === 'Orphan On Disk'), 'preserve: orphan folder registered');
 
-  // A stale shared scopes[] is removed on sync without dropping activeScope.
+  // An orphan in the old shared cache must not be silently discarded by sync.
   const projectPath = join(cwd, '.agents', 'kyro', 'project.json');
   const project = JSON.parse(readFileSync(projectPath, 'utf-8'));
   project.scopes = [{ id: 'stale', title: 'Stale', status: 'active' }];
+  writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`, 'utf-8');
+  let refused = false;
+  try {
+    captureLogs(() => sync(cliOptions({ agents: [standard] })));
+  } catch (error) {
+    refused = error?.code === 'INVALID_INPUT' && String(error.message).includes('stale');
+  }
+  assert(refused, 'sync: refuses to discard an orphaned legacy scope');
+  assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'sync: refusal preserves old cache');
+  const { runDoctorChecks } = require(join(repo, 'dist/cli/commands/doctor.js'));
+  const registryCheck = runDoctorChecks(false, false, false, false, null).find((check) => check.name === 'scope registry');
+  assert(registryCheck?.status === 'fail' && registryCheck.detail.includes('stale'), 'doctor: names the orphaned legacy scope');
+  const { classifyRegistry } = require(join(repo, 'dist/cli/project/reconcile.js'));
+  assert(classifyRegistry('stale')[0]?.classification === 'registered-orphan', 'reconcile: retains orphan diagnosis');
+  project.scopes = [{ id: 'known', title: 'Known From Disk', status: 'planning' }];
   writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`, 'utf-8');
   captureLogs(() => sync(cliOptions({ agents: [standard] })));
   assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'sync: removes stale shared scopes[]');
