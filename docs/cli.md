@@ -456,7 +456,9 @@ latest release, and picks a lane by install mode: a durable global `kyro` on PAT
 pin, never a floating tag). It then re-runs `sync` (or runtime-only `install` when this
 directory has no workspace state) from the fresh package — never continuing in the old process.
 When the CLI is already current but the installed runtime is older, it refreshes the runtime
-locally with no download.
+locally with no download. If the CLI is current but the workspace still has the legacy
+`project.json.scopes[]` cache, it syncs the workspace to remove that cache. An installed runtime
+newer than the running CLI is used for this sync.
 
 Behavior notes:
 

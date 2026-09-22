@@ -109,6 +109,8 @@ Useful variants: `kyro update --check` reports the status without changing anyth
 `kyro update --dry-run` previews the planned steps, and `kyro update --yes` skips the
 confirmation (for scripts). The manual equivalent is `npx kyro-ai@latest sync --scope workspace`
 plus `npm i -g kyro-ai` when you keep a global install.
+With Kyro 5, `update` also syncs an already-current workspace when it finds the old
+`project.json.scopes[]` cache, removing it from shared state.
 
 See [CLI · invocation persistence](cli.md#cli-invocation-persistence-kyroinvocation) and
 [CLI · update](cli.md#update-kyro-update).
