@@ -16,7 +16,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
@@ -200,6 +200,20 @@ try {
     assert(digestTree(join(root, '.agents')) === before, 'incorrect digest must not write');
   }
 
+  // An unrelated scope added after approval does not invalidate this scope's retirement.
+  {
+    const root = workspace();
+    const prepared = prepare(root);
+    const unrelatedPath = join(root, '.agents/kyro/scopes/unrelated/sprint.json');
+    mkdirSync(dirname(unrelatedPath), { recursive: true });
+    writeJson(unrelatedPath, { ...json(scopePath(root)), scope: 'unrelated', title: 'Unrelated' });
+    const sharedBeforeApply = readFileSync(projectPaths(root).shared, 'utf8');
+    const applied = apply(root, prepared.digest);
+    assert(applied.status === 0, `unrelated scope addition must not invalidate retirement approval: ${output(applied)}`);
+    assert(readFileSync(projectPaths(root).shared, 'utf8') === sharedBeforeApply, 'retirement must not write shared project.json');
+    assert(existsSync(unrelatedPath), 'retirement must preserve the unrelated scope');
+  }
+
   // Missing registration, active sprint, and corrupt close checkpoints fail closed without writes.
   {
     const root = workspace({ close: false });
@@ -303,6 +317,19 @@ try {
     assertFailure(stale, 'DIVERGED');
     assert(digestTree(join(root, '.agents')) === before, 'archive divergence must not write');
   }
+  {
+    const root = workspace();
+    addSuccessor(root);
+    const prepared = prepare(root, ['--superseded-by', 'successor']);
+    const successorPath = join(root, '.agents/kyro/scopes/successor/sprint.json');
+    const successor = json(successorPath);
+    successor.title = 'Changed successor';
+    writeJson(successorPath, successor);
+    const before = digestTree(join(root, '.agents'));
+    const stale = apply(root, prepared.digest, ['--superseded-by', 'successor']);
+    assertFailure(stale, 'DIVERGED');
+    assert(digestTree(join(root, '.agents')) === before, 'successor change must invalidate approval without writing');
+  }
 
   // Successful apply records the terminal lifecycle across every consumer and preserves archive bytes.
   {
@@ -388,7 +415,7 @@ try {
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'legacy migration must preserve archive bytes');
   }
 
-  // The immutable transaction resumes after interruption, including a split project-layer write.
+  // The immutable transaction resumes after interruption without binding unrelated scopes.
   {
     const root = workspace();
     const archiveBefore = digestTree(scopePath(root, 'archive'));
@@ -398,16 +425,22 @@ try {
     const checkpoint = json(scopePath(root, 'retirement.checkpoint.json'));
     assert(json(scopePath(root)).status === 'retired', 'sprint write must be durable before interruption');
 
-    // Simulate a crash after the shared registry layer but before the local active-scope layer.
     const paths = projectPaths(root);
-    const shared = json(paths.shared);
-    shared.scopes = checkpoint.afterProject.scopes;
-    writeJson(paths.shared, shared);
-    assert(json(paths.local).activeScope === 'demo', 'fixture must represent the partial layered write');
+    const sharedBeforeRetry = readFileSync(paths.shared, 'utf8');
+    const unrelatedPath = join(root, '.agents/kyro/scopes/unrelated/sprint.json');
+    mkdirSync(dirname(unrelatedPath), { recursive: true });
+    writeJson(unrelatedPath, { ...checkpoint.beforeSprint, scope: 'unrelated', title: 'Unrelated' });
+    const local = json(paths.local);
+    local.activeScope = 'unrelated';
+    writeJson(paths.local, local);
 
     const resumed = apply(root, prepared.digest);
     assert(resumed.status === 0, `retry must converge an interrupted transaction: ${output(resumed)}`);
-    assert(json(paths.local).activeScope === null, 'resume must finish the local layer');
+    assert(json(paths.local).activeScope === 'unrelated', 'resume must preserve a newer personal scope selection');
+    assert(readFileSync(paths.shared, 'utf8') === sharedBeforeRetry, 'resume must not write the shared project file');
+    assert(existsSync(unrelatedPath), 'resume must preserve a scope added after the checkpoint');
+    const inspect = run(root, ['scope', 'inspect', 'demo']);
+    assert(inspect.status === 0, `retirement inspection must accept the unrelated scope: ${output(inspect)}`);
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'resume must preserve archive bytes');
   }
 

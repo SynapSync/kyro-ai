@@ -102,20 +102,20 @@ export function buildScopeRetirementPreparation(request: ScopeRetirementRequest)
   const beforeSprint = readValidSprint(request.scope);
   const beforeProject = readRegisteredProject(request.scope);
   assertRetirementAllowed(request, beforeSprint, beforeProject);
-  const observed = observedState(request.scope, beforeSprint, beforeProject);
+  const observed = observedState(request, beforeSprint, beforeProject);
   const planDigest = retirementPlanDigest(request, observed);
   return {
     request,
     currentStatus: beforeProject.scopes.find((entry) => entry.id === request.scope)?.status ?? beforeSprint.status,
     planDigest,
     checkpointPath: scopeRetirementCheckpointPath(request.scope),
-    affectedFiles: affectedFiles(request.scope, beforeProject),
+    affectedFiles: affectedFiles(request.scope),
     validations: [
-      'scope exists and is registered',
+      'scope has a valid matching sprint.json',
       'activeSprint is null',
       'all close checkpoints are intact and converged',
       'archive fingerprint is bound to the plan digest',
-      'successor is registered and not retired when supplied',
+      'successor has a valid matching sprint.json and is not retired when supplied',
       'apply requires this digest and --yes under the writer lock',
     ],
     observed,
@@ -200,12 +200,19 @@ export function validateScopeRetirementCheckpoint(value: unknown, path: string):
   if (checkpoint.digests.afterSprint !== sha256(checkpoint.afterSprint)) issues.push(`${path}: afterSprint digest mismatch`);
   if (checkpoint.digests.beforeProject !== sha256(checkpoint.beforeProject)) issues.push(`${path}: beforeProject digest mismatch`);
   if (checkpoint.digests.afterProject !== sha256(checkpoint.afterProject)) issues.push(`${path}: afterProject digest mismatch`);
-  const observed: ScopeRetirementObserved = {
+  const legacyObserved: ScopeRetirementObserved = {
     sprintDigest: checkpoint.digests.beforeSprint,
     projectDigest: checkpoint.digests.beforeProject,
     archiveDigest: checkpoint.digests.archive,
   };
-  if (checkpoint.request.planDigest !== retirementPlanDigest(checkpoint.request, observed)) issues.push(`${path}: planDigest does not bind the frozen request and before-state`);
+  const scopedObserved = {
+    ...legacyObserved,
+    projectDigest: scopedApprovalProjectDigest(checkpoint.request, checkpoint.beforeProject),
+  };
+  if (checkpoint.request.planDigest !== retirementPlanDigest(checkpoint.request, legacyObserved)
+    && checkpoint.request.planDigest !== retirementPlanDigest(checkpoint.request, scopedObserved)) {
+    issues.push(`${path}: planDigest does not bind the frozen request and before-state`);
+  }
   if (checkpoint.commitment !== checkpointCommitment(checkpoint)) issues.push(`${path}: commitment mismatch`);
   if (!authorizedAfterImages(checkpoint)) issues.push(`${path}: after-images are not the authorized retired transition`);
   return issues;
@@ -227,7 +234,9 @@ export function inspectScopeRetirement(scope: string): CheckResult[] {
   const applied = sprint.exists && !sprint.error
     && project !== null
     && sha256(sprint.value) === checkpoint.digests.afterSprint
-    && sha256(project) === checkpoint.digests.afterProject
+    && (hasLayeredProjectStateOnDisk()
+      ? layeredRetirementApplied(project, checkpoint)
+      : sha256(project) === checkpoint.digests.afterProject)
     && archive === checkpoint.digests.archive;
   if (applied) {
     return [{ status: 'pass', name: `${scope}/retirement`, detail: `APPLIED: ${path} matches the retired sprint/project state and archive fingerprint.` }];
@@ -266,7 +275,7 @@ export function archiveFingerprint(scope: string): string {
 function buildCheckpoint(request: ScopeRetirementRequest, preparation: ScopeRetirementPreparation): ScopeRetirementCheckpointV1 {
   const beforeSprint = readValidSprint(request.scope);
   const beforeProject = readRegisteredProject(request.scope);
-  const observed = observedState(request.scope, beforeSprint, beforeProject);
+  const observed = observedState(request, beforeSprint, beforeProject);
   if (retirementPlanDigest(request, observed) !== preparation.planDigest) throw diverged('State changed while acquiring the writer lock.');
   const createdAt = new Date().toISOString();
   const retirement: ScopeRetirement = {
@@ -338,7 +347,9 @@ function applyCheckpoint(checkpoint: ScopeRetirementCheckpointV1, resumed: boole
   const project = readProjectState();
   if (!project) throw diverged('project state is missing.');
   assertProjectTransitionState(project, checkpoint);
-  if (sha256(project) !== checkpoint.digests.afterProject) {
+  if (hasLayeredProjectStateOnDisk()) {
+    if (project.activeScope === scope) updateProjectStateLayersUnlocked({ activeScope: null });
+  } else if (sha256(project) !== checkpoint.digests.afterProject) {
     updateProjectStateLayersUnlocked({
       scopes: checkpoint.afterProject.scopes,
       ...(checkpoint.beforeProject.activeScope === scope ? { activeScope: null } : {}),
@@ -373,6 +384,24 @@ function assertProjectTransitionState(
   project: KyroProjectState,
   checkpoint: ScopeRetirementCheckpointV1,
 ): void {
+  if (hasLayeredProjectStateOnDisk()) {
+    const scope = checkpoint.request.scope;
+    const beforeEntry = checkpoint.beforeProject.scopes.find((entry) => entry.id === scope);
+    const afterEntry = checkpoint.afterProject.scopes.find((entry) => entry.id === scope);
+    const currentEntry = project.scopes.find((entry) => entry.id === scope);
+    if (!beforeEntry || !afterEntry || !currentEntry) throw diverged('the approved scope entry is missing.');
+    if (sha256(currentEntry) !== sha256(beforeEntry) && sha256(currentEntry) !== sha256(afterEntry)) {
+      throw diverged('the scope entry matches neither approved state.');
+    }
+    if (checkpoint.request.supersededBy) {
+      const beforeSuccessor = checkpoint.beforeProject.scopes.find((entry) => entry.id === checkpoint.request.supersededBy);
+      const currentSuccessor = project.scopes.find((entry) => entry.id === checkpoint.request.supersededBy);
+      if (!beforeSuccessor || !currentSuccessor || sha256(beforeSuccessor) !== sha256(currentSuccessor)) {
+        throw diverged('the approved successor scope changed.');
+      }
+    }
+    return;
+  }
   const digest = sha256(project);
   if (digest === checkpoint.digests.beforeProject || digest === checkpoint.digests.afterProject) return;
 
@@ -406,8 +435,17 @@ function verifyApplied(checkpoint: ScopeRetirementCheckpointV1): void {
   const sprint = readJsonSafely(sprintJsonPath(checkpoint.request.scope));
   const project = readProjectState();
   if (sprint.error || !sprint.exists || sha256(sprint.value) !== checkpoint.digests.afterSprint) throw diverged('post-write sprint verification failed.');
-  if (!project || sha256(project) !== checkpoint.digests.afterProject) throw diverged('post-write project verification failed.');
+  if (!project || (hasLayeredProjectStateOnDisk()
+    ? !layeredRetirementApplied(project, checkpoint)
+    : sha256(project) !== checkpoint.digests.afterProject)) throw diverged('post-write project verification failed.');
   if (archiveFingerprint(checkpoint.request.scope) !== checkpoint.digests.archive) throw diverged('archive fingerprint changed during apply.');
+}
+
+function layeredRetirementApplied(project: KyroProjectState, checkpoint: ScopeRetirementCheckpointV1): boolean {
+  const scope = checkpoint.request.scope;
+  const expected = checkpoint.afterProject.scopes.find((entry) => entry.id === scope);
+  const actual = project.scopes.find((entry) => entry.id === scope);
+  return Boolean(expected && actual && sha256(expected) === sha256(actual) && project.activeScope !== scope);
 }
 
 function assertRetirementAllowed(request: ScopeRetirementRequest, sprint: SprintFile, project: KyroProjectState): void {
@@ -419,7 +457,7 @@ function assertRetirementAllowed(request: ScopeRetirementRequest, sprint: Sprint
   }
   if (request.supersededBy) {
     const successor = project.scopes.find((entry) => entry.id === request.supersededBy);
-    if (!successor) throw new KyroCoreError('SCOPE_NOT_FOUND', `Successor scope is not registered: ${request.supersededBy}.`, 'Register the successor scope before preparing retirement.');
+    if (!successor) throw new KyroCoreError('SCOPE_NOT_FOUND', `Successor scope has no valid matching sprint.json: ${request.supersededBy}.`, 'Create or restore the successor sprint before preparing retirement.');
     if (successor.status === 'retired') throw new KyroCoreError('INVALID_INPUT', `Successor scope "${request.supersededBy}" is retired.`, 'Choose a non-retired registered successor.');
   }
 }
@@ -428,7 +466,7 @@ function readValidSprint(scope: string): SprintFile {
   assertSafePathSegment(scope, 'Scope');
   const root = scopeRoot(scope);
   assertSafeManagedPath(root);
-  if (!existsSync(resolveManagedPath(root))) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see registered scopes.');
+  if (!existsSync(resolveManagedPath(root))) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see available scopes.');
   const sprintPath = sprintJsonPath(scope);
   assertSafeManagedPath(sprintPath);
   const read = readJsonSafely(sprintPath);
@@ -450,12 +488,21 @@ function readRegisteredProject(scope: string): KyroProjectState {
   return clone(project);
 }
 
-function observedState(scope: string, sprint: SprintFile, project: KyroProjectState): ScopeRetirementObserved {
+function observedState(request: ScopeRetirementRequest, sprint: SprintFile, project: KyroProjectState): ScopeRetirementObserved {
   return {
     sprintDigest: sha256(sprint),
-    projectDigest: sha256(project),
-    archiveDigest: archiveFingerprint(scope),
+    projectDigest: scopedApprovalProjectDigest(request, project),
+    archiveDigest: archiveFingerprint(request.scope),
   };
+}
+
+function scopedApprovalProjectDigest(request: ScopeRetirementRequest, project: KyroProjectState): string {
+  return sha256({
+    scope: project.scopes.find((entry) => entry.id === request.scope) ?? null,
+    successor: request.supersededBy
+      ? project.scopes.find((entry) => entry.id === request.supersededBy) ?? null
+      : null,
+  });
 }
 
 function retirementPlanDigest(request: ScopeRetirementRequest, observed: ScopeRetirementObserved): string {
@@ -524,22 +571,28 @@ function preparationFromCheckpoint(checkpoint: ScopeRetirementCheckpointV1, alre
     currentStatus: alreadyApplied ? 'retired' : checkpoint.beforeProject.scopes.find((entry) => entry.id === checkpoint.request.scope)?.status ?? checkpoint.beforeSprint.status,
     planDigest: checkpoint.request.planDigest,
     checkpointPath: scopeRetirementCheckpointPath(checkpoint.request.scope),
-    affectedFiles: affectedFiles(checkpoint.request.scope, checkpoint.beforeProject),
+    affectedFiles: affectedFiles(checkpoint.request.scope),
     validations: ['immutable retirement checkpoint validated', 'apply is resumable only from its frozen before/after images', 'archive fingerprint remains immutable'],
     observed: {
       sprintDigest: checkpoint.digests.beforeSprint,
-      projectDigest: checkpoint.digests.beforeProject,
+      projectDigest: retirementPlanDigest(checkpoint.request, {
+        sprintDigest: checkpoint.digests.beforeSprint,
+        projectDigest: scopedApprovalProjectDigest(checkpoint.request, checkpoint.beforeProject),
+        archiveDigest: checkpoint.digests.archive,
+      }) === checkpoint.request.planDigest
+        ? scopedApprovalProjectDigest(checkpoint.request, checkpoint.beforeProject)
+        : checkpoint.digests.beforeProject,
       archiveDigest: checkpoint.digests.archive,
     },
     alreadyApplied,
   };
 }
 
-function affectedFiles(scope: string, project: KyroProjectState): string[] {
-  const files = [scopeRetirementCheckpointPath(scope), sprintJsonPath(scope), '.agents/kyro/project.json'];
+function affectedFiles(scope: string): string[] {
+  const files = [scopeRetirementCheckpointPath(scope), sprintJsonPath(scope)];
   if (!hasLayeredProjectStateOnDisk() && hasMonolitoProjectStateOnDisk()) {
-    files.push('.agents/kyro/local.json', '.agents/kyro/kyro.json', '.agents/kyro/kyro.json.migrated');
-  } else if (project.activeScope === scope) {
+    files.push('.agents/kyro/project.json', '.agents/kyro/local.json', '.agents/kyro/kyro.json', '.agents/kyro/kyro.json.migrated');
+  } else {
     files.push('.agents/kyro/local.json');
   }
   return files;

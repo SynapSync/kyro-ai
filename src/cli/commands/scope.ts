@@ -3,7 +3,7 @@ import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { formatScopeAuthor } from '../core/actor';
-import { readProjectState, updateProjectStateLayers } from '../state';
+import { hasLayeredProjectStateOnDisk, readProjectState, updateProjectStateLayers } from '../state';
 import { applyPlan } from '../fs';
 import { sha256 } from '../core/digest';
 import { setCliMachineResult } from '../core/cli-envelope';
@@ -284,7 +284,10 @@ function prepareScopeDiscard(scope: string, reason: string): { sprint: SprintFil
     digest = match[1];
     resumed = true;
   }
-  return { sprint, digest, resumed, affectedFiles: [sprintJsonPath(scope), `${archiveDir(scope)}/`, scopeRetirementCheckpointPath(scope), '.agents/kyro/project.json'] };
+  const affectedFiles = [sprintJsonPath(scope), `${archiveDir(scope)}/`, scopeRetirementCheckpointPath(scope)];
+  if (!hasLayeredProjectStateOnDisk()) affectedFiles.push('.agents/kyro/project.json', '.agents/kyro/local.json', '.agents/kyro/kyro.json', '.agents/kyro/kyro.json.migrated');
+  else affectedFiles.push('.agents/kyro/local.json');
+  return { sprint, digest, resumed, affectedFiles };
 }
 
 function parseDiscardArgs(args: string[]): ScopeDiscardArgs {
