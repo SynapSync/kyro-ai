@@ -197,7 +197,7 @@
     "slug": "instrucciones-y-certificacion",
     "title": "Instrucciones y certificación de distribución",
     "objective": "Alinear instrucciones, ayuda y diagnósticos con npm global, preservar la vía exclusiva de plugin y certificar el paquete distribuido en POSIX y Windows.",
-    "status": "complete",
+    "status": "executing",
     "phases": [
       {
         "id": "P1",
@@ -515,7 +515,74 @@
         ]
       }
     ],
-    "emergentTasks": [],
+    "emergentTasks": [
+      {
+        "id": "E1",
+        "title": "Diagnosticar fallos de permisos de npm global",
+        "description": "Conservar progreso visible de npm install -g y distinguir un fallo de permisos de un fallo de red al informar una actualización incompleta.",
+        "files_to_touch": [
+          "src/cli/commands/update.ts",
+          "scripts/check-update.mjs"
+        ],
+        "context": "QA PR #138: nota no bloqueante sobre stdio inherit que pierde stderr y clasifica permisos como error de red.",
+        "acceptance_criteria": [
+          "Un npm install -g que falla con EACCES o EPERM produce un remedio de permisos accionable, sin anunciar actualización exitosa.",
+          "Los fallos sin señal de permisos conservan un diagnóstico general correcto; los tests dirigidos pasan."
+        ],
+        "depends_on": [],
+        "scenario_refs": [
+          "S4"
+        ],
+        "status": "done",
+        "evidence": {
+          "summary": "npm install -g streams stdout/stderr while retaining recent stderr for classified failure remedies; EACCES/EPERM gets a permissions remedy, other failures keep network/general guidance, and no failure reports success.",
+          "validation": [
+            "npm run build: PASS",
+            "npm run check:update: PASS, including isolated EACCES and ENETUNREACH install failures with visible output",
+            "git diff --check: PASS"
+          ],
+          "files_changed": [
+            "src/cli/commands/update.ts",
+            "scripts/check-update.mjs"
+          ],
+          "by": "maker",
+          "recordedAt": "2026-09-23T14:07:26.851Z"
+        },
+        "verdict": {
+          "result": "pass",
+          "checked_criteria": [
+            "Un npm install -g que falla con EACCES o EPERM produce un remedio de permisos accionable, sin anunciar actualización exitosa.",
+            "Los fallos sin señal de permisos conservan un diagnóstico general correcto; los tests dirigidos pasan."
+          ],
+          "findings": [],
+          "by": "checker",
+          "reviewedAt": "2026-09-23T14:08:27.206Z",
+          "requestDigest": "a2bce5b4d483f414820bf21c3f35c5160957eb4711b568a244a130524a1f6e64",
+          "reviewedMaterialDigest": "5755124e7d180904b9bae712e1aa565fd0d35393b1b2634eea3a5ab99c841400"
+        }
+      },
+      {
+        "id": "E2",
+        "title": "Conciliar evidencia de la entrega final",
+        "description": "Agregar una corrección explícita a la evidencia histórica del Sprint 2 para separar la PR temporal #137 de la PR final #138 y rectificar los archivos y checks atribuidos a T2.2.",
+        "files_to_touch": [],
+        "context": "QA PR #138: CHANGES REQUIRED por evidencia activa obsoleta en T2.2/T2.4/T2.5. Corrección append-only para preservar los veredictos históricos.",
+        "acceptance_criteria": [
+          "La evidencia identifica el SHA y run de la PR #138 con Ubuntu y Windows Node 18/20/22 exitosos, y distingue los runs 4.51.0 de la rama temporal como historia.",
+          "Se declara que scripts/check-scope-registry-reading.mjs no existe en la rama final y que src/cli/project/reconcile.ts no cambió en esta PR; se validan los diagnósticos con los checks reales de la rama.",
+          "doctor --artifacts, analyze y la QA independiente pueden distinguir sin ambigüedad el estado actual del histórico sin alterar archivos de archivo o veredictos antiguos."
+        ],
+        "depends_on": [
+          "E1"
+        ],
+        "scenario_refs": [
+          "S10"
+        ],
+        "status": "pending",
+        "evidence": null,
+        "verdict": null
+      }
+    ],
     "definitionOfDone": [
       "S9 y S10 tienen tareas implementadas, evidencia concreta y veredictos aprobatorios; S8 se verifica en Windows real.",
       "README, guías, ayuda, diagnósticos y skills activos indican el recorrido npm global y conservan la vía exclusiva de plugin.",
@@ -525,11 +592,11 @@
   },
   "debt": [],
   "handoff": {
-    "nextAction": "qa_or_close",
-    "nextTaskId": null,
+    "nextAction": "execute_task",
+    "nextTaskId": "E2",
     "blockers": [],
-    "note": "Task T2.5 passed checker review.",
-    "lastUpdated": "2026-09-23T03:56:14.906Z"
+    "note": "Task E1 passed checker review.",
+    "lastUpdated": "2026-09-23T14:08:27.206Z"
   },
   "author": {
     "name": "Roimer Peraza",

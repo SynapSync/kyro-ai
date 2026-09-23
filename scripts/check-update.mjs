@@ -245,6 +245,43 @@ if (process.platform !== 'win32') {
   }
 }
 
+// A failed npm install must keep progress visible and distinguish permissions from network errors.
+if (process.platform !== 'win32') {
+  const fixture = mkdtempSync(join(tmpdir(), 'kyro-update-install-failure-'));
+  try {
+    const home = join(fixture, 'home');
+    const prefix = join(fixture, 'prefix');
+    const bin = join(prefix, 'bin');
+    const packageRoot = join(prefix, 'lib', 'node_modules', 'kyro-ai');
+    const cli = join(packageRoot, 'dist', 'cli.js');
+    const npmStub = join(bin, 'npm');
+    const newerVersion = `${Number(packageVersion.split('.')[0]) + 1}.0.0`;
+    mkdirSync(home);
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+    mkdirSync(join(packageRoot, 'agents'), { recursive: true });
+    symlinkSync(process.execPath, join(bin, 'node'));
+    writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name: 'kyro-ai', version: packageVersion }));
+    writeFileSync(join(packageRoot, 'agents', 'orchestrator.md'), 'fixture\n');
+    writeFileSync(cli, `#!/usr/bin/env node\nconsole.log(${JSON.stringify(packageVersion)});\n`);
+    chmodSync(cli, 0o755);
+    symlinkSync(cli, join(bin, 'kyro'));
+    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    for (const [errorCode, expectedRemedy] of [['EACCES', 'permission'], ['ENETUNREACH', 'network']]) {
+      writeFileSync(npmStub, `#!/bin/sh\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${newerVersion}"\\n' ;;\n  install) printf 'install-started\\n'; printf 'npm ERR! code ${errorCode}\\n' >&2; exit 1 ;;\nesac\n`);
+      chmodSync(npmStub, 0o755);
+      const result = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', '--yes'], { cwd: fixture, env, encoding: 'utf8' });
+      const output = result.stdout + result.stderr;
+      assert(result.status !== 0, `${errorCode} install must fail`);
+      assert(output.includes('install-started') && output.includes(errorCode), `${errorCode} npm progress must remain visible: ${output}`);
+      assert(output.toLowerCase().includes(expectedRemedy), `${errorCode} must give a ${expectedRemedy} remedy: ${output}`);
+      assert(!output.includes('Updated kyro'), `${errorCode} must not report update success`);
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
 // --- behind + global lane ---
 {
   const plan = buildUpdatePlan(facts({ latest: '4.49.0' }));

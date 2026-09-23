@@ -1,4 +1,4 @@
-import { spawnSync, type SpawnSyncOptions, type SpawnSyncReturns } from 'node:child_process';
+import { spawn, spawnSync, type SpawnSyncOptions, type SpawnSyncReturns } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -218,6 +218,27 @@ export function runPackageManager(
     stderr: typeof raw.stderr === 'string' ? raw.stderr : '',
     spawnError: raw.error ? String(raw.error) : null,
   };
+}
+
+/** Stream install progress while retaining recent stderr for an actionable failure. */
+export function installGlobalPackage(target: string): Promise<PackageManagerResult> {
+  const args = ['install', '-g', `${UPDATE_PACKAGE}@${target}`];
+  return new Promise((resolve) => {
+    const child = process.platform === 'win32'
+      ? spawn(['npm', ...args.map(quoteWinArg)].join(' '), {
+        shell: true, stdio: ['inherit', 'pipe', 'pipe'], timeout: INSTALL_TIMEOUT_MS,
+      })
+      : spawn('npm', args, { stdio: ['inherit', 'pipe', 'pipe'], timeout: INSTALL_TIMEOUT_MS });
+    let stderr = '';
+    let spawnError: string | null = null;
+    child.stdout?.on('data', (chunk: Buffer) => process.stdout.write(chunk));
+    child.stderr?.on('data', (chunk: Buffer) => {
+      process.stderr.write(chunk);
+      stderr = (stderr + chunk.toString()).slice(-8192);
+    });
+    child.on('error', (error) => { spawnError = String(error); });
+    child.on('close', (status) => resolve({ status, stdout: '', stderr, spawnError }));
+  });
 }
 
 /** Ask the registry for the latest release. Fail-soft: null when offline or unparsable. */
@@ -489,9 +510,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
   }
 
   if (plan.action === 'update-global') {
-    const installed = runPackageManager('npm', ['install', '-g', `${UPDATE_PACKAGE}@${plan.target}`], {
-      stdio: 'inherit',
-    });
+    const installed = await installGlobalPackage(plan.target);
     if (installed.spawnError || installed.status !== 0) {
       throwInstallFailed(installed.spawnError ?? `exit code ${String(installed.status)}`, installed.stderr);
     }
