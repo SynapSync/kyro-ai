@@ -43,7 +43,7 @@
     {
       "id": "instalacion-global-sin-npx",
       "title": "Instalación global de Kyro sin dependencia de npx",
-      "status": "active"
+      "status": "planning"
     },
     {
       "id": "integrity-recovery",
