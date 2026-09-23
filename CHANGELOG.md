@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [4.52.0] - 2026-09-23
+
+### Added
+
+- Global npm installation and update guidance across the CLI help, active agent instructions, and documentation. The Windows CI matrix verifies installation and sync from the packaged tarball on Node 18, 20, and 22.
+
+### Changed
+
+- `kyro update` verifies ownership of the active global command, installs an exact npm version, and refreshes the projected runtime from that new package. Preview modes report the planned action without writing files.
+- Projected CLI entrypoints resolve Windows command shims and retain the standalone Claude plugin route. Runtime-only users receive an explicit migration path to a global npm installation.
+
+### Fixed
+
+- Update failures distinguish unavailable registry data, ambiguous command ownership, incomplete packages, and partial synchronization without reporting success.
+
 ## [4.51.0] - 2026-09-17
 
 ### Added

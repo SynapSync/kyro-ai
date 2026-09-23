@@ -1,0 +1,254 @@
+{
+  "n": 1,
+  "slug": "actualizacion-global-segura",
+  "title": "Actualización global segura y migración",
+  "objective": "Hacer que kyro update use npm global con procedencia verificada, sin fallback interno a npx, y que diagnostique migración y fallos parciales sin anunciar éxito falso.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Procedencia del comando activo",
+      "objective": "Determinar si el kyro que ejecutará el usuario pertenece al paquete npm global gestionado.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "title": "Clasificar binario npm, ajeno, ausente y ambiguo",
+          "description": "Extender la resolución de invocación para comparar el comando kyro efectivo en PATH con la instalación global de npm que usaría update. Distinguir una instalación npm propia de shims pnpm, otros prefijos, ausencia de global y rutas que no puedan validarse. Mantener la detección de binarios efímeros y la invocación de agentes en Windows.",
+          "files_to_touch": [
+            "src/cli/invocation.ts",
+            "src/cli/commands/update.ts",
+            "scripts/check-invocation.mjs",
+            "scripts/check-update.mjs"
+          ],
+          "context": "isDurableKyroOnPath solo comprueba permanencia, no propiedad. npm root -g puede diferir del primer kyro en PATH. El runtime proyectado sigue siendo válido para uso diario pero no para install/sync. La convención process-1 exige que toda transición post-close reproduzca el checkpoint; esta tarea no debe tocar estado de scopes.",
+          "acceptance_criteria": [
+            "Las pruebas separan un shim npm del mismo prefijo, un shim pnpm, un segundo prefijo npm, la ausencia de kyro y una ruta ambigua; solo el primero autoriza la vía npm global.",
+            "La detección de rutas npx/dlx continúa rechazándolas como invocación durable y las pruebas Windows de .cmd siguen pasando.",
+            "La clasificación se puede usar en --check y --dry-run sin ejecutar una instalación ni escribir estado."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S2",
+            "S5",
+            "S8"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Clasificación de propiedad npm del kyro efectivo frente al prefijo y root globales; distingue npm propio, gestor/prefijo ajeno, ausencia y rutas ambiguas con soporte de shims Windows.",
+            "validation": [
+              "npm run build: pass",
+              "npm run check:invocation: pass",
+              "npm run check:update: pass",
+              "git diff --check: pass"
+            ],
+            "files_changed": [
+              "src/cli/invocation.ts",
+              "src/cli/commands/update.ts",
+              "scripts/check-invocation.mjs",
+              "scripts/check-update.mjs"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-09-23T00:10:04.414Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Las pruebas separan un shim npm del mismo prefijo, un shim pnpm, un segundo prefijo npm, la ausencia de kyro y una ruta ambigua; solo el primero autoriza la vía npm global.",
+              "La detección de rutas npx/dlx continúa rechazándolas como invocación durable y las pruebas Windows de .cmd siguen pasando.",
+              "La clasificación se puede usar en --check y --dry-run sin ejecutar una instalación ni escribir estado."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-23T00:10:06.861Z",
+            "requestDigest": "1c2c2b81be8bf0c246a42f2b3be2f40d43c299dc563efc4ff34f0a81ea2ee7d6",
+            "reviewedMaterialDigest": "00aef4ab1cca68f1446573105b44cced61e167858a75933a562b1ac3bcc18731"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Actualización global y postcondiciones",
+      "objective": "Actualizar desde el paquete npm nuevo, verificar versiones y reportar fallos parciales.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.2",
+          "title": "Retirar la rama npx del actualizador",
+          "description": "Modificar el plan y la ejecución de kyro update para que la única vía automática soportada sea npm global. Cuando el binario global no exista o no pertenezca a npm, mostrar instalación/migración o bloqueo accionable antes de descargar. Conservar consulta de registro, confirmación, --check y --dry-run; no ejecutar npx en ningún camino de update.",
+          "files_to_touch": [
+            "src/cli/commands/update.ts",
+            "scripts/check-update.mjs"
+          ],
+          "context": "La rama update-npx y offline-retry-latest usan npx hoy. El proceso proyectado puede ofrecer diagnóstico pero no debe hacer install/sync desde su propio árbol. En offline no se cambia de gestor en silencio.",
+          "acceptance_criteria": [
+            "Ninguna rama ejecutable de kyro update invoca npx; sin global y con binario ajeno se emite un remedio npm específico sin instalación oculta.",
+            "--check y --dry-run no llaman install ni modifican archivos y muestran plan o bloqueo correcto con y sin registro disponible.",
+            "La actualización desde npm global instala una versión validada y ejecuta sync o refresco runtime desde el CLI del paquete recién instalado."
+          ],
+          "depends_on": [
+            "T1.1"
+          ],
+          "scenario_refs": [
+            "S2",
+            "S3",
+            "S5",
+            "S6"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "El plan y la ejecución de update solo usan npm global verificado; sin comando global, con propiedad ajena/ambigua o registro no verificable ofrecen diagnóstico sin instalación. Refresh usa CLI global fresco.",
+            "validation": [
+              "npm run build: pass",
+              "npm run check:update: pass",
+              "npm run check:invocation: pass",
+              "git diff --check: pass"
+            ],
+            "files_changed": [
+              "src/cli/commands/update.ts",
+              "scripts/check-update.mjs"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-09-23T00:11:30.314Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Ninguna rama ejecutable de kyro update invoca npx; sin global y con binario ajeno se emite un remedio npm específico sin instalación oculta.",
+              "--check y --dry-run no llaman install ni modifican archivos y muestran plan o bloqueo correcto con y sin registro disponible.",
+              "La actualización desde npm global instala una versión validada y ejecuta sync o refresco runtime desde el CLI del paquete recién instalado."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-23T00:11:33.527Z",
+            "requestDigest": "2f34deaa9b19e8892f213b17cb6a0da622eb8d56292fb7393920c20f2027319e",
+            "reviewedMaterialDigest": "1f1c9de17e9d9657995fe21ddb2f3f52a40cd9e21494b0faa20d505769a3c2f2"
+          }
+        },
+        {
+          "id": "T1.3",
+          "title": "Verificar versión efectiva y fallo parcial",
+          "description": "Después de npm install global, comprobar que el paquete nuevo existe con la versión objetivo, que el kyro efectivo resuelve a esa instalación y que el runtime sincronizado tiene la misma versión. Diferenciar error de instalación, ruta/versión divergente y sync fallido; no imprimir éxito total en ninguno de ellos y entregar un remedio basado en la ruta verificada.",
+          "files_to_touch": [
+            "src/cli/commands/update.ts",
+            "scripts/check-update.mjs"
+          ],
+          "context": "La versión del proceso padre es vieja durante update. No confiar en la mera salida cero de npm ni en npm root -g si PATH apunta a otra copia. Mantener el hijo de paquete fresco fuera del bloqueo de escritura del proceso padre.",
+          "acceptance_criteria": [
+            "Las pruebas cubren instalación correcta, versión del comando visible distinta, paquete ausente tras npm, fallo de sync y runtime viejo; solo el estado consistente imprime actualización completada.",
+            "Un fallo después de instalar explica si el paquete cambió y qué operación falta, sin presentar el runtime como actualizado.",
+            "El camino de éxito comprueba la versión objetivo en paquete, comando activo y runtime; el caso sin workspace refresca solo el runtime."
+          ],
+          "depends_on": [
+            "T1.2"
+          ],
+          "scenario_refs": [
+            "S3",
+            "S4",
+            "S6"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Replaced the update planner's plain invariant Error with KyroCoreError INTERNAL and an actionable diagnostic remedy; preserved the prior package, visible-command, and runtime verification logic.",
+            "validation": [
+              "npm run build: PASS",
+              "npm run check: PASS end-to-end, including check:mcp, check:invocation, check:update, and check:cli-bundle",
+              "git diff --check: PASS",
+              "kyro doctor --artifacts --kyro-scope instalacion-global-sin-npx: PASS"
+            ],
+            "files_changed": [
+              "src/cli/commands/update.ts"
+            ],
+            "notes": "QA4 full-check failure corrected; no dedicated test added because the invariant branch is unreachable through valid UpdateFacts, while check:mcp directly enforces typed CLI errors.",
+            "by": "maker",
+            "recordedAt": "2026-09-23T02:25:28.926Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Las pruebas cubren instalación correcta, versión del comando visible distinta, paquete ausente tras npm, fallo de sync y runtime viejo; solo el estado consistente imprime actualización completada.",
+              "Un fallo después de instalar explica si el paquete cambió y qué operación falta, sin presentar el runtime como actualizado.",
+              "El camino de éxito comprueba la versión objetivo en paquete, comando activo y runtime; el caso sin workspace refresca solo el runtime."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-23T02:25:33.018Z",
+            "requestDigest": "9e2841470b4baa12525b864edb5a608ab622cbefc0a46600d3fcbabb1393bccc",
+            "reviewedMaterialDigest": "eb9b861c116c2f3e1f60b482e6aa0c8fa8daa7eba7fa12419114e032af78ae65"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Migración y protección de estado",
+      "objective": "Probar el paso de instalaciones temporales al comando npm global sin alterar scopes ni romper el runtime proyectado.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.4",
+          "title": "Cubrir migración de runtime proyectado y casos de invocación",
+          "description": "Crear o adaptar pruebas con un usuario que tiene el runtime proyectado pero no kyro global, luego instala el paquete npm y sincroniza desde un proyecto existente. Comparar archivos de estado y scopes antes y después; comprobar que el runtime proyectado sigue rechazando install/sync y que las invocaciones persistidas funcionan en POSIX y Windows.",
+          "files_to_touch": [
+            "scripts/check-update.mjs",
+            "scripts/check-invocation.mjs",
+            "scripts/check-cli-bundle.mjs",
+            "src/cli/package-root-mode.ts"
+          ],
+          "context": "El runtime en ~/.agents/kyro/current se mantiene como proyección. No modificar sprint.json ni scopes como atajo de migración. Los cambios de mensajes públicos extensos y certificación de tarball pertenecen al Sprint 2.",
+          "acceptance_criteria": [
+            "El fixture de migración termina con comando npm global y runtime funcional sin diferencias no esperadas en el estado ni los scopes del proyecto.",
+            "install/sync siguen bloqueados desde el runtime proyectado y las pruebas de invocación POSIX/Windows pasan.",
+            "Las pruebas dirigidas de update, invocation y CLI bundle pasan; se registra evidencia de resultados y límites del entorno."
+          ],
+          "depends_on": [
+            "T1.3"
+          ],
+          "scenario_refs": [
+            "S1",
+            "S7",
+            "S8"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Fixture POSIX empaqueta e instala Kyro con npm en prefijo temporal, sincroniza desde proyecto con runtime proyectado y compara estado/scopes; solo cambia installedAt del adaptador local. Runtime proyectado sigue rechazando install/sync y pruebas de invocación Windows simuladas pasan.",
+            "validation": [
+              "npm run check:update: pass; previews sin install/escritura",
+              "npm run check:invocation: pass; shims Windows simulados y rutas efímeras",
+              "npm run check:cli-bundle: pass; migración npm real en POSIX, preservación de estado y bloqueo de runtime proyectado",
+              "git diff --check: pass"
+            ],
+            "files_changed": [
+              "scripts/check-update.mjs",
+              "scripts/check-invocation.mjs",
+              "scripts/check-cli-bundle.mjs"
+            ],
+            "notes": "El fixture npm global real se ejecuta en POSIX; Windows se cubre mediante pruebas puras de .cmd y self-spawn, sin runner Windows disponible en este entorno.",
+            "by": "maker",
+            "recordedAt": "2026-09-23T00:16:17.515Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "El fixture de migración termina con comando npm global y runtime funcional sin diferencias no esperadas en el estado ni los scopes del proyecto.",
+              "install/sync siguen bloqueados desde el runtime proyectado y las pruebas de invocación POSIX/Windows pasan.",
+              "Las pruebas dirigidas de update, invocation y CLI bundle pasan; se registra evidencia de resultados y límites del entorno."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-23T00:16:19.907Z",
+            "requestDigest": "03d55e456d6cb9950e9a15c98021fb5ac24b61b2f57f9819dc9744d83ac5c41e",
+            "reviewedMaterialDigest": "67972decb6964268a49f9a328760670490e8067c07214acd6110d1869d47bcae"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "Todas las tareas del Sprint 1 tienen evidencia y veredicto aprobatorio.",
+    "Las pruebas dirigidas de actualización, invocación y runtime proyectado pasan en los entornos disponibles.",
+    "No queda una rama de actualización interna que ejecute npx ni un caso conocido de éxito con versiones divergentes."
+  ]
+}
