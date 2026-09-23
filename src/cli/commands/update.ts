@@ -8,7 +8,13 @@ import { isInteractiveTerminal } from '../core/tty';
 import { readPackageVersion } from '../help';
 import { classifyGlobalKyroOwnership, resolveKyroCommandPath, type GlobalKyroOwnership } from '../invocation';
 import { assertWorkspaceScope } from '../options';
-import { readManifest, readProjectState } from '../state';
+import {
+  assertPersistedLegacyScopeCachesMigratable,
+  readManifest,
+  readMonolitoProjectState,
+  readProjectState,
+  readSharedProjectState,
+} from '../state';
 import { detectPackageRootMode } from '../package-root-mode';
 import type { CliOptions } from '../types';
 import { compareSemverLike } from './doctor';
@@ -30,9 +36,10 @@ import { compareSemverLike } from './doctor';
  *
  * Deliberately NOT gated on `requireFullPackageFor`: the check step works from the projected
  * runtime too (often the only CLI agents have), and the mutating steps shell out to a fresh
- * full package either way. For the same reason this verb stays out of `isMutatingInvocation` in
+ * full package either way. A current CLI also syncs a workspace that still has the legacy
+ * shared scopes[] cache. For the same reason this verb stays out of `isMutatingInvocation` in
  * app.ts — the spawned fresh CLI takes its own state-writer lock, and a parent-held lock would
- * deadlock the child. `update` itself writes no state files.
+ * deadlock the child. `update` delegates state writes to that child.
  */
 
 export const UPDATE_PACKAGE = 'kyro-ai';
@@ -51,12 +58,14 @@ export interface UpdateFacts {
   latest: string | null;
   runtimeVersion: string | null;
   hasWorkspace: boolean;
+  hasLegacyScopeCache: boolean;
   ownership: GlobalKyroOwnership;
 }
 
 export type UpdateAction =
   | 'up-to-date'
   | 'refresh-stale-runtime'
+  | 'refresh-workspace'
   | 'blocked-runtime-ahead'
   | 'blocked-runtime-mismatch'
   | 'ahead-of-registry'
@@ -80,7 +89,7 @@ export interface UpdatePlan {
  * Unit-tested in scripts/check-update.mjs (no network in tests).
  */
 export function buildUpdatePlan(facts: UpdateFacts): UpdatePlan {
-  const { current, latest, runtimeVersion, hasWorkspace, ownership } = facts;
+  const { current, latest, runtimeVersion, hasWorkspace, hasLegacyScopeCache, ownership } = facts;
   const pinned = validateTargetVersion(latest);
   const cmp = pinned ? compareSemverLike(pinned, current) : null;
   const behind = cmp !== null && cmp > 0;
@@ -152,6 +161,17 @@ export function buildUpdatePlan(facts: UpdateFacts): UpdatePlan {
         ? 'sync the current workspace from the verified npm global package (no download needed)'
         : 'refresh the global runtime from the verified npm global package (no workspace state in this directory)'],
       summary: `Npm global kyro is ${current}, but the installed runtime is ${runtimeVersion ?? 'missing'}; refresh it from the verified package.`,
+    };
+  }
+
+  if (!behind && hasWorkspace && hasLegacyScopeCache && pinned === current) {
+    return {
+      facts,
+      action: 'refresh-workspace',
+      target: current,
+      behind: false,
+      steps: ['sync the current workspace from the verified npm global package to remove legacy project.json.scopes[]'],
+      summary: `Workspace has a legacy scopes[] cache; refresh it from verified npm global kyro ${current}.`,
     };
   }
 
@@ -442,9 +462,12 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     latest: queryRegistryLatest(),
     runtimeVersion: typeof manifest?.packageVersion === 'string' ? manifest.packageVersion : null,
     hasWorkspace: readProjectState() !== null,
+    hasLegacyScopeCache: [readSharedProjectState(), readMonolitoProjectState()]
+      .some((state) => state !== null && Object.prototype.hasOwnProperty.call(state, 'scopes')),
     ownership,
   };
   const plan = buildUpdatePlan(facts);
+  if (facts.hasLegacyScopeCache) assertPersistedLegacyScopeCachesMigratable();
 
   if (options.check) {
     printPlan(plan);
@@ -469,7 +492,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     return;
   }
 
-  if (plan.action === 'refresh-stale-runtime') {
+  if (plan.action === 'refresh-stale-runtime' || plan.action === 'refresh-workspace') {
     printPlan(plan);
     if (!options.yes) {
       if (!isInteractiveTerminal()) {

@@ -262,7 +262,7 @@ export function buildClosePlan(
     throw new KyroCoreError(
       'STATE_DIVERGED',
       `Cannot checkpoint ${scope}: its KyroScopeEntry is missing from project state.`,
-      'Repair project.json (or legacy kyro.json) scopes[] before closing so the checkpoint can preserve scope state.',
+      'Inspect the scope sprint.json with kyro doctor --artifacts before closing.',
     );
   }
   const createdAt = new Date().toISOString();
