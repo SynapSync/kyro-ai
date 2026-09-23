@@ -1,0 +1,902 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "1748cf4d0fd6e33a3c29326a33d0f6d6ac244fa4bf4881efb8cde8a34e687998",
+  "createdAt": "2026-09-23T16:01:39.910Z",
+  "identity": {
+    "scope": "instalacion-global-sin-npx",
+    "sprintN": 2,
+    "sprintSlug": "instrucciones-y-certificacion"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": "Sprint 2 cerrado y QA APPROVED WITH NOTES para PR #138; roadmap agotado, pendiente decidir completion del scope.",
+    "summary": "Documentación, diagnósticos y distribución global npm certificados en POSIX y Windows; PR #138 lista para merge a develop.",
+    "recommendations": [
+      "Revisar E2 junto con los registros históricos T2.2/T2.4/T2.5 al auditar esta entrega.",
+      "Tras el merge a develop, promover 4.52.0 a main y verificar tag, publicación npm y GitHub Release."
+    ],
+    "learnings": [
+      "La instalación y sincronización deben verificarse desde el tarball distribuido y con el comando realmente visible en PATH.",
+      "La PR temporal #137 dejó evidencia histórica que exigió una corrección append-only E2 antes de certificar la PR final #138.",
+      "La salida de npm global debe permanecer visible y permitir distinguir EACCES/EPERM de errores de red."
+    ]
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/instalacion-global-sin-npx/archive/sprint-002-instrucciones-y-certificacion.json",
+    "narrative": ".agents/kyro/scopes/instalacion-global-sin-npx/archive/sprint-002-instrucciones-y-certificacion.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "instalacion-global-sin-npx",
+    "title": "Instalación global de Kyro sin dependencia de npx",
+    "status": "planning",
+    "objective": "Permitir instalar y actualizar el CLI de Kyro mediante npm global con un comando durable y verificable, sin depender internamente de npx ni anunciar éxito sobre otra instalación.",
+    "successCriteria": [
+      "Una persona instala Kyro una vez, usa kyro desde una terminal nueva e inicializa un proyecto desde su raíz.",
+      "Una actualización confirma que el comando visible y el runtime corresponden a la versión instalada antes de anunciar éxito.",
+      "Una instalación ajena o ambigua y un fallo parcial producen un diagnóstico accionable sin éxito falso ni cambio silencioso de gestor.",
+      "Las instrucciones operativas y la migración de usuarios existentes siguen un único recorrido global sin ejecutar npx internamente."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "La instalación oficial del CLI crea un comando Kyro durable mediante npm global y permite inicializar el proyecto desde su raíz.",
+          "priority": "must",
+          "rationale": "El paquete ya publica el binario kyro; npx es temporal y la copia proyectada no equivale al paquete completo. Verificar en un prefijo limpio y una terminal nueva."
+        },
+        {
+          "id": "R2",
+          "statement": "La actualización no depende internamente de npx y ofrece migración explícita cuando solo existe el runtime proyectado.",
+          "priority": "must",
+          "rationale": "La rama npx actual perpetúa instalaciones sin comando global. La migración conserva los scopes y el estado de proyecto; probar un usuario sin binario global."
+        },
+        {
+          "id": "R3",
+          "statement": "La actualización identifica que el comando activo pertenece a la instalación npm que va a actualizar y bloquea gestores o prefijos ajenos o ambiguos.",
+          "priority": "must",
+          "rationale": "Un binario durable de pnpm no prueba propiedad npm; actualizar otra copia daría éxito falso. Probar pnpm y prefijos competidores."
+        },
+        {
+          "id": "R4",
+          "statement": "La actualización instala la versión objetivo antes de refrescar el runtime desde el paquete nuevo y comprueba la versión del paquete, el comando visible y el runtime antes de declarar éxito.",
+          "priority": "must",
+          "rationale": "Evita proyectar el proceso viejo o declarar actualizada una versión distinta; verificar camino exitoso y fallo parcial."
+        },
+        {
+          "id": "R5",
+          "statement": "Las vistas previas de actualización no instalan paquetes ni modifican archivos y describen con veracidad el camino o bloqueo previsto.",
+          "priority": "must",
+          "rationale": "--check y --dry-run se usan para decidir sin efectos secundarios; probar con stubs del gestor y diff de archivos."
+        },
+        {
+          "id": "R6",
+          "statement": "La ausencia de registro, un paquete incompleto o un fallo de sincronización se comunican como estados distintos y no se presentan como actualización completada.",
+          "priority": "must",
+          "rationale": "La falla parcial necesita remedio con el paquete verificado, sin fallback silencioso a otro gestor."
+        },
+        {
+          "id": "R7",
+          "statement": "El runtime proyectado sigue sin poder ser fuente de instalación o sincronización y una migración no borra ni reescribe scopes para obtener un comando global.",
+          "priority": "must",
+          "rationale": "Conserva el límite del paquete completo y evita pérdida de estado durante migración; comparar fixture antes/después."
+        },
+        {
+          "id": "R8",
+          "statement": "Los agentes conservan una invocación ejecutable en Windows y no persisten shims temporales como comandos duraderos.",
+          "priority": "must",
+          "rationale": "El shim .cmd no debe lanzarse directamente como hijo Node; conservar detección de rutas npx/dlx y ejecutar pruebas Windows."
+        },
+        {
+          "id": "R9",
+          "statement": "Documentación, ayuda, diagnósticos y skills vigentes indican la instalación npm global y una migración coherente, conservando la vía de plugin independiente.",
+          "priority": "must",
+          "rationale": "Las recetas activas con npx volverían al camino anterior; revisar superficies operativas y tests de contrato, sin reescribir historia."
+        },
+        {
+          "id": "R10",
+          "statement": "El paquete publicado contiene CLI y recursos necesarios y supera las comprobaciones de build, check, empaquetado y plataformas aplicables.",
+          "priority": "must",
+          "rationale": "La instalación global debe funcionar desde el tarball, no solo desde el checkout; probar npm pack y CI POSIX/Windows."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "una máquina con npm y sin Kyro",
+          "when": "instalo globalmente el paquete y abro una terminal nueva",
+          "then": "kyro está en PATH y puede inicializar un proyecto desde su raíz"
+        },
+        {
+          "id": "S2",
+          "requirement": "R3",
+          "given": "el kyro primero en PATH pertenece a pnpm, otro prefijo o una ruta ambigua",
+          "when": "solicito comprobar o ejecutar update",
+          "then": "Kyro explica la discrepancia y no instala una copia npm suponiendo que actualizará ese comando"
+        },
+        {
+          "id": "S3",
+          "requirement": "R4",
+          "given": "un kyro npm global anterior y una versión objetivo válida",
+          "when": "ejecuto update y npm termina correctamente",
+          "then": "el paquete nuevo, el comando visible y el runtime quedan en la versión objetivo antes de anunciar éxito"
+        },
+        {
+          "id": "S4",
+          "requirement": "R6",
+          "given": "npm instaló la versión objetivo pero falla la sincronización o diverge el comando visible",
+          "when": "update termina",
+          "then": "Kyro identifica el paso incompleto y no afirma actualización completada"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "cualquier instalación o un registro inaccesible",
+          "when": "ejecuto update --check o --dry-run",
+          "then": "recibo un diagnóstico veraz sin instalación ni escritura"
+        },
+        {
+          "id": "S6",
+          "requirement": "R2",
+          "given": "solo existe el runtime proyectado y no hay kyro npm global",
+          "when": "solicito update",
+          "then": "Kyro indica la migración a npm y nunca invoca npx internamente"
+        },
+        {
+          "id": "S7",
+          "requirement": "R7",
+          "given": "un proyecto existente con scopes y runtime proyectado",
+          "when": "instalo el paquete npm global y sincronizo",
+          "then": "el runtime se refresca sin perder ni reescribir scopes por motivo de distribución"
+        },
+        {
+          "id": "S8",
+          "requirement": "R8",
+          "given": "un agente en Windows o un PATH con shim temporal",
+          "when": "Kyro persiste la invocación",
+          "then": "el agente puede ejecutarla y no se conserva un shim efímero como comando duradero"
+        },
+        {
+          "id": "S9",
+          "requirement": "R9",
+          "given": "una persona consulta instrucciones vigentes o usa solo el plugin",
+          "when": "busca instalar o reparar Kyro",
+          "then": "encuentra el recorrido global npm sin obligación de CLI para el caso exclusivo de plugin"
+        },
+        {
+          "id": "S10",
+          "requirement": "R10",
+          "given": "un tarball construido y los entornos de CI",
+          "when": "se ejecutan instalación, build, check y pruebas de plataforma",
+          "then": "el CLI y los recursos funcionan desde el paquete distribuido"
+        }
+      ],
+      "nonGoals": [
+        "Soporte oficial de instalación y actualización global mediante pnpm en esta entrega.",
+        "Prohibir que un tercero ejecute externamente npx kyro-ai.",
+        "Cambiar el formato de sprint.json, scopes o estado de proyecto.",
+        "Reescribir referencias históricas a instalaciones anteriores."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 2,
+      "sizingRationale": "Dos objetivos verificables y dependientes: primero cerrar la actualización segura, la procedencia del binario y la migración sin npx; después alinear todas las superficies públicas y certificar el tarball y las plataformas. Un solo sprint mezclaría el cambio de comportamiento con una actualización extensa de mensajes antes de estabilizar el contrato; más sprints añadirían cortes artificiales. npm global es la única vía oficial inicial; pnpm se bloquea con diagnóstico hasta tener soporte propio.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "actualizacion-global-segura",
+          "title": "Actualización global segura y migración",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "instrucciones-y-certificacion",
+          "title": "Instrucciones y certificación de distribución",
+          "state": "active"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "actualizacion-global-segura",
+        "outcome": "shipped",
+        "closedAt": "2026-09-23",
+        "archive": "archive/sprint-001-actualizacion-global-segura.md",
+        "snapshot": "archive/sprint-001-actualizacion-global-segura.json",
+        "checkpoint": "archive/sprint-001-actualizacion-global-segura.checkpoint.json",
+        "checkpointSha256": "cac612855e6ca131d4220d845468a8bbd325620dda07bb4a6611bf6b4b002413"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "actualizacion-global-segura",
+      "outcome": "shipped",
+      "summary": "Hacer que kyro update use npm global con procedencia verificada, sin fallback interno a npx, y que diagnostique migración y fallos parciales sin anunciar éxito falso."
+    },
+    "activeSprint": {
+      "n": 2,
+      "slug": "instrucciones-y-certificacion",
+      "title": "Instrucciones y certificación de distribución",
+      "objective": "Alinear instrucciones, ayuda y diagnósticos con npm global, preservar la vía exclusiva de plugin y certificar el paquete distribuido en POSIX y Windows.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Recorrido público de instalación y migración",
+          "objective": "Dar una receta global coherente en las instrucciones vigentes y conservar la instalación exclusiva de plugin.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.1",
+              "title": "Actualizar README y guías operativas",
+              "description": "Revisar README y guías activas de instalación, sincronización, actualización y migración. Presentar npm install -g kyro-ai, kyro install desde la raíz del proyecto, kyro update y el remedio manual coherente. Diferenciar explícitamente la vía exclusiva de plugin Claude, que no exige CLI, y conservar referencias históricas como historia.",
+              "files_to_touch": [
+                "README.md",
+                "docs/getting-started.md",
+                "docs/cli.md",
+                "docs/teams.md",
+                "docs/agent-adapters.md",
+                "docs/HOW-TO-USE-CODEX.md",
+                "docs/HOW-TO-USE-OPENCODE.md"
+              ],
+              "context": "S9/R9. El inventario dirigido de recetas vigentes mostró npx en estas superficies. Los ejemplos externos de npx y las referencias históricas son no-objetivos; la ruta oficial debe ser npm global. project.json no declara principios ni hay convenciones de scope adicionales.",
+              "acceptance_criteria": [
+                "Cada guía operativa vigente explica instalación npm global y la inicialización desde la raíz del proyecto sin prometer que el runtime proyectado instala o sincroniza.",
+                "La migración desde runtime proyectado o uso temporal tiene pasos accionables y coincide con el comportamiento de kyro update.",
+                "El recorrido solo-plugin de Claude continúa documentado como independiente del CLI y los enlaces de las guías siguen válidos."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S9"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Updated current README and operational guides for npm global CLI installation, project-root initialization, verified update and projected-runtime migration; preserved independent Claude plugin path and historical npx explanation.",
+                "validation": [
+                  "npm run check:links: PASS, 88 relative-link files checked",
+                  "git diff --check: PASS",
+                  "Targeted active-guide npx search: only historical migration and ephemeral-path explanation remain"
+                ],
+                "files_changed": [
+                  "README.md",
+                  "docs/getting-started.md",
+                  "docs/cli.md",
+                  "docs/teams.md",
+                  "docs/agent-adapters.md",
+                  "docs/HOW-TO-USE-CODEX.md",
+                  "docs/HOW-TO-USE-OPENCODE.md"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-09-23T03:02:08.216Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Cada guía operativa vigente explica instalación npm global y la inicialización desde la raíz del proyecto sin prometer que el runtime proyectado instala o sincroniza.",
+                  "La migración desde runtime proyectado o uso temporal tiene pasos accionables y coincide con el comportamiento de kyro update.",
+                  "El recorrido solo-plugin de Claude continúa documentado como independiente del CLI y los enlaces de las guías siguen válidos."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-23T03:02:11.764Z",
+                "requestDigest": "e371cc575ee44db75165daefc99ae25b8cb119347f51b15c0f3e0e9d01f5da6c",
+                "reviewedMaterialDigest": "198abadf7a9e4c741a3e0a6eca8e919d46a29d7e3ff575768a6c91f65c3d9cb8"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Ayuda, diagnósticos y agentes",
+          "objective": "Eliminar remedios operativos obsoletos en código y plantillas que reciben usuarios y agentes.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.2",
+              "title": "Alinear ayuda y remedios del CLI",
+              "description": "Actualizar mensajes de ayuda y diagnósticos activos que recomiendan npx en doctor, estado de proyecto, conciliación, plan, reglas y guardas de paquete. Mantener errores distintos para paquete completo, runtime proyectado, migración y estado incompleto; ajustar pruebas de contrato que afirman las recetas antiguas.",
+              "files_to_touch": [
+                "src/cli/commands/doctor.ts",
+                "src/cli/commands/artifact-doctor.ts",
+                "src/cli/commands/plan.ts",
+                "src/cli/commands/rule.ts",
+                "src/cli/state.ts",
+                "src/cli/project/reconcile.ts",
+                "src/cli/package-root-mode.ts",
+                "scripts/check-cli-bundle.mjs",
+                "scripts/check-scope-registry-reading.mjs"
+              ],
+              "context": "S9/R9 y nota QA del Sprint 1: las recetas de reparación actuales aún devuelven a npx. Mantener el límite del paquete completo y los diagnósticos de procedencia establecidos en Sprint 1. project.json no declara principios ni hay convenciones de scope adicionales.",
+              "acceptance_criteria": [
+                "Los remedios vigentes dirigen a npm global y kyro install/sync/update según el caso, sin indicar ejecutar el runtime proyectado como instalador.",
+                "Los mensajes distinguen ausencia de CLI global, paquete incompleto y fallo de sincronización sin afirmar éxito falso.",
+                "Las pruebas dirigidas de diagnósticos y contratos de texto pasan con las nuevas recetas."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S9",
+                "S10"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Replaced active CLI package-root, doctor, project-state, reconciliation, plan, rule, and artifact remedies with npm-global installation and project-root install/sync steps; retained projected-runtime package boundary and updated text contracts.",
+                "validation": [
+                  "npm run build: PASS",
+                  "npm run check:cli-bundle: PASS, projected/corrupt roots blocked and global migration fixture",
+                  "npm run check:scope-registry-reading: PASS",
+                  "npm run check:plan: PASS",
+                  "npm run check:rule: PASS"
+                ],
+                "files_changed": [
+                  "src/cli/commands/doctor.ts",
+                  "src/cli/commands/artifact-doctor.ts",
+                  "src/cli/commands/plan.ts",
+                  "src/cli/commands/rule.ts",
+                  "src/cli/state.ts",
+                  "src/cli/project/reconcile.ts",
+                  "src/cli/package-root-mode.ts",
+                  "scripts/check-cli-bundle.mjs",
+                  "scripts/check-scope-registry-reading.mjs"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-09-23T03:03:58.744Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Los remedios vigentes dirigen a npm global y kyro install/sync/update según el caso, sin indicar ejecutar el runtime proyectado como instalador.",
+                  "Los mensajes distinguen ausencia de CLI global, paquete incompleto y fallo de sincronización sin afirmar éxito falso.",
+                  "Las pruebas dirigidas de diagnósticos y contratos de texto pasan con las nuevas recetas."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-23T03:04:02.057Z",
+                "requestDigest": "960853e6326b1413f690789b6aae1a6043ab3a4bf65e5f784d6d22eb754ce255",
+                "reviewedMaterialDigest": "169765a4f9f5acde2f98e8e748f160cebd2a2cadc15eaa8d7a223119992d07e8"
+              }
+            },
+            {
+              "id": "T2.3",
+              "title": "Alinear skills, routers y plantillas de agentes",
+              "description": "Revisar instrucciones activas de orchestrator, skills canónicos y texto generado de command skills para que arranque, recuperación y falta de capacidades remitan al paquete npm global. Conservar la resolución de invocación ejecutable en Windows y la vía de plugin sin instalación CLI obligatoria. Adaptar pruebas de startup, rutas y assets proyectados.",
+              "files_to_touch": [
+                "agents/orchestrator.md",
+                "internal/skills/sprint-forge/SKILL.md",
+                "internal/skills/qa-review/SKILL.md",
+                "internal/skills/kyro-sprint-executor/SKILL.md",
+                "internal/skills/sprint-forge/assets/modes/INIT.md",
+                "internal/skills/sprint-forge/assets/helpers/debt-tracker.md",
+                "src/cli/adapters/command-skills.ts",
+                "scripts/check-startup-contract.mjs",
+                "scripts/check-managed-write-contract.mjs",
+                "scripts/check-sprint-guard.mjs"
+              ],
+              "context": "S9/R9 y S8/R8. Los skills instalados proceden del paquete y de las plantillas canónicas; la forma node <runtime>/dist/cli.js puede seguir siendo necesaria en Windows para self-spawn, pero no debe ofrecerse como fuente de install/sync. No alterar el contrato de gates ni el estado Kyro. project.json no declara principios ni hay convenciones de scope adicionales.",
+              "acceptance_criteria": [
+                "Los agentes reciben instrucciones coherentes de instalación/migración global y un remedio ejecutable cuando falta el CLI o falla el handshake.",
+                "La proyección y el canal plugin mantienen invocaciones válidas en Windows sin persistir shims temporales.",
+                "Las pruebas de startup, guardas, rutas y skills generados validan las nuevas instrucciones."
+              ],
+              "depends_on": [
+                "T2.2"
+              ],
+              "scenario_refs": [
+                "S8",
+                "S9"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Agent startup now resolves a bundled full-package CLI through CLAUDE_PLUGIN_ROOT for plugin-only Claude use; npm global recovery remains for missing CLI, and projected runtime is never used for install/sync.",
+                "validation": [
+                  "npm run check:startup-contract: PASS, 10 elements in both entry points including plugin fallback",
+                  "npm run check:no-placeholder: PASS",
+                  "npm run check:token-budgets: PASS",
+                  "npm run check:adapters: PASS"
+                ],
+                "files_changed": [
+                  "agents/orchestrator.md",
+                  "internal/skills/sprint-forge/SKILL.md",
+                  "internal/skills/qa-review/SKILL.md",
+                  "internal/skills/kyro-sprint-executor/SKILL.md",
+                  "scripts/check-startup-contract.mjs"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-09-23T03:31:57.814Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Los agentes reciben instrucciones coherentes de instalación/migración global y un remedio ejecutable cuando falta el CLI o falla el handshake.",
+                  "La proyección y el canal plugin mantienen invocaciones válidas en Windows sin persistir shims temporales.",
+                  "Las pruebas de startup, guardas, rutas y skills generados validan las nuevas instrucciones."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-23T03:32:01.879Z",
+                "requestDigest": "af714099899e3902ab51861a7dcefd94e8e9c4b5b1dae98e8d5d53716160e91a",
+                "reviewedMaterialDigest": "cef1b7909b52b34a438d81edbfb549d1aec31b8180a4372802350549a5910881"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P3",
+          "title": "Certificación del paquete y plataformas",
+          "objective": "Probar el tarball instalado como usuario final y ejecutar la ruta crítica en un runner Windows real.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.4",
+              "title": "Probar instalación global desde tarball y migración",
+              "description": "Extender fixtures para crear el tarball, instalarlo en un prefijo npm temporal limpio, abrir una invocación nueva por PATH y ejecutar kyro install/update o sync según corresponda. Verificar CLI y recursos empaquetados, versión de paquete/comando/runtime y preservación de scopes en migración. Añadir comprobaciones de npm pack y cobertura de recursos distributivos.",
+              "files_to_touch": [
+                "scripts/check-cli-bundle.mjs",
+                "scripts/check-cli-bundle-assets.mjs",
+                "scripts/check-update.mjs",
+                "package.json"
+              ],
+              "context": "S1/R1, S7/R7 y S10/R10. El fixture POSIX existente ya prueba parte de la migración, pero R10 requiere certificar el artefacto distribuido y no solo el checkout. Conservar el límite de paquete completo y pruebas sin publicación. project.json no declara principios ni hay convenciones de scope adicionales.",
+              "acceptance_criteria": [
+                "Un prefijo limpio instala el tarball y una invocación nueva encuentra kyro en PATH e inicializa un proyecto desde su raíz.",
+                "El paquete contiene CLI, plantillas, skills, adapters y recursos necesarios; su versión coincide con el comando y el runtime tras sincronizar.",
+                "La migración preserva scopes y estado de proyecto; npm pack --dry-run y los checks dirigidos pasan."
+              ],
+              "depends_on": [
+                "T2.3"
+              ],
+              "scenario_refs": [
+                "S1",
+                "S7",
+                "S10"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Corregido el fixture del tarball: PATH inicial contiene Node pero no kyro; token audit corre antes de migrar; tras npm global sync los diagnósticos usan el PATH migrado. El tarball y la migración conservaron estado/scopes.",
+                "validation": [
+                  "npm run check:cli-bundle PASS en checkout original 5.0.0 y rama temporal 4.51.0 con PATH aislado",
+                  "npm run check PASS en rama temporal con HOME y PATH limpios, sin kyro global; /tmp/kyro-sprint2-ci-clean-check.log",
+                  "npm pack --dry-run --json PASS: kyro-ai 4.51.0, 976 files",
+                  "GitHub Actions 35815753272 SHA 8e90068: Ubuntu Validate step SUCCESS; release-version gate FAILURE porque v4.51.0 ya publicada"
+                ],
+                "files_changed": [
+                  "scripts/check-cli-bundle.mjs"
+                ],
+                "notes": "CI global permanece rojo únicamente por gate de publicación de la PR draft temporal, que conserva versión base 4.51.0; no se modificó gate ni se certifica publicación. Windows Node 18/20/22 SUCCESS en el mismo SHA.",
+                "by": "maker",
+                "recordedAt": "2026-09-23T03:55:42.892Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Un prefijo limpio instala el tarball y una invocación nueva encuentra kyro en PATH e inicializa un proyecto desde su raíz.",
+                  "El paquete contiene CLI, plantillas, skills, adapters y recursos necesarios; su versión coincide con el comando y el runtime tras sincronizar.",
+                  "La migración preserva scopes y estado de proyecto; npm pack --dry-run y los checks dirigidos pasan."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-23T03:55:46.456Z",
+                "requestDigest": "d4753a3c79a99a87fc0d5bff3b56ab199b0b5264fa8d94cea736f8b2bd550d93",
+                "reviewedMaterialDigest": "38aa3a821e6f0606484287dc041a8f09b6be4b208ae65f66ff8f953396659993"
+              }
+            },
+            {
+              "id": "T2.5",
+              "title": "Ejecutar smoke de npm global en Windows CI",
+              "description": "Ampliar el smoke Windows y el workflow para instalar el tarball con npm global en un prefijo aislado, ejecutar el shim real en una terminal nueva y probar install, invocación persistida, sync/update y sus postcondiciones relevantes. Registrar evidencia del runner Windows real; si falla, corregir la causa antes de certificar.",
+              "files_to_touch": [
+                "scripts/check-windows-install-smoke.mjs",
+                ".github/workflows/ci.yml",
+                "package.json",
+                "scripts/check-invocation.mjs"
+              ],
+              "context": "S8/R8 y S10/R10. Sprint 1 solo ejecutó pruebas de shims simulados en POSIX; el workflow Windows actual instala desde dist del checkout y no comprueba npm global desde tarball. No presentar prueba simulada como ejecución Windows real. project.json no declara principios ni hay convenciones de scope adicionales.",
+              "acceptance_criteria": [
+                "La CI Windows ejecuta el smoke con un tarball npm y el shim real, y verifica la invocación persistida del agente sin depender de un shim efímero.",
+                "Un runner Windows real completa build, tests de plataforma, install/sync y las comprobaciones de versión y estado previstas.",
+                "El resultado Windows y cualquier limitación quedan registrados como evidencia de la tarea y de la QA."
+              ],
+              "depends_on": [
+                "T2.4"
+              ],
+              "scenario_refs": [
+                "S8",
+                "S10"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Smoke npm global desde tarball ejecutado en runners Windows nativos Node 18/20/22 sobre SHA final 8e90068d831d1be8ea9496e25bdedf9e7a1aef01: build, identidad de archivo, contratos invocation/update, instalación y sync global desde tarball, y lock pasaron.",
+                "validation": [
+                  "Actions run 35815753272 Windows Node 18 SUCCESS https://github.com/SynapSync/kyro-ai/actions/runs/35815753272/job/107036795563",
+                  "Actions run 35815753272 Windows Node 20 SUCCESS https://github.com/SynapSync/kyro-ai/actions/runs/35815753272/job/107036795485",
+                  "Actions run 35815753272 Windows Node 22 SUCCESS https://github.com/SynapSync/kyro-ai/actions/runs/35815753272/job/107036795382",
+                  "Ubuntu Validate step SUCCESS, including build/check/adapters/tokens/artifacts/npm pack; job overall FAILURE only at Verify release version is new because draft PR uses already released v4.51.0 https://github.com/SynapSync/kyro-ai/actions/runs/35815753272/job/107036795202"
+                ],
+                "files_changed": [
+                  "scripts/check-windows-install-smoke.mjs",
+                  ".github/workflows/ci.yml"
+                ],
+                "notes": "PR #137 es vehículo temporal draft desde develop; su gate de publicación no fue modificado, el run global sigue FAILURE y no certifica una publicación. El smoke Windows y sus postcondiciones sí pasaron en el SHA final. Checkout original conserva código Sprint1/snapshot que esta PR aislada no incluye; no usar esta PR como aprobación de merge de todo el scope.",
+                "by": "maker",
+                "recordedAt": "2026-09-23T03:56:11.077Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "La CI Windows ejecuta el smoke con un tarball npm y el shim real, y verifica la invocación persistida del agente sin depender de un shim efímero.",
+                  "Un runner Windows real completa build, tests de plataforma, install/sync y las comprobaciones de versión y estado previstas.",
+                  "El resultado Windows y cualquier limitación quedan registrados como evidencia de la tarea y de la QA."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-23T03:56:14.906Z",
+                "requestDigest": "ff49d412fafb9a20c91cd0b361f2c9190edb1356cf282aba1db550835a9368d0",
+                "reviewedMaterialDigest": "bfd6040b6fef73dbb83f6c06a6e8218ae531ac693bda7ade5c2b1a0b09043e5b"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [
+        {
+          "id": "E1",
+          "title": "Diagnosticar fallos de permisos de npm global",
+          "description": "Conservar progreso visible de npm install -g y distinguir un fallo de permisos de un fallo de red al informar una actualización incompleta.",
+          "files_to_touch": [
+            "src/cli/commands/update.ts",
+            "scripts/check-update.mjs"
+          ],
+          "context": "QA PR #138: nota no bloqueante sobre stdio inherit que pierde stderr y clasifica permisos como error de red.",
+          "acceptance_criteria": [
+            "Un npm install -g que falla con EACCES o EPERM produce un remedio de permisos accionable, sin anunciar actualización exitosa.",
+            "Los fallos sin señal de permisos conservan un diagnóstico general correcto; los tests dirigidos pasan."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S4"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "npm install -g streams stdout/stderr while retaining recent stderr for classified failure remedies; EACCES/EPERM gets a permissions remedy, other failures keep network/general guidance, and no failure reports success.",
+            "validation": [
+              "npm run build: PASS",
+              "npm run check:update: PASS, including isolated EACCES and ENETUNREACH install failures with visible output",
+              "git diff --check: PASS"
+            ],
+            "files_changed": [
+              "src/cli/commands/update.ts",
+              "scripts/check-update.mjs"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-09-23T14:07:26.851Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Un npm install -g que falla con EACCES o EPERM produce un remedio de permisos accionable, sin anunciar actualización exitosa.",
+              "Los fallos sin señal de permisos conservan un diagnóstico general correcto; los tests dirigidos pasan."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-23T14:08:27.206Z",
+            "requestDigest": "a2bce5b4d483f414820bf21c3f35c5160957eb4711b568a244a130524a1f6e64",
+            "reviewedMaterialDigest": "5755124e7d180904b9bae712e1aa565fd0d35393b1b2634eea3a5ab99c841400"
+          }
+        },
+        {
+          "id": "E2",
+          "title": "Conciliar evidencia de la entrega final",
+          "description": "Agregar una corrección explícita a la evidencia histórica del Sprint 2 para separar la PR temporal #137 de la PR final #138 y rectificar los archivos y checks atribuidos a T2.2.",
+          "files_to_touch": [],
+          "context": "QA PR #138: CHANGES REQUIRED por evidencia activa obsoleta en T2.2/T2.4/T2.5. Corrección append-only para preservar los veredictos históricos.",
+          "acceptance_criteria": [
+            "La evidencia identifica el SHA y run de la PR #138 con Ubuntu y Windows Node 18/20/22 exitosos, y distingue los runs 4.51.0 de la rama temporal como historia.",
+            "Se declara que scripts/check-scope-registry-reading.mjs no existe en la rama final y que src/cli/project/reconcile.ts no cambió en esta PR; se validan los diagnósticos con los checks reales de la rama.",
+            "doctor --artifacts, analyze y la QA independiente pueden distinguir sin ambigüedad el estado actual del histórico sin alterar archivos de archivo o veredictos antiguos."
+          ],
+          "depends_on": [
+            "E1"
+          ],
+          "scenario_refs": [
+            "S10"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Final delivery is PR #138, kyro-ai 4.52.0. Code commit 7346627a97c4b0706a37466f233f5dd7d0d80532 passed Actions run 35872036060: Ubuntu validate and native Windows Node 18/20/22. T2.2/T2.4/T2.5 references to PR #137, SHA 8e90068, version 4.51.0 and failed release gate document historical temporary validation, not the current delivery.",
+            "validation": [
+              "Actions run 35872036060: validate SUCCESS, Windows Node 18 SUCCESS, Node 20 SUCCESS, Node 22 SUCCESS; tag/publish/release SKIPPED on PR",
+              "npm run build and npm run check: PASS on code commit 7346627; check includes cli-bundle, plan, rule, invocation, update and Windows contract checks",
+              "doctor --artifacts --kyro-scope instalacion-global-sin-npx: PASS; analyze: zero findings",
+              "git diff confirms scripts/check-scope-registry-reading.mjs absent and src/cli/project/reconcile.ts unchanged in PR #138; T2.2 historical files_changed/validation entries for those paths do not describe the final branch"
+            ],
+            "files_changed": [],
+            "notes": "Append-only QA correction: previous T2.2 evidence attributed a nonexistent script and unchanged reconcile.ts to this delivery. Current diagnostic changes are in doctor.ts, artifact-doctor.ts, plan.ts, rule.ts, state.ts, package-root-mode.ts and check-cli-bundle.mjs. PR #137 was temporary; PR #138 carries Sprint 1 plus Sprint 2 and the passing 4.52.0 CI. Preserve old task evidence and Sprint 1 checkpoint as history.",
+            "by": "maker",
+            "recordedAt": "2026-09-23T14:15:47.235Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "La evidencia identifica el SHA y run de la PR #138 con Ubuntu y Windows Node 18/20/22 exitosos, y distingue los runs 4.51.0 de la rama temporal como historia.",
+              "Se declara que scripts/check-scope-registry-reading.mjs no existe en la rama final y que src/cli/project/reconcile.ts no cambió en esta PR; se validan los diagnósticos con los checks reales de la rama.",
+              "doctor --artifacts, analyze y la QA independiente pueden distinguir sin ambigüedad el estado actual del histórico sin alterar archivos de archivo o veredictos antiguos."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-09-23T14:16:16.683Z",
+            "requestDigest": "c12e16de437191cd653b040a01d2f27b6d7b9d1555674d64a8be54fe1601f708",
+            "reviewedMaterialDigest": "dde7b122b3d27900dc9413f0b8c2727b9170b2e73a8cc02857e70cbe890f3985"
+          }
+        }
+      ],
+      "definitionOfDone": [
+        "S9 y S10 tienen tareas implementadas, evidencia concreta y veredictos aprobatorios; S8 se verifica en Windows real.",
+        "README, guías, ayuda, diagnósticos y skills activos indican el recorrido npm global y conservan la vía exclusiva de plugin.",
+        "El tarball supera instalación global aislada, build, check, pruebas de adapters, npm pack --dry-run y CI POSIX/Windows.",
+        "La QA independiente revisa todos los requisitos y notas del Sprint 1 antes de cerrar el sprint."
+      ]
+    },
+    "debt": [],
+    "handoff": {
+      "nextAction": "qa_or_close",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task E2 passed checker review.",
+      "lastUpdated": "2026-09-23T14:16:16.683Z"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-09-23T00:05:22.293Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "instalacion-global-sin-npx",
+    "title": "Instalación global de Kyro sin dependencia de npx",
+    "status": "planning",
+    "objective": "Permitir instalar y actualizar el CLI de Kyro mediante npm global con un comando durable y verificable, sin depender internamente de npx ni anunciar éxito sobre otra instalación.",
+    "successCriteria": [
+      "Una persona instala Kyro una vez, usa kyro desde una terminal nueva e inicializa un proyecto desde su raíz.",
+      "Una actualización confirma que el comando visible y el runtime corresponden a la versión instalada antes de anunciar éxito.",
+      "Una instalación ajena o ambigua y un fallo parcial producen un diagnóstico accionable sin éxito falso ni cambio silencioso de gestor.",
+      "Las instrucciones operativas y la migración de usuarios existentes siguen un único recorrido global sin ejecutar npx internamente."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "La instalación oficial del CLI crea un comando Kyro durable mediante npm global y permite inicializar el proyecto desde su raíz.",
+          "priority": "must",
+          "rationale": "El paquete ya publica el binario kyro; npx es temporal y la copia proyectada no equivale al paquete completo. Verificar en un prefijo limpio y una terminal nueva."
+        },
+        {
+          "id": "R2",
+          "statement": "La actualización no depende internamente de npx y ofrece migración explícita cuando solo existe el runtime proyectado.",
+          "priority": "must",
+          "rationale": "La rama npx actual perpetúa instalaciones sin comando global. La migración conserva los scopes y el estado de proyecto; probar un usuario sin binario global."
+        },
+        {
+          "id": "R3",
+          "statement": "La actualización identifica que el comando activo pertenece a la instalación npm que va a actualizar y bloquea gestores o prefijos ajenos o ambiguos.",
+          "priority": "must",
+          "rationale": "Un binario durable de pnpm no prueba propiedad npm; actualizar otra copia daría éxito falso. Probar pnpm y prefijos competidores."
+        },
+        {
+          "id": "R4",
+          "statement": "La actualización instala la versión objetivo antes de refrescar el runtime desde el paquete nuevo y comprueba la versión del paquete, el comando visible y el runtime antes de declarar éxito.",
+          "priority": "must",
+          "rationale": "Evita proyectar el proceso viejo o declarar actualizada una versión distinta; verificar camino exitoso y fallo parcial."
+        },
+        {
+          "id": "R5",
+          "statement": "Las vistas previas de actualización no instalan paquetes ni modifican archivos y describen con veracidad el camino o bloqueo previsto.",
+          "priority": "must",
+          "rationale": "--check y --dry-run se usan para decidir sin efectos secundarios; probar con stubs del gestor y diff de archivos."
+        },
+        {
+          "id": "R6",
+          "statement": "La ausencia de registro, un paquete incompleto o un fallo de sincronización se comunican como estados distintos y no se presentan como actualización completada.",
+          "priority": "must",
+          "rationale": "La falla parcial necesita remedio con el paquete verificado, sin fallback silencioso a otro gestor."
+        },
+        {
+          "id": "R7",
+          "statement": "El runtime proyectado sigue sin poder ser fuente de instalación o sincronización y una migración no borra ni reescribe scopes para obtener un comando global.",
+          "priority": "must",
+          "rationale": "Conserva el límite del paquete completo y evita pérdida de estado durante migración; comparar fixture antes/después."
+        },
+        {
+          "id": "R8",
+          "statement": "Los agentes conservan una invocación ejecutable en Windows y no persisten shims temporales como comandos duraderos.",
+          "priority": "must",
+          "rationale": "El shim .cmd no debe lanzarse directamente como hijo Node; conservar detección de rutas npx/dlx y ejecutar pruebas Windows."
+        },
+        {
+          "id": "R9",
+          "statement": "Documentación, ayuda, diagnósticos y skills vigentes indican la instalación npm global y una migración coherente, conservando la vía de plugin independiente.",
+          "priority": "must",
+          "rationale": "Las recetas activas con npx volverían al camino anterior; revisar superficies operativas y tests de contrato, sin reescribir historia."
+        },
+        {
+          "id": "R10",
+          "statement": "El paquete publicado contiene CLI y recursos necesarios y supera las comprobaciones de build, check, empaquetado y plataformas aplicables.",
+          "priority": "must",
+          "rationale": "La instalación global debe funcionar desde el tarball, no solo desde el checkout; probar npm pack y CI POSIX/Windows."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R1",
+          "given": "una máquina con npm y sin Kyro",
+          "when": "instalo globalmente el paquete y abro una terminal nueva",
+          "then": "kyro está en PATH y puede inicializar un proyecto desde su raíz"
+        },
+        {
+          "id": "S2",
+          "requirement": "R3",
+          "given": "el kyro primero en PATH pertenece a pnpm, otro prefijo o una ruta ambigua",
+          "when": "solicito comprobar o ejecutar update",
+          "then": "Kyro explica la discrepancia y no instala una copia npm suponiendo que actualizará ese comando"
+        },
+        {
+          "id": "S3",
+          "requirement": "R4",
+          "given": "un kyro npm global anterior y una versión objetivo válida",
+          "when": "ejecuto update y npm termina correctamente",
+          "then": "el paquete nuevo, el comando visible y el runtime quedan en la versión objetivo antes de anunciar éxito"
+        },
+        {
+          "id": "S4",
+          "requirement": "R6",
+          "given": "npm instaló la versión objetivo pero falla la sincronización o diverge el comando visible",
+          "when": "update termina",
+          "then": "Kyro identifica el paso incompleto y no afirma actualización completada"
+        },
+        {
+          "id": "S5",
+          "requirement": "R5",
+          "given": "cualquier instalación o un registro inaccesible",
+          "when": "ejecuto update --check o --dry-run",
+          "then": "recibo un diagnóstico veraz sin instalación ni escritura"
+        },
+        {
+          "id": "S6",
+          "requirement": "R2",
+          "given": "solo existe el runtime proyectado y no hay kyro npm global",
+          "when": "solicito update",
+          "then": "Kyro indica la migración a npm y nunca invoca npx internamente"
+        },
+        {
+          "id": "S7",
+          "requirement": "R7",
+          "given": "un proyecto existente con scopes y runtime proyectado",
+          "when": "instalo el paquete npm global y sincronizo",
+          "then": "el runtime se refresca sin perder ni reescribir scopes por motivo de distribución"
+        },
+        {
+          "id": "S8",
+          "requirement": "R8",
+          "given": "un agente en Windows o un PATH con shim temporal",
+          "when": "Kyro persiste la invocación",
+          "then": "el agente puede ejecutarla y no se conserva un shim efímero como comando duradero"
+        },
+        {
+          "id": "S9",
+          "requirement": "R9",
+          "given": "una persona consulta instrucciones vigentes o usa solo el plugin",
+          "when": "busca instalar o reparar Kyro",
+          "then": "encuentra el recorrido global npm sin obligación de CLI para el caso exclusivo de plugin"
+        },
+        {
+          "id": "S10",
+          "requirement": "R10",
+          "given": "un tarball construido y los entornos de CI",
+          "when": "se ejecutan instalación, build, check y pruebas de plataforma",
+          "then": "el CLI y los recursos funcionan desde el paquete distribuido"
+        }
+      ],
+      "nonGoals": [
+        "Soporte oficial de instalación y actualización global mediante pnpm en esta entrega.",
+        "Prohibir que un tercero ejecute externamente npx kyro-ai.",
+        "Cambiar el formato de sprint.json, scopes o estado de proyecto.",
+        "Reescribir referencias históricas a instalaciones anteriores."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 2,
+      "sizingRationale": "Dos objetivos verificables y dependientes: primero cerrar la actualización segura, la procedencia del binario y la migración sin npx; después alinear todas las superficies públicas y certificar el tarball y las plataformas. Un solo sprint mezclaría el cambio de comportamiento con una actualización extensa de mensajes antes de estabilizar el contrato; más sprints añadirían cortes artificiales. npm global es la única vía oficial inicial; pnpm se bloquea con diagnóstico hasta tener soporte propio.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "actualizacion-global-segura",
+          "title": "Actualización global segura y migración",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "instrucciones-y-certificacion",
+          "title": "Instrucciones y certificación de distribución",
+          "state": "closed"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "actualizacion-global-segura",
+        "outcome": "shipped",
+        "closedAt": "2026-09-23",
+        "archive": "archive/sprint-001-actualizacion-global-segura.md",
+        "snapshot": "archive/sprint-001-actualizacion-global-segura.json",
+        "checkpoint": "archive/sprint-001-actualizacion-global-segura.checkpoint.json",
+        "checkpointSha256": "cac612855e6ca131d4220d845468a8bbd325620dda07bb4a6611bf6b4b002413"
+      },
+      {
+        "n": 2,
+        "slug": "instrucciones-y-certificacion",
+        "outcome": "shipped",
+        "closedAt": "2026-09-23",
+        "archive": "archive/sprint-002-instrucciones-y-certificacion.md",
+        "snapshot": "archive/sprint-002-instrucciones-y-certificacion.json",
+        "checkpoint": "archive/sprint-002-instrucciones-y-certificacion.checkpoint.json",
+        "recommendations": [
+          "Revisar E2 junto con los registros históricos T2.2/T2.4/T2.5 al auditar esta entrega.",
+          "Tras el merge a develop, promover 4.52.0 a main y verificar tag, publicación npm y GitHub Release."
+        ],
+        "checkpointSha256": "96eebcfd2c6636b53cd6e2f93319b04ede6f07926a1608c562f3b64fe7c13a2b"
+      }
+    ],
+    "previousSprint": {
+      "n": 2,
+      "slug": "instrucciones-y-certificacion",
+      "outcome": "shipped",
+      "summary": "Documentación, diagnósticos y distribución global npm certificados en POSIX y Windows; PR #138 lista para merge a develop."
+    },
+    "activeSprint": null,
+    "debt": [],
+    "handoff": {
+      "nextAction": "await_scope_completion",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Sprint 2 cerrado y QA APPROVED WITH NOTES para PR #138; roadmap agotado, pendiente decidir completion del scope.",
+      "lastUpdated": "2026-09-23"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-09-23T00:05:22.293Z"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "instalacion-global-sin-npx",
+    "title": "Instalación global de Kyro sin dependencia de npx",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "instalacion-global-sin-npx",
+    "title": "Instalación global de Kyro sin dependencia de npx",
+    "status": "planning"
+  },
+  "digests": {
+    "beforeClose": "65c79115cb97f44fe181f4726c2c79bbed51451229dbc941a3e424c8ab8b5380",
+    "intendedAfterClose": "00043d14f5000158af9a9c9d047dd12cf7fcac22624e4188265b95cfa60580eb",
+    "projectScopeBefore": "003d768ade1386ab0ee1a121e0060b189ce1419ac5f0639a67a8173b18268e22",
+    "projectScopeAfter": "9ba799f94ffba6cc8f939538b83b1d6071f42ff65d9116967f57a41f7bbd08c3",
+    "legacySnapshot": "4e66f66bdf6decaaf11b6eca7ec9045e4b28735c5e5067987cba3dc357a62ea2",
+    "narrative": "bd3ba4fbfe65197a55051095392bcf70a4f519c2bd0d97d84700418c64acaefa"
+  }
+}
