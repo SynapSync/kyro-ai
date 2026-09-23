@@ -337,6 +337,9 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   for (const command of EXPECTED_COMMAND_SKILLS) {
     const skillPath = join(home, '.agents', 'skills', `kyro-${command}`, 'SKILL.md');
     assert(existsSync(skillPath), `install: missing projected skill ${skillPath}`);
+    const skill = readFileSync(skillPath, 'utf-8');
+    assert(skill.includes('npm install -g kyro-ai') && skill.includes('kyro update'), `install: ${command} skill missing global npm guidance`);
+    assert(!skill.includes('npx kyro-ai'), `install: ${command} skill recommends temporary npx install`);
   }
   const ideaSkill = readFileSync(join(home, '.agents', 'skills', 'kyro-idea', 'SKILL.md'), 'utf-8');
   assert(ideaSkill.includes('rough or mature idea'), 'install: kyro-idea skill missing adaptive input description');
@@ -345,6 +348,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!executorSkill.includes('{{KYRO_CLI}}'), 'install: kyro-sprint-executor skill left {{KYRO_CLI}} unsubstituted');
   assert(/runtimeVersion: "/.test(executorSkill), 'install: kyro-sprint-executor skill missing runtimeVersion pin');
   assert(executorSkill.includes('capabilities --json'), 'install: kyro-sprint-executor skill missing capability handshake');
+  assert(executorSkill.includes('npm install -g kyro-ai'), 'install: executor skill missing global npm recovery');
   assert(existsSync(join(home, '.agents', 'kyro', 'current', 'manifest.json')), 'install: missing runtime manifest');
   assert(existsSync(join(home, '.agents', 'kyro', 'current')), 'install: missing active runtime');
 

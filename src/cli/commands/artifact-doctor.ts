@@ -108,7 +108,7 @@ export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResu
       checks.push(warn(
         'legacy monolito',
         `${KYRO_STATE_PATH} still present alongside layered project state (dual-read leftover)`,
-        'Run: npx kyro-ai install --init-workspace --yes (or npx kyro-ai sync) to migrate leftover kyro.json into project.json + local.json.',
+        'From the project root, run npm install -g kyro-ai, then kyro install --init-workspace --yes (or kyro sync for an initialized workspace) to migrate leftover kyro.json into project.json + local.json.',
       ));
     }
   } else if (monolito) {

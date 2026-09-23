@@ -14,13 +14,14 @@ Kyro is a portable sprint workflow kit for AI coding agents (**kyro-ai**, `sprin
 
 **Run every install/sync from the project root** (the repository Kyro should manage). The global runtime and skills always land under your home directory; **project state** (layered files under `.agents/kyro/` and registration of `scopes/`) is written relative to the **current working directory**. If you install from `~` or another folder, you still get the runtime—but Kyro state appears in the wrong place.
 
-Always install and sync with **`npx kyro-ai@latest …`** so you get the current release (omit `@latest` only if you intentionally pin a version).
+Install the complete npm package globally once. Open a new terminal so its `kyro` command is on PATH; then initialize each project from its root. The projected runtime under `~/.agents/kyro/current/` is for workflow commands and cannot install or sync package assets.
 
 Default standard install:
 
 ```bash
+npm install -g kyro-ai
 cd /path/to/your-app
-npx kyro-ai@latest install --scope workspace --init-workspace --yes
+kyro install --scope workspace --init-workspace --yes
 ```
 
 `--init-workspace` creates or refreshes **layered** project state in this directory (non-interactive):
@@ -34,11 +35,11 @@ It also **rehydrates** any existing `scopes/` folders (common after cloning a te
 Agent-specific installs (still from the project root):
 
 ```bash
-npx kyro-ai@latest install --agent opencode --scope workspace --init-workspace --yes
-npx kyro-ai@latest install --agent codex --scope workspace --init-workspace --yes
+kyro install --agent opencode --scope workspace --init-workspace --yes
+kyro install --agent codex --scope workspace --init-workspace --yes
 ```
 
-Claude Code can use the first-class plugin (see [README](../README.md#choose-your-host)); the CLI install still projects the shared runtime and project state when you want them—run it from the project root.
+Claude Code can use the first-class plugin independently, without installing the npm CLI (see [README](../README.md#install-claude-code-plugin)). Install the CLI only when you want its projected runtime or shared project state.
 
 ## What gets installed
 
@@ -92,9 +93,9 @@ Full multi-dev commit matrix: [Teams](teams.md).
 
 ### CLI invocation (important)
 
-`npx kyro-ai@latest install` does **not** permanently put `kyro` on PATH. Install/sync records a durable invocation in the **global** `manifest.json` only (bare `kyro` only if a real global bin exists; otherwise `node ~/.agents/kyro/current/dist/cli.js`). Projected modes under `current/` substitute that string for agents. Project state files are not the source of truth for the CLI string — one install/sync refreshes invocation for every workspace on the machine.
+`npm install -g kyro-ai` provides the durable CLI. `kyro install` records an agent-safe invocation in the global runtime `manifest.json`; on Windows, that invocation uses Node and the projected CLI because a `.cmd` shim cannot be spawned directly by Node. Project state files do not store the CLI string. A one-time install refreshes it for projected agent modes across workspaces.
 
-Installed as a **Claude Code plugin** instead (marketplace install, no `npx kyro-ai install` ever run)? The plugin channel ships the raw skill/agent files unsubstituted — the orchestrator resolves the CLI invocation itself at the start of every session (same `kyro` vs. `node ~/.agents/kyro/current/dist/cli.js` decision, see `agents/orchestrator.md`'s Startup Step 1), so no separate setup is required for that path either.
+Installed as a **Claude Code plugin** instead? Its plugin commands work without the npm CLI or projected runtime; CLI-only operations still require the full npm package.
 
 Upgrading (from the project root) is one command — it checks the registry for the latest
 release, updates the global package when behind, and refreshes the runtime plus the current
@@ -107,8 +108,7 @@ kyro update
 
 Useful variants: `kyro update --check` reports the status without changing anything,
 `kyro update --dry-run` previews the planned steps, and `kyro update --yes` skips the
-confirmation (for scripts). The manual equivalent is `npx kyro-ai@latest sync --scope workspace`
-plus `npm i -g kyro-ai` when you keep a global install.
+confirmation (for scripts). If only a projected runtime exists, migrate with `npm install -g kyro-ai`, open a new terminal, verify `kyro --version`, then run `kyro install --scope workspace --init-workspace --yes` from the project root. For a manual update of an initialized workspace, run `npm install -g kyro-ai` first and then `kyro sync --scope workspace --yes`. Existing scopes remain in place.
 
 See [CLI · invocation persistence](cli.md#cli-invocation-persistence-kyroinvocation) and
 [CLI · update](cli.md#update-kyro-update).
@@ -260,7 +260,7 @@ node ~/.agents/kyro/current/dist/cli.js doctor
 node ~/.agents/kyro/current/dist/cli.js doctor --artifacts
 ```
 
-Use the **full npm package** (`npx kyro-ai@latest` or a global `kyro` from `npm i -g kyro-ai`) for `install`, `sync`, and `doctor --tokens`. Day-to-day workflow uses installed skills and the projected runtime CLI (including `doctor --artifacts`).
+Use the **full npm package** (global `kyro` from `npm install -g kyro-ai`) for `install`, `sync`, and `doctor --tokens`. Day-to-day workflow uses installed skills and the projected runtime CLI (including `doctor --artifacts`).
 
 `doctor --tokens` audits realistic Kyro runtime paths and fails forbidden eager helper loading or over-budget paths — run it from the full package.
 

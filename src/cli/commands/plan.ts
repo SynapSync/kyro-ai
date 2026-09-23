@@ -544,7 +544,7 @@ function assertProjectStateIsValid(): void {
   throw new KyroCoreError(
     'INVALID_PROJECT_STATE',
     `sprint.json was written, but project state failed validation — ${detail}.`,
-    'Run: npx kyro-ai install --scope workspace --init-workspace --yes to rewrite the managed fields. Do NOT hand-edit project.json or local.json — Kyro owns their shape.',
+    'Run: npm install -g kyro-ai; from the project root run kyro install --scope workspace --init-workspace --yes to rewrite the managed fields. Do NOT hand-edit project.json or local.json — Kyro owns their shape.',
   );
 }
 

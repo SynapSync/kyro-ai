@@ -53,10 +53,11 @@ Never auto-enable on install/sync. See [Architecture — Delegated execution](ar
 ## Clone bootstrap
 
 ```bash
+npm install -g kyro-ai
 cd /path/to/clone
-npx kyro-ai@latest install --scope workspace --init-workspace --yes
+kyro install --scope workspace --init-workspace --yes
 # if multiple scopes:
-node ~/.agents/kyro/current/dist/cli.js scope set-active <scope> --yes
+kyro scope set-active <scope> --yes
 ```
 
 What install does:
@@ -76,7 +77,7 @@ You do **not** need to gitignore the entire `.agents/kyro/` directory.
 `status`, `doctor`, and `context-pack` **never create** project state files. If layers are missing (or scopes exist on disk but are unregistered), they surface an actionable bootstrap remedy:
 
 ```text
-Run: npx kyro-ai install --init-workspace --yes  (writes project.json + local.json; rehydrates on-disk scopes).
+Install the CLI with npm install -g kyro-ai; then, from the project root, run kyro install --init-workspace --yes.
 ```
 
 ## Migration & dual-read
@@ -99,7 +100,9 @@ written** — the only remaining behavior is getting you off it:
 To migrate now, from the project root:
 
 ```bash
-npx kyro-ai@latest install --scope workspace --init-workspace --yes
+npm install -g kyro-ai
+cd /path/to/your-project
+kyro install --scope workspace --init-workspace --yes
 ```
 
 Then confirm `project.json` + `local.json` hold what you expect and remove `kyro.json.migrated`.

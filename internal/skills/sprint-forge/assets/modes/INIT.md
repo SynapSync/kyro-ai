@@ -58,7 +58,7 @@ Load `../templates/sprint.json`. Fill:
 
 **Mandatory: materialize `sprint.json` via the CLI, not by hand.** Write a compact lean plan JSON (`scope`, `title`, `objective`, `successCriteria`, `spec`, `roadmap` — **no `author` field**) and run `{{KYRO_CLI}} plan --from <file>`. This is tool-owned and validated: it materializes `sprint.json` (including optional `author` captured from git when available) and registers the scope in `project.json`/`local.json` for you — skip straight to Step 6's verification. The startup capability handshake (`{{KYRO_CLI}} capabilities --json`, Step 0 of `../../SKILL.md`) already confirms `plan` is supported before INIT ever runs, so there is essentially never a legitimate reason to skip this.
 
-If `{{KYRO_CLI}} plan --from <file>` returns a validation error (for example `INVALID_INPUT` or `INVALID_SPRINT_SHAPE`), fix the lean plan JSON and retry the CLI. If the runtime is absent, the handshake fails, or `plan` is unknown, STOP without creating or changing Kyro-managed files. Report the observed runtime version (or `not installed`) and the exact remedy `npx kyro-ai@latest sync --scope workspace --yes`.
+If `{{KYRO_CLI}} plan --from <file>` returns a validation error (for example `INVALID_INPUT` or `INVALID_SPRINT_SHAPE`), fix the lean plan JSON and retry the CLI. If the runtime is absent, the handshake fails, or `plan` is unknown, STOP without creating or changing Kyro-managed files. Report the observed runtime version (or `not installed`) and the exact remedy `npm install -g kyro-ai`, then from the project root `kyro sync --scope workspace --yes`.
 
 ## Step 6 — Verify project state (do not hand-write it)
 
@@ -69,7 +69,7 @@ when none is active. **Verify, do not re-create.**
 
 Read `.agents/kyro/project.json` + `.agents/kyro/local.json` and confirm the scope is present and
 active. If either file is missing, project state was never bootstrapped — tell the human to run
-`npx kyro-ai install --scope workspace --init-workspace --yes` once (full npm package only, never
+`npm install -g kyro-ai`, then from the project root `kyro install --scope workspace --init-workspace --yes` once (full npm package only, never
 via the projected runtime CLI), then retry. Do not hand-author these files to paper over it.
 
 The active runtime version is read from `~/.agents/kyro/current/manifest.json.packageVersion`, not

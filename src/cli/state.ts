@@ -67,7 +67,7 @@ export function hasPersistedProjectStateOnDisk(): boolean {
  * Read-only commands surface this string; they never create the files themselves.
  */
 export const PROJECT_STATE_BOOTSTRAP_REMEDY =
-  'Run: npx kyro-ai install --init-workspace --yes  (writes project.json + local.json; rehydrates on-disk scopes).';
+  'Run: npm install -g kyro-ai; from the project root run kyro install --init-workspace --yes (writes project.json + local.json; rehydrates on-disk scopes).';
 
 /**
  * Format a one-line actionable bootstrap remedy. Optional reason prefixes the install line.

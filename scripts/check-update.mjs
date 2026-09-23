@@ -9,15 +9,20 @@
  * The live registry query is fail-soft by design and covered by inspection, not here.
  */
 import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const repo = resolve(new URL('..', import.meta.url).pathname);
+const packageVersion = JSON.parse(readFileSync(resolve(repo, 'package.json'), 'utf8')).version;
 const require = createRequire(import.meta.url);
 const {
   UPDATE_PACKAGE,
+  assessUpdateConsistency,
   buildUpdatePlan,
   quoteWinArg,
+  refreshFromCli,
   validateTargetVersion,
 } = require(resolve(repo, 'dist/cli/commands/update.js'));
 const { parseOptions } = require(resolve(repo, 'dist/cli/options.js'));
@@ -32,7 +37,7 @@ function facts(overrides = {}) {
     latest: '4.48.3',
     runtimeVersion: '4.48.3',
     hasWorkspace: true,
-    durableGlobal: true,
+    ownership: 'npm-owned',
     ...overrides,
   };
 }
@@ -54,6 +59,187 @@ assert(quoteWinArg('install') === 'install', 'simple arg untouched');
 assert(quoteWinArg('a b') === '"a b"', 'spaced arg quoted');
 assert(quoteWinArg('a"b') === '"a""b"', 'inner quote doubled');
 
+// --- final consistency gate: no partial outcome can report completed ---
+const consistent = {
+  target: '4.49.0', packageVersion: '4.49.0', ownership: 'npm-owned',
+  commandVersion: '4.49.0', runtimeVersion: '4.49.0',
+};
+assert(assessUpdateConsistency(consistent) === 'consistent', 'matching package, command, and runtime succeed');
+assert(assessUpdateConsistency({ ...consistent, packageVersion: null }) === 'package-missing', 'missing package fails');
+assert(assessUpdateConsistency({ ...consistent, packageVersion: '4.48.3' }) === 'package-version', 'wrong package version fails');
+assert(assessUpdateConsistency({ ...consistent, ownership: 'foreign' }) === 'command-ownership', 'PATH shadowing fails');
+assert(assessUpdateConsistency({ ...consistent, commandVersion: '4.48.3' }) === 'command-version', 'stale visible command fails');
+assert(assessUpdateConsistency({ ...consistent, runtimeVersion: '4.48.3' }) === 'runtime-version', 'stale runtime fails');
+
+// The fresh package child receives sync for a workspace, runtime-only install otherwise.
+{
+  const fixture = mkdtempSync(join(tmpdir(), 'kyro-update-child-'));
+  try {
+    const cli = join(fixture, 'cli.js');
+    const argsFile = join(fixture, 'args.json');
+    writeFileSync(cli, `require('node:fs').writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(process.argv.slice(2)));`);
+    refreshFromCli(cli, true, false);
+    assert(JSON.stringify(JSON.parse(readFileSync(argsFile, 'utf8'))) === JSON.stringify(['sync', '--scope', 'workspace']), 'workspace refresh uses sync');
+    refreshFromCli(cli, false, false);
+    assert(JSON.stringify(JSON.parse(readFileSync(argsFile, 'utf8'))) === JSON.stringify(['install', '--scope', 'workspace', '--no-init-workspace']), 'no workspace only refreshes runtime');
+    writeFileSync(cli, 'process.exit(7);');
+    let failed = false;
+    try { refreshFromCli(cli, true, false); } catch (error) { failed = String(error).includes('Workspace refresh failed'); }
+    assert(failed, 'failed sync propagates a partial-update error');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+// Previews from a machine with only a projected/runtime CLI are read-only and never install.
+// On Windows the shell may resolve a real npm.cmd outside this stub PATH; the Windows shim
+// behavior is covered by check:invocation, while this process fixture runs on POSIX.
+if (process.platform !== 'win32') {
+  const fixture = mkdtempSync(join(tmpdir(), 'kyro-update-preview-'));
+  try {
+    const home = join(fixture, 'home');
+    const bin = join(fixture, 'bin');
+    mkdirSync(home); mkdirSync(bin);
+    const log = join(fixture, 'npm.log');
+    const npmStub = join(bin, 'npm');
+    writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\nif [ "$1" = view ]; then printf '"4.49.0"\\n'; fi\n`);
+    chmodSync(npmStub, 0o755);
+    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    for (const flag of ['--check', '--dry-run']) {
+      const preview = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', flag], { cwd: fixture, env, encoding: 'utf8' });
+      assert(preview.status === 0 && preview.stdout.includes('No global kyro command'), `preview ${flag} diagnoses migration: ${preview.stderr || preview.stdout}`);
+      assert(!existsSync(join(fixture, '.agents')), `preview ${flag} must not write workspace state`);
+    }
+    const calls = readFileSync(log, 'utf8');
+    assert(!calls.includes('install'), `previews must never install: ${calls}`);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+// A valid npm-owned shim does not prove that the package itself is complete.
+// Both preview and normal update must diagnose a missing package.json before saying "latest".
+if (process.platform !== 'win32') {
+  const fixture = mkdtempSync(join(tmpdir(), 'kyro-update-incomplete-'));
+  try {
+    const home = join(fixture, 'home');
+    const prefix = join(fixture, 'prefix');
+    const bin = join(prefix, 'bin');
+    const packageRoot = join(prefix, 'lib', 'node_modules', 'kyro-ai');
+    const cli = join(packageRoot, 'dist', 'cli.js');
+    mkdirSync(home); mkdirSync(bin, { recursive: true });
+    mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+    mkdirSync(join(packageRoot, 'agents'), { recursive: true });
+    writeFileSync(cli, '#!/usr/bin/env node\n');
+    chmodSync(cli, 0o755);
+    writeFileSync(join(packageRoot, 'agents', 'orchestrator.md'), 'fixture\n');
+    symlinkSync(cli, join(bin, 'kyro'));
+    const log = join(fixture, 'npm.log');
+    const npmStub = join(bin, 'npm');
+    writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${packageVersion}"\\n' ;;\nesac\n`);
+    chmodSync(npmStub, 0o755);
+    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    for (const flag of ['--check', '--yes']) {
+      const result = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', flag], { cwd: fixture, env, encoding: 'utf8' });
+      const output = result.stdout + result.stderr;
+      assert(result.status !== 0 && /incomplete/i.test(output), `update ${flag} must diagnose incomplete npm package: ${output}`);
+      assert(!output.includes('latest release'), `update ${flag} must not announce latest: ${output}`);
+    }
+    assert(!readFileSync(log, 'utf8').includes('install'), 'incomplete package must not trigger install');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+// A complete npm package can still expose a stale command through its owned shim.
+// Every up-to-date invocation must reject that mismatch before reporting "latest".
+if (process.platform !== 'win32') {
+  const fixture = mkdtempSync(join(tmpdir(), 'kyro-update-stale-command-'));
+  try {
+    const home = join(fixture, 'home');
+    const prefix = join(fixture, 'prefix');
+    const bin = join(prefix, 'bin');
+    const packageRoot = join(prefix, 'lib', 'node_modules', 'kyro-ai');
+    const cli = join(packageRoot, 'dist', 'cli.js');
+    mkdirSync(home); mkdirSync(bin, { recursive: true });
+    mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+    mkdirSync(join(packageRoot, 'agents'), { recursive: true });
+    writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name: 'kyro-ai', version: packageVersion }));
+    writeFileSync(join(packageRoot, 'agents', 'orchestrator.md'), 'fixture\n');
+    writeFileSync(cli, '#!/usr/bin/env node\nconsole.log("4.0.0");\n');
+    chmodSync(cli, 0o755);
+    symlinkSync(cli, join(bin, 'kyro'));
+    const log = join(fixture, 'npm.log');
+    const npmStub = join(bin, 'npm');
+    writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${packageVersion}"\\n' ;;\nesac\n`);
+    chmodSync(npmStub, 0o755);
+    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    for (const flag of ['--check', '--dry-run', '--yes']) {
+      const result = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', flag], { cwd: fixture, env, encoding: 'utf8' });
+      const output = result.stdout + result.stderr;
+      assert(result.status !== 0 && output.includes('4.0.0') && output.includes(packageVersion), `update ${flag} must diagnose stale visible command: ${output}`);
+      assert(!output.includes('latest release') && !output.includes('Updated kyro'), `update ${flag} must not announce success: ${output}`);
+      assert(!existsSync(join(fixture, '.agents')), `update ${flag} must not write workspace state`);
+    }
+    assert(!readFileSync(log, 'utf8').includes('install'), 'stale visible command must not trigger install');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+// Exercise every early-success route with the package and visible command aligned.
+// The runtime is the only changing fact, so a newer runtime is the QA counterexample.
+if (process.platform !== 'win32') {
+  const fixture = mkdtempSync(join(tmpdir(), 'kyro-update-runtime-matrix-'));
+  try {
+    const home = join(fixture, 'home');
+    const prefix = join(fixture, 'prefix');
+    const bin = join(prefix, 'bin');
+    const packageRoot = join(prefix, 'lib', 'node_modules', 'kyro-ai');
+    const cli = join(packageRoot, 'dist', 'cli.js');
+    const manifest = join(home, '.agents', 'kyro', 'current', 'manifest.json');
+    const syncLog = join(fixture, 'sync.log');
+    mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+    mkdirSync(join(packageRoot, 'agents'), { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(join(home, '.agents', 'kyro', 'current'), { recursive: true });
+    writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name: 'kyro-ai', version: packageVersion }));
+    writeFileSync(join(packageRoot, 'agents', 'orchestrator.md'), 'fixture\n');
+    writeFileSync(cli, `#!/usr/bin/env node\nif (process.argv.includes('--version')) console.log(${JSON.stringify(packageVersion)}); else { require('node:fs').writeFileSync(${JSON.stringify(manifest)}, JSON.stringify({ packageVersion: ${JSON.stringify(packageVersion)} })); require('node:fs').appendFileSync(${JSON.stringify(syncLog)}, 'sync\\n'); }\n`);
+    chmodSync(cli, 0o755);
+    symlinkSync(cli, join(bin, 'kyro'));
+    const npmLog = join(fixture, 'npm.log');
+    const npmStub = join(bin, 'npm');
+    writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${npmLog}"\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${packageVersion}"\\n' ;;\nesac\n`);
+    chmodSync(npmStub, 0o755);
+    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    for (const [runtimeVersion, expected] of [[null, 'refresh'], ['4.0.0', 'refresh'], [packageVersion, 'latest'], ['6.0.0', 'blocked']]) {
+      if (runtimeVersion === null) rmSync(manifest, { force: true });
+      else writeFileSync(manifest, JSON.stringify({ packageVersion: runtimeVersion }));
+      for (const flag of ['--check', '--dry-run', '--yes']) {
+        const before = existsSync(manifest) ? readFileSync(manifest, 'utf8') : null;
+        const result = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', flag], { cwd: fixture, env, encoding: 'utf8' });
+        const output = result.stdout + result.stderr;
+        if (expected === 'blocked') {
+          assert(output.includes('6.0.0') && !output.includes('latest release'), `${flag} must diagnose newer runtime: ${output}`);
+          assert(result.status === (flag === '--yes' ? 1 : 0), `${flag} returned unexpected status for newer runtime: ${result.status}`);
+        } else if (expected === 'refresh') {
+          assert(result.status === 0 && output.includes('refresh'), `${flag} must refresh or preview missing/older runtime: ${output}`);
+        } else {
+          assert(result.status === 0 && output.includes('latest release'), `${flag} may report latest only for equal versions: ${output}`);
+        }
+        if (flag !== '--yes' || expected === 'blocked' || expected === 'latest') {
+          assert((existsSync(manifest) ? readFileSync(manifest, 'utf8') : null) === before, `${flag} changed runtime manifest`);
+        }
+      }
+    }
+    assert(!readFileSync(npmLog, 'utf8').includes('install'), 'runtime matrix must not install packages');
+    assert(readFileSync(syncLog, 'utf8').trim().split('\n').length === 2, 'only missing and older runtime were refreshed');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
 // --- behind + global lane ---
 {
   const plan = buildUpdatePlan(facts({ latest: '4.49.0' }));
@@ -69,15 +255,20 @@ assert(quoteWinArg('a"b') === '"a""b"', 'inner quote doubled');
   assert(plan.steps[1].includes('no workspace'), `follow-up names missing workspace, got ${plan.steps[1]}`);
 }
 
-// --- behind + npx lane (no durable global kyro) ---
+// --- no global or foreign command: actionable diagnosis, no install ---
 {
-  const plan = buildUpdatePlan(facts({ latest: '4.49.0', durableGlobal: false }));
-  assert(plan.action === 'update-npx', `expected update-npx, got ${plan.action}`);
-  assert(plan.steps.length === 1 && plan.steps[0] === 'npx -y kyro-ai@4.49.0 sync --scope workspace', `single npx shot, got ${plan.steps}`);
+  const plan = buildUpdatePlan(facts({ latest: '4.49.0', ownership: 'missing' }));
+  assert(plan.action === 'migrate-global', `expected migration, got ${plan.action}`);
+  assert(plan.steps[0] === 'npm install -g kyro-ai', `npm migration, got ${plan.steps}`);
 }
 {
-  const plan = buildUpdatePlan(facts({ latest: '4.49.0', durableGlobal: false, hasWorkspace: false }));
-  assert(plan.steps[0] === 'npx -y kyro-ai@4.49.0 install --scope workspace --no-init-workspace', `npx install lane, got ${plan.steps}`);
+  const plan = buildUpdatePlan(facts({ latest: '4.49.0', ownership: 'foreign' }));
+  assert(plan.action === 'blocked-ownership' && plan.steps.length === 0, 'foreign command blocks update');
+  assert(plan.summary.includes('PATH'), 'foreign command has actionable PATH remedy');
+}
+{
+  const plan = buildUpdatePlan(facts({ latest: '4.49.0', ownership: 'ambiguous' }));
+  assert(plan.action === 'blocked-ownership' && plan.steps.length === 0, 'ambiguous command blocks update');
 }
 
 // --- up-to-date ---
@@ -89,7 +280,7 @@ assert(quoteWinArg('a"b') === '"a""b"', 'inner quote doubled');
 {
   // Published latest older than running CLI (local dev ahead): not "behind".
   const plan = buildUpdatePlan(facts({ current: '9.9.9', latest: '4.48.3', runtimeVersion: '9.9.9' }));
-  assert(plan.action === 'up-to-date', `newer-than-registry stays put, got ${plan.action}`);
+  assert(plan.action === 'ahead-of-registry', `newer-than-registry stays put without a latest claim, got ${plan.action}`);
 }
 
 // --- CLI current but runtime stale: refresh locally, no download ---
@@ -99,25 +290,38 @@ assert(quoteWinArg('a"b') === '"a""b"', 'inner quote doubled');
   assert(plan.target === '4.48.3', 'refresh targets the running version');
 }
 {
-  // Runtime NEWER than CLI (workspace synced from a newer package): leave alone.
+  // Runtime newer than the verified package must never be called up to date.
   const plan = buildUpdatePlan(facts({ current: '4.48.2', latest: '4.48.2', runtimeVersion: '4.48.3' }));
-  assert(plan.action === 'up-to-date', `newer runtime is not stale, got ${plan.action}`);
+  assert(plan.action === 'blocked-runtime-ahead', `newer runtime must be diagnosed, got ${plan.action}`);
 }
 
-// --- offline: registry unreachable → retry against the floating tag, never a guess pin ---
+for (const [runtimeVersion, expectedSame, expectedNewer] of [
+  [null, 'refresh-stale-runtime', 'update-global'],
+  ['4.48.2', 'refresh-stale-runtime', 'update-global'],
+  ['4.48.3', 'up-to-date', 'update-global'],
+  ['4.49.0', 'blocked-runtime-ahead', 'update-global'],
+  ['4.50.0', 'blocked-runtime-ahead', 'blocked-runtime-ahead'],
+  ['garbage', 'blocked-runtime-mismatch', 'blocked-runtime-mismatch'],
+  ['4.48.3+different', 'blocked-runtime-mismatch', 'update-global'],
+]) {
+  assert(buildUpdatePlan(facts({ runtimeVersion })).action === expectedSame, `same registry, runtime ${runtimeVersion}`);
+  assert(buildUpdatePlan(facts({ latest: '4.49.0', runtimeVersion })).action === expectedNewer, `newer registry, runtime ${runtimeVersion}`);
+}
+assert(buildUpdatePlan(facts({ latest: '4.48.3+different' })).action === 'ahead-of-registry', 'registry metadata divergence cannot claim latest');
+
+// --- offline: registry unreachable is a distinct diagnosis, never a floating install ---
 {
   const plan = buildUpdatePlan(facts({ latest: null }));
-  assert(plan.action === 'offline-retry-latest', `expected offline-retry-latest, got ${plan.action}`);
-  assert(plan.target === 'latest', 'offline target is the tag, not a fabricated version');
-  assert(plan.steps[0] === 'npm install -g kyro-ai@latest', `offline global lane, got ${plan.steps}`);
+  assert(plan.action === 'registry-unavailable', `expected registry-unavailable, got ${plan.action}`);
+  assert(plan.steps.length === 0, 'offline check does not assume a target');
 }
 {
-  const plan = buildUpdatePlan(facts({ latest: null, durableGlobal: false }));
-  assert(plan.steps[0].startsWith('npx -y kyro-ai@latest'), `offline npx lane, got ${plan.steps}`);
+  const plan = buildUpdatePlan(facts({ latest: null, ownership: 'missing' }));
+  assert(plan.action === 'migrate-global' && plan.steps[0].startsWith('npm install'), 'offline missing global still diagnoses migration');
 }
 {
   const plan = buildUpdatePlan(facts({ latest: 'garbage!!' }));
-  assert(plan.action === 'offline-retry-latest', `unparsable latest is offline, got ${plan.action}`);
+  assert(plan.action === 'registry-unavailable', `unparsable latest is unavailable, got ${plan.action}`);
 }
 
 // --- wiring: verb registered, flag parsed, help advertised ---

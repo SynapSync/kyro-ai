@@ -5,11 +5,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   windows_state_writer_lock:
-    name: Windows lock (Node ${{ matrix.node }})
+    name: Windows tarball install (Node ${{ matrix.node }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -37,7 +37,12 @@ jobs:
       - name: Verify state-writer lock
         run: npm run check:lossless-checkpoints
 
-      - name: Verify idempotent install
+      - name: Verify Windows invocation and update contracts
+        run: |
+          npm run check:invocation
+          npm run check:update
+
+      - name: Verify npm tarball global install and sync
         run: npm run check:windows-install-smoke
 
   validate:

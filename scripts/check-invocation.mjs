@@ -14,6 +14,7 @@ const repo = resolve(new URL('..', import.meta.url).pathname);
 const require = createRequire(import.meta.url);
 const {
   buildInvocation,
+  classifyGlobalKyroOwnership,
   execKyroInvocationSync,
   getPersistedKyroInvocation,
   isBareKyroInvocation,
@@ -27,6 +28,28 @@ const {
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
+
+// The effective PATH shim must belong to the same npm prefix/root that update changes.
+const owner = {
+  commandPath: '/opt/npm/bin/kyro',
+  npmPrefix: '/opt/npm',
+  npmRoot: '/opt/npm/lib/node_modules',
+  realPath: '/opt/npm/lib/node_modules/kyro-ai/dist/cli.js',
+  platform: 'linux',
+};
+assert(classifyGlobalKyroOwnership(owner) === 'npm-owned', 'same-prefix npm shim is owned');
+assert(classifyGlobalKyroOwnership({ ...owner, commandPath: '/home/u/.local/share/pnpm/kyro' }) === 'foreign', 'pnpm shim is foreign');
+assert(classifyGlobalKyroOwnership({ ...owner, commandPath: '/other/bin/kyro', realPath: '/other/lib/node_modules/kyro-ai/dist/cli.js' }) === 'foreign', 'second npm prefix is foreign');
+assert(classifyGlobalKyroOwnership({ ...owner, commandPath: null, realPath: null }) === 'missing', 'absent kyro is missing');
+assert(classifyGlobalKyroOwnership({ ...owner, realPath: null }) === 'ambiguous', 'unreadable path is ambiguous');
+assert(classifyGlobalKyroOwnership({ ...owner, npmRoot: '/other/lib/node_modules' }) === 'ambiguous', 'inconsistent npm root is ambiguous');
+assert(classifyGlobalKyroOwnership({ ...owner, commandPath: '/home/u/.npm/_npx/a/node_modules/.bin/kyro' }) === 'foreign', 'npx command is foreign');
+const winOwner = {
+  commandPath: 'C:\\npm\\kyro.cmd', npmPrefix: 'C:\\npm', npmRoot: 'C:\\npm\\node_modules',
+  realPath: 'C:\\npm\\kyro.cmd', shimContents: '@ECHO off\r\nnode "%~dp0\\node_modules\\kyro-ai\\dist\\cli.js" %*', platform: 'win32',
+};
+assert(classifyGlobalKyroOwnership(winOwner) === 'npm-owned', 'Windows npm cmd shim is owned');
+assert(classifyGlobalKyroOwnership({ ...winOwner, shimContents: '@ECHO off\r\npnpm kyro' }) === 'foreign', 'Windows foreign cmd shim is rejected');
 
 // --- isEphemeralPackageManagerPath ---
 const ephemeralSamples = [

@@ -124,9 +124,67 @@ function main() {
     assert(!doctor.stdout.includes('missing agents/orchestrator.md'), 'check-cli-bundle: doctor must not FAIL on missing root agents/orchestrator.md');
     assert(!doctor.stdout.includes('.claude-plugin/plugin.json missing'), 'check-cli-bundle: doctor must not FAIL on missing .claude-plugin');
 
-    // 5c. Install/sync from projected runtime must fail with exact INVALID_INPUT + npx remedy (no ENOENT).
+    // 5c. Install/sync from projected runtime must fail with exact INVALID_INPUT + npm global remedy (no ENOENT).
     assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
     assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
+
+    // 5c.1. Migrate this existing project through a real npm global install in an isolated
+    // prefix. The projected runtime remains operational; distribution must not rewrite scope
+    // or project state simply to make a durable command available.
+    if (process.platform !== 'win32') {
+      const stateBeforeMigration = snapshotProjectState(workspace);
+      const npmPrefix = join(root, '.npm-global');
+      mkdirSync(npmPrefix, { recursive: true });
+      const pack = spawnSync('npm', ['pack', '--ignore-scripts', '--pack-destination', root, '--json'], {
+        cwd: repo, env: { ...process.env, HOME: home }, encoding: 'utf8',
+      });
+      assert(pack.status === 0, `check-cli-bundle: npm pack migration fixture failed: ${pack.stderr || pack.stdout}`);
+      const packed = JSON.parse(pack.stdout)[0];
+      assert(packed.version === version, `check-cli-bundle: tarball version differs from package ${version}`);
+      const packedPaths = new Set(packed.files.map((file) => file.path));
+      for (const path of [
+        'dist/cli.js', 'agents/orchestrator.md', 'internal/skills/sprint-forge/SKILL.md',
+        'internal/skills/kyro-sprint-executor/SKILL.md', 'commands/forge.md',
+        'providers/claude/commands/forge.md', '.claude-plugin/plugin.json',
+        'config.json', 'WORKFLOW.yaml',
+      ]) {
+        assert(packedPaths.has(path), `check-cli-bundle: tarball missing distributive asset ${path}`);
+      }
+      const tarball = join(root, packed.filename);
+      const globalInstall = spawnSync('npm', ['install', '-g', tarball, '--prefix', npmPrefix, '--ignore-scripts', '--offline', '--no-audit', '--no-fund'], {
+        cwd: workspace, env: { ...process.env, HOME: home }, encoding: 'utf8',
+      });
+      assert(globalInstall.status === 0, `check-cli-bundle: isolated npm global install failed: ${globalInstall.stderr || globalInstall.stdout}`);
+      const globalEnv = { ...runEnv, PATH: `${join(npmPrefix, 'bin')}:${dirname(process.execPath)}:/usr/bin:/bin`, npm_config_prefix: npmPrefix };
+      const globalVersion = spawnSync('kyro', ['--version'], { cwd: workspace, env: globalEnv, encoding: 'utf8' });
+      assert(globalVersion.status === 0 && globalVersion.stdout.trim() === version, `check-cli-bundle: new terminal must find npm global kyro ${version}: ${globalVersion.stderr || globalVersion.stdout}`);
+      const globalSync = spawnSync('kyro', ['sync', '--scope', 'workspace'], { cwd: workspace, env: globalEnv, encoding: 'utf8' });
+      assert(globalSync.status === 0, `check-cli-bundle: global package sync failed: ${globalSync.stderr || globalSync.stdout}`);
+      const stateAfterMigration = snapshotProjectState(workspace);
+      const changed = [...new Set([...Object.keys(stateBeforeMigration), ...Object.keys(stateAfterMigration)])]
+        .filter((path) => stateBeforeMigration[path] !== stateAfterMigration[path]);
+      assert(changed.length === 0, `check-cli-bundle: npm migration must preserve project state and scopes; changed: ${changed.join(', ')}`);
+      const newManifest = JSON.parse(readFileSync(join(runtimeRoot, 'manifest.json'), 'utf8'));
+      assert(newManifest.packageVersion === version, 'check-cli-bundle: migrated runtime version matches global package');
+
+      // A separate HOME and project exercise first installation from the packed global binary,
+      // not the checkout's dist/cli.js or an already-projected runtime.
+      const cleanHome = join(root, '.clean-home');
+      const cleanProject = join(root, 'clean-project');
+      mkdirSync(cleanHome, { recursive: true });
+      mkdirSync(cleanProject, { recursive: true });
+      const cleanEnv = { ...globalEnv, HOME: cleanHome };
+      const cleanVersion = spawnSync('kyro', ['--version'], { cwd: cleanProject, env: cleanEnv, encoding: 'utf8' });
+      assert(cleanVersion.status === 0 && cleanVersion.stdout.trim() === version, `check-cli-bundle: clean shell must find tarball CLI ${version}: ${cleanVersion.stderr || cleanVersion.stdout}`);
+      const cleanInstall = spawnSync('kyro', ['install', '--scope', 'workspace', '--init-workspace', '--yes'], { cwd: cleanProject, env: cleanEnv, encoding: 'utf8' });
+      assert(cleanInstall.status === 0, `check-cli-bundle: clean project install from tarball failed: ${cleanInstall.stderr || cleanInstall.stdout}`);
+      const cleanRuntime = join(cleanHome, '.agents', 'kyro', 'current');
+      const cleanManifest = JSON.parse(readFileSync(join(cleanRuntime, 'manifest.json'), 'utf8'));
+      const cleanPackage = JSON.parse(readFileSync(join(npmPrefix, 'lib', 'node_modules', 'kyro-ai', 'package.json'), 'utf8'));
+      assert(cleanPackage.version === version && cleanManifest.packageVersion === version, 'check-cli-bundle: tarball package and clean runtime versions must match CLI');
+      assert(existsSync(join(cleanProject, '.agents', 'kyro', 'project.json')), 'check-cli-bundle: clean project state missing');
+      assert(existsSync(join(cleanRuntime, 'skills', 'sprint-forge', 'SKILL.md')), 'check-cli-bundle: clean projected skill missing');
+    }
 
     // 5d. Token audit from projected runtime fails clearly (package-only), not with packaging ENOENT noise.
     const doctorTokens = spawnSync(command, [...invArgs, 'doctor', '--tokens'], {
@@ -136,7 +194,7 @@ function main() {
     });
     assert(doctorTokens.status !== 0, 'check-cli-bundle: projected doctor --tokens should exit non-zero');
     assert(doctorTokens.stdout.includes('token audit'), `check-cli-bundle: doctor --tokens should report token audit check, got:\n${doctorTokens.stdout}`);
-    assert(doctorTokens.stdout.includes('full npm package') || doctorTokens.stdout.includes('npx kyro-ai'), `check-cli-bundle: token audit remedy should point at full package, got:\n${doctorTokens.stdout}`);
+    assert(doctorTokens.stdout.includes('full npm package') || doctorTokens.stdout.includes('npm install -g kyro-ai'), `check-cli-bundle: token audit remedy should point at full package, got:\n${doctorTokens.stdout}`);
     assert(!doctorTokens.stdout.includes('ENOENT'), `check-cli-bundle: token audit must not surface ENOENT packaging noise, got:\n${doctorTokens.stdout}`);
 
     const scopePath = join(workspace, '.agents', 'kyro', 'scopes', 'demo');
@@ -225,6 +283,31 @@ function main() {
   console.log('check:cli-bundle — package-root-aware TUI and runtime workflows pass; package operations fail closed for projected, corrupt, conflicting, and unknown roots');
 }
 
+function snapshotProjectState(workspace) {
+  const stateRoot = join(workspace, '.agents', 'kyro');
+  const result = {};
+  for (const relative of ['project.json', 'local.json']) {
+    const file = join(stateRoot, relative);
+    if (existsSync(file)) {
+      const value = JSON.parse(readFileSync(file, 'utf8'));
+      // A sync records the adapter refresh time; that operational timestamp is expected.
+      if (relative === 'local.json') for (const adapter of value.installedAdapters ?? []) delete adapter.installedAt;
+      result[relative] = JSON.stringify(value);
+    }
+  }
+  const scopesRoot = join(stateRoot, 'scopes');
+  const stack = existsSync(scopesRoot) ? [scopesRoot] : [];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(path);
+      else result[path.slice(stateRoot.length + 1)] = readFileSync(path, 'utf8');
+    }
+  }
+  return Object.fromEntries(Object.entries(result).sort(([a], [b]) => a.localeCompare(b)));
+}
+
 /** Projected/unknown TUI roots expose Doctor + Exit and the full-package remedy only. */
 function assertRestrictedTui(command, invArgs, workspace, runEnv, expectedRootLabel) {
   const lockReady = join(workspace, '.restricted-tui-lock-ready');
@@ -239,7 +322,7 @@ function assertRestrictedTui(command, invArgs, workspace, runEnv, expectedRootLa
   const out = `${result.stdout || ''}${result.stderr || ''}`;
   assert(out.includes('Package management is unavailable'), `check-cli-bundle: restricted TUI must explain package operation limits, got:\n${out}`);
   assert(out.includes(expectedRootLabel), `check-cli-bundle: restricted TUI must name ${expectedRootLabel}, got:\n${out}`);
-  assert(out.includes('npx kyro-ai'), `check-cli-bundle: restricted TUI must show the full-package remedy, got:\n${out}`);
+  assert(out.includes('npm install -g kyro-ai'), `check-cli-bundle: restricted TUI must show the full-package remedy, got:\n${out}`);
   assert(out.includes('1) Run doctor') && out.includes('2) Exit'), `check-cli-bundle: restricted TUI must offer Doctor and Exit, got:\n${out}`);
   assert(!out.includes('Install standard .agents adapter'), `check-cli-bundle: restricted TUI must not advertise standard install, got:\n${out}`);
   assert(!out.includes('Install OpenCode adapter'), `check-cli-bundle: restricted TUI must not advertise OpenCode install, got:\n${out}`);
@@ -247,7 +330,7 @@ function assertRestrictedTui(command, invArgs, workspace, runEnv, expectedRootLa
   assert(!existsSync(lockReady), 'check-cli-bundle: restricted TUI Exit must not acquire the state-writer lock');
 }
 
-/** Install/sync from any non-full-package root: exact INVALID_INPUT, npx remedy, no ENOENT. */
+/** Install/sync from any non-full-package root: exact INVALID_INPUT, npm global remedy, no ENOENT. */
 function assertPackageOpBlocked(command, invArgs, workspace, runEnv, operation, args) {
   const result = spawnSync(command, [...invArgs, operation, ...args], {
     cwd: workspace,
@@ -257,7 +340,7 @@ function assertPackageOpBlocked(command, invArgs, workspace, runEnv, operation, 
   assert(result.status !== 0, `check-cli-bundle: non-full-package ${operation} should exit non-zero`);
   const out = `${result.stdout || ''}${result.stderr || ''}`;
   assert(out.includes('INVALID_INPUT'), `check-cli-bundle: blocked ${operation} must report INVALID_INPUT, got:\n${out}`);
-  assert(out.includes('npx kyro-ai'), `check-cli-bundle: blocked ${operation} remedy must mention npx kyro-ai, got:\n${out}`);
+  assert(out.includes('npm install -g kyro-ai'), `check-cli-bundle: blocked ${operation} remedy must name npm global installation, got:\n${out}`);
   assert(out.includes('full kyro-ai npm package') || out.includes('full npm package'), `check-cli-bundle: blocked ${operation} must name the full package, got:\n${out}`);
   assert(!out.includes('scandir'), `check-cli-bundle: blocked ${operation} must not crash with scandir ENOENT, got:\n${out}`);
   assert(!/ENOENT: no such file or directory, scandir/.test(out), `check-cli-bundle: blocked ${operation} must not surface scandir ENOENT, got:\n${out}`);

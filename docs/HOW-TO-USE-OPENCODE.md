@@ -5,8 +5,9 @@ OpenCode should discover Kyro through native OpenCode skills and slash commands.
 ## Setup
 
 ```bash
+npm install -g kyro-ai
 cd /path/to/your-app
-npx kyro-ai@latest install --agent opencode --scope workspace --init-workspace --yes
+kyro install --agent opencode --scope workspace --init-workspace --yes
 ```
 
 This installs:

@@ -242,7 +242,7 @@ function loadSharedProject(required: boolean): KyroSharedProjectState | null {
     throw new KyroCoreError(
       'INVALID_INPUT',
       'Global rule persistence requires .agents/kyro/project.json.',
-      'Run npx kyro-ai install --init-workspace --yes to create or migrate layered project state, then retry with --global.',
+      'Run npm install -g kyro-ai, then from the project root run kyro install --init-workspace --yes to create or migrate layered project state; retry with --global.',
     );
   }
   const issues = validateSharedProjectStateShape(shared, PROJECT_STATE_PATH);

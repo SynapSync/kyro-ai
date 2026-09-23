@@ -1,7 +1,7 @@
 import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { posix, resolve, win32 } from 'node:path';
 import { KYRO_ROOT } from './constants';
 import { readManifest } from './state';
 
@@ -70,6 +70,17 @@ export function isEphemeralPackageManagerPath(resolvedPath: string): boolean {
  * Infra probe — isolated so pure helpers stay unit-testable.
  */
 export function resolveKyroBinaryPath(): string | null {
+  const raw = resolveKyroCommandPath();
+  if (!raw) return null;
+  try {
+    return realpathSync(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/** First shell-visible command, before following a symlink (needed to verify npm ownership). */
+export function resolveKyroCommandPath(): string | null {
   try {
     let raw: string;
     if (process.platform === 'win32') {
@@ -82,15 +93,57 @@ export function resolveKyroBinaryPath(): string | null {
         stdio: ['ignore', 'pipe', 'ignore'],
       }).trim();
     }
-    if (!raw) return null;
-    try {
-      return realpathSync(raw);
-    } catch {
-      return raw;
-    }
+    return raw || null;
   } catch {
     return null;
   }
+}
+
+export type GlobalKyroOwnership = 'npm-owned' | 'missing' | 'foreign' | 'ambiguous';
+
+export interface GlobalKyroProbe {
+  commandPath: string | null;
+  npmPrefix: string | null;
+  npmRoot: string | null;
+  /** Real path of commandPath; null if the shim cannot be inspected. */
+  realPath: string | null;
+  /** Windows npm .cmd text; null if unreadable. */
+  shimContents?: string | null;
+  platform?: NodeJS.Platform;
+}
+
+/**
+ * Classify the effective PATH command against the npm installation that update would change.
+ * A durable command alone is insufficient: pnpm and a second npm prefix are different installs.
+ * This function performs no I/O, so previews can use it without modifying any state.
+ */
+export function classifyGlobalKyroOwnership(probe: GlobalKyroProbe): GlobalKyroOwnership {
+  const { commandPath, npmPrefix, npmRoot, realPath } = probe;
+  const platform = probe.platform ?? process.platform;
+  if (!commandPath) return 'missing';
+  if (isEphemeralPackageManagerPath(commandPath) || (realPath && isEphemeralPackageManagerPath(realPath))) return 'foreign';
+  if (!npmPrefix || !npmRoot || !realPath) return 'ambiguous';
+  const path = platform === 'win32' ? win32 : posix;
+  const normalize = (value: string): string => {
+    const absolute = path.resolve(value);
+    return platform === 'win32' ? absolute.toLowerCase() : absolute;
+  };
+  const expectedRoot = platform === 'win32'
+    ? path.join(npmPrefix, 'node_modules')
+    : path.join(npmPrefix, 'lib', 'node_modules');
+  if (normalize(npmRoot) !== normalize(expectedRoot)) return 'ambiguous';
+  const expectedShim = platform === 'win32' ? path.join(npmPrefix, 'kyro.cmd') : path.join(npmPrefix, 'bin', 'kyro');
+  if (normalize(commandPath) !== normalize(expectedShim)) return 'foreign';
+  const expectedCli = path.join(npmRoot, 'kyro-ai', 'dist', 'cli.js');
+  if (platform === 'win32') {
+    const contents = probe.shimContents;
+    if (!contents) return 'ambiguous';
+    // npm's Windows shim invokes the package relative to %~dp0; reject unrelated shims.
+    const normalized = contents.replace(/\//g, '\\').toLowerCase();
+    return normalized.includes('node_modules\\kyro-ai\\dist\\cli.js') &&
+      !normalized.includes('pnpm') ? 'npm-owned' : 'foreign';
+  }
+  return normalize(realPath) === normalize(expectedCli) ? 'npm-owned' : 'foreign';
 }
 
 /**

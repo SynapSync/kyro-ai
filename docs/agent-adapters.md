@@ -19,11 +19,12 @@ Kyro's adapter contract is: global runtime, adapter command entrypoints, and loc
 ## Install adapters
 
 ```bash
-# Always from the project root. Always @latest unless you intentionally pin a version.
+npm install -g kyro-ai
+# Run each adapter install from the project root.
 cd /path/to/your-app
-npx kyro-ai@latest install --scope workspace --init-workspace --yes
-npx kyro-ai@latest install --agent opencode --scope workspace --init-workspace --yes
-npx kyro-ai@latest install --agent codex --scope workspace --init-workspace --yes
+kyro install --scope workspace --init-workspace --yes
+kyro install --agent opencode --scope workspace --init-workspace --yes
+kyro install --agent codex --scope workspace --init-workspace --yes
 ```
 
 Implemented adapters:
@@ -69,7 +70,9 @@ See [cli.md](cli.md) for full syntax and [maker-checker.md](maker-checker.md) fo
 Use:
 
 ```bash
-npx kyro-ai@latest install --agent codex --scope workspace --yes
+npm install -g kyro-ai
+cd /path/to/your-app
+kyro install --agent codex --scope workspace --yes
 ```
 
 Codex reads the managed root `AGENTS.md` block, discovers `~/.agents/skills/kyro-*`, and follows the router-first workflow.
@@ -79,7 +82,9 @@ Codex reads the managed root `AGENTS.md` block, discovers `~/.agents/skills/kyro
 Use:
 
 ```bash
-npx kyro-ai@latest install --agent opencode --scope workspace --yes
+npm install -g kyro-ai
+cd /path/to/your-app
+kyro install --agent opencode --scope workspace --yes
 ```
 
 OpenCode should invoke the native `/kyro/forge`, `/kyro/status`, `/kyro/task-context`, `/kyro/idea`, `/kyro/qa`, and `/kyro/scope-retire` commands, or the installed `kyro-*` skills under `~/.config/opencode/skills/`. It should not copy Kyro core into the project.
@@ -92,7 +97,8 @@ Claude plugin support remains first-class through `.claude-plugin/`. Its public 
 `/kyro-ai:forge`, `/kyro-ai:status`, `/kyro-ai:task-context`, `/kyro-ai:idea`, `/kyro-ai:qa`, and `/kyro-ai:scope-retire`.
 Provider wrappers delegate to the canonical command routers; `sprint-forge`, `seedbed`, `qa-review`,
 and `kyro-sprint-executor` remain internal assets and must not appear in Claude's command menu. The
-CLI adapter path complements the plugin; it does not retire it.
+The plugin works without installing the npm CLI. The CLI adapter path remains available when a
+project needs shared state and projected runtime assets.
 
 ## Cursor
 
