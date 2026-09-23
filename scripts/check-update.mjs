@@ -101,6 +101,7 @@ if (process.platform !== 'win32') {
     const home = join(fixture, 'home');
     const bin = join(fixture, 'bin');
     mkdirSync(home); mkdirSync(bin);
+    symlinkSync(process.execPath, join(bin, 'node'));
     const log = join(fixture, 'npm.log');
     const npmStub = join(bin, 'npm');
     writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\nif [ "$1" = view ]; then printf '"4.49.0"\\n'; fi\n`);
@@ -129,6 +130,7 @@ if (process.platform !== 'win32') {
     const packageRoot = join(prefix, 'lib', 'node_modules', 'kyro-ai');
     const cli = join(packageRoot, 'dist', 'cli.js');
     mkdirSync(home); mkdirSync(bin, { recursive: true });
+    symlinkSync(process.execPath, join(bin, 'node'));
     mkdirSync(join(packageRoot, 'dist'), { recursive: true });
     mkdirSync(join(packageRoot, 'agents'), { recursive: true });
     writeFileSync(cli, '#!/usr/bin/env node\n');
@@ -163,6 +165,7 @@ if (process.platform !== 'win32') {
     const packageRoot = join(prefix, 'lib', 'node_modules', 'kyro-ai');
     const cli = join(packageRoot, 'dist', 'cli.js');
     mkdirSync(home); mkdirSync(bin, { recursive: true });
+    symlinkSync(process.execPath, join(bin, 'node'));
     mkdirSync(join(packageRoot, 'dist'), { recursive: true });
     mkdirSync(join(packageRoot, 'agents'), { recursive: true });
     writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name: 'kyro-ai', version: packageVersion }));
@@ -203,6 +206,7 @@ if (process.platform !== 'win32') {
     mkdirSync(join(packageRoot, 'dist'), { recursive: true });
     mkdirSync(join(packageRoot, 'agents'), { recursive: true });
     mkdirSync(bin, { recursive: true });
+    symlinkSync(process.execPath, join(bin, 'node'));
     mkdirSync(join(home, '.agents', 'kyro', 'current'), { recursive: true });
     writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name: 'kyro-ai', version: packageVersion }));
     writeFileSync(join(packageRoot, 'agents', 'orchestrator.md'), 'fixture\n');
