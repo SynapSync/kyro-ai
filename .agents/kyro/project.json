@@ -18,6 +18,17 @@
       "status": "completed"
     },
     {
+      "id": "change-current-work",
+      "title": "Cambiar el trabajo vigente sin congelarlo",
+      "status": "completed",
+      "completion": {
+        "completedAt": "2026-09-17T22:06:51.389Z",
+        "by": "maker",
+        "requestDigest": "273a82d6f885464c06c656b8fa953bebfc9dfbd38264a7c2c7c32a80c8f9b1a4",
+        "beforeEntryDigest": "55f7a23b49cb47ddc1df78467c5ee506bdfb89219cbf759541f1a2a5a1623c42"
+      }
+    },
+    {
       "id": "harn-01-snapshots-backups-pipeline",
       "title": "Snapshots específicos y limpieza de backups del pipeline",
       "status": "completed",
@@ -28,6 +39,11 @@
         "requestDigest": "c34fc1cb9ae7e309253553a63a04b41e38b84c6c155079de37ca9cb26db26745",
         "beforeEntryDigest": "4516d0f4bd9bdc2854f11cb287f64d76c277c9c4bfef2c76d1c574491e1915f6"
       }
+    },
+    {
+      "id": "instalacion-global-sin-npx",
+      "title": "Instalación global de Kyro sin dependencia de npx",
+      "status": "active"
     },
     {
       "id": "integrity-recovery",
@@ -53,17 +69,6 @@
       "id": "scoped-integrity-preflight",
       "title": "Scoped integrity preflight and trace relocation",
       "status": "completed"
-    },
-    {
-      "id": "change-current-work",
-      "title": "Cambiar el trabajo vigente sin congelarlo",
-      "status": "completed",
-      "completion": {
-        "completedAt": "2026-09-17T22:06:51.389Z",
-        "by": "maker",
-        "requestDigest": "273a82d6f885464c06c656b8fa953bebfc9dfbd38264a7c2c7c32a80c8f9b1a4",
-        "beforeEntryDigest": "55f7a23b49cb47ddc1df78467c5ee506bdfb89219cbf759541f1a2a5a1623c42"
-      }
     }
   ],
   "conventions": [

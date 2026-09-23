@@ -57,13 +57,13 @@ const PROJECT_STATE_INSTALL_REMEDY = PROJECT_STATE_BOOTSTRAP_REMEDY;
 const GLOBAL_RUNTIME_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
 const GLOBAL_RUNTIME_SYNC_REMEDY = FULL_PACKAGE_SYNC_REMEDY;
 const MONOLITO_MIGRATE_REMEDY =
-  'Run: npx kyro-ai install --init-workspace --yes (or npx kyro-ai sync) to migrate leftover kyro.json into project.json + local.json and archive the monolito.';
+  'From the project root, run npm install -g kyro-ai, then kyro install --init-workspace --yes (or kyro sync for an initialized workspace) to migrate leftover kyro.json into project.json + local.json and archive the monolito.';
 const PRINCIPLES_ON_LOCAL_REMEDY =
   'Move principles to .agents/kyro/project.json (shared team constitution) and remove them from local.json, then re-run install/sync if needed.';
 const TEAM_MIN_PACKAGE_REMEDY =
-  'Upgrade Kyro to at least the team minPackageVersion (npx kyro-ai@latest install / sync from the full npm package).';
+  'Upgrade the global npm package to at least the team minPackageVersion with kyro update, then sync from the full package.';
 const CLI_INVOCATION_REMEDY =
-  'Re-run once: npx kyro-ai install --scope workspace --yes (or npx kyro-ai sync) from the full npm package so ~/.agents/kyro/current/manifest.json.kyroInvocation is refreshed (global for all workspaces). On Windows the installer persists the `node <runtime>/dist/cli.js` form because bare `kyro` shims cannot be self-spawned by Node (PATHEXT is ignored without a shell, and direct `.cmd` spawn is blocked since CVE-2024-27980). Agents should use that form, not a bare `kyro` that only existed during npx.';
+  'Run npm install -g kyro-ai if the global command is absent; from the project root run kyro install --scope workspace --yes (or kyro sync) from the full npm package so ~/.agents/kyro/current/manifest.json.kyroInvocation is refreshed (global for all workspaces). On Windows the installer persists the `node <runtime>/dist/cli.js` form because bare `kyro` shims cannot be self-spawned by Node (PATHEXT is ignored without a shell, and direct `.cmd` spawn is blocked since CVE-2024-27980). Agents should use that form when a bare `kyro` cannot be spawned by Node.';
 
 export function doctor(options?: Pick<CliOptions, 'tokens' | 'artifacts' | 'adapters' | 'trace' | 'kyroScope'>): void {
   const checks = runDoctorChecks(options?.tokens ?? false, options?.artifacts ?? false, options?.adapters ?? false, options?.trace ?? false, options?.kyroScope ?? null);
@@ -108,7 +108,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
         status: 'fail',
         name: 'token audit',
         detail: `token/context budget audit requires a verified full npm package layout; current CLI root mode is ${rootMode}`,
-        remedy: 'Run doctor --tokens via npx kyro-ai (or a verified full-package CLI), not a projected or unrecognized CLI root.',
+        remedy: 'Install the full package with npm install -g kyro-ai; run kyro doctor --tokens from that package, not from a projected or unrecognized CLI root.',
       });
     } else {
       checks.push(...runTokenAuditChecks());

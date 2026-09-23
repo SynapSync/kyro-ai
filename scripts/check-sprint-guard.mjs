@@ -58,7 +58,7 @@ for (const [expected, label, payload] of cases) {
 }
 
 const blocked = decide(write(owned[2]));
-for (const needle of ['CLI-owned state', 'kyro --version', 'npx kyro-ai@latest sync', 'defense in depth']) {
+for (const needle of ['CLI-owned state', 'kyro --version', 'kyro sync', 'defense in depth']) {
   if (!blocked.stderr.includes(needle)) failures.push('block message should mention ' + JSON.stringify(needle));
 }
 

@@ -31,7 +31,7 @@ Use `{{KYRO_CLI}} debt add|start|resolve|defer|escalate` — tool-owned and dete
 - `debt defer <id> --target <n> --note <t>` — `status: deferred` (both flags required).
 - `debt escalate <id> --priority <p>` — raises priority only.
 
-If the runtime or verb is unavailable, STOP without mutation. Report the observed version (or `not installed`) and `npx kyro-ai@latest sync --scope workspace --yes`; never edit `debt[]` by hand.
+If the runtime or verb is unavailable, STOP without mutation. Report the observed version (or `not installed`) and `npm install -g kyro-ai`, then from the project root global `kyro` with `sync --scope workspace --yes`; never edit `debt[]` by hand.
 
 ## Reporting
 
