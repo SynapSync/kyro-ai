@@ -39,7 +39,7 @@ Run this before reading further or writing artifacts. Standalone invocation need
    - Else, check whether `~/.agents/kyro/current/dist/cli.js` exists. If it does, `{{KYRO_CLI}}` means
      `node ~/.agents/kyro/current/dist/cli.js`.
    - Else, Kyro's runtime is not installed on this machine. STOP — tell the user to run
-     `npm install -g kyro-ai`, then from the project root `kyro install --scope workspace --init-workspace --yes` once, then retry. Never hand-edit `sprint.json`.
+     `npm install -g kyro-ai`, then from the project root global `kyro` with `install --scope workspace --init-workspace --yes` once, then retry. Never hand-edit `sprint.json`.
    Use the resolved value for every `{{KYRO_CLI}}` token this session.
 2. Read `.agents/kyro/project.json` + `.agents/kyro/local.json`. Unreadable/corrupt → stop here.
 3. Resolve the scope from user input, `local.json.activeScope`, or the only directory under
@@ -53,7 +53,7 @@ Run this before reading further or writing artifacts. Standalone invocation need
 6. **Capability handshake:** run `{{KYRO_CLI}} capabilities --json`. Unknown command, handshake
    failure, or a missing tool-owned verb (`record-evidence` included) means the runtime is unusable: ABORT without mutating Kyro
    state. Report the observed output of `{{KYRO_CLI}} --version` (or `not installed`) and the exact
-   remedy `npm install -g kyro-ai`, then from the project root `kyro sync --scope workspace --yes`. Never work around it by hand.
+   remedy `npm install -g kyro-ai`, then from the project root global `kyro` with `sync --scope workspace --yes`. Never work around it by hand.
 7. Resolve routing with `{{KYRO_CLI}} context-pack --kyro-scope <scope> --json` (lean pack:
    `nextAction`, `nextTaskId`, `reviewPending`, `conventions`, budget). Do not open the full
    `sprint.json` to route. No `sprint.json` → INIT.
@@ -85,7 +85,7 @@ The full `sprint.json` is ~10–20k tokens. Never open it to route/execute/revie
 Every mutation of `sprint.json`, project state, checkpoints, or `archive/` MUST be owned by a CLI verb.
 The CLI validates, locks, writes, and re-verifies the affected state internally. Agents must not
 substitute an editor, patch, or ad-hoc script. If a required state-changing verb is absent, stop and
-report the observed runtime version plus `npm install -g kyro-ai`, then from the project root `kyro sync --scope workspace --yes`.
+report the observed runtime version plus `npm install -g kyro-ai`, then from the project root global `kyro` with `sync --scope workspace --yes`.
 
 ## Tool-owned operations (use the CLI, do not hand-roll)
 
