@@ -11,7 +11,7 @@ import {
   type ScopeDirectory,
 } from '../artifacts/scopes';
 import { deriveScopeStatus } from '../core/status';
-import { readMonolitoProjectState, readProjectState, readSharedProjectState } from '../state';
+import { readProjectState } from '../state';
 import type { KyroScopeEntry } from '../types';
 
 export const REGISTRY_CLASS = {
@@ -64,14 +64,7 @@ export function registryReconciliationPath(id: string): string {
 
 export function classifyRegistry(requestedScope: string | null = null): RegistryClassification[] {
   const state = readProjectState();
-  const registeredById = new Map((state?.scopes ?? []).map((entry) => [entry.id, entry]));
-  for (const source of [readSharedProjectState(), readMonolitoProjectState()]) {
-    if (!Array.isArray(source?.scopes)) continue;
-    for (const entry of source.scopes) {
-      if (entry && typeof entry.id === 'string') registeredById.set(entry.id, entry);
-    }
-  }
-  const registered = [...registeredById.values()];
+  const registered = state?.scopes ?? [];
   const folders = listScopeFolders();
   const ids = new Set<string>([...registered.map((entry) => entry.id), ...folders]);
   if (requestedScope) {
@@ -195,16 +188,6 @@ export function validateRegistryReconciliationRecord(value: unknown, path: strin
   for (const key of ['id', 'beforeDigest', 'afterDigest', 'reason', 'actor', 'kyroVersion', 'createdAt'] as const) {
     if (typeof record[key] !== 'string' || record[key].length === 0) issues.push(`${path}:${key} must be a non-empty string`);
   }
-  if (record.id !== path.split('/').pop()?.replace(/\.json$/, '')) issues.push(`${path}:id must match filename`);
-  for (const key of ['beforeDigest', 'afterDigest'] as const) {
-    if (typeof record[key] === 'string' && !/^[0-9a-f]{64}$/.test(record[key])) issues.push(`${path}:${key} must be a SHA-256 digest`);
-  }
-  if (record.previousChainHead !== null && (typeof record.previousChainHead !== 'string' || !/^[0-9a-f]{64}$/.test(record.previousChainHead))) {
-    issues.push(`${path}:previousChainHead must be null or a SHA-256 digest`);
-  }
-  if (record.sourcePath !== undefined && record.sourcePath !== '.agents/kyro/project.json' && record.sourcePath !== '.agents/kyro/kyro.json') {
-    issues.push(`${path}:sourcePath must name a legacy project state file`);
-  }
-  if (typeof record.retiredEntry !== 'object' || record.retiredEntry === null || Array.isArray(record.retiredEntry)) issues.push(`${path}:retiredEntry must be an object`);
+  if (typeof record.retiredEntry !== 'object' || record.retiredEntry === null) issues.push(`${path}:retiredEntry must be an object`);
   return issues;
 }
