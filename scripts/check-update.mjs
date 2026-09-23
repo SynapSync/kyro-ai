@@ -474,7 +474,7 @@ if (process.platform !== 'win32') {
       ledger: [],
       previousSprint: null,
       activeSprint: null,
-      debt: [],
+      debt: [{ id: 'legacy-debt', title: 'Legacy debt', origin: 1, priority: 'medium', status: 'resolved', targetSprint: 1, resolvedSprint: 1, note: 'historical' }],
       handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-09-22' },
     }, null, 2)}\n`);
     const manifestDir = join(home, '.agents', 'kyro', 'current');
@@ -493,6 +493,11 @@ if (process.platform !== 'win32') {
     const result = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
     assert(result.status === 0, `update --yes failed: ${result.stderr}\n${result.stdout}`);
     assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'update --yes removes shared scopes[]');
+    const migratedSprint = JSON.parse(readFileSync(join(scopeDir, 'sprint.json'), 'utf8'));
+    assert(!Object.hasOwn(migratedSprint.debt[0], 'resolvedSprint'), 'safe legacy debt field is migrated automatically');
+    assert(existsSync(join(projectDir, 'legacy-migrations', 'legacy.sprint.json')), 'migration backup is preserved');
+    const second = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
+    assert(second.status === 0, `second update must remain idempotent: ${second.stderr}\n${second.stdout}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

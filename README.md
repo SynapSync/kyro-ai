@@ -225,7 +225,7 @@ nothing else, so it cannot repair a record-level legacy shape: a debt that carri
 *and* legacy-only keys like `detail`/`resolution`/`addedSprint` *and* missing canonical fields.
 **4.44.0 and later** adds `debt.canonicalize` (remediation protocol v3), which repairs the whole
 record at once, emits exactly the seven canonical keys `id, title, origin, priority, status,
-targetSprint, note`, and names the legacy keys it retires. The candidate **5.0.0** carries
+targetSprint, note`, and names the legacy keys it retires. The **5.0.1** release also carries
 that operation unchanged.
 
 Nothing is migrated for you. Installing a newer Kyro never rewrites an existing scope, and Doctor
@@ -307,7 +307,7 @@ kyro update
 
 Details: [Teams multi-dev contract](docs/teams.md) · [CLI project state](docs/cli.md).
 
-For the 5.0.0 upgrade, update every writer before syncing a shared workspace. Install/sync removes the old `project.json.scopes[]` cache after confirming every old ID has a valid matching `sprint.json` and no lifecycle or custom metadata would be lost; otherwise it stops and reports the unresolved entries without changing shared state. Older runtimes can write the cache again.
+For the 5.0.0 upgrade, update every writer before syncing a shared workspace. Install/sync removes the old `project.json.scopes[]` cache after confirming every old ID has a valid matching `sprint.json` and no lifecycle or custom metadata would be lost; otherwise it stops and reports the unresolved entries without changing shared state. Kyro 5.0.1 also removes redundant legacy `resolvedSprint` debt metadata when it exactly matches `targetSprint`, preserving a backup before writing. Older runtimes can write the cache again.
 
 ---
 
