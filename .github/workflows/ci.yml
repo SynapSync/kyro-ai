@@ -34,9 +34,6 @@ jobs:
       - name: Probe file identity
         run: npm run check:windows-file-identity
 
-      - name: Verify state-writer lock
-        run: npm run check:lossless-checkpoints
-
       - name: Verify Windows invocation and update contracts
         run: |
           npm run check:invocation
@@ -44,6 +41,9 @@ jobs:
 
       - name: Verify npm tarball global install and sync
         run: npm run check:windows-install-smoke
+
+      - name: Verify state-writer lock
+        run: npm run check:lossless-checkpoints
 
   validate:
     runs-on: ubuntu-latest
