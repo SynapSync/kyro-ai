@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // End-to-end proof (design.md §10.2 / tasks.md 7.1): the bundled runtime CLI must run a
@@ -33,9 +33,14 @@ function main() {
   // A PATH with no `kyro` binary so `isKyroOnPath()` is deterministically false → the node
   // fallback invocation is exercised (proves PATH-less resolution end-to-end).
   const noKyroBin = join(root, '.no-kyro-bin');
+  const nodeOnlyBin = join(root, '.node-only-bin');
   mkdirSync(home, { recursive: true });
   mkdirSync(workspace, { recursive: true });
   mkdirSync(noKyroBin, { recursive: true });
+  if (process.platform !== 'win32') {
+    mkdirSync(nodeOnlyBin, { recursive: true });
+    symlinkSync(process.execPath, join(nodeOnlyBin, basename(process.execPath)));
+  }
   // Seed a scope with an activeSprint ready to close.
   cpSync(resolve(repo, 'fixtures/evals/close-sprint-happy/state'), workspace, { recursive: true });
 
@@ -47,9 +52,14 @@ function main() {
   const installEnv = { ...inheritedEnv, HOME: home, PATH: noKyroBin };
   // The workflow run needs `node` resolvable (as a real agent's shell has), but crucially NO
   // `kyro` binary — so the projected `node {runtimeRoot}/dist/cli.js` invocation is what runs.
-  const runEnv = { ...inheritedEnv, HOME: home, PATH: `${dirname(process.execPath)}:${noKyroBin}` };
+  const nodePath = process.platform === 'win32' ? dirname(process.execPath) : nodeOnlyBin;
+  let runEnv = { ...inheritedEnv, HOME: home, PATH: `${nodePath}:${noKyroBin}` };
 
   try {
+    if (process.platform !== 'win32') {
+      const unavailableKyro = spawnSync('kyro', ['--version'], { env: runEnv, encoding: 'utf-8' });
+      assert(unavailableKyro.error?.code === 'ENOENT', 'check-cli-bundle: projected fixture PATH must not contain a kyro binary');
+    }
     // 0. The full package TUI may advertise package installation operations.
     const packageTuiLockReady = join(workspace, '.full-package-tui-lock-ready');
     const packageTui = spawnSync(process.execPath, [cli], {
@@ -128,6 +138,19 @@ function main() {
     assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'install', ['--scope', 'workspace', '--yes']);
     assertPackageOpBlocked(command, invArgs, workspace, runEnv, 'sync', ['--scope', 'workspace']);
 
+    // 5d. Audit the projected runtime before migration changes the global manifest to
+    // the new bare `kyro` invocation. This fixture deliberately has no `kyro` on PATH;
+    // after migration, that old PATH would describe a different installation state.
+    const doctorTokens = spawnSync(command, [...invArgs, 'doctor', '--tokens'], {
+      cwd: workspace,
+      env: runEnv,
+      encoding: 'utf-8',
+    });
+    assert(doctorTokens.status !== 0, 'check-cli-bundle: projected doctor --tokens should exit non-zero');
+    assert(doctorTokens.stdout.includes('token audit'), `check-cli-bundle: doctor --tokens should report token audit check, got:\n${doctorTokens.stdout}`);
+    assert(doctorTokens.stdout.includes('full npm package') || doctorTokens.stdout.includes('npm install -g kyro-ai'), `check-cli-bundle: token audit remedy should point at full package, got:\n${doctorTokens.stdout}`);
+    assert(!doctorTokens.stdout.includes('ENOENT'), `check-cli-bundle: token audit must not surface ENOENT packaging noise, got:\n${doctorTokens.stdout}`);
+
     // 5c.1. Migrate this existing project through a real npm global install in an isolated
     // prefix. The projected runtime remains operational; distribution must not rewrite scope
     // or project state simply to make a durable command available.
@@ -155,7 +178,7 @@ function main() {
         cwd: workspace, env: { ...process.env, HOME: home }, encoding: 'utf8',
       });
       assert(globalInstall.status === 0, `check-cli-bundle: isolated npm global install failed: ${globalInstall.stderr || globalInstall.stdout}`);
-      const globalEnv = { ...runEnv, PATH: `${join(npmPrefix, 'bin')}:${dirname(process.execPath)}:/usr/bin:/bin`, npm_config_prefix: npmPrefix };
+      const globalEnv = { ...runEnv, PATH: `${join(npmPrefix, 'bin')}:${nodePath}:/usr/bin:/bin`, npm_config_prefix: npmPrefix };
       const globalVersion = spawnSync('kyro', ['--version'], { cwd: workspace, env: globalEnv, encoding: 'utf8' });
       assert(globalVersion.status === 0 && globalVersion.stdout.trim() === version, `check-cli-bundle: new terminal must find npm global kyro ${version}: ${globalVersion.stderr || globalVersion.stdout}`);
       const globalSync = spawnSync('kyro', ['sync', '--scope', 'workspace'], { cwd: workspace, env: globalEnv, encoding: 'utf8' });
@@ -184,18 +207,11 @@ function main() {
       assert(cleanPackage.version === version && cleanManifest.packageVersion === version, 'check-cli-bundle: tarball package and clean runtime versions must match CLI');
       assert(existsSync(join(cleanProject, '.agents', 'kyro', 'project.json')), 'check-cli-bundle: clean project state missing');
       assert(existsSync(join(cleanRuntime, 'skills', 'sprint-forge', 'SKILL.md')), 'check-cli-bundle: clean projected skill missing');
-    }
 
-    // 5d. Token audit from projected runtime fails clearly (package-only), not with packaging ENOENT noise.
-    const doctorTokens = spawnSync(command, [...invArgs, 'doctor', '--tokens'], {
-      cwd: workspace,
-      env: runEnv,
-      encoding: 'utf-8',
-    });
-    assert(doctorTokens.status !== 0, 'check-cli-bundle: projected doctor --tokens should exit non-zero');
-    assert(doctorTokens.stdout.includes('token audit'), `check-cli-bundle: doctor --tokens should report token audit check, got:\n${doctorTokens.stdout}`);
-    assert(doctorTokens.stdout.includes('full npm package') || doctorTokens.stdout.includes('npm install -g kyro-ai'), `check-cli-bundle: token audit remedy should point at full package, got:\n${doctorTokens.stdout}`);
-    assert(!doctorTokens.stdout.includes('ENOENT'), `check-cli-bundle: token audit must not surface ENOENT packaging noise, got:\n${doctorTokens.stdout}`);
+      // Sync intentionally switches the manifest to the newly installed bare `kyro`.
+      // Keep later projected-root diagnostics in that migrated environment.
+      runEnv = globalEnv;
+    }
 
     const scopePath = join(workspace, '.agents', 'kyro', 'scopes', 'demo');
     const sprintBefore = JSON.parse(readFileSync(join(scopePath, 'sprint.json'), 'utf-8'));
