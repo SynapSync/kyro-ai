@@ -38,6 +38,7 @@ Run this before reading further or writing artifacts. Standalone invocation need
    - Run `kyro --version`. If it exits 0, `{{KYRO_CLI}}` means bare `kyro` for the rest of this session.
    - Else, check whether `~/.agents/kyro/current/dist/cli.js` exists. If it does, `{{KYRO_CLI}}` means
      `node ~/.agents/kyro/current/dist/cli.js`.
+   - Else, if `${CLAUDE_PLUGIN_ROOT}/dist/cli.js` exists, use `node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js"` for the Claude plugin alone.
    - Else, Kyro's runtime is not installed on this machine. STOP — tell the user to run
      `npm install -g kyro-ai`, then from the project root global `kyro` with `install --scope workspace --init-workspace --yes` once, then retry. Never hand-edit `sprint.json`.
    Use the resolved value for every `{{KYRO_CLI}}` token this session.

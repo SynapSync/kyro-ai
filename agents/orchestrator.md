@@ -16,6 +16,7 @@ Load only the current lifecycle contract. `sprint.json` is the source of truth. 
 1. **Resolve `{{KYRO_CLI}}`, once per session.** Install/sync substitutes it. Otherwise resolve it:
    - Run `kyro --version`. If it exits 0, `{{KYRO_CLI}}` means bare `kyro` for the rest of this session.
    - Else, check whether `~/.agents/kyro/current/dist/cli.js` exists. If it does, `{{KYRO_CLI}}` means `node ~/.agents/kyro/current/dist/cli.js`.
+   - Else, if `${CLAUDE_PLUGIN_ROOT}/dist/cli.js` exists in the Claude plugin, use `node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js"` without installing the npm CLI.
    - Else, Kyro's runtime is not installed on this machine. STOP — tell the user to run `npm install -g kyro-ai`, then from the project root global `kyro` with `install --scope workspace --init-workspace --yes` once, then retry. Never hand-edit `sprint.json`.
    Use that value for every `{{KYRO_CLI}}` token this session; never run the literal token.
 2. Read `project.json` + `local.json`; unreadable stops here.

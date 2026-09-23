@@ -27,6 +27,7 @@ const REQUIRED_ELEMENTS = [
   ['placeholder token present verbatim', /\{\{KYRO_CLI\}\}/],
   ['CLI resolution ladder — probe step', /kyro --version/],
   ['CLI resolution ladder — runtime fallback path', /~\/\.agents\/kyro\/current\/dist\/cli\.js/],
+  ['CLI resolution ladder — standalone Claude plugin', /CLAUDE_PLUGIN_ROOT\}\/dist\/cli\.js/],
   ['CLI resolution ladder — install remedy when absent', /npm install -g kyro-ai/],
   ['capability handshake', /\{\{KYRO_CLI\}\} capabilities --json/],
   ['handshake guards the tool-owned verbs', /record-evidence/],
