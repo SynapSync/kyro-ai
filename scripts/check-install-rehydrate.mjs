@@ -157,10 +157,35 @@ function kyroDir(cwd) {
   return join(cwd, '.agents', 'kyro');
 }
 
-/** Read the CLI's effective state, including disk-derived scopes. */
+/** Effective layered state (shared + local), matching readProjectState merge rules. */
 function readEffectiveState(cwd) {
-  assert(process.cwd() === cwd, 'fixture workspace must be active');
-  return require(join(repo, 'dist/cli/state.js')).readProjectState();
+  const root = kyroDir(cwd);
+  const projectPath = join(root, 'project.json');
+  const localPath = join(root, 'local.json');
+  const monolitoPath = join(root, 'kyro.json');
+  const hasLayers = existsSync(projectPath) || existsSync(localPath);
+  if (hasLayers) {
+    const shared = existsSync(projectPath)
+      ? JSON.parse(readFileSync(projectPath, 'utf-8'))
+      : { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [] };
+    const local = existsSync(localPath)
+      ? JSON.parse(readFileSync(localPath, 'utf-8'))
+      : { schemaVersion: 4, activeScope: null, installedAdapters: [] };
+    return {
+      schemaVersion: 4,
+      artifactRoot: shared.artifactRoot ?? '.agents/kyro/scopes',
+      scopes: Array.isArray(shared.scopes) ? shared.scopes : [],
+      activeScope: local.activeScope ?? null,
+      runtimePath: local.runtimePath ?? '~/.agents/kyro/current',
+      installedAdapters: Array.isArray(local.installedAdapters) ? local.installedAdapters : [],
+      ...(shared.principles !== undefined ? { principles: shared.principles } : {}),
+      ...(shared.team !== undefined ? { team: shared.team } : {}),
+    };
+  }
+  if (existsSync(monolitoPath)) {
+    return JSON.parse(readFileSync(monolitoPath, 'utf-8'));
+  }
+  throw new Error(`No layered or monolito project state under ${root}`);
 }
 
 function assertLayeredInstall(cwd, label) {
@@ -168,8 +193,6 @@ function assertLayeredInstall(cwd, label) {
   assert(existsSync(join(root, 'project.json')), `${label}: project.json must exist after install`);
   assert(existsSync(join(root, 'local.json')), `${label}: local.json must exist after install`);
   assert(!existsSync(join(root, 'kyro.json')), `${label}: live kyro.json must not remain as SoT after install`);
-  assert(!Object.hasOwn(JSON.parse(readFileSync(join(root, 'project.json'), 'utf8')), 'scopes'),
-    `${label}: shared project.json must omit scopes[]`);
   const gitignorePath = join(root, '.gitignore');
   assert(existsSync(gitignorePath), `${label}: .agents/kyro/.gitignore must exist`);
   const gitignore = readFileSync(gitignorePath, 'utf-8');
@@ -318,34 +341,18 @@ withWorkspace('kyro-rehydrate-preserve-', (cwd) => {
   );
   let state = readEffectiveState(cwd);
   const known = state.scopes.find((s) => s.id === 'known');
-  assert(known?.title === 'Known From Disk', 'preserve: disk title is authoritative');
-  assert(known?.status === 'planning', 'preserve: disk status is authoritative');
+  assert(known?.title === 'Custom Title Keep Me', 'preserve: must not clobber existing title');
+  assert(known?.status === 'blocked', 'preserve: must not clobber existing status');
   assert(state.activeScope === 'known', 'preserve: must not clobber activeScope');
   assert(state.principles?.[0]?.id === 'p1', 'preserve: principles kept on shared layer');
   assert(state.scopes.some((s) => s.id === 'orphan' && s.title === 'Orphan On Disk'), 'preserve: orphan folder registered');
 
-  // An orphan in the old shared cache must not be silently discarded by sync.
+  // Empty shared scopes[] then sync rehydrates without dropping activeScope.
   const projectPath = join(cwd, '.agents', 'kyro', 'project.json');
   const project = JSON.parse(readFileSync(projectPath, 'utf-8'));
-  project.scopes = [{ id: 'stale', title: 'Stale', status: 'active' }];
-  writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`, 'utf-8');
-  let refused = false;
-  try {
-    captureLogs(() => sync(cliOptions({ agents: [standard] })));
-  } catch (error) {
-    refused = error?.code === 'INVALID_INPUT' && String(error.message).includes('stale');
-  }
-  assert(refused, 'sync: refuses to discard an orphaned legacy scope');
-  assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'sync: refusal preserves old cache');
-  const { runDoctorChecks } = require(join(repo, 'dist/cli/commands/doctor.js'));
-  const registryCheck = runDoctorChecks(false, false, false, false, null).find((check) => check.name === 'scope registry');
-  assert(registryCheck?.status === 'fail' && registryCheck.detail.includes('stale'), 'doctor: names the orphaned legacy scope');
-  const { classifyRegistry } = require(join(repo, 'dist/cli/project/reconcile.js'));
-  assert(classifyRegistry('stale')[0]?.classification === 'registered-orphan', 'reconcile: retains orphan diagnosis');
-  project.scopes = [{ id: 'known', title: 'Known From Disk', status: 'planning' }];
+  project.scopes = [];
   writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`, 'utf-8');
   captureLogs(() => sync(cliOptions({ agents: [standard] })));
-  assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'sync: removes stale shared scopes[]');
   state = readEffectiveState(cwd);
   assert(state.scopes.map((s) => s.id).sort().join(',') === 'known,orphan', 'sync: rehydrates both folders');
   assert(state.activeScope === 'known', 'sync: keeps existing activeScope');
@@ -380,7 +387,7 @@ withWorkspace('kyro-rehydrate-clone-', (cwd) => {
   assert(state.activeScope === 'from-clone', 'clone: single-scope auto-activeScope');
 });
 
-// --- doctor sees a valid scope added after install without a registry sync ---
+// --- doctor warns when registry lags disk ---
 withWorkspace('kyro-rehydrate-doctor-', (cwd) => {
   const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
   const { install } = require(join(repo, 'dist/cli/commands/install.js'));
@@ -393,7 +400,9 @@ withWorkspace('kyro-rehydrate-doctor-', (cwd) => {
 
   const checks = runDoctorChecks(false, false, false, false, null);
   const registry = checks.find((c) => c.name === 'scope registry');
-  assert(registry?.status === 'pass', `doctor: expected pass, got ${registry?.status}`);
+  assert(registry?.status === 'warn', `doctor: expected warn, got ${registry?.status}`);
+  assert(registry?.detail?.includes('late-arrival'), 'doctor: detail names missing folder');
+  assert(registry?.remedy?.includes('install'), 'doctor: remedy mentions install/sync');
 });
 
 // --- doctor FAILS (not warns) when a projected full skill has no runtimeVersion pin ---

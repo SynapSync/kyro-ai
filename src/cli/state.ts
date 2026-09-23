@@ -10,8 +10,6 @@ import {
 } from './constants';
 import { readJsonFromManagedPath, readJsonFromWorkspace, resolveManagedPath } from './fs';
 import { KyroCoreError } from './core/errors';
-import { canonicalJson } from './core/digest';
-import { scopeEntriesFromDisk, scopeEntryFromDisk } from './core/scope-entries';
 import { assertSafeManagedPath, assertStateWriterLeaseHealthy, withStateWriterLock } from './pipeline/state-writer-lock';
 import type {
   KyroLocalProjectState,
@@ -51,47 +49,6 @@ export function readMonolitoProjectState(): KyroProjectState | null {
   return readJsonFromWorkspace<KyroProjectState>(KYRO_STATE_PATH);
 }
 
-/** Refuse to discard the only persisted identity of a legacy scope during migration. */
-export function assertLegacyScopeCacheMigratable(source: unknown, path: string): void {
-  if (!source || typeof source !== 'object' || !Object.prototype.hasOwnProperty.call(source, 'scopes')) return;
-  const cache = (source as { scopes?: unknown }).scopes;
-  if (!Array.isArray(cache)) {
-    throw new KyroCoreError('INVALID_INPUT', `${path}.scopes is not an array.`,
-      'Repair the legacy scope registry before migrating project state. No files were changed.');
-  }
-  const unresolved = cache.flatMap((entry: unknown, index: number) => {
-    const id = entry && typeof entry === 'object' ? (entry as { id?: unknown }).id : null;
-    if (typeof id !== 'string' || !id) return [`entry ${index} has no valid id`];
-    try {
-      const disk = scopeEntryFromDisk(id);
-      if (!disk) return [id];
-      const legacy = entry as Record<string, unknown>;
-      const unknownFields = Object.keys(legacy).filter((key) => !['id', 'title', 'status', 'completion', 'completionHistory', 'retirement'].includes(key));
-      if (unknownFields.length > 0) return [`${id} (unmigrated fields: ${unknownFields.join(', ')})`];
-      for (const field of ['completion', 'completionHistory', 'retirement'] as const) {
-        if (legacy[field] !== undefined && canonicalJson(legacy[field]) !== canonicalJson(disk[field])) {
-          return [`${id} (${field} differs from sprint.json)`];
-        }
-      }
-      return [];
-    } catch {
-      return [id];
-    }
-  });
-  if (unresolved.length > 0) {
-    throw new KyroCoreError(
-      'INVALID_INPUT',
-      `Cannot remove ${path}.scopes: unresolved legacy entries ${unresolved.join(', ')}.`,
-      'Restore missing sprint.json files or reconcile metadata against them, then retry. Keep the legacy state for investigation; no files were changed.',
-    );
-  }
-}
-
-export function assertPersistedLegacyScopeCachesMigratable(): void {
-  assertLegacyScopeCacheMigratable(readSharedProjectState(), PROJECT_STATE_PATH);
-  assertLegacyScopeCacheMigratable(readMonolitoProjectState(), KYRO_STATE_PATH);
-}
-
 export function hasLayeredProjectStateOnDisk(): boolean {
   return workspacePathExists(PROJECT_STATE_PATH) || workspacePathExists(LOCAL_STATE_PATH);
 }
@@ -110,7 +67,7 @@ export function hasPersistedProjectStateOnDisk(): boolean {
  * Read-only commands surface this string; they never create the files themselves.
  */
 export const PROJECT_STATE_BOOTSTRAP_REMEDY =
-  'Run: npx kyro-ai install --init-workspace --yes  (writes project.json + local.json; reads on-disk scopes).';
+  'Run: npx kyro-ai install --init-workspace --yes  (writes project.json + local.json; rehydrates on-disk scopes).';
 
 /**
  * Format a one-line actionable bootstrap remedy. Optional reason prefixes the install line.
@@ -127,9 +84,10 @@ export function formatBootstrapRemedy(reason?: string): string {
 
 /**
  * Detect whether a read-only command should surface a bootstrap remedy.
- * Callers pass on-disk scope ids when project state is absent. Never writes.
+ * Callers pass unregistered on-disk scope ids (from unregisteredScopeFolders) so this module
+ * stays free of scopes imports. Never writes.
  *
- * @returns one-line remedy, or null when persisted state exists
+ * @returns one-line remedy, or null when persisted state exists and all listed scopes are registered
  */
 export function detectProjectStateBootstrapNeed(unregisteredScopeIds: string[] = []): string | null {
   if (!hasPersistedProjectStateOnDisk()) {
@@ -154,7 +112,7 @@ export function detectProjectStateBootstrapNeed(unregisteredScopeIds: string[] =
  * 2. Else if legacy monolito exists → return sanitized monolito as effective state.
  * 3. Else → null.
  *
- * Layered state derives its effective scopes from disk without writing files.
+ * Disk scope rehydrate is NOT applied here (D7a); install/sync/bootstrap own that.
  */
 export function readProjectState(): KyroProjectState | null {
   const sharedRaw = readSharedProjectState();
@@ -188,7 +146,7 @@ export function mergeProjectLayers(
   const effective: KyroProjectState = {
     schemaVersion: 4,
     artifactRoot: shared.artifactRoot,
-    scopes: scopeEntriesFromDisk(),
+    scopes: shared.scopes,
     activeScope: local.activeScope,
     runtimePath: local.runtimePath ?? KYRO_ROOT,
     installedAdapters: local.installedAdapters,
@@ -225,13 +183,14 @@ export interface SplitMonolitoResult {
 
 /**
  * Pure split of a legacy effective/monolito state into layer payloads.
- * Shared scopes are omitted; each sprint file is authoritative.
+ * v1: scopes registry cache lives on **shared** (team-visible); personal fields on local.
  */
 export function splitMonolitoToLayers(monolito: KyroProjectState): SplitMonolitoResult {
   const effective = effectiveFromMonolito(monolito);
   const shared: KyroSharedProjectState = {
     schemaVersion: 4,
     artifactRoot: effective.artifactRoot,
+    scopes: effective.scopes.map(cloneScopeEntry),
   };
   if (effective.principles !== undefined) {
     shared.principles = effective.principles.map(clonePrinciple);
@@ -284,7 +243,6 @@ export function migrateMonolitoToLayersUnlocked(options: MigrateMonolitoOptions 
       'Run kyro install --init-workspace or provide monolito state to migrateMonolitoToLayers.',
     );
   }
-  assertLegacyScopeCacheMigratable(source, KYRO_STATE_PATH);
   const { shared, local } = splitMonolitoToLayers(source);
   writeProjectLayersUnlocked({ shared, local });
   let archivedMonolitoPath: string | null = null;
@@ -330,7 +288,6 @@ export function writeProjectLayers(layers: ProjectLayerWrite): void {
 
 export function writeSharedProjectStateUnlocked(shared: KyroSharedProjectState): void {
   assertStateWriterLeaseHealthy();
-  assertPersistedLegacyScopeCachesMigratable();
   writeJsonManaged(PROJECT_STATE_PATH, sanitizeSharedForWrite(shared));
 }
 
@@ -394,7 +351,8 @@ export function updateProjectStateLayersUnlocked(update: ProjectStateLayerUpdate
   };
 
   const touchShared =
-    update.principles !== undefined
+    update.scopes !== undefined
+    || update.principles !== undefined
     || update.conventions !== undefined
     || update.team !== undefined
     || update.artifactRoot !== undefined;
@@ -413,7 +371,10 @@ export function updateProjectStateLayersUnlocked(update: ProjectStateLayerUpdate
 
   if (touchShared) writeSharedProjectStateUnlocked(shared);
   if (touchLocal) writeLocalProjectStateUnlocked(local);
-  // A scopes-only update is obsolete: the sprint file already defines the scope.
+  // If update is empty, still a no-op; callers always pass at least one field.
+  if (!touchShared && !touchLocal) {
+    writeProjectLayersUnlocked({ shared, local });
+  }
 }
 
 function archiveMonolitoIfPresentUnlocked(): void {
@@ -431,6 +392,7 @@ export function sanitizeSharedForWrite(shared: KyroSharedProjectState): KyroShar
   const cleaned = stripLegacyProjectFields({
     schemaVersion: 4 as const,
     artifactRoot: shared.artifactRoot || ARTIFACT_ROOT,
+    scopes: Array.isArray(shared.scopes) ? shared.scopes.map(cloneScopeEntry) : [],
     ...(shared.principles !== undefined ? { principles: shared.principles.map(clonePrinciple) } : {}),
     ...(shared.conventions !== undefined ? { conventions: shared.conventions.map(cloneConvention) } : {}),
     ...(shared.team !== undefined ? { team: cloneTeamPolicy(shared.team) } : {}),
@@ -443,6 +405,7 @@ export function sanitizeSharedForWrite(shared: KyroSharedProjectState): KyroShar
   return {
     schemaVersion: 4,
     artifactRoot: cleaned.artifactRoot,
+    scopes: cleaned.scopes,
     ...(cleaned.principles !== undefined ? { principles: cleaned.principles as Principle[] } : {}),
     ...(cleaned.conventions !== undefined ? { conventions: cleaned.conventions as Convention[] } : {}),
     ...(cleaned.team !== undefined ? { team: cleaned.team as TeamPolicy } : {}),
@@ -494,7 +457,7 @@ export function stripLegacyProjectFields<T extends object>(value: T): T {
 
 function normalizeShared(raw: KyroSharedProjectState | null): KyroSharedProjectState {
   if (!raw) {
-    return { schemaVersion: 4, artifactRoot: ARTIFACT_ROOT };
+    return { schemaVersion: 4, artifactRoot: ARTIFACT_ROOT, scopes: [] };
   }
   const stripped = stripLegacyProjectFields({ ...raw }) as KyroSharedProjectState & {
     activeScope?: unknown;
@@ -507,6 +470,7 @@ function normalizeShared(raw: KyroSharedProjectState | null): KyroSharedProjectS
     artifactRoot: typeof stripped.artifactRoot === 'string' && stripped.artifactRoot
       ? stripped.artifactRoot
       : ARTIFACT_ROOT,
+    scopes: Array.isArray(stripped.scopes) ? stripped.scopes : [],
     ...(stripped.principles !== undefined ? { principles: stripped.principles } : {}),
     ...(stripped.conventions !== undefined ? { conventions: stripped.conventions } : {}),
     ...(stripped.team !== undefined ? { team: stripped.team } : {}),

@@ -113,10 +113,10 @@ npx kyro-ai@latest install --init-workspace --yes
 ```
 
 This creates:
-- `.agents/kyro/project.json` — shared, committed (team constitution)
+- `.agents/kyro/project.json` — shared, committed (team constitution + scopes registry)
 - `.agents/kyro/local.json` — personal, gitignored (your active scope)
 
-If scopes already exist from teammates, Kyro reads their `sprint.json` files. Then set your active scope:
+If scopes already exist from teammates, this registers them. Then set your active scope:
 
 ```bash
 kyro scope set-active <scope> --yes
@@ -271,7 +271,7 @@ Unknowns become `[NEEDS CLARIFICATION]` markers; `doctor` / `analyze` fail until
 
 ```text
 .agents/kyro/
-├── project.json              # SHARED — commit: principles, global conventions, team policy
+├── project.json              # SHARED — commit: principles, global conventions, team policy, scopes cache
 ├── local.json                # LOCAL — gitignored: activeScope, installedAdapters
 ├── .gitignore                # written by install/sync (local.json, locks)
 └── scopes/{scope}/           # SHARED — commit sprint artifacts
@@ -282,7 +282,7 @@ Unknowns become `[NEEDS CLARIFICATION]` markers; `doctor` / `analyze` fail until
 
 | Path | Commit? | Holds |
 | ---- | ------- | ----- |
-| `project.json` | **Yes** | Team constitution (`principles`), global `conventions`, optional `team.minPackageVersion` |
+| `project.json` | **Yes** | Team constitution (`principles`), global `conventions`, optional `team.minPackageVersion`, scopes registry cache |
 | `local.json` | **No** (gitignored) | Personal `activeScope`, machine `installedAdapters` |
 | `scopes/**` | **Yes** | Sprint work shared by the team |
 
@@ -305,13 +305,11 @@ npx kyro-ai@latest sync --scope workspace --yes
 | **Working directory** | Always install/sync from the **project root**. Global runtime is shared; `.agents/kyro/` is per-cwd. |
 | **Upgrade** | Always `npx kyro-ai@latest sync` (or re-`install`) from that root so you get the newest package and refresh the global runtime / projected modes. `kyroInvocation` lives in `~/.agents/kyro/current/manifest.json` (one refresh serves all projects). |
 | **Team commit matrix** | Commit `project.json` + `scopes/**`. Do **not** commit `local.json` (personal `activeScope`). Install writes `.agents/kyro/.gitignore` for local-only files — you no longer need to gitignore the entire `.agents/kyro/` tree. |
-| **Clone bootstrap** | From the clone root: `install --init-workspace --yes` writes layers if missing and reads scopes from their `sprint.json` files. It leaves `activeScope` unset when multiple scopes exist. Then: `… scope set-active <scope> --yes`. |
+| **Clone bootstrap** | From the clone root: `install --init-workspace --yes` writes layers if missing, **rehydrates** on-disk scopes into the shared registry, and leaves `activeScope` unset when multiple scopes exist. Then: `… scope set-active <scope> --yes`. |
 | **Read-only commands** | `status` / `doctor` / `context-pack` never create project state files; they surface an install bootstrap remedy when layers are missing. |
 | **Global bin (optional)** | `npm i -g kyro-ai@latest` for a durable `kyro` on PATH; still prefer `@latest` on every upgrade. |
 
 Details: [Teams multi-dev contract](docs/teams.md) · [CLI project state](docs/cli.md).
-
-For the 5.0.0 upgrade, update every writer before syncing a shared workspace. Install/sync removes the old `project.json.scopes[]` cache after confirming every old ID has a valid matching `sprint.json` and no lifecycle or custom metadata would be lost; otherwise it stops and reports the unresolved entries without changing shared state. Older runtimes can write the cache again.
 
 ---
 
@@ -347,7 +345,7 @@ cd /path/to/your-project
 npx kyro-ai@latest install --init-workspace --yes
 ```
 
-Kyro reads existing scopes from their `sprint.json` files and creates your personal `local.json`. Then set your active scope:
+Kyro registers existing scopes into `project.json` and creates your personal `local.json`. Then set your active scope:
 
 ```bash
 kyro scope set-active <scope> --yes

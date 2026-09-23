@@ -192,9 +192,9 @@ export function validateSharedProjectStateShape(value: unknown, path: string): V
   if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
   requireLiteral(value, 'schemaVersion', 4, path, issues);
   requireString(value, 'artifactRoot', path, issues);
-  if ('scopes' in value && !Array.isArray(value.scopes)) {
-    issues.push({ path, field: 'scopes', message: 'must be an array when present' });
-  } else if (Array.isArray(value.scopes)) {
+  if (!Array.isArray(value.scopes)) {
+    issues.push({ path, field: 'scopes', message: 'must be an array' });
+  } else {
     value.scopes.forEach((entry, index) => validateScopeEntry(entry, path, `scopes[${index}]`, issues));
   }
   if ('activeScope' in value) {

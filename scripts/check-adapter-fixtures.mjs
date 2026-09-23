@@ -380,11 +380,6 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
     },
   ];
   const scopes = [{ id: 'upgrade-scope', title: 'Upgrade Scope', status: 'active' }];
-  // Migration may discard a legacy cache only when the scope is recoverable from its sprint file.
-  const upgradeSprint = JSON.parse(readFileSync(join(repo, 'fixtures/evals/close-sprint-happy/state/.agents/kyro/scopes/demo/sprint.json'), 'utf-8'));
-  const upgradeScopeDir = join(installDir, '.agents/kyro/scopes/upgrade-scope');
-  mkdirSync(upgradeScopeDir, { recursive: true });
-  writeFileSync(join(upgradeScopeDir, 'sprint.json'), `${JSON.stringify({ ...upgradeSprint, scope: 'upgrade-scope', title: 'Upgrade Scope' }, null, 2)}\n`, 'utf-8');
   sharedBeforeUpgrade.principles = principles;
   sharedBeforeUpgrade.scopes = scopes;
   // Inject retired fields that install/sync must strip from layers.
@@ -409,7 +404,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const sharedAfterSync = JSON.parse(readFileSync(sharedPath, 'utf-8'));
   const localAfterSync = JSON.parse(readFileSync(localPath, 'utf-8'));
   assert(JSON.stringify(sharedAfterSync.principles) === JSON.stringify(principles), 'sync: principles were not preserved');
-  assert(!Object.hasOwn(sharedAfterSync, 'scopes'), 'sync: removes legacy shared scopes[]');
+  assert(JSON.stringify(sharedAfterSync.scopes) === JSON.stringify(scopes), 'sync: scopes were not preserved');
   assert(localAfterSync.activeScope === 'upgrade-scope', 'sync: activeScope was not preserved');
   assert(!Object.hasOwn(sharedAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed from shared');
   assert(!Object.hasOwn(sharedAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from shared');
@@ -434,7 +429,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const reinstalledCodex = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
   const reinstalledStandard = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
   assert(JSON.stringify(sharedAfterReinstall.principles) === JSON.stringify(principles), 'reinstall: principles were not preserved');
-  assert(!Object.hasOwn(sharedAfterReinstall, 'scopes'), 'reinstall: shared scopes[] must remain absent');
+  assert(JSON.stringify(sharedAfterReinstall.scopes) === JSON.stringify(scopes), 'reinstall: scopes were not preserved');
   assert(localAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
   assert(!Object.hasOwn(sharedAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed from shared');
   assert(!Object.hasOwn(sharedAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from shared');

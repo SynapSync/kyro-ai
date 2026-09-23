@@ -23,7 +23,6 @@ import {
   hasMonolitoProjectStateOnDisk,
   KYRO_STATE_MIGRATED_PATH,
   readProjectState,
-  assertPersistedLegacyScopeCachesMigratable,
   sanitizeLocalForWrite,
   collectUnnormalizableState,
   sanitizeSharedForWrite,
@@ -59,7 +58,6 @@ function buildInstallPlanForMode(
   scope: InstallScope,
   options: { includeWorkspace: boolean },
 ): OperationPlan[] {
-  if (options.includeWorkspace) assertPersistedLegacyScopeCachesMigratable();
   const now = new Date().toISOString();
   const packageVersion = readPackageVersion();
   const runtimeRoot = KYRO_ROOT;

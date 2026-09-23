@@ -10,12 +10,9 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { delimiter, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
-const repo = fileURLToPath(new URL('..', import.meta.url));
+const repo = resolve(new URL('..', import.meta.url).pathname);
 const require = createRequire(import.meta.url);
 const {
   UPDATE_PACKAGE,
@@ -35,7 +32,6 @@ function facts(overrides = {}) {
     latest: '4.48.3',
     runtimeVersion: '4.48.3',
     hasWorkspace: true,
-    hasLegacyScopeCache: false,
     durableGlobal: true,
     ...overrides,
   };
@@ -90,29 +86,6 @@ assert(quoteWinArg('a"b') === '"a""b"', 'inner quote doubled');
   assert(plan.action === 'up-to-date', `expected up-to-date, got ${plan.action}`);
   assert(plan.behind === false && plan.steps.length === 0, 'nothing to do');
 }
-
-// --- current package also migrates a legacy shared scope cache ---
-{
-  const plan = buildUpdatePlan(facts({ hasLegacyScopeCache: true }));
-  assert(plan.action === 'refresh-workspace', `expected refresh-workspace, got ${plan.action}`);
-  assert(plan.target === '4.48.3' && plan.steps[0].includes('sync'), 'current package syncs the workspace');
-}
-{
-  const plan = buildUpdatePlan(facts({ hasLegacyScopeCache: true, latest: '4.49.0' }));
-  assert(plan.action === 'update-global', 'new release takes precedence over local migration');
-}
-{
-  const plan = buildUpdatePlan(facts({ hasLegacyScopeCache: true, hasWorkspace: false }));
-  assert(plan.action === 'up-to-date', 'no workspace means no cache to migrate');
-}
-{
-  const plan = buildUpdatePlan(facts({ hasLegacyScopeCache: true, runtimeVersion: '4.49.0' }));
-  assert(plan.action === 'refresh-workspace' && plan.target === '4.49.0', 'newer runtime is used for migration');
-}
-{
-  const plan = buildUpdatePlan(facts({ hasLegacyScopeCache: true, runtimeVersion: '4.49.0; bad' }));
-  assert(plan.target === '4.48.3', 'invalid runtime version cannot become an npx pin');
-}
 {
   // Published latest older than running CLI (local dev ahead): not "behind".
   const plan = buildUpdatePlan(facts({ current: '9.9.9', latest: '4.48.3', runtimeVersion: '9.9.9' }));
@@ -124,10 +97,6 @@ assert(quoteWinArg('a"b') === '"a""b"', 'inner quote doubled');
   const plan = buildUpdatePlan(facts({ runtimeVersion: '4.48.2' }));
   assert(plan.action === 'refresh-stale-runtime', `expected refresh-stale-runtime, got ${plan.action}`);
   assert(plan.target === '4.48.3', 'refresh targets the running version');
-}
-{
-  const plan = buildUpdatePlan(facts({ runtimeVersion: '4.48.2', hasWorkspace: false }));
-  assert(plan.action === 'refresh-stale-runtime' && plan.steps[0].includes('global runtime'), 'runtime-only refresh without workspace');
 }
 {
   // Runtime NEWER than CLI (workspace synced from a newer package): leave alone.
@@ -172,76 +141,4 @@ assert(quoteWinArg('a"b') === '"a""b"', 'inner quote doubled');
 }
 
 assert(UPDATE_PACKAGE === 'kyro-ai', 'package constant');
-
-// --- actual CLI migration, with isolated HOME and a fake read-only npm registry response ---
-{
-  const root = mkdtempSync(join(tmpdir(), 'kyro-update-migrate-'));
-  try {
-    const version = require(resolve(repo, 'package.json')).version;
-    const projectDir = join(root, '.agents', 'kyro');
-    const fakeBin = join(root, 'bin');
-    mkdirSync(projectDir, { recursive: true });
-    mkdirSync(fakeBin);
-    mkdirSync(join(root, 'home'));
-    const projectPath = join(projectDir, 'project.json');
-    writeFileSync(projectPath, `${JSON.stringify({ schemaVersion: 4, scopes: [{ id: 'legacy', title: 'Legacy', status: 'planning' }] }, null, 2)}\n`);
-    writeFileSync(join(projectDir, 'local.json'), `${JSON.stringify({ schemaVersion: 4, activeScope: null, installedAdapters: [] })}\n`);
-    const npmPath = join(fakeBin, 'npm');
-    writeFileSync(npmPath, `#!/bin/sh\n[ "$1" = view ] || exit 90\nprintf '%s\\n' '"${version}"'\n`);
-    chmodSync(npmPath, 0o755);
-    writeFileSync(join(fakeBin, 'npm.cmd'), `@echo off\r\nif not "%1"=="view" exit /b 90\r\necho "${version}"\r\n`);
-    writeFileSync(join(fakeBin, 'npx'), '#!/bin/sh\nexit 90\n');
-    chmodSync(join(fakeBin, 'npx'), 0o755);
-    writeFileSync(join(fakeBin, 'npx.cmd'), '@echo off\r\nexit /b 90\r\n');
-    const env = {
-      ...process.env,
-      HOME: join(root, 'home'),
-      USERPROFILE: join(root, 'home'),
-      APPDATA: join(root, 'home', 'appdata'),
-      LOCALAPPDATA: join(root, 'home', 'localappdata'),
-      PATH: `${fakeBin}${delimiter}${process.env.PATH ?? ''}`,
-    };
-    const cli = resolve(repo, 'dist/cli.js');
-    for (const flag of ['--check', '--dry-run']) {
-      const result = spawnSync(process.execPath, [cli, 'update', flag], { cwd: root, env, encoding: 'utf8' });
-      assert(result.status !== 0 && result.stderr.includes('unresolved legacy entries legacy'),
-        `${flag} must report blocked migration: ${result.stderr}`);
-      assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${flag} must not change project.json`);
-    }
-    const blocked = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
-    assert(blocked.status !== 0 && blocked.stderr.includes('unresolved legacy entries legacy'),
-      `update must refuse to discard orphaned legacy scope: ${blocked.stderr}\n${blocked.stdout}`);
-    assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'refused update preserves shared scopes[]');
-    const scopeDir = join(projectDir, 'scopes', 'legacy');
-    mkdirSync(scopeDir, { recursive: true });
-    writeFileSync(join(scopeDir, 'sprint.json'), `${JSON.stringify({
-      schemaVersion: 4,
-      scope: 'legacy',
-      title: 'Legacy',
-      status: 'planning',
-      objective: 'Keep legacy scope.',
-      successCriteria: ['Scope survives migration.'],
-      clarifications: [],
-      conventions: [],
-      adrs: [],
-      roadmap: { plannedSprintCount: 1, sizingRationale: 'One sprint.', sprints: [{ n: 1, slug: 's1', title: 'Sprint 1', state: 'planned' }] },
-      ledger: [],
-      previousSprint: null,
-      activeSprint: null,
-      debt: [],
-      handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-09-22' },
-    }, null, 2)}\n`);
-    for (const flag of ['--check', '--dry-run']) {
-      const preview = spawnSync(process.execPath, [cli, 'update', flag], { cwd: root, env, encoding: 'utf8' });
-      assert(preview.status === 0 && preview.stdout.includes('legacy scopes[] cache'), `${flag} previews safe migration`);
-      assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${flag} remains read-only`);
-    }
-    const result = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
-    assert(result.status === 0, `update --yes failed: ${result.stderr}\n${result.stdout}`);
-    assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'update --yes removes shared scopes[]');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-}
-
-console.log('check:update — decision matrix, CLI wiring, and isolated workspace migration passed');
+console.log('check:update — decision matrix, flag parsing, and verb wiring passed');
