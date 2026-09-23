@@ -15,6 +15,7 @@ import { runAdapterPreflight, summarizePlanTargets } from './preflight';
 import { analyzeDrift, buildPrunePlan, hasDrift, hasPrunableDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
 import { readPackageVersion } from '../help';
 import { withStateWriterLock, withStateWriterLockAsync } from '../pipeline/state-writer-lock';
+import { migrateLegacySprintFiles } from '../migrations/legacy-sprints';
 
 export function install(options: CliOptions): void | Promise<void> {
   requireFullPackageFor('install');
@@ -41,6 +42,10 @@ function runInstallPlan(
   packageVersion: string,
   shouldInitializeWorkspace: boolean,
 ): void {
+  if (shouldInitializeWorkspace && !options.dryRun) {
+    const migrations = migrateLegacySprintFiles();
+    if (migrations.length > 0) console.log(`Migrated legacy sprint metadata for ${migrations.map((migration) => migration.scope).join(', ')}; backups preserved under .agents/kyro/legacy-migrations/.`);
+  }
   const plan = shouldInitializeWorkspace ? buildInstallPlan(agents, options.scope) : buildRuntimeInstallPlan(options.scope);
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
   if (!shouldInitializeWorkspace && options.dryRun) {
@@ -78,6 +83,10 @@ export function sync(options: CliOptions): void {
   runAdapterPreflight('sync', unique);
 
   const currentVersion = readPackageVersion();
+  if (!options.dryRun) {
+    const migrations = migrateLegacySprintFiles();
+    if (migrations.length > 0) console.log(`Migrated legacy sprint metadata for ${migrations.map((migration) => migration.scope).join(', ')}; backups preserved under .agents/kyro/legacy-migrations/.`);
+  }
   const plan = buildInstallPlan(unique, SCOPE.WORKSPACE);
   const drift = analyzeDrift(currentVersion, managedFilesFromInstallPlan(plan));
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);

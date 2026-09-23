@@ -279,7 +279,7 @@ They do not create per-scope files. Each scope's `sprint.json` (the single sourc
 
 If an old `scopes[]` entry has no recoverable scope on disk, inspect it with `kyro repair integrity prepare --kyro-scope <id> --reason "<reason>"`. Review the full entry, source path, and digest before running `kyro repair integrity apply --kyro-scope <id> --reason "<same reason>" --digest <sha256> --yes`. Apply records the original entry as reconciliation evidence and removes only that approved cache entry; it never deletes a scope directory. Damaged or recoverable Kyro artifacts block this discard.
 
-For the 5.0.0 upgrade, update every writer in a shared workspace before running sync. An older runtime can write the legacy cache again.
+For the 5.0.0 upgrade, update every writer in a shared workspace before running sync. Kyro 5.0.1 also migrates redundant `resolvedSprint` debt metadata when it matches `targetSprint`, preserving a backup before writing. An older runtime can write the legacy cache again.
 
 Bare interactive install (`kyro install`) asks whether to initialize the workspace; when scopes already exist on disk, the prompt lists them so a **y** answer includes them in the project intentionally.
 
@@ -835,6 +835,7 @@ that leaves an immutable record of itself.
 | --- | --- | --- |
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
 | **4.44.0 and later** (candidate: **5.0.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+| **5.0.1** | update-time compatibility migration | Removes redundant `resolvedSprint` only when it equals `targetSprint`; contradictory values remain blocked. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract
@@ -918,7 +919,7 @@ These are refusals by design, not bugs:
 - **A certificate must bind the current head.** Recertification is refused when the chain does not
   replay to live state, when the head has moved, when evidence is empty or does not re-derive, or
   when the verdict is not a pass.
-- **Nothing is migrated automatically.** No install step and no Doctor run canonicalizes a legacy
+- **Canonical debt records are not migrated automatically.** No install step and no Doctor run performs record-level `debt.canonicalize`; the narrow 5.0.1 update-time `resolvedSprint` compatibility migration is the exception described above.
   scope for you.
 
 ### Verification in Kyro Lens

@@ -30,6 +30,9 @@ export const CANONICAL_DEBT_KEYS = ['id', 'title', 'origin', 'priority', 'status
 /** Keys that legacy writers produced and the canonical projection retires. */
 export const LEGACY_DEBT_KEYS = ['detail', 'resolution', 'addedSprint', 'severity', 'source', 'disposition'] as const;
 
+/** Transitional keys handled by a workspace migration before strict sprint validation. */
+export const LEGACY_MIGRATION_DEBT_KEYS = ['resolvedSprint'] as const;
+
 export const DEBT_CLASSIFICATION = {
   CANONICAL: 'canonical',
   LEGACY_COMPATIBLE: 'legacy_compatible',

@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-09-23
+
+### Fixed
+
+- `kyro update` automatically migrates redundant legacy `resolvedSprint` debt metadata when it matches `targetSprint`, preserving a recoverable backup and leaving contradictory or invalid records blocked for manual review.
+
 ## [5.0.0] - 2026-09-23
 
 ### Added
