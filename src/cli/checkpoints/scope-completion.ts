@@ -2,7 +2,7 @@ import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
-import { readProjectState, updateProjectStateLayersUnlocked } from '../state';
+import { hasLayeredProjectStateOnDisk, readProjectState, updateProjectStateLayersUnlocked } from '../state';
 import { withStateWriterLock } from '../pipeline/state-writer-lock';
 import {
   SCOPE_COMPLETION_KIND,
@@ -37,7 +37,7 @@ export interface ScopeCompletionPreparation {
 export interface ScopeCompletionApplyResult {
   requestDigest: string;
   resumed: boolean;
-  wrote: 'both' | 'registry-only' | 'none';
+  wrote: 'both' | 'sprint-only' | 'registry-only' | 'none';
 }
 
 /**
@@ -112,9 +112,11 @@ export function buildScopeCompletionPreparation(
     normalizedSummary,
     requestDigest,
     currentStatus: entry.status,
-    affectedFiles: [sprintJsonPath(request.scope), '.agents/kyro/project.json'],
+    affectedFiles: hasLayeredProjectStateOnDisk()
+      ? [sprintJsonPath(request.scope)]
+      : [sprintJsonPath(request.scope), '.agents/kyro/project.json', '.agents/kyro/local.json', '.agents/kyro/kyro.json', '.agents/kyro/kyro.json.migrated'],
     validations: [
-      'scope exists, is registered, and is not retired',
+      'scope has a valid matching sprint.json and is not retired',
       'no active sprint, open debt, pending review, or blocking findings (fresh completions only)',
       'apply is a single locked transaction bound to this request digest',
       'a matching prior attempt resumes instead of re-writing sprint.json',
@@ -145,6 +147,7 @@ export function applyScopeCompletion(
     }
 
     if (sprintMatches && !entryMatches) {
+      if (hasLayeredProjectStateOnDisk()) throw diverged('the derived scope entry does not match sprint.json');
       if (entry.completion !== undefined) {
         throw new KyroCoreError('COMPLETION_CONFLICT', `Scope "${request.scope}" registry entry already carries a different completion than sprint.json authorizes.`, 'Inspect status or doctor for the conflicting completion records.');
       }
@@ -183,6 +186,10 @@ export function applyScopeCompletion(
     const nextSprint: SprintFile = completedSprintState(sprint, completion);
     atomicReplace(sprintJsonPath(request.scope), `${JSON.stringify(nextSprint, null, 2)}\n`);
     failAfter('sprint');
+    if (hasLayeredProjectStateOnDisk()) {
+      verifyApplied(request.scope, requestDigest);
+      return { requestDigest, resumed: false, wrote: 'sprint-only' };
+    }
     const nextEntry: KyroScopeEntry = completedScopeEntry(entry, completion);
     updateProjectStateLayersUnlocked({ scopes: project.scopes.map((candidate) => candidate.id === request.scope ? nextEntry : candidate) });
     failAfter('registry');
@@ -199,7 +206,7 @@ function verifyApplied(scope: string, requestDigest: string): void {
 
 /**
  * A request digest identifies intent, not the entire committed transition.  A no-op is legal only
- * when both durable records also contain the exact terminal shape this writer owns; otherwise an
+ * when the durable sprint and its effective scope projection have the terminal shape; otherwise an
  * interrupted or externally edited state must never be mistaken for success.
  */
 function assertExactlyApplied(scope: string, sprint: SprintFile, entry: KyroScopeEntry, requestDigest: string): void {

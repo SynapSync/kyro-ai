@@ -2,7 +2,7 @@ import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
-import { readProjectState, updateProjectStateLayersUnlocked } from '../state';
+import { hasLayeredProjectStateOnDisk, readProjectState, updateProjectStateLayersUnlocked } from '../state';
 import { withStateWriterLock } from '../pipeline/state-writer-lock';
 import {
   SCOPE_REOPEN_KIND,
@@ -38,7 +38,7 @@ export interface ScopeReopenPreparation {
 export interface ScopeReopenApplyResult {
   requestDigest: string;
   resumed: boolean;
-  wrote: 'both' | 'registry-only' | 'none';
+  wrote: 'both' | 'sprint-only' | 'registry-only' | 'none';
 }
 
 function normalizeReason(raw: string): string {
@@ -137,9 +137,11 @@ export function buildScopeReopenPreparation(request: ScopeReopenRequest): ScopeR
     requestDigest,
     currentStatus: entry.status,
     supersededCompletion,
-    affectedFiles: [sprintJsonPath(request.scope), '.agents/kyro/project.json'],
+    affectedFiles: hasLayeredProjectStateOnDisk()
+      ? [sprintJsonPath(request.scope)]
+      : [sprintJsonPath(request.scope), '.agents/kyro/project.json', '.agents/kyro/local.json', '.agents/kyro/kyro.json', '.agents/kyro/kyro.json.migrated'],
     validations: [
-      'scope exists, is registered, is not retired, and carries an explicit completion',
+      'scope has a valid matching sprint.json, is not retired, and carries an explicit completion',
       'the superseded completion is preserved in append-only completionHistory',
       'apply is a single locked transaction bound to this request digest',
       'archive/ is never read for mutation, rewritten, or removed',
@@ -167,6 +169,7 @@ export function applyScopeReopen(request: ScopeReopenRequest): ScopeReopenApplyR
     }
 
     if (state === 'resumable') {
+      if (hasLayeredProjectStateOnDisk()) throw diverged('the derived scope entry does not match sprint.json');
       const record = lastReopen(sprint.completionHistory)!;
       assertAuthorizedSprintAfterState(request.scope, sprint, requestDigest);
       if (entry.completion === undefined && lastReopen(entry.completionHistory)?.requestDigest !== requestDigest) {
@@ -202,6 +205,10 @@ export function applyScopeReopen(request: ScopeReopenRequest): ScopeReopenApplyR
     const nextSprint = reopenedSprintState(sprint, record);
     atomicReplace(sprintJsonPath(request.scope), `${JSON.stringify(nextSprint, null, 2)}\n`);
     failAfter('sprint');
+    if (hasLayeredProjectStateOnDisk()) {
+      verifyApplied(request.scope, requestDigest);
+      return { requestDigest, resumed: false, wrote: 'sprint-only' };
+    }
     updateProjectStateLayersUnlocked({ scopes: project.scopes.map((candidate) => candidate.id === request.scope ? reopenedScopeEntry(entry, record, nextSprint) : candidate) });
     failAfter('registry');
     verifyApplied(request.scope, requestDigest);
@@ -217,7 +224,7 @@ function verifyApplied(scope: string, requestDigest: string): void {
 
 /**
  * A request digest identifies intent, not the entire committed transition. A no-op is legal only
- * when both durable records also contain the exact terminal shape this writer owns; otherwise an
+ * when the durable sprint and its effective scope projection have the terminal shape; otherwise an
  * interrupted or externally edited state must never be mistaken for success.
  */
 function assertExactlyApplied(scope: string, sprint: SprintFile, entry: KyroScopeEntry, requestDigest: string): void {

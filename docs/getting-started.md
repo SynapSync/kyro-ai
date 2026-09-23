@@ -26,11 +26,11 @@ kyro install --scope workspace --init-workspace --yes
 
 `--init-workspace` creates or refreshes **layered** project state in this directory (non-interactive):
 
-- `.agents/kyro/project.json` — shared (safe to commit): principles, global conventions, team policy, scopes registry cache
+- `.agents/kyro/project.json` — shared (safe to commit): principles, global conventions, team policy
 - `.agents/kyro/local.json` — personal/machine (gitignored): `activeScope`, installed adapters
 - `.agents/kyro/.gitignore` — ignores local-only files; never ignores `project.json` or `scopes/`
 
-It also **rehydrates** any existing `scopes/` folders (common after cloning a team repo that commits scopes + `project.json` while each developer keeps a personal `local.json`).
+It reads scopes from valid matching `scopes/<id>/sprint.json` files (common after cloning a team repo that commits scopes + `project.json` while each developer keeps a personal `local.json`).
 
 Agent-specific installs (still from the project root):
 
@@ -82,7 +82,7 @@ Project state (layered):
 └── scopes/
 ```
 
-`kyro install` does not create a scoped `sprint.json`; forge/INIT creates it when a scope is opened for the first time. If `scopes/` already has directories (for example after cloning a team repo), install/sync **registers** them into the shared `project.json` scopes registry. With multiple scopes, set yours with:
+`kyro install` does not create a scoped `sprint.json`; forge/INIT creates it when a scope is opened for the first time. If `scopes/` already has valid sprint files (for example after cloning a team repo), Kyro reads them directly. With multiple scopes, set yours with:
 
 ```bash
 node ~/.agents/kyro/current/dist/cli.js scope set-active <scope> --yes
@@ -109,6 +109,7 @@ kyro update
 Useful variants: `kyro update --check` reports the status without changing anything,
 `kyro update --dry-run` previews the planned steps, and `kyro update --yes` skips the
 confirmation (for scripts). If only a projected runtime exists, migrate with `npm install -g kyro-ai`, open a new terminal, verify `kyro --version`, then run `kyro install --scope workspace --init-workspace --yes` from the project root. For a manual update of an initialized workspace, run `npm install -g kyro-ai` first and then `kyro sync --scope workspace --yes`. Existing scopes remain in place.
+With Kyro 5, install or sync also removes the old shared `project.json.scopes[]` cache after verifying every old entry against its scope's `sprint.json`. If the cache contains an unresolved entry, migration stops and explains what must be reconciled.
 
 See [CLI · invocation persistence](cli.md#cli-invocation-persistence-kyroinvocation) and
 [CLI · update](cli.md#update-kyro-update).

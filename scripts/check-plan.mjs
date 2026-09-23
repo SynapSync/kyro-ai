@@ -65,28 +65,14 @@ function readSprint(root, scope) {
   return JSON.parse(readFileSync(sprintPath(root, scope), 'utf-8'));
 }
 
-/** Effective project state: layered merge when present, else legacy monolito. */
+/** Read the CLI's effective state, including scope entries derived from disk. */
 function readKyroJson(root) {
-  const projectPath = projectJsonPath(root);
-  const localPath = localJsonPath(root);
-  if (existsSync(projectPath) || existsSync(localPath)) {
-    const shared = existsSync(projectPath)
-      ? JSON.parse(readFileSync(projectPath, 'utf-8'))
-      : { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [] };
-    const local = existsSync(localPath)
-      ? JSON.parse(readFileSync(localPath, 'utf-8'))
-      : { schemaVersion: 4, activeScope: null, installedAdapters: [] };
-    return {
-      schemaVersion: 4,
-      artifactRoot: shared.artifactRoot ?? '.agents/kyro/scopes',
-      scopes: shared.scopes ?? [],
-      activeScope: local.activeScope ?? null,
-      runtimePath: local.runtimePath ?? '~/.agents/kyro/current',
-      installedAdapters: local.installedAdapters ?? [],
-      ...(shared.principles !== undefined ? { principles: shared.principles } : {}),
-    };
-  }
-  return JSON.parse(readFileSync(kyroJsonPath(root), 'utf-8'));
+  const stateModule = join(repo, 'dist/cli/state.js');
+  const result = spawnSync(process.execPath, ['-e', `process.stdout.write(JSON.stringify(require(${JSON.stringify(stateModule)}).readProjectState()))`], {
+    cwd: root, encoding: 'utf8',
+  });
+  assert(result.status === 0, `effective state read failed: ${result.stderr}`);
+  return JSON.parse(result.stdout);
 }
 
 /**
@@ -229,7 +215,8 @@ function initScope(root, scope = 'demo-scope') {
     assert(!Object.hasOwn(sprint, 'author'), 'author must be omitted when git identity is unavailable');
 
     const kyroJson = readKyroJson(root);
-    assert(kyroJson.scopes.some((entry) => entry.id === 'demo-scope'), 'kyro.json should register the new scope');
+    assert(kyroJson.scopes.some((entry) => entry.id === 'demo-scope'), 'sprint.json should define the new scope');
+    assert(!Object.hasOwn(JSON.parse(readFileSync(projectJsonPath(root), 'utf8')), 'scopes'), 'shared project.json must omit scopes[]');
     assert(kyroJson.activeScope === 'demo-scope', 'kyro.json activeScope should be set to the initialized scope');
 
     const doctorResult = run(['doctor', '--artifacts', '--kyro-scope', 'demo-scope'], root);

@@ -21,6 +21,7 @@ import {
 import { managedPathExists, readJsonFromPackage, readPackageText, resolveManagedPath } from '../fs';
 import { readPackageVersion } from '../help';
 import {
+  assertPersistedLegacyScopeCachesMigratable,
   formatBootstrapRemedy,
   hasLayeredProjectStateOnDisk,
   hasMonolitoProjectStateOnDisk,
@@ -46,7 +47,7 @@ import {
   type ValidationIssue,
 } from '../artifacts/schema';
 import { runTokenAuditChecks } from './token-audit';
-import { listScopes, unregisteredScopeFolders } from '../core/scopes';
+import { listScopes } from '../core/scopes';
 import { listForeignScopeDirectories } from '../artifacts/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
@@ -410,7 +411,7 @@ function checkForeignScopeDirectories(): CheckResult[] {
   }];
 }
 
-/** Advisory: scope folders on disk that never made it into the project registry. */
+/** Advisory when workspace state has not been initialized. */
 function checkUnregisteredScopes(): CheckResult {
   const state = readProjectState();
   if (!state || !Array.isArray(state.scopes)) {
@@ -420,21 +421,21 @@ function checkUnregisteredScopes(): CheckResult {
       detail: 'skipped (no project state)',
     };
   }
-  const missing = unregisteredScopeFolders(state);
-  if (missing.length === 0) {
+  try {
+    assertPersistedLegacyScopeCachesMigratable();
+  } catch (error) {
+    if (!(error instanceof KyroCoreError)) throw error;
     return {
-      status: 'pass',
+      status: 'fail',
       name: 'scope registry',
-      detail: 'all on-disk scopes are registered in project state',
+      detail: error.message,
+      remedy: error.remedy,
     };
   }
   return {
-    status: 'warn',
+    status: 'pass',
     name: 'scope registry',
-    detail: `${missing.length} scope folder(s) on disk missing from project state scopes[]: ${missing.sort().join(', ')}`,
-    remedy: formatBootstrapRemedy(
-      `${missing.length} on-disk scope(s) not registered in project state: ${missing.sort().join(', ')}`,
-    ),
+    detail: 'scope entries are derived from valid sprint files',
   };
 }
 
