@@ -21,6 +21,7 @@ import {
 import { managedPathExists, readJsonFromPackage, readPackageText, resolveManagedPath } from '../fs';
 import { readPackageVersion } from '../help';
 import {
+  assertPersistedLegacyScopeCachesMigratable,
   formatBootstrapRemedy,
   hasLayeredProjectStateOnDisk,
   hasMonolitoProjectStateOnDisk,
@@ -410,7 +411,7 @@ function checkForeignScopeDirectories(): CheckResult[] {
   }];
 }
 
-/** Advisory: scope folders on disk that never made it into the project registry. */
+/** Advisory when workspace state has not been initialized. */
 function checkUnregisteredScopes(): CheckResult {
   const state = readProjectState();
   if (!state || !Array.isArray(state.scopes)) {
@@ -420,12 +421,23 @@ function checkUnregisteredScopes(): CheckResult {
       detail: 'skipped (no project state)',
     };
   }
+  try {
+    assertPersistedLegacyScopeCachesMigratable();
+  } catch (error) {
+    if (!(error instanceof KyroCoreError)) throw error;
+    return {
+      status: 'fail',
+      name: 'scope registry',
+      detail: error.message,
+      remedy: error.remedy,
+    };
+  }
   const missing = unregisteredScopeFolders(state);
   if (missing.length === 0) {
     return {
       status: 'pass',
       name: 'scope registry',
-      detail: 'all on-disk scopes are registered in project state',
+      detail: 'scope entries are derived from valid sprint files',
     };
   }
   return {

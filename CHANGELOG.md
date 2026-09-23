@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-09-22
+
+### Changed
+
+- Scope identity, title, status, completion, reopen history, and retirement are read from each valid matching `scopes/<id>/sprint.json`. Shared `project.json` writes omit `scopes[]`, so different scopes created in separate clones merge without a registry conflict.
+- Install and sync remove the legacy shared `scopes[]` cache. Upgrade every writer before syncing an existing team workspace; older runtimes cannot enforce the disk-derived contract.
+- `kyro update` also detects and removes the legacy shared `scopes[]` cache when the installed CLI is already current; `--check` and `--dry-run` only preview that migration.
+- Migration now stops before writing when a legacy scope entry has no valid matching `sprint.json`. Doctor and integrity preparation identify the unresolved entry instead of silently discarding its only record.
+- Layered close, completion, reopen, and retirement use the scope's sprint file for lifecycle state. Retirement approvals bind the affected scope and optional successor, so an unrelated scope can change without invalidating the approval; older retirement checkpoints remain readable.
+
 ## [4.51.0] - 2026-09-17
 
 ### Added

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { KYRO_PROJECT_ROOT } from '../constants';
+import { KYRO_PROJECT_ROOT, KYRO_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir } from '../artifacts/paths';
@@ -20,7 +20,7 @@ import {
   REGISTRY_CLASS,
   type RegistryClassification,
 } from '../project/reconcile';
-import { readProjectState } from '../state';
+import { readMonolitoProjectState, readProjectState, readSharedProjectState } from '../state';
 import { readPackageVersion } from '../help';
 import type { Convention, KyroScopeEntry, SprintFile } from '../types';
 
@@ -85,6 +85,7 @@ export interface IntegrityTargets {
 export type IntegrityOperation =
   | { kind: 'registry.register-on-disk'; scope: string; entry: KyroScopeEntry }
   | { kind: 'registry.unregister-orphan'; scope: string; entry: KyroScopeEntry; reason: string }
+  | { kind: 'legacy-scope.discard'; scope: string; sourcePath: typeof PROJECT_STATE_PATH | typeof KYRO_STATE_PATH; sourceSha256: string; afterSha256: string; entry: Record<string, unknown>; reason: string }
   | {
     kind: 'checkpoint.canonicalize';
     scope: string;
@@ -112,6 +113,7 @@ export type IntegrityBlockerCode =
   | 'diverged'
   | 'irreconcilable'
   | 'identity-conflict'
+  | 'legacy-registered-orphan'
   | 'unrecoverable'
   /** sprint.json is gone but a usable close checkpoint can resume the scope. */
   | 'recoverable-no-sprint'
@@ -212,21 +214,48 @@ export function prepareIntegrityPlan(options: {
     activeScope: { before: readProjectState()?.activeScope ?? null, after: readProjectState()?.activeScope ?? null },
   };
 
-  const unregisterReason = options.reason?.trim() || 'registered scope directory is absent';
   for (const row of classifications) {
     if (row.classification === REGISTRY_CLASS.ON_DISK_UNREGISTERED && row.derivedEntry) {
       operations.push({ kind: 'registry.register-on-disk', scope: row.id, entry: row.derivedEntry });
       targets.register.push(row.id);
       findings.push({ class: 'register', summary: row.id });
     } else if (row.classification === REGISTRY_CLASS.REGISTERED_ORPHAN && row.registeredEntry) {
-      operations.push({
-        kind: 'registry.unregister-orphan',
-        scope: row.id,
-        entry: row.registeredEntry,
-        reason: unregisterReason,
-      });
-      targets.unregister.push(row.id);
-      findings.push({ class: 'unregister', summary: row.id });
+      const reason = options.reason?.trim();
+      if (requested === row.id && reason) {
+        const sources = ([
+          [PROJECT_STATE_PATH, readSharedProjectState()],
+          [KYRO_STATE_PATH, readMonolitoProjectState()],
+        ] as const).filter(([, value]) => Array.isArray(value?.scopes));
+        let planned = false;
+        const plannedSources: string[] = [];
+        const duplicateSource = sources.some(([, value]) => (value?.scopes ?? []).filter((entry) => asRecord(entry)?.id === row.id).length > 1);
+        if (duplicateSource) {
+          const blocker: IntegrityFinding = { class: 'blocker', code: 'identity-conflict', summary: `${row.id}: duplicate legacy entries require manual review` };
+          blockers.push(blocker);
+          findings.push(blocker);
+          continue;
+        }
+        for (const [sourcePath, value] of sources) {
+          const entries = (value?.scopes ?? []) as unknown[];
+          const matching = entries.filter((entry) => asRecord(entry)?.id === row.id);
+          if (matching.length !== 1) continue;
+          const entry = asRecord(matching[0]);
+          if (!entry) continue;
+          const after = { ...value, scopes: entries.filter((candidate) => asRecord(candidate)?.id !== row.id),
+            ...(sourcePath === KYRO_STATE_PATH && value?.activeScope === row.id ? { activeScope: '' } : {}) };
+          operations.push({ kind: 'legacy-scope.discard', scope: row.id, sourcePath, sourceSha256: sha256(value), afterSha256: sha256(after), entry, reason });
+          planned = true;
+          plannedSources.push(sourcePath);
+        }
+        if (planned) {
+          targets.unregister.push(row.id);
+          findings.push({ class: 'unregister', summary: `${row.id}: discard approved legacy entry from ${plannedSources.join(', ')}` });
+          continue;
+        }
+      }
+      const blocker: IntegrityFinding = { class: 'blocker', code: 'legacy-registered-orphan', summary: `${row.id}: legacy registry entry has no valid matching sprint.json; restore it or prepare an explicit --kyro-scope ${row.id} --reason <text> discard` };
+      blockers.push(blocker);
+      findings.push(blocker);
     } else if (row.classification === REGISTRY_CLASS.IDENTITY_CONFLICT) {
       const blocker: IntegrityFinding = { class: 'blocker', code: 'identity-conflict', summary: `${row.id}: ${row.detail}` };
       blockers.push(blocker);
@@ -479,6 +508,14 @@ function validateIntegrityOperations(value: unknown, path: string, issues: strin
         validateScopeEntry(operation.entry, `${operationPath}.entry`, operation.scope, issues);
         requireNonEmptyString(operation.reason, `${operationPath}.reason`, issues);
         return;
+      case 'legacy-scope.discard':
+        requireExactKeys(operation, ['kind', 'scope', 'sourcePath', 'sourceSha256', 'afterSha256', 'entry', 'reason'], operationPath, issues);
+        if (operation.sourcePath !== PROJECT_STATE_PATH && operation.sourcePath !== KYRO_STATE_PATH) issues.push(`${operationPath}.sourcePath is not a legacy project state file`);
+        requireDigest(operation.sourceSha256, `${operationPath}.sourceSha256`, issues);
+        requireDigest(operation.afterSha256, `${operationPath}.afterSha256`, issues);
+        if (asRecord(operation.entry)?.id !== operation.scope) issues.push(`${operationPath}.entry.id must match operation scope`);
+        requireNonEmptyString(operation.reason, `${operationPath}.reason`, issues);
+        return;
       case 'checkpoint.canonicalize':
         requireExactKeys(operation, ['kind', 'scope', 'sprintN', 'sprintSlug', 'originalPath', 'originalSha256', 'reason'], operationPath, issues);
         requirePositiveInteger(operation.sprintN, `${operationPath}.sprintN`, issues);
@@ -724,8 +761,14 @@ export function formatIntegritySummary(plan: IntegrityPlan): string {
     lines.push('');
   }
   if (plan.targets.unregister.length > 0) {
-    lines.push('Eliminar registros cuyo directorio no existe:');
-    for (const id of plan.targets.unregister) lines.push(`- ${id}`);
+    lines.push('Descartar entradas heredadas irrecuperables (sin borrar directorios):');
+    for (const operation of plan.operations) {
+      if (operation.kind !== 'legacy-scope.discard') continue;
+      lines.push(`- ${operation.scope} en ${operation.sourcePath}`);
+      lines.push(`  motivo: ${operation.reason}`);
+      lines.push(`  archivo antes: ${operation.sourceSha256}`);
+      lines.push(`  entrada completa: ${JSON.stringify(operation.entry)}`);
+    }
     lines.push('');
   }
   if (plan.targets.canonicalize.length > 0) {

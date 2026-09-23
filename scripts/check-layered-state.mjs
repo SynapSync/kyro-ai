@@ -107,7 +107,7 @@ function readJson(cwd, relative) {
   clearDistCache();
   const { validateSharedProjectStateShape, validateLocalProjectStateShape, validateProjectStateShape } = loadSchema();
   const sharedOk = validateSharedProjectStateShape(
-    { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', scopes: [], principles: [principle()] },
+    { schemaVersion: 4, artifactRoot: '.agents/kyro/scopes', principles: [principle()] },
     'project.json',
   );
   assert(sharedOk.length === 0, `shared valid should pass: ${JSON.stringify(sharedOk)}`);
@@ -147,6 +147,7 @@ withWorkspace('kyro-layered-merge-', (cwd) => {
     activeScope: 'alpha',
     installedAdapters: monolitoFixture().installedAdapters,
   });
+  writeJson(cwd, '.agents/kyro/scopes/alpha/sprint.json', minimalSprint('alpha'));
 
   const before = listKyroFiles(cwd);
   const effective = readProjectState();
@@ -154,7 +155,7 @@ withWorkspace('kyro-layered-merge-', (cwd) => {
   assert(JSON.stringify(before) === JSON.stringify(after), `readProjectState must not create files: ${after}`);
   assert(effective.principles?.[0]?.id === 'p-quality', 'principles must come from shared');
   assert(effective.activeScope === 'alpha', 'activeScope must come from local');
-  assert(effective.scopes[0].id === 'alpha', 'scopes must come from shared');
+  assert(effective.scopes[0].id === 'alpha', 'scopes must come from sprint.json');
   assert(!('kyroInvocation' in effective), 'effective must not expose kyroInvocation');
 
   const merged = mergeProjectLayers(
@@ -190,12 +191,15 @@ withWorkspace('kyro-layered-migrate-', (cwd) => {
   } = loadState();
 
   writeJson(cwd, KYRO_STATE_PATH, monolitoFixture());
+  for (const id of ['alpha', 'beta']) {
+    writeJson(cwd, `.agents/kyro/scopes/${id}/sprint.json`, minimalSprint(id));
+  }
   const split = splitMonolitoToLayers(monolitoFixture());
   assert(!('activeScope' in split.shared), 'split shared must omit activeScope');
   assert(split.shared.principles[0].id === 'p-quality', 'split principles on shared');
   assert(split.local.activeScope === 'alpha', 'split activeScope on local');
   assert(split.local.installedAdapters[0].agent === 'standard', 'split adapters on local');
-  assert(split.shared.scopes.map((s) => s.id).join(',') === 'alpha,beta', 'split scopes on shared');
+  assert(!Object.hasOwn(split.shared, 'scopes'), 'split omits shared scopes[]');
 
   migrateMonolitoToLayers();
   const files = listKyroFiles(cwd);
@@ -214,9 +218,38 @@ withWorkspace('kyro-layered-migrate-', (cwd) => {
   const effective = readProjectState();
   assert(effective.activeScope === 'alpha', 'post-migrate activeScope');
   assert(effective.principles[0].id === 'p-quality', 'post-migrate principles');
-  assert(effective.scopes.length === 2, 'post-migrate scopes');
+  assert(effective.scopes.map((scope) => scope.id).join(',') === 'alpha,beta', 'migration keeps disk-backed scopes');
   assert(effective.installedAdapters[0].agent === 'standard', 'post-migrate adapters');
   console.log('ok migration');
+});
+
+// --- migration refuses to discard the only record of a legacy scope ---
+withWorkspace('kyro-layered-migrate-orphan-', (cwd) => {
+  const { KYRO_STATE_PATH, PROJECT_STATE_PATH } = loadConstants();
+  const { migrateMonolitoToLayers } = loadState();
+  writeJson(cwd, KYRO_STATE_PATH, monolitoFixture());
+  let refused = false;
+  try {
+    migrateMonolitoToLayers();
+  } catch (error) {
+    refused = error?.code === 'INVALID_INPUT' && String(error.message).includes('alpha, beta');
+  }
+  assert(refused, 'migration must name legacy scopes without valid sprint files');
+  assert(existsSync(join(cwd, KYRO_STATE_PATH)), 'refusal preserves monolito');
+  assert(!existsSync(join(cwd, PROJECT_STATE_PATH)), 'refusal does not write layers');
+  for (const id of ['alpha', 'beta']) {
+    writeJson(cwd, `.agents/kyro/scopes/${id}/sprint.json`, minimalSprint(id));
+  }
+  const legacy = readJson(cwd, KYRO_STATE_PATH);
+  legacy.scopes[0].custom = 'keep this metadata';
+  writeJson(cwd, KYRO_STATE_PATH, legacy);
+  let metadataRefused = false;
+  try {
+    migrateMonolitoToLayers();
+  } catch (error) {
+    metadataRefused = error?.code === 'INVALID_INPUT' && String(error.message).includes('unmigrated fields: custom');
+  }
+  assert(metadataRefused && !existsSync(join(cwd, PROJECT_STATE_PATH)), 'migration must preserve unknown legacy metadata');
 });
 
 // --- write targeting: local-only leaves shared principles byte-stable ---
@@ -259,6 +292,7 @@ withWorkspace('kyro-layered-write-', (cwd) => {
   assert(sharedBefore === sharedAfterLocal, 'local write must not rewrite shared file');
   assert(readJson(cwd, LOCAL_STATE_PATH).activeScope === 'beta', 'local activeScope updated');
   assert(readProjectState().principles[0].id === 'p-quality', 'principles survive local write');
+  assert(!Object.hasOwn(readJson(cwd, PROJECT_STATE_PATH), 'scopes'), 'shared writer strips legacy scopes[]');
 
   writeSharedProjectState({
     schemaVersion: 4,
@@ -302,9 +336,9 @@ withWorkspace('kyro-layered-setactive-', (cwd) => {
     },
   });
 
-  // Create scope dirs so set-active path resolution is happy (also in registry).
-  mkdirSync(join(cwd, '.agents/kyro/scopes/alpha'), { recursive: true });
-  mkdirSync(join(cwd, '.agents/kyro/scopes/beta'), { recursive: true });
+  // Valid sprint files grant scope identity.
+  writeJson(cwd, '.agents/kyro/scopes/alpha/sprint.json', minimalSprint('alpha'));
+  writeJson(cwd, '.agents/kyro/scopes/beta/sprint.json', minimalSprint('beta'));
 
   const sharedBefore = readFileSync(join(cwd, PROJECT_STATE_PATH), 'utf-8');
   withStateWriterLock(() => {

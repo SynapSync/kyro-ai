@@ -16,7 +16,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
@@ -140,7 +140,6 @@ function layerize(root) {
   writeJson(paths.shared, {
     schemaVersion: 4,
     artifactRoot: legacy.artifactRoot,
-    scopes: legacy.scopes,
     ...(legacy.principles ? { principles: legacy.principles } : {}),
     ...(legacy.conventions ? { conventions: legacy.conventions } : {}),
     ...(legacy.team ? { team: legacy.team } : {}),
@@ -156,9 +155,18 @@ function layerize(root) {
 
 function addSuccessor(root) {
   const paths = projectPaths(root);
-  const shared = json(paths.shared);
-  shared.scopes.push({ id: 'successor', title: 'Successor', status: 'planning' });
-  writeJson(paths.shared, shared);
+  const planPath = join(root, 'successor-plan.json');
+  writeJson(planPath, {
+    scope: 'successor', title: 'Successor', objective: 'Replace demo.',
+    successCriteria: ['Successor is ready.'],
+    spec: { requirements: [{ id: 'R1', statement: 'Successor is ready.', priority: 'must' }], nonGoals: [], openQuestions: [] },
+    roadmap: { plannedSprintCount: 1, sizingRationale: 'One scope.', sprints: [{ n: 1, slug: 'successor', title: 'Successor' }] },
+  });
+  const result = run(root, ['plan', '--from', planPath]);
+  assert(result.status === 0, `successor plan failed: ${output(result)}`);
+  const local = json(paths.local);
+  local.activeScope = 'demo';
+  writeJson(paths.local, local);
 }
 
 try {
@@ -190,6 +198,20 @@ try {
     const wrongDigest = apply(root, `${prepared.digest.slice(0, 63)}${prepared.digest.endsWith('0') ? '1' : '0'}`);
     assertFailure(wrongDigest, 'DIVERGED');
     assert(digestTree(join(root, '.agents')) === before, 'incorrect digest must not write');
+  }
+
+  // An unrelated scope added after approval does not invalidate this scope's retirement.
+  {
+    const root = workspace();
+    const prepared = prepare(root);
+    const unrelatedPath = join(root, '.agents/kyro/scopes/unrelated/sprint.json');
+    mkdirSync(dirname(unrelatedPath), { recursive: true });
+    writeJson(unrelatedPath, { ...json(scopePath(root)), scope: 'unrelated', title: 'Unrelated' });
+    const sharedBeforeApply = readFileSync(projectPaths(root).shared, 'utf8');
+    const applied = apply(root, prepared.digest);
+    assert(applied.status === 0, `unrelated scope addition must not invalidate retirement approval: ${output(applied)}`);
+    assert(readFileSync(projectPaths(root).shared, 'utf8') === sharedBeforeApply, 'retirement must not write shared project.json');
+    assert(existsSync(unrelatedPath), 'retirement must preserve the unrelated scope');
   }
 
   // Missing registration, active sprint, and corrupt close checkpoints fail closed without writes.
@@ -253,11 +275,11 @@ try {
     shared.scopes = [];
     writeJson(paths.shared, shared);
     const before = digestTree(join(root, '.agents'));
-    const missing = run(root, [
+    const derived = run(root, [
       'scope', 'retire', '--kyro-scope', 'demo', '--reason', 'No longer needed.',
     ]);
-    assertFailure(missing, 'SCOPE_NOT_FOUND');
-    assert(digestTree(join(root, '.agents')) === before, 'unregistered-scope rejection must not write');
+    assert(derived.status === 0, `valid sprint must remain visible with an empty legacy registry: ${output(derived)}`);
+    assert(digestTree(join(root, '.agents')) === before, 'retirement preparation must not write');
   }
   {
     const root = workspace();
@@ -295,6 +317,19 @@ try {
     assertFailure(stale, 'DIVERGED');
     assert(digestTree(join(root, '.agents')) === before, 'archive divergence must not write');
   }
+  {
+    const root = workspace();
+    addSuccessor(root);
+    const prepared = prepare(root, ['--superseded-by', 'successor']);
+    const successorPath = join(root, '.agents/kyro/scopes/successor/sprint.json');
+    const successor = json(successorPath);
+    successor.title = 'Changed successor';
+    writeJson(successorPath, successor);
+    const before = digestTree(join(root, '.agents'));
+    const stale = apply(root, prepared.digest, ['--superseded-by', 'successor']);
+    assertFailure(stale, 'DIVERGED');
+    assert(digestTree(join(root, '.agents')) === before, 'successor change must invalidate approval without writing');
+  }
 
   // Successful apply records the terminal lifecycle across every consumer and preserves archive bytes.
   {
@@ -311,7 +346,7 @@ try {
     const paths = projectPaths(root);
     const shared = json(paths.shared);
     const local = json(paths.local);
-    const entry = shared.scopes.find((candidate) => candidate.id === 'demo');
+    const entry = sprint;
     assert(sprint.status === 'retired' && sprint.handoff.nextAction === 'done', 'sprint must enter the retired terminal state');
     assert(sprint.activeSprint === null, 'retired scope must have no active sprint');
     assert(sprint.retirement.reason === 'Scope replaced by the successor.', 'sprint must record the human reason');
@@ -322,7 +357,8 @@ try {
         && retirementCheckpoint.approval?.identityVerified === false,
       'checkpoint must record the explicit decision without claiming verified identity',
     );
-    assert(entry?.status === 'retired' && entry.retirement?.planDigest === prepared.digest, 'registry must record retirement');
+    assert(entry.status === 'retired' && entry.retirement?.planDigest === prepared.digest, 'disk-derived registry must record retirement');
+    assert(!Object.hasOwn(shared, 'scopes'), 'shared project must omit scopes[]');
     assert(local.activeScope === null, 'retiring the active scope must clear local activeScope');
 
     const status = run(root, ['status', 'brief', '--kyro-scope', 'demo', '--json']);
@@ -379,7 +415,7 @@ try {
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'legacy migration must preserve archive bytes');
   }
 
-  // The immutable transaction resumes after interruption, including a split project-layer write.
+  // The immutable transaction resumes after interruption without binding unrelated scopes.
   {
     const root = workspace();
     const archiveBefore = digestTree(scopePath(root, 'archive'));
@@ -389,16 +425,22 @@ try {
     const checkpoint = json(scopePath(root, 'retirement.checkpoint.json'));
     assert(json(scopePath(root)).status === 'retired', 'sprint write must be durable before interruption');
 
-    // Simulate a crash after the shared registry layer but before the local active-scope layer.
     const paths = projectPaths(root);
-    const shared = json(paths.shared);
-    shared.scopes = checkpoint.afterProject.scopes;
-    writeJson(paths.shared, shared);
-    assert(json(paths.local).activeScope === 'demo', 'fixture must represent the partial layered write');
+    const sharedBeforeRetry = readFileSync(paths.shared, 'utf8');
+    const unrelatedPath = join(root, '.agents/kyro/scopes/unrelated/sprint.json');
+    mkdirSync(dirname(unrelatedPath), { recursive: true });
+    writeJson(unrelatedPath, { ...checkpoint.beforeSprint, scope: 'unrelated', title: 'Unrelated' });
+    const local = json(paths.local);
+    local.activeScope = 'unrelated';
+    writeJson(paths.local, local);
 
     const resumed = apply(root, prepared.digest);
     assert(resumed.status === 0, `retry must converge an interrupted transaction: ${output(resumed)}`);
-    assert(json(paths.local).activeScope === null, 'resume must finish the local layer');
+    assert(json(paths.local).activeScope === 'unrelated', 'resume must preserve a newer personal scope selection');
+    assert(readFileSync(paths.shared, 'utf8') === sharedBeforeRetry, 'resume must not write the shared project file');
+    assert(existsSync(unrelatedPath), 'resume must preserve a scope added after the checkpoint');
+    const inspect = run(root, ['scope', 'inspect', 'demo']);
+    assert(inspect.status === 0, `retirement inspection must accept the unrelated scope: ${output(inspect)}`);
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'resume must preserve archive bytes');
   }
 
@@ -499,8 +541,7 @@ try {
     assert(completedSprint.retirement === undefined, 'completion must NOT mint retirement metadata');
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'completion must never rewrite archive/');
     const paths = projectPaths(root);
-    const sharedEntry = json(paths.shared).scopes.find((candidate) => candidate.id === 'demo');
-    assert(sharedEntry?.status === 'completed' && sharedEntry.completion?.summary === 'All demo work done.', 'registry must record completion status and metadata');
+    assert(!Object.hasOwn(json(paths.shared), 'scopes'), 'completion must leave shared project.json without scopes[]');
 
     // Completion is visible in status and context-pack, distinct from retirement.
     const status = run(root, ['status', 'brief', '--kyro-scope', 'demo', '--json']);
@@ -523,9 +564,7 @@ try {
   }
 
   // Scope completion recovery: a single locked transaction, revalidated and resumable. A fault
-  // injected after the sprint write but before the registry write must leave sprint.json durably
-  // completed and the registry untouched; retrying the identical request must resume by writing only
-  // the registry, and retrying again after that must be a byte-for-byte no-op.
+  // A failure after the sprint write leaves completion durable. Retrying is a no-op.
   {
     const root = workspace();
     const archiveBefore = digestTree(scopePath(root, 'archive'));
@@ -540,21 +579,16 @@ try {
     const afterFault = json(scopePath(root));
     assert(afterFault.status === 'completed' && afterFault.completion?.requestDigest, 'sprint write must be durable before interruption');
     const sprintBytesAfterFault = readFileSync(scopePath(root), 'utf-8');
-    const registryAfterFault = json(paths.shared).scopes.find((s) => s.id === 'demo');
-    assert(registryAfterFault?.status !== 'completed', 'registry must still be pre-transition after the injected failure');
+    const sharedBytesAfterFault = readFileSync(paths.shared, 'utf8');
+    assert(!Object.hasOwn(json(paths.shared), 'scopes'), 'completion must not write a shared registry');
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'interrupted completion must never touch archive/');
 
-    // Retry the identical request: must resume by finishing only the registry write.
+    // Retry the identical request: sprint.json already contains the completed state.
     const resumed = run(root, ['scope', 'complete', '--kyro-scope', 'demo', '--summary', 'Recovery summary.', '--yes']);
     assert(resumed.status === 0, `resume must succeed: ${output(resumed)}`);
     assert(output(resumed).includes('resumed=true'), `resume must report resumed=true: ${output(resumed)}`);
     assert(readFileSync(scopePath(root), 'utf-8') === sprintBytesAfterFault, 'resume must not rewrite sprint.json');
-    const registryAfterResume = json(paths.shared).scopes.find((s) => s.id === 'demo');
-    assert(registryAfterResume?.status === 'completed', 'resume must finish the registry update');
-    assert(
-      JSON.stringify(registryAfterResume.completion) === JSON.stringify(afterFault.completion),
-      'resumed registry completion must exactly match the authorized sprint completion',
-    );
+    assert(readFileSync(paths.shared, 'utf8') === sharedBytesAfterFault, 'resume must not edit shared project.json');
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'resume must never touch archive/');
 
     // Idempotent retry against a fully-applied state must write nothing new (no new timestamps, no
@@ -565,16 +599,14 @@ try {
     assert(output(noop).includes('resumed=true'), `idempotent retry must report resumed=true: ${output(noop)}`);
     assert(digestTree(join(root, '.agents')) === wholeTreeBefore, 'idempotent retry must write zero new bytes');
 
-    // The intent digest alone is not sufficient evidence of success. If a concurrent or manual
-    // writer leaves the same completion record on a non-terminal registry entry, retry must fail
-    // closed rather than declaring the request a no-op.
-    const malformedProject = json(paths.shared);
-    malformedProject.scopes.find((s) => s.id === 'demo').status = 'planning';
-    writeJson(paths.shared, malformedProject);
-    const malformedBytes = readFileSync(paths.shared, 'utf-8');
+    // A matching completion record with a non-terminal sprint status must fail closed.
+    const malformedSprint = json(scopePath(root));
+    malformedSprint.status = 'planning';
+    writeJson(scopePath(root), malformedSprint);
+    const malformedBytes = readFileSync(scopePath(root), 'utf-8');
     const malformedRetry = run(root, ['scope', 'complete', '--kyro-scope', 'demo', '--summary', 'Recovery summary.', '--yes']);
-    assertFailure(malformedRetry, 'DIVERGED');
-    assert(readFileSync(paths.shared, 'utf-8') === malformedBytes, 'a digest-matching but non-terminal registry must not be overwritten');
+    assert(malformedRetry.status !== 0, 'non-terminal sprint must be rejected');
+    assert(readFileSync(scopePath(root), 'utf-8') === malformedBytes, 'a non-terminal sprint must not be overwritten');
   }
 
   // Scope completion: an incompatible retry (different summary) against an already-completed scope
@@ -600,15 +632,13 @@ try {
       { KYRO_TEST_COMPLETE_FAIL_AFTER: 'sprint' },
     );
     assert(interrupted.status !== 0, `injected sprint-boundary failure must fail: ${output(interrupted)}`);
-    const paths2 = projectPaths(root2);
-    const shared = json(paths2.shared);
-    const entry = shared.scopes.find((s) => s.id === 'demo');
-    entry.title = 'Renamed by a concurrent writer';
-    writeJson(paths2.shared, shared);
-    const tamperedBytes = readFileSync(paths2.shared, 'utf-8');
+    const modifiedSprint = json(scopePath(root2));
+    modifiedSprint.status = 'planning';
+    writeJson(scopePath(root2), modifiedSprint);
+    const tamperedBytes = readFileSync(scopePath(root2), 'utf-8');
     const resumeAttempt = run(root2, ['scope', 'complete', '--kyro-scope', 'demo', '--summary', 'Recovery summary.', '--yes']);
-    assertFailure(resumeAttempt, 'DIVERGED');
-    assert(readFileSync(paths2.shared, 'utf-8') === tamperedBytes, "a diverged resume must not lose the concurrent writer's change");
+    assert(resumeAttempt.status !== 0, 'a modified completed sprint must be rejected');
+    assert(readFileSync(scopePath(root2), 'utf-8') === tamperedBytes, "a rejected resume must not lose the concurrent writer's change");
     assert(digestTree(scopePath(root2, 'archive')) === archiveBefore2, 'a diverged resume must never touch archive/');
   }
 
@@ -703,12 +733,7 @@ try {
       'history must preserve the superseded completion verbatim',
     );
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'reopen must never rewrite archive/');
-    const entry = json(paths.shared).scopes.find((candidate) => candidate.id === 'demo');
-    assert(entry.status === 'planning' && entry.completion === undefined, 'registry must show the scope open again');
-    assert(
-      JSON.stringify(entry.completionHistory) === JSON.stringify(reopenedSprint.completionHistory),
-      'registry and sprint history must match exactly',
-    );
+    assert(!Object.hasOwn(json(paths.shared), 'scopes'), 'reopen must leave project.json without scopes[]');
 
     // Completion history stays visible to readers after the scope is open again.
     const inspected = run(root, ['scope', 'inspect', 'demo']);
@@ -800,20 +825,15 @@ try {
     const afterFault = json(scopePath(root));
     assert(afterFault.completion === undefined && afterFault.completionHistory?.length === 1, 'sprint write must be durable before interruption');
     const sprintBytesAfterFault = readFileSync(scopePath(root), 'utf-8');
-    const registryAfterFault = json(paths.shared).scopes.find((s) => s.id === 'demo');
-    assert(registryAfterFault?.status === 'completed', 'registry must still be pre-transition after the injected failure');
+    const sharedBytesAfterFault = readFileSync(paths.shared, 'utf8');
+    assert(!Object.hasOwn(json(paths.shared), 'scopes'), 'reopen must not write a shared registry');
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'an interrupted reopen must never touch archive/');
 
     const resumed = run(root, ['scope', 'reopen', '--kyro-scope', 'demo', '--reason', reason, '--yes']);
     assert(resumed.status === 0, `resume must succeed: ${output(resumed)}`);
     assert(output(resumed).includes('resumed=true'), `resume must report resumed=true: ${output(resumed)}`);
     assert(readFileSync(scopePath(root), 'utf-8') === sprintBytesAfterFault, 'resume must not rewrite sprint.json');
-    const registryAfterResume = json(paths.shared).scopes.find((s) => s.id === 'demo');
-    assert(registryAfterResume?.status === 'planning' && registryAfterResume.completion === undefined, 'resume must finish the registry update');
-    assert(
-      JSON.stringify(registryAfterResume.completionHistory) === JSON.stringify(afterFault.completionHistory),
-      'resumed registry history must exactly match the authorized sprint history',
-    );
+    assert(readFileSync(paths.shared, 'utf8') === sharedBytesAfterFault, 'resume must not edit shared project.json');
     assert(digestTree(scopePath(root, 'archive')) === archiveBefore, 'resume must never touch archive/');
 
     // A concurrent writer that changes the registry entry between the fault and the resume must fail
@@ -827,14 +847,13 @@ try {
       { KYRO_TEST_REOPEN_FAIL_AFTER: 'sprint' },
     );
     assert(interrupted2.status !== 0, `injected sprint-boundary failure must fail: ${output(interrupted2)}`);
-    const paths2 = projectPaths(root2);
-    const shared = json(paths2.shared);
-    shared.scopes.find((s) => s.id === 'demo').title = 'Renamed by a concurrent writer';
-    writeJson(paths2.shared, shared);
-    const tamperedBytes = readFileSync(paths2.shared, 'utf-8');
+    const modifiedSprint = json(scopePath(root2));
+    modifiedSprint.status = 'completed';
+    writeJson(scopePath(root2), modifiedSprint);
+    const tamperedBytes = readFileSync(scopePath(root2), 'utf-8');
     const divergedResume = run(root2, ['scope', 'reopen', '--kyro-scope', 'demo', '--reason', reason, '--yes']);
-    assertFailure(divergedResume, 'DIVERGED');
-    assert(readFileSync(paths2.shared, 'utf-8') === tamperedBytes, "a diverged resume must not lose the concurrent writer's change");
+    assert(divergedResume.status !== 0, 'modified reopened sprint must be rejected');
+    assert(readFileSync(scopePath(root2), 'utf-8') === tamperedBytes, "a rejected resume must not lose the concurrent writer's change");
   }
 
   // S1/S2/S3/S6/S7 — the original rigidity failure, exercised through the compiled CLI only:
@@ -1038,13 +1057,6 @@ try {
       const result = run(root, ['scope', 'reopen', '--kyro-scope', 'demo', '--reason', reason, '--yes']);
       assert(result.status === 0, `reopen must succeed: ${output(result)}`);
     };
-    const readRegistry = (root) => {
-      const shared = projectPaths(root).shared;
-      const project = json(shared);
-      const entry = project.scopes.find((candidate) => candidate.id === 'demo');
-      assert(entry, 'the registry must carry the demo scope');
-      return { shared, project, entry };
-    };
     const assertDiverged = (root, what) => {
       const inspected = run(root, ['scope', 'inspect', 'demo']);
       assert(inspected.status !== 0, `${what} must fail closed: ${output(inspected)}`);
@@ -1122,10 +1134,6 @@ try {
     delete unsignedSprint.completion.requestDigest;
     delete unsignedSprint.completion.beforeEntryDigest;
     writeJson(scopePath(unsigned), unsignedSprint);
-    const unsignedRegistry = readRegistry(unsigned);
-    delete unsignedRegistry.entry.completion.requestDigest;
-    delete unsignedRegistry.entry.completion.beforeEntryDigest;
-    writeJson(unsignedRegistry.shared, unsignedRegistry.project);
     assertDiverged(unsigned, 'a completion with no structural binding');
 
     // Structural binding, case 2: the digests are present but the record's own content was restated
@@ -1137,9 +1145,6 @@ try {
     restatedSprint.completion.summary = 'A summary nobody ever approved.';
     restatedSprint.handoff.note = `Scope explicitly completed: ${restatedSprint.completion.summary}`;
     writeJson(scopePath(restated), restatedSprint);
-    const restatedRegistry = readRegistry(restated);
-    restatedRegistry.entry.completion.summary = restatedSprint.completion.summary;
-    writeJson(restatedRegistry.shared, restatedRegistry.project);
     assertDiverged(restated, 'a completion restated underneath its request digest');
 
     // Structural binding, case 3: the request digest re-derives, but the record claims a registry state it
@@ -1151,9 +1156,6 @@ try {
     const misboundSprint = json(scopePath(misbound));
     misboundSprint.completion.beforeEntryDigest = foreignDigest;
     writeJson(scopePath(misbound), misboundSprint);
-    const misboundRegistry = readRegistry(misbound);
-    misboundRegistry.entry.completion.beforeEntryDigest = foreignDigest;
-    writeJson(misboundRegistry.shared, misboundRegistry.project);
     assertDiverged(misbound, 'a completion bound to a registry state it never started from');
 
     // Trust-boundary case: both digests are public and deterministic. An editor with write access to
@@ -1171,9 +1173,6 @@ try {
     );
     recomputedSprint.handoff.note = `Scope explicitly completed: ${recomputedSprint.completion.summary}`;
     writeJson(scopePath(recomputed), recomputedSprint);
-    const recomputedRegistry = readRegistry(recomputed);
-    recomputedRegistry.entry.completion = structuredClone(recomputedSprint.completion);
-    writeJson(recomputedRegistry.shared, recomputedRegistry.project);
 
     const recomputedInspect = run(recomputed, ['scope', 'inspect', 'demo']);
     assert(recomputedInspect.status === 0,
