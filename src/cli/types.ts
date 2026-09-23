@@ -24,7 +24,7 @@ export interface KyroInstalledAdapter {
   skillsPath?: string;
 }
 
-/** A scope entry in kyro.json.scopes[] — always an object, never a bare string. */
+/** Effective scope view derived from its sprint.json. */
 export interface KyroScopeEntry {
   id: string;
   title: string;
@@ -138,14 +138,14 @@ export interface ExecutionPreferences {
  * | principles         | **shared only**               | Team constitution; must travel with git |
  * | conventions        | **shared only**               | Global operational rules; merged into every scope pack |
  * | team               | **shared only**               | TeamPolicy (minPackageVersion, …) |
- * | scopes             | shared cache + disk rehydrate | Presence SoT is scopes/ folders |
+ * | scopes             | derived from sprint.json      | Valid matching per-scope files define effective entries |
  * | activeScope        | **local only**                | Never on shared (git thrash) |
  * | installedAdapters  | **local only**                | Per-machine adapter install records |
  * | execution          | **local only**                | Personal delegation opt-in (L1); default off |
  * | runtimePath        | effective default / local     | Informational; not a git conflict surface |
  * | kyroInvocation     | **neither** (global only)     | `~/.agents/kyro/current/manifest.json` |
  *
- * Effective façade = merge(shared, local) + optional in-memory disk rehydrate on mutating paths.
+ * Effective façade = merge(shared, local) + scope entries derived from disk.
  * Legacy monolito `.agents/kyro/kyro.json` dual-reads into the same effective shape.
  */
 
@@ -153,8 +153,8 @@ export interface ExecutionPreferences {
 export interface KyroSharedProjectState {
   schemaVersion: 4;
   artifactRoot: string;
-  /** Registry cache + titles/status hints; disk folders remain recoverable SoT for presence. */
-  scopes: KyroScopeEntry[];
+  /** Read only for legacy layered files; new writes omit it. */
+  scopes?: KyroScopeEntry[];
   /** Team constitution (optional until authored). */
   principles?: Principle[];
   /** Global operational rules inherited by every scope context pack. */

@@ -111,7 +111,7 @@ export function buildCommandSkill(command: KyroCommandName): string {
     '',
     'CLI workflow: invoke via the CLI line above (or the same form in runtime modes): `status`, `doctor --artifacts`, `analyze`, `scenario add|link`, `record-evidence`, `review`, `repair`, `close-sprint`, `plan --from`, `scope complete`.',
     'Finished-scope completion is Forge-owned (`scope complete`). Retirement of an obsolete scope is operator-only: only the `kyro-scope-retire` router may prepare it, pause for fresh human approval, and then apply.',
-    `Install/update Kyro: only via the full npm package (\`npx kyro-ai install …\` or global \`kyro install\`). Do not treat \`${KYRO_ROOT}\` as the install source.`,
+    `Install/update Kyro: run \`npm install -g kyro-ai\`, then \`kyro install\` from the project root; use \`kyro update\` for upgrades. The projected runtime at \`${KYRO_ROOT}\` cannot install or sync package assets. Claude's plugin-only path does not require the npm CLI.`,
     '',
     'Do not ask the user to restate this workflow in natural language.',
     '',

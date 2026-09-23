@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-09-23
+
+### Added
+
+- Global npm installation and update guidance across the CLI help, active agent instructions, and documentation. The Windows CI matrix verifies installation and sync from the packaged tarball on Node 18, 20, and 22.
+
+### Changed
+
+- `kyro update` verifies ownership of the active global command, installs an exact npm version, and refreshes the projected runtime from that new package. Preview modes report the planned action without writing files.
+- Projected CLI entrypoints resolve Windows command shims and retain the standalone Claude plugin route. Runtime-only users receive an explicit migration path to a global npm installation.
+- Scope identity, title, status, completion, reopen history, and retirement are read from each valid matching `scopes/<id>/sprint.json`. Shared `project.json` writes omit `scopes[]`, so creating distinct scopes in separate clones does not modify a shared registry.
+- Install and sync migrate the legacy shared `scopes[]` cache only when every entry has a valid matching sprint file and no lifecycle or custom metadata would be lost. Unresolved entries stop the migration with a diagnostic and retain the original evidence.
+- Layered close, completion, reopen, and retirement use scope-local lifecycle state. Older retirement checkpoints remain readable; approvals bind the affected scope and optional successor.
+- An already-current global CLI can run `kyro update` to sync a workspace with a legacy `scopes[]` cache. Previews remain read-only.
+
+### Fixed
+
+- Update failures distinguish unavailable registry data, ambiguous command ownership, incomplete packages, and partial synchronization without reporting success.
+- Doctor and integrity repair identify unresolved legacy registry entries instead of silently dropping them.
+
 ## [4.51.0] - 2026-09-17
 
 ### Added

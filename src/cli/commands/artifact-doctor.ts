@@ -79,7 +79,7 @@ export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResu
         checks.push(fail(
           'project.json',
           formatIssues(sharedIssues),
-          'Fix project.json so scopes[] are objects { id, title, status }, schemaVersion is 4, and activeScope is never present. Or run kyro install to repopulate.',
+          'Fix project.json so schemaVersion is 4 and activeScope is absent. Or run kyro install to rewrite managed fields.',
         ));
         return checks;
       }
@@ -108,7 +108,7 @@ export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResu
       checks.push(warn(
         'legacy monolito',
         `${KYRO_STATE_PATH} still present alongside layered project state (dual-read leftover)`,
-        'Run: npx kyro-ai install --init-workspace --yes (or npx kyro-ai sync) to migrate leftover kyro.json into project.json + local.json.',
+        'From the project root, run npm install -g kyro-ai, then kyro install --init-workspace --yes (or kyro sync for an initialized workspace) to migrate leftover kyro.json into project.json + local.json.',
       ));
     }
   } else if (monolito) {
@@ -623,8 +623,10 @@ function resolveScopeNames(scopes: KyroScopeEntry[], activeScope: string | null,
     assertNotForeignDirectory(requestedScope);
     return [requestedScope];
   }
-  if (activeScope) return [activeScope];
   const names = new Set<string>(scopes.map((s) => s.id));
+  // A personal active selection must not narrow a project-wide audit. Include it even when its
+  // directory has gone missing so Doctor reports the stale selection rather than hiding it.
+  if (activeScope) names.add(activeScope);
   for (const scope of listScopeFolders()) names.add(scope);
   return [...names].sort();
 }

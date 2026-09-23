@@ -28,7 +28,7 @@ kyro sync               # Refresh managed workspace assets
 kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
 ```
 
-`npx kyro-ai@latest` resolves to the same CLI entrypoint. Prefer **`@latest`** for install/sync so clients do not reuse a stale npx cache; pin an explicit version only when you need reproducibility.
+Install with `npm install -g kyro-ai`, open a new terminal, and run `kyro install` from the project root. `kyro update` checks the npm registry and updates the verified global installation before refreshing the projected runtime.
 
 ## Machine-readable output
 
@@ -52,13 +52,13 @@ The no-argument TUI is package-root-aware:
 
 | CLI root | Available actions |
 | --- | --- |
-| Full npm package (`npx kyro-ai`, global package binary) | Install standard, OpenCode, or Codex adapter; Doctor; Exit |
+| Full npm package (global `kyro` binary) | Install standard, OpenCode, or Codex adapter; Doctor; Exit |
 | Projected runtime (`node ~/.agents/kyro/current/dist/cli.js`) | Doctor; Exit; full-package installation remedy |
 | Unrecognized or corrupt root | Doctor; Exit; full-package recovery remedy |
 
 The projected runtime is the canonical entrypoint for normal workflow commands, but it intentionally
-cannot install or synchronize package assets. Run install/sync from `npx kyro-ai@latest` or a verified
-global package instead. The restricted TUI never presents unavailable package actions and does not
+cannot install or synchronize package assets. Run install/sync from the verified global npm package.
+The restricted TUI never presents unavailable package actions and does not
 acquire the writer lock merely to reject them.
 
 ## Maintenance Scripts
@@ -131,7 +131,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 | Root | How you get it | Layout highlights |
 | ---- | -------------- | ----------------- |
-| **Full npm package** | `npx kyro-ai@latest …` or global `kyro` after `npm i -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
+| **Full npm package** | Global `kyro` after `npm install -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
 | **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when no durable `kyro` is on PATH) | `manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror |
 
 ### CLI invocation persistence (`kyroInvocation`)
@@ -147,7 +147,7 @@ Install/sync probe PATH once, write the result into the **runtime manifest**, an
 
 On Windows npm installs `.cmd`/`.ps1` shims, not a real `kyro.exe`: Node's spawn without a shell ignores PATHEXT (`spawnSync("kyro")` → ENOENT) and direct `.cmd` spawn is blocked since CVE-2024-27980 (EINVAL), so a bare `kyro` manifest value can never self-spawn via `doctor`. The installer therefore always persists the `node` form on win32, and `doctor` resolves legacy bare values via the projected runtime (`process.execPath` + `<runtime>/dist/cli.js`) instead of reporting a false FAIL on a healthy install.
 
-**Why:** `npx kyro-ai@latest install` puts a temporary `…/.npm/_npx/…/bin/kyro` on PATH for the install process only. Treating that as durable used to persist bare `kyro`, which then failed for agents after npx exited and pushed them into hand-writing `sprint.json`. Ephemeral package-manager paths are rejected. Re-run `npx kyro-ai@latest sync` (or install) **once** (any workspace, or runtime-only install) so the global manifest and projected modes refresh; you do not need to visit every project just to fix the invocation string.
+**Historical migration:** `npx kyro-ai@latest install` placed a temporary `…/.npm/_npx/…/bin/kyro` on PATH. It never provided a durable command. Install the complete package with `npm install -g kyro-ai`; then run `kyro install --scope workspace --init-workspace --yes` from the project root (or `kyro sync --scope workspace --yes` in an initialized workspace). Install/sync refreshes the global manifest and projected modes without rewriting scopes.
 
 **Must run from the full npm package:**
 
@@ -158,7 +158,7 @@ On Windows npm installs `.cmd`/`.ps1` shims, not a real `kyro.exe`: Node's spawn
 
 - `status`, `doctor`, `doctor --artifacts`, `analyze`, `repair`, `close-sprint`, `clarify`, `record-evidence`, `review`, `scenario add|link`, `scope retire`, `context-pack`, and other scope workflow commands
 
-Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable `npx kyro-ai@latest` remedy.
+Root mode is fail-closed. A full package requires the root orchestrator and no projected markers; a projected runtime can retain its identity through any of `manifest.json`, `KYRO.md`, `core/agents/orchestrator.md`, or `core/WORKFLOW.yaml`. Conflicting or marker-less layouts are `unknown`, report an explicit doctor FAIL, and skip npm-package checks. Only a verified full package may run install/sync; projected or unknown roots return `INVALID_INPUT` with an actionable global npm installation remedy.
 
 Global command skills are installed for agent discovery:
 
@@ -175,7 +175,7 @@ The project keeps only state and artifacts (layered):
 
 ```text
 .agents/kyro/
-├── project.json                 # SHARED — commit: principles, team policy, scopes registry cache
+├── project.json                 # SHARED — commit: principles, team policy
 ├── local.json                   # LOCAL — gitignored: activeScope, installedAdapters
 ├── .gitignore                   # install/sync assist (local-only files; never project.json/scopes/)
 ├── trace/{scope}/               # LOCAL — gitignored: append-only per-machine event log
@@ -216,19 +216,20 @@ Implemented workspace adapters:
 Default install uses `standard`. **Always run install/sync from the project root:** global runtime and skills go under `~/.agents/…`; project state (`.agents/kyro/`) is created in the current working directory.
 
 ```bash
+npm install -g kyro-ai
 cd /path/to/your-app
-npx kyro-ai@latest install --scope workspace --dry-run
-npx kyro-ai@latest install --scope workspace --init-workspace --yes
+kyro install --scope workspace --dry-run
+kyro install --scope workspace --init-workspace --yes
 ```
 
-`--init-workspace` non-interactively writes layered project state (`project.json` + `local.json`), ensures `.agents/kyro/.gitignore` for local-only files, and rehydrates on-disk `scopes/`. Without it, a non-interactive install may install only the global runtime. `--yes` alone does not initialize a new workspace.
+`--init-workspace` non-interactively writes layered project state (`project.json` + `local.json`), ensures `.agents/kyro/.gitignore` for local-only files, and reads on-disk `scopes/`. Without it, a non-interactive install may install only the global runtime. `--yes` alone does not initialize a new workspace.
 
 Agent-specific installs (from the project root):
 
 ```bash
-npx kyro-ai@latest install --agent opencode --scope workspace --init-workspace --yes
-npx kyro-ai@latest install --agent codex --scope workspace --init-workspace --yes
-npx kyro-ai@latest install --agent standard,opencode,codex --scope workspace --init-workspace --yes
+kyro install --agent opencode --scope workspace --init-workspace --yes
+kyro install --agent codex --scope workspace --init-workspace --yes
+kyro install --agent standard,opencode,codex --scope workspace --init-workspace --yes
 ```
 
 The adapters project Kyro workflows into concrete agent entrypoints so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose. `standard` and `codex` use `~/.agents/skills/`; OpenCode uses its native config tree and preserves non-Kyro `opencode.json` keys.
@@ -274,9 +275,13 @@ They do not create per-scope files. Each scope's `sprint.json` (the single sourc
 
 **Effective state** is a deterministic merge of shared + local (see [Teams](teams.md) for the pre-layered migration path). Readers use one façade (`readProjectState`); writers target the correct layer only.
 
-**Rehydrate from disk:** if `.agents/kyro/scopes/{id}/` directories already exist (common after clone when scopes + `project.json` are committed but `local.json` is not), install/sync **registers** those folders into the shared scopes registry. Title and status come from each scope's `sprint.json` when readable; existing registry entries are never overwritten. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
+**Read from disk:** scopes come from valid matching `.agents/kyro/scopes/{id}/sprint.json` files. Title and status come from each sprint file. Install/sync removes legacy `project.json.scopes[]` only when every old ID has a valid matching sprint file and no lifecycle or custom metadata would be lost; otherwise it stops before writing and names the unresolved entries. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
 
-Bare interactive install (`npx kyro-ai@latest install`) asks whether to initialize the workspace; when scopes already exist on disk, the prompt lists them so a **y** answer registers them intentionally.
+If an old `scopes[]` entry has no recoverable scope on disk, inspect it with `kyro repair integrity prepare --kyro-scope <id> --reason "<reason>"`. Review the full entry, source path, and digest before running `kyro repair integrity apply --kyro-scope <id> --reason "<same reason>" --digest <sha256> --yes`. Apply records the original entry as reconciliation evidence and removes only that approved cache entry; it never deletes a scope directory. Damaged or recoverable Kyro artifacts block this discard.
+
+For the 5.0.0 upgrade, update every writer in a shared workspace before running sync. An older runtime can write the legacy cache again.
+
+Bare interactive install (`kyro install`) asks whether to initialize the workspace; when scopes already exist on disk, the prompt lists them so a **y** answer includes them in the project intentionally.
 
 **Read-only commands never create state files** (`status`, `doctor`, `context-pack`). If layers are missing, they surface an install bootstrap remedy instead of writing `project.json` / `local.json` (D7a).
 
@@ -308,12 +313,12 @@ You no longer need to gitignore the entire `.agents/kyro/` tree. See [Teams](tea
 After clone:
 
 1. `cd` into the cloned project root (not your home directory).
-2. `npx kyro-ai@latest install --init-workspace --yes` (or interactive install and answer **y**) so layers exist here and scopes are registered.
+2. `kyro install --init-workspace --yes` (or interactive install and answer **y**) so layers exist here and scopes are read from disk.
 3. If more than one scope: `kyro scope set-active <yours> --yes` (or the projected `node ~/.agents/kyro/current/dist/cli.js …` form).
 
-`kyro doctor` validates layered shapes, WARNs on leftover live monolito when layers exist, WARNs on unregistered on-disk scopes, WARNs (global runs only) on directories under `scopes/` that hold no Kyro artifacts and were therefore ignored, and may WARN when `team.minPackageVersion` is newer than the runtime (non-blocking). In Git workspaces it also FAILs when shared `project.json` or `scopes/**` are ignored, and WARNs when only `.agents/kyro/.gitignore` is ignored; the diagnostic prints the exact required negations. It skips this check outside Git.
+`kyro doctor` validates layered shapes, WARNs on leftover live monolito when layers exist, WARNs (global runs only) on directories under `scopes/` that hold no Kyro artifacts and were therefore ignored, and may WARN when `team.minPackageVersion` is newer than the runtime (non-blocking). In Git workspaces it also FAILs when shared `project.json` or `scopes/**` are ignored, and WARNs when only `.agents/kyro/.gitignore` is ignored; the diagnostic prints the exact required negations. It skips this check outside Git.
 
-The project state intentionally does not copy runtime infrastructure fields. Kyro has one global active runtime: authoritative `packageVersion` and `kyroInvocation` live on `~/.agents/kyro/current/manifest.json`. Install and sync remove legacy project-local `runtimeVersion` and `kyroInvocation` while preserving scopes, principles, adapters, and custom metadata.
+The project state intentionally does not copy runtime infrastructure fields. Kyro has one global active runtime: authoritative `packageVersion` and `kyroInvocation` live on `~/.agents/kyro/current/manifest.json`. Install and sync remove legacy project-local `runtimeVersion`, `kyroInvocation`, and shared `scopes[]`, while preserving principles, adapters, and custom metadata. Effective scopes come from their sprint files.
 
 ## Token Audit
 
@@ -379,7 +384,7 @@ kyro doctor --tokens --artifacts
 kyro doctor --artifacts --kyro-scope auth-refactor
 ```
 
-The audit validates project state, scoped `sprint.json` shape including ADR records, versioned lossless checkpoints, legacy ActiveSprint snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. It also reports resumable and divergent close transactions. Managed scope roots, `sprint.json`, `archive/` directories and checkpoint candidates must be real paths inside the workspace: Doctor never follows symlinks, fails them for registered or Kyro-owned scopes, and reports unregistered foreign entries only as a global WARN.
+Without `--kyro-scope`, the artifact audit inspects every scope in project state and every Kyro-owned scope directory, even when a personal active scope is selected. `--kyro-scope` limits the audit to that scope. The audit validates project state, `sprint.json` shape including ADR records, versioned lossless checkpoints, legacy ActiveSprint snapshots, archive narratives, and unresolved `[NEEDS CLARIFICATION]` markers. It also reports resumable and divergent close transactions. Managed scope roots, `sprint.json`, `archive/` directories and checkpoint candidates must be real paths inside the workspace: Doctor never follows symlinks, fails them for registered or Kyro-owned scopes, and reports unregistered foreign entries only as a global WARN.
 
 Repair and normalize a scope's `sprint.json` without rewriting user-authored archives:
 
@@ -441,30 +446,25 @@ If an old manifest lists shared config, sync reports it under `Shared config pre
 
 ## Update (`kyro update`)
 
-One command replaces the old two-step upgrade (`npx kyro-ai install` plus `npm i -g kyro-ai`).
+One command replaces the old two-step upgrade (installing a package, then syncing its runtime).
 Run it from the project root:
 
 ```bash
 kyro update
 ```
 
-It reads the running CLI version and the installed runtime version, asks the registry for the
-latest release, and picks a lane by install mode: a durable global `kyro` on PATH updates via
-`npm install -g kyro-ai@<exact>`; npx-only setups refresh via `npx -y kyro-ai@<exact> …` (exact
-pin, never a floating tag). It then re-runs `sync` (or runtime-only `install` when this
-directory has no workspace state) from the fresh package — never continuing in the old process.
-When the CLI is already current but the installed runtime is older, it refreshes the runtime
-locally with no download.
+It checks that the active `kyro` command belongs to the npm global package, reads the running CLI and projected runtime versions, and asks the registry for the latest release. When an update is available, it runs `npm install -g kyro-ai@<exact>`, verifies the installed package and visible command, then runs `sync` (or runtime-only `install` when this directory has no workspace state) from the fresh package. It verifies the projected runtime before reporting success. When the package is current but the runtime is older, it refreshes the runtime without downloading a package.
+
+When the package and runtime are current but the workspace still has legacy `project.json.scopes[]`, `kyro update` syncs that workspace from the verified global package to remove the cache. Migration stops before writing if an old entry cannot be recovered from a matching sprint file.
 
 Behavior notes:
 
 - `kyro update` asks for confirmation before changing anything; `--yes` skips the prompt
   (required outside interactive terminals), `--dry-run` previews the steps, and
   `kyro update --check` only reports the status.
-- The registry query fails soft when offline: `--check` reports the status as unknown, and a
-  real run retries against the `@latest` tag so npm itself reports any network error.
-- It works from the projected runtime CLI too (the check needs no full package); only the
-  stale-runtime refresh from this package requires the full npm layout.
+- `--check` and `--dry-run` are read-only. If the registry cannot be reached, they report that the target version is unknown; a real update stops without choosing an unverified version.
+- If only the projected runtime exists, `kyro update` reports migration steps and does not install another package implicitly: `npm install -g kyro-ai`, open a new terminal, verify `kyro --version`, then run `kyro install --scope workspace --init-workspace --yes` from the project root. Existing scope state is preserved.
+- A command owned by pnpm, another npm prefix, or an ambiguous PATH is blocked with a diagnostic rather than updating a different installation. A partial failure reports which package and runtime steps completed and an explicit repair command.
 - `update` is operator surface like `install` and `sync`: it is not a tool-owned verb, so the
   capability handshake is untouched and agents never self-update mid-sprint.
 
@@ -703,7 +703,7 @@ The default destination is `sprint.json.conventions[]` in the active (or only) s
 
 `kyro plan --from <file> [--kyro-scope <scope>] [--dry-run]` is tool-owned and validated, so the agent never hand-authors the full v4 `sprint.json` document. It has two modes, **auto-detected from the resolved scope's state** — not from the `--from` file's shape:
 
-- **Init mode** — the scope has no `sprint.json` yet. Materializes the scope's initial `sprint.json` (spec + roadmap, `activeSprint: null`) from a compact lean plan JSON file. Refuses with `SCOPE_ALREADY_INITIALIZED` if the scope already has a `sprint.json` (never overwrites). Also registers the scope in the shared scopes registry on `project.json` (and sets local `activeScope` if unset). When either `git config user.name` or a schema-valid `user.email` resolves, writes optional `sprint.json.author` (`name?`, `email?`, `source: "git"`, `capturedAt`) with the available fields; drops malformed emails and omits the field when nothing usable remains. Author is best-effort only and **never blocks init**. Author is **not** accepted from the lean file.
+- **Init mode** — the scope has no `sprint.json` yet. Materializes the scope's initial `sprint.json` (spec + roadmap, `activeSprint: null`) from a compact lean plan JSON file. Refuses with `SCOPE_ALREADY_INITIALIZED` if the scope already has a `sprint.json` (never overwrites). The new scope is read from that file, and local `activeScope` is set if unset. When either `git config user.name` or a schema-valid `user.email` resolves, writes optional `sprint.json.author` (`name?`, `email?`, `source: "git"`, `capturedAt`) with the available fields; drops malformed emails and omits the field when nothing usable remains. Author is best-effort only and **never blocks init**. Author is **not** accepted from the lean file.
 - **Sprint mode** — the scope's `sprint.json` exists, `activeSprint` is `null`, and `handoff.nextAction === 'plan_sprint'`. Materializes the next `activeSprint` (all tasks `pending`, `evidence: null`, `verdict: null`) from a lean sprint-plan JSON file. Writes only `sprint.json` and **preserves** any existing `author`. Refuses with `SPRINT_ALREADY_ACTIVE` if a sprint is already active, or `NOT_READY_TO_PLAN` if the handoff isn't at `plan_sprint` yet (e.g. still `clarify`).
 
 `[NEEDS CLARIFICATION]` markers are allowed in both modes' output (they legitimately route `handoff.nextAction` to `clarify`); this is separate from the O5 clarification gate on execute-phase commands. **Init mode** also routes to `clarify` when `spec.openQuestions` is non-empty (even without markers), so requirement-level questions drain before Sprint 1 planning.
@@ -834,7 +834,7 @@ that leaves an immutable record of itself.
 | Runtime | Operations | Repairs |
 | --- | --- | --- |
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
-| **4.44.0 and later** (current: **4.51.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
+| **4.44.0 and later** (candidate: **5.0.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

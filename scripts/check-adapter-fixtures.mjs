@@ -337,6 +337,9 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   for (const command of EXPECTED_COMMAND_SKILLS) {
     const skillPath = join(home, '.agents', 'skills', `kyro-${command}`, 'SKILL.md');
     assert(existsSync(skillPath), `install: missing projected skill ${skillPath}`);
+    const skill = readFileSync(skillPath, 'utf-8');
+    assert(skill.includes('npm install -g kyro-ai') && skill.includes('kyro update'), `install: ${command} skill missing global npm guidance`);
+    assert(!skill.includes('npx kyro-ai'), `install: ${command} skill recommends temporary npx install`);
   }
   const ideaSkill = readFileSync(join(home, '.agents', 'skills', 'kyro-idea', 'SKILL.md'), 'utf-8');
   assert(ideaSkill.includes('rough or mature idea'), 'install: kyro-idea skill missing adaptive input description');
@@ -345,6 +348,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!executorSkill.includes('{{KYRO_CLI}}'), 'install: kyro-sprint-executor skill left {{KYRO_CLI}} unsubstituted');
   assert(/runtimeVersion: "/.test(executorSkill), 'install: kyro-sprint-executor skill missing runtimeVersion pin');
   assert(executorSkill.includes('capabilities --json'), 'install: kyro-sprint-executor skill missing capability handshake');
+  assert(executorSkill.includes('npm install -g kyro-ai'), 'install: executor skill missing global npm recovery');
   assert(existsSync(join(home, '.agents', 'kyro', 'current', 'manifest.json')), 'install: missing runtime manifest');
   assert(existsSync(join(home, '.agents', 'kyro', 'current')), 'install: missing active runtime');
 
@@ -380,6 +384,11 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
     },
   ];
   const scopes = [{ id: 'upgrade-scope', title: 'Upgrade Scope', status: 'active' }];
+  // Migration may discard a legacy cache only when the scope is recoverable from its sprint file.
+  const upgradeSprint = JSON.parse(readFileSync(join(repo, 'fixtures/evals/close-sprint-happy/state/.agents/kyro/scopes/demo/sprint.json'), 'utf-8'));
+  const upgradeScopeDir = join(installDir, '.agents/kyro/scopes/upgrade-scope');
+  mkdirSync(upgradeScopeDir, { recursive: true });
+  writeFileSync(join(upgradeScopeDir, 'sprint.json'), `${JSON.stringify({ ...upgradeSprint, scope: 'upgrade-scope', title: 'Upgrade Scope' }, null, 2)}\n`, 'utf-8');
   sharedBeforeUpgrade.principles = principles;
   sharedBeforeUpgrade.scopes = scopes;
   // Inject retired fields that install/sync must strip from layers.
@@ -404,7 +413,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const sharedAfterSync = JSON.parse(readFileSync(sharedPath, 'utf-8'));
   const localAfterSync = JSON.parse(readFileSync(localPath, 'utf-8'));
   assert(JSON.stringify(sharedAfterSync.principles) === JSON.stringify(principles), 'sync: principles were not preserved');
-  assert(JSON.stringify(sharedAfterSync.scopes) === JSON.stringify(scopes), 'sync: scopes were not preserved');
+  assert(!Object.hasOwn(sharedAfterSync, 'scopes'), 'sync: removes legacy shared scopes[]');
   assert(localAfterSync.activeScope === 'upgrade-scope', 'sync: activeScope was not preserved');
   assert(!Object.hasOwn(sharedAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed from shared');
   assert(!Object.hasOwn(sharedAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from shared');
@@ -429,7 +438,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const reinstalledCodex = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
   const reinstalledStandard = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
   assert(JSON.stringify(sharedAfterReinstall.principles) === JSON.stringify(principles), 'reinstall: principles were not preserved');
-  assert(JSON.stringify(sharedAfterReinstall.scopes) === JSON.stringify(scopes), 'reinstall: scopes were not preserved');
+  assert(!Object.hasOwn(sharedAfterReinstall, 'scopes'), 'reinstall: shared scopes[] must remain absent');
   assert(localAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
   assert(!Object.hasOwn(sharedAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed from shared');
   assert(!Object.hasOwn(sharedAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from shared');

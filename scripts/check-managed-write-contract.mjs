@@ -44,7 +44,7 @@ for (const path of files) {
 
 for (const required of ['agents/orchestrator.md', 'internal/skills/sprint-forge/SKILL.md']) {
   const content = readFileSync(resolve(repo, required), 'utf-8');
-  for (const phrase of ['observed', 'without mutating', 'npx kyro-ai@latest sync --scope workspace --yes']) {
+  for (const phrase of ['observed', 'without mutating', 'npm install -g kyro-ai']) {
     if (!content.includes(phrase)) failures.push(required + ': missing fail-closed startup phrase ' + JSON.stringify(phrase));
   }
 }

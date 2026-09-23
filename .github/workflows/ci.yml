@@ -5,11 +5,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   windows_state_writer_lock:
-    name: Windows lock (Node ${{ matrix.node }})
+    name: Windows tarball install (Node ${{ matrix.node }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -34,11 +34,16 @@ jobs:
       - name: Probe file identity
         run: npm run check:windows-file-identity
 
+      - name: Verify Windows invocation and update contracts
+        run: |
+          npm run check:invocation
+          npm run check:update
+
+      - name: Verify npm tarball global install and sync
+        run: npm run check:windows-install-smoke
+
       - name: Verify state-writer lock
         run: npm run check:lossless-checkpoints
-
-      - name: Verify idempotent install
-        run: npm run check:windows-install-smoke
 
   validate:
     runs-on: ubuntu-latest
@@ -74,6 +79,7 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Verify release version is new
+        if: github.event_name == 'push' || github.base_ref == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -32,11 +32,11 @@ export function detectPackageRootMode(root: string = PACKAGE_ROOT): PackageRootM
 
 /** Shared install remedy for any CLI root that is not a verified full package. */
 export const FULL_PACKAGE_INSTALL_REMEDY =
-  'Run: npx kyro-ai install --scope workspace --yes  (or: npm i -g kyro-ai && kyro install …). Use the full npm package, not node ~/.agents/kyro/current/dist/cli.js.';
+  'Run: npm install -g kyro-ai; open a new terminal, then from the project root run kyro install --scope workspace --init-workspace --yes. The projected runtime cannot install package assets.';
 
 /** Shared sync remedy for any CLI root that is not a verified full package. */
 export const FULL_PACKAGE_SYNC_REMEDY =
-  'Run: npx kyro-ai sync --scope workspace  (or: npx kyro-ai install --scope workspace --yes). Use the full npm package, not node ~/.agents/kyro/current/dist/cli.js.';
+  'Run: npm install -g kyro-ai; open a new terminal, then from the project root run kyro sync --scope workspace (or kyro install --scope workspace --init-workspace --yes for a new workspace). The projected runtime cannot sync package assets.';
 
 /**
  * Throw when install/sync (or any op that must read the full package tree) is
