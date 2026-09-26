@@ -201,6 +201,41 @@ function registrySandbox() {
   return root;
 }
 
+function legacyCompletionSandbox() {
+  const root = mkdtempSync(join(tmpdir(), 'kyro-legacy-completion-'));
+  const scope = 'legacy-completion';
+  writeJson(join(root, '.agents/kyro/kyro.json'), {
+    schemaVersion: 4,
+    artifactRoot: '.agents/kyro/scopes',
+    scopes: [{ id: scope, title: scope, status: 'planning' }],
+    activeScope: scope,
+    runtimePath: '~/.agents/kyro/current',
+    installedAdapters: [],
+  });
+  writeJson(join(root, `.agents/kyro/scopes/${scope}/sprint.json`), makeSprint(scope, 1, scope));
+  const close = run(root, ['close-sprint', '--kyro-scope', scope, '--outcome', 'shipped', '--yes']);
+  if (close.status !== 0) throw new Error(`fixture close failed: ${close.stderr}\n${close.stdout}`);
+  const sprintPath = join(root, `.agents/kyro/scopes/${scope}/sprint.json`);
+  const closedSprint = readFileSync(sprintPath);
+  const completion = run(root, ['scope', 'complete', '--kyro-scope', scope, '--summary', 'Legacy completion.', '--yes']);
+  if (completion.status !== 0) throw new Error(`fixture completion failed: ${completion.stderr}\n${completion.stdout}`);
+  const projectPath = join(root, '.agents/kyro/project.json');
+  const project = JSON.parse(readFileSync(projectPath, 'utf8'));
+  const completedSprint = JSON.parse(readFileSync(sprintPath, 'utf8'));
+  const legacyEntry = {
+    id: scope,
+    title: completedSprint.title,
+    status: 'completed',
+    completion: completedSprint.completion,
+  };
+  if (!legacyEntry.completion) throw new Error('fixture did not persist the completion');
+  project.scopes = [legacyEntry];
+  writeJson(projectPath, project);
+  // Recreate the old partial-write state: registry completion exists, sprint completion is absent.
+  writeFileSync(sprintPath, closedSprint);
+  return { root, scope, completion: legacyEntry.completion };
+}
+
 function main() {
   if (!existsSync(cli)) throw new Error('dist/cli.js missing; run npm run build first');
   const identities = family.scopes.flatMap((scope) => scope.sprints.map((sprint) => ({ scope: scope.id, ...sprint })));
@@ -499,6 +534,52 @@ function main() {
     assert(plan.blockers.some((item) => item.code === 'identity-conflict'), `identity conflict must block: ${JSON.stringify(plan.blockers)}`);
   } finally {
     rmSync(identityRoot, { recursive: true, force: true });
+  }
+
+  const legacyCompletion = legacyCompletionSandbox();
+  try {
+    const { root: completionRoot, scope, completion } = legacyCompletion;
+    const reason = 'Restore the historical completion only if its close checkpoint proves it.';
+    const blocked = run(completionRoot, ['repair', 'integrity', 'prepare', '--kyro-scope', scope, '--json']);
+    assert(blocked.status === 0, `legacy completion diagnosis failed: ${blocked.stderr}\n${blocked.stdout}`);
+    const blockedPlan = JSON.parse(blocked.stdout).data;
+    assert(blockedPlan.blockers.some((item) => item.code === 'diverged'), 'unapproved legacy completion remains blocked');
+    assert(!blockedPlan.operations.some((item) => item.kind === 'scope.completion.restore-from-legacy'), 'no reason means no restore operation');
+
+    const prep = run(completionRoot, ['repair', 'integrity', 'prepare', '--kyro-scope', scope, '--reason', reason, '--json']);
+    assert(prep.status === 0, `legacy completion prepare failed: ${prep.stderr}\n${prep.stdout}`);
+    const plan = JSON.parse(prep.stdout).data;
+    const operation = plan.operations.find((item) => item.kind === 'scope.completion.restore-from-legacy');
+    assert(operation?.completion.requestDigest === completion.requestDigest, 'plan binds the exact registry completion');
+    assert(plan.blockers.length === 0, `checkpoint-proven legacy completion should be repairable: ${JSON.stringify(plan.blockers)}`);
+    const denied = run(completionRoot, ['repair', 'integrity', 'apply', '--kyro-scope', scope, '--reason', reason, '--digest', plan.digest]);
+    assert(denied.status !== 0, 'legacy completion restore requires --yes');
+    const applied = run(completionRoot, ['repair', 'integrity', 'apply', '--kyro-scope', scope, '--reason', reason, '--digest', plan.digest, '--yes']);
+    assert(applied.status === 0, `legacy completion apply failed: ${applied.stderr}\n${applied.stdout}`);
+    const restored = JSON.parse(readFileSync(join(completionRoot, `.agents/kyro/scopes/${scope}/sprint.json`), 'utf8'));
+    assert(restored.completion?.requestDigest === completion.requestDigest && restored.status === 'completed', 'restore writes only the proven completion into sprint.json');
+    const doctor = run(completionRoot, ['doctor', '--artifacts', '--kyro-scope', scope]);
+    assert(doctor.status === 0, `restored lifecycle must pass doctor: ${doctor.stderr}\n${doctor.stdout}`);
+    const retry = run(completionRoot, ['repair', 'integrity', 'apply', '--kyro-scope', scope, '--reason', reason, '--digest', plan.digest, '--yes']);
+    assert(retry.status === 0, `legacy completion apply retry failed: ${retry.stderr}\n${retry.stdout}`);
+  } finally {
+    rmSync(legacyCompletion.root, { recursive: true, force: true });
+  }
+
+  const forgedCompletion = legacyCompletionSandbox();
+  try {
+    const projectPath = join(forgedCompletion.root, '.agents/kyro/project.json');
+    const project = JSON.parse(readFileSync(projectPath, 'utf8'));
+    project.scopes.find((entry) => entry.id === forgedCompletion.scope).completion.beforeEntryDigest = 'f'.repeat(64);
+    writeJson(projectPath, project);
+    const prep = run(forgedCompletion.root, ['repair', 'integrity', 'prepare', '--kyro-scope', forgedCompletion.scope, '--reason', 'Test fail-closed replay.', '--json']);
+    assert(prep.status === 0, `forged completion prepare failed: ${prep.stderr}\n${prep.stdout}`);
+    const plan = JSON.parse(prep.stdout).data;
+    assert(plan.blockers.some((item) => item.code === 'diverged')
+      && !plan.operations.some((item) => item.kind === 'scope.completion.restore-from-legacy'),
+    'unverifiable legacy completion fails closed without an operation');
+  } finally {
+    rmSync(forgedCompletion.root, { recursive: true, force: true });
   }
 
   console.log(`check-repair-integrity: ${passed} assertions passed`);

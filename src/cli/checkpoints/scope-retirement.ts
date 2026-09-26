@@ -531,29 +531,38 @@ function authorizedAfterImages(checkpoint: ScopeRetirementCheckpointV1): boolean
     ...(checkpoint.request.supersededBy ? { supersededBy: checkpoint.request.supersededBy } : {}),
     planDigest: checkpoint.request.planDigest,
   };
-  const expectedSprint: SprintFile = {
-    ...clone(checkpoint.beforeSprint),
-    status: 'retired',
-    activeSprint: null,
-    retirement: expectedRetirement,
-    handoff: {
-      nextAction: 'done',
-      nextTaskId: null,
-      blockers: [],
-      note: checkpoint.request.supersededBy
-        ? `Scope retired by explicit human approval; superseded by ${checkpoint.request.supersededBy}.`
-        : 'Scope retired by explicit human approval.',
-      lastUpdated: checkpoint.createdAt.slice(0, 10),
-    },
-  };
-  const expectedProject = clone(checkpoint.beforeProject);
-  expectedProject.scopes = expectedProject.scopes.map((candidate) => candidate.id === checkpoint.request.scope
-    ? { ...candidate, status: 'retired', retirement: expectedRetirement }
-    : candidate);
-  if (expectedProject.activeScope === checkpoint.request.scope) expectedProject.activeScope = null;
-  return canonicalJson(checkpoint.afterSprint) === canonicalJson(expectedSprint)
-    && canonicalJson(checkpoint.afterProject) === canonicalJson(expectedProject)
-    && canonicalJson(metadata) === canonicalJson(entry.retirement);
+  // Kyro 4.x retirement checkpoints stored the terminal status on the scope entry, but omitted
+  // it from the nested retirement metadata. Accept that exact historical representation without
+  // weakening the request, before-image, approval, or commitment checks above.
+  const legacyRetirement = { ...expectedRetirement } as Partial<ScopeRetirement>;
+  delete legacyRetirement.status;
+  const retirementVariants = [expectedRetirement, legacyRetirement as ScopeRetirement];
+  return retirementVariants.some((retirement) => {
+    const expectedSprint: SprintFile = {
+      ...clone(checkpoint.beforeSprint),
+      status: 'retired',
+      activeSprint: null,
+      retirement,
+      handoff: {
+        nextAction: 'done',
+        nextTaskId: null,
+        blockers: [],
+        note: checkpoint.request.supersededBy
+          ? `Scope retired by explicit human approval; superseded by ${checkpoint.request.supersededBy}.`
+          : 'Scope retired by explicit human approval.',
+        lastUpdated: checkpoint.createdAt.slice(0, 10),
+      },
+    };
+    const expectedProject = clone(checkpoint.beforeProject);
+    expectedProject.scopes = expectedProject.scopes.map((candidate) => candidate.id === checkpoint.request.scope
+      ? { ...candidate, status: 'retired', retirement }
+      : candidate);
+    if (expectedProject.activeScope === checkpoint.request.scope) expectedProject.activeScope = null;
+    return canonicalJson(checkpoint.afterSprint) === canonicalJson(expectedSprint)
+      && canonicalJson(checkpoint.afterProject) === canonicalJson(expectedProject)
+      && canonicalJson(metadata) === canonicalJson(retirement)
+      && canonicalJson(entry.retirement) === canonicalJson(retirement);
+  });
 }
 
 function assertMatchingRequest(checkpoint: ScopeRetirementCheckpointV1, request: ScopeRetirementRequest, digest: string): void {

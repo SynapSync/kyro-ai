@@ -25,6 +25,7 @@ const fixture = resolve(repo, 'fixtures/evals/close-sprint-happy/state');
 const temporaryRoots = [];
 const require = createRequire(import.meta.url);
 const { scopeCompletionRequestDigest } = require(join(repo, 'dist/cli/checkpoints/lifecycle-state.js'));
+const { sha256 } = require(join(repo, 'dist/cli/checkpoints/sprint-close.js'));
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -400,6 +401,32 @@ try {
       '--superseded-by', 'successor', '--digest', prepared.digest, '--yes',
     ]);
     assertFailure(changedReason, 'CHECKPOINT_CONFLICT');
+  }
+
+  // Kyro 4.x retirement checkpoints omitted the nested metadata status while preserving the
+  // terminal status on the sprint and project scope entry. Keep that committed history readable.
+  {
+    const root = workspace();
+    const prepared = prepare(root);
+    const result = apply(root, prepared.digest);
+    assert(result.status === 0, `legacy compatibility fixture must start from an applied retirement: ${output(result)}`);
+
+    const checkpointPath = scopePath(root, 'retirement.checkpoint.json');
+    const checkpoint = json(checkpointPath);
+    delete checkpoint.afterSprint.retirement.status;
+    const entry = checkpoint.afterProject.scopes.find((candidate) => candidate.id === 'demo');
+    delete entry.retirement.status;
+    const liveSprint = json(scopePath(root));
+    delete liveSprint.retirement.status;
+    writeJson(scopePath(root), liveSprint);
+    checkpoint.digests.afterSprint = sha256(checkpoint.afterSprint);
+    checkpoint.digests.afterProject = sha256(checkpoint.afterProject);
+    delete checkpoint.commitment;
+    checkpoint.commitment = sha256(checkpoint);
+    writeJson(checkpointPath, checkpoint);
+
+    const doctor = run(root, ['doctor', '--artifacts', '--kyro-scope', 'demo']);
+    assert(doctor.status === 0, `doctor must accept committed legacy retirement metadata: ${output(doctor)}`);
   }
 
   // A legacy monolithic workspace migrates through the existing compatibility path on apply.

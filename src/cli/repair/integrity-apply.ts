@@ -3,6 +3,9 @@ import { ARTIFACT_ROOT, KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } 
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
+import { validateSprintFile } from '../artifacts/schema';
+import { readScopeSprint } from '../artifacts/scopes';
+import { resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
 import { SCOPE_DIR_CLASS, classifyScopeDirectory } from '../artifacts/scopes';
 import {
   CHECKPOINT_DISCOVERY_STATUS,
@@ -48,6 +51,13 @@ import {
 import { commitRemediationPlanUnlocked } from '../remediation/transaction';
 import { KyroCoreError } from '../core/errors';
 import { readProjectState, updateProjectStateLayersUnlocked } from '../state';
+import { scopeEntryFromDisk } from '../core/scope-entries';
+import {
+  SCOPE_LIFECYCLE_VERIFICATION_STATUS,
+  completedScopeEntry,
+  completedSprintState,
+  verifyScopeLifecycleEvolution,
+} from '../checkpoints/lifecycle-state';
 import { withStateWriterLock } from '../pipeline/state-writer-lock';
 import { readPackageVersion } from '../help';
 import {
@@ -74,12 +84,15 @@ export function resolveIntegrityTraceScope(
 ): string {
   assertIntegrityDigest(approvedDigest);
   const warrant = findWarrantByDigest(approvedDigest);
-  const targets = warrant?.targets ?? prepareIntegrityPlan({ kyroScope: options.kyroScope, reason: options.reason }).targets;
+  const freshPlan = warrant ? null : prepareIntegrityPlan({ kyroScope: options.kyroScope, reason: options.reason });
+  const targets = warrant?.targets ?? freshPlan!.targets;
   return options.kyroScope
     ?? targets.live[0]?.scope
     ?? targets.register[0]
     ?? targets.unregister[0]
     ?? targets.canonicalize[0]?.scope
+    ?? warrant?.operations.find((operation) => operation.kind === 'scope.completion.restore-from-legacy')?.scope
+    ?? freshPlan?.operations.find((operation) => operation.kind === 'scope.completion.restore-from-legacy')?.scope
     ?? 'project';
 }
 
@@ -155,6 +168,7 @@ function applyIntegrityPlanUnlocked(
     }
     const label = operationLabel(operation);
     if (operation.kind === 'legacy-scope.discard' ? applyLegacyDiscard(operation, actor, now)
+      : operation.kind === 'scope.completion.restore-from-legacy' ? applyLegacyCompletionRestore(operation)
       : operation.kind === 'registry.unregister-orphan' ? applyUnregister(operation, actor, now)
       : operation.kind === 'registry.register-on-disk' ? applyRegister(operation)
         : applyCanonicalize(operation, actor, now)) {
@@ -268,6 +282,58 @@ function validatedRegistryReconciliations(): Array<Record<string, unknown>> {
     records.push(record);
   }
   return records;
+}
+
+function applyLegacyCompletionRestore(
+  operation: Extract<IntegrityOperation, { kind: 'scope.completion.restore-from-legacy' }>,
+): boolean {
+  if (operation.sourcePath !== PROJECT_STATE_PATH && operation.sourcePath !== KYRO_STATE_PATH) {
+    throw new KyroCoreError('DIVERGED', 'Legacy completion source is not a supported state file.', 'Prepare a new integrity plan.');
+  }
+  const raw = readJsonSafely(operation.sourcePath);
+  if (!raw.exists || raw.error || !raw.value || typeof raw.value !== 'object' || Array.isArray(raw.value)) {
+    throw new KyroCoreError('DIVERGED', `${operation.sourcePath} is missing or unreadable.`, 'Prepare a new integrity plan.');
+  }
+  const source = raw.value as Record<string, unknown>;
+  const entries = Array.isArray(source.scopes) ? source.scopes : [];
+  const matches = entries.filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
+    && (entry as { id?: unknown }).id === operation.scope);
+  if (matches.length !== 1 || canonicalJson(matches[0]) !== canonicalJson(operation.sourceEntry)) {
+    throw new KyroCoreError('DIVERGED', `${operation.scope} legacy completion changed after approval.`, 'Prepare and approve a new digest.');
+  }
+  const legacyEntry = matches[0] as Record<string, unknown>;
+  if (canonicalJson(legacyEntry.completion) !== canonicalJson(operation.completion)) {
+    throw new KyroCoreError('DIVERGED', `${operation.scope} legacy completion differs from the approved value.`, 'Prepare and approve a new digest.');
+  }
+
+  const read = readScopeSprint(operation.scope);
+  if (read.kind !== 'valid') throw new KyroCoreError('DIVERGED', `${operation.scope}/sprint.json is missing or invalid.`, 'Restore the scope evidence before retrying.');
+  const alreadyApplied = canonicalJson(read.sprint.completion) === canonicalJson(operation.completion);
+  if (!alreadyApplied && sha256(read.sprint) !== operation.expectedSprintSha256) {
+    throw new KyroCoreError('DIVERGED', `${operation.scope}/sprint.json changed after approval.`, 'Prepare and approve a new digest.');
+  }
+  const diskEntry = scopeEntryFromDisk(operation.scope);
+  if (!diskEntry) throw new KyroCoreError('DIVERGED', `${operation.scope} no longer has a valid on-disk scope.`, 'Restore the scope evidence before retrying.');
+  const candidateSprint = completedSprintState(read.sprint, operation.completion);
+  const candidateEntry = completedScopeEntry(diskEntry, operation.completion);
+  const shapeIssues = validateSprintFile(candidateSprint, `${operation.scope}/sprint.json`);
+  if (shapeIssues.length > 0) throw new KyroCoreError('DIVERGED', 'Restored completion would produce an invalid sprint.', shapeIssues.join('; '));
+
+  const checkpointRead = readJsonSafely(operation.checkpointPath);
+  if (!checkpointRead.exists || checkpointRead.error || sha256(checkpointRead.value) !== operation.checkpointSha256) {
+    throw new KyroCoreError('DIVERGED', `${operation.checkpointPath} changed after approval.`, 'Prepare and approve a new digest.');
+  }
+  const resolved = resolveEffectiveCheckpointAtPath(operation.scope, operation.checkpointPath);
+  const after = resolved.checkpoint?.intendedAfterClose;
+  const afterEntry = resolved.checkpoint?.projectScopeAfter;
+  if (!after || !afterEntry) throw new KyroCoreError('DIVERGED', 'The approved checkpoint no longer has a usable after-image.', 'Restore the checkpoint before retrying.');
+  const replay = verifyScopeLifecycleEvolution(after, afterEntry, candidateSprint, candidateEntry);
+  if (replay.status !== SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED) {
+    throw new KyroCoreError('DIVERGED', `Checkpoint no longer proves the legacy completion (${replay.reason}).`, 'Prepare a new plan or restore the incompatible evidence.');
+  }
+  if (alreadyApplied) return false;
+  atomicReplace(sprintJsonPath(operation.scope), `${JSON.stringify(candidateSprint, null, 2)}\n`);
+  return true;
 }
 
 function applyUnregister(operation: Extract<IntegrityOperation, { kind: 'registry.unregister-orphan' }>, actor: string, now: string): boolean {
@@ -529,6 +595,7 @@ function toRemediationOperation(operation: Extract<IntegrityOperation, { kind: '
 
 function operationLabel(operation: IntegrityOperation): string {
   if (operation.kind === 'legacy-scope.discard') return `discard ${operation.scope} from ${operation.sourcePath}`;
+  if (operation.kind === 'scope.completion.restore-from-legacy') return `restore proven completion for ${operation.scope}`;
   if (operation.kind === 'registry.register-on-disk') return `register ${operation.scope}`;
   if (operation.kind === 'registry.unregister-orphan') return `unregister ${operation.scope}`;
   if (operation.kind === 'checkpoint.canonicalize') return `canonicalize ${operation.scope}#${operation.sprintN}`;

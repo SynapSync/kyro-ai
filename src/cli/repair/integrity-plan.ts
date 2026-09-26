@@ -3,11 +3,15 @@ import { KYRO_PROJECT_ROOT, KYRO_STATE_PATH, PROJECT_STATE_PATH } from '../const
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir } from '../artifacts/paths';
+import { validateSprintFile } from '../artifacts/schema';
 import { listScopeFolders, readScopeSprint } from '../artifacts/scopes';
 import { assertNotForeignDirectory } from '../core/scope-resolution';
+import { scopeEntryFromDisk } from '../core/scope-entries';
 import { CHECKPOINT_DISCOVERY_STATUS, surveyScopeCheckpoints } from '../checkpoints/discovery';
 import {
   SCOPE_LIFECYCLE_VERIFICATION_STATUS,
+  completedScopeEntry,
+  completedSprintState,
   verifyScopeLifecycleEvolution,
 } from '../checkpoints/lifecycle-state';
 import { canonicalJson, sha256 } from '../checkpoints/sprint-close';
@@ -22,7 +26,7 @@ import {
 } from '../project/reconcile';
 import { readMonolitoProjectState, readProjectState, readSharedProjectState } from '../state';
 import { readPackageVersion } from '../help';
-import type { Convention, KyroScopeEntry, SprintFile } from '../types';
+import type { Convention, KyroScopeEntry, ScopeCompletion, SprintFile } from '../types';
 
 export const INTEGRITY_REPAIR_KIND = 'kyro.integrity-repair' as const;
 export const INTEGRITY_REPAIR_SCHEMA_VERSION = 1 as const;
@@ -86,6 +90,17 @@ export type IntegrityOperation =
   | { kind: 'registry.register-on-disk'; scope: string; entry: KyroScopeEntry }
   | { kind: 'registry.unregister-orphan'; scope: string; entry: KyroScopeEntry; reason: string }
   | { kind: 'legacy-scope.discard'; scope: string; sourcePath: typeof PROJECT_STATE_PATH | typeof KYRO_STATE_PATH; sourceSha256: string; afterSha256: string; entry: Record<string, unknown>; reason: string }
+  | {
+    kind: 'scope.completion.restore-from-legacy';
+    scope: string;
+    sourcePath: typeof PROJECT_STATE_PATH | typeof KYRO_STATE_PATH;
+    sourceEntry: Record<string, unknown>;
+    expectedSprintSha256: string;
+    checkpointPath: string;
+    checkpointSha256: string;
+    completion: ScopeCompletion;
+    reason: string;
+  }
   | {
     kind: 'checkpoint.canonicalize';
     scope: string;
@@ -289,6 +304,8 @@ export function prepareIntegrityPlan(options: {
     }
   }
 
+  planLegacyCompletionReconciliation(requested, options.reason, operations, findings, blockers);
+
   const scopesForCheckpoints = requested
     ? [requested]
     : unique([
@@ -365,13 +382,28 @@ export function prepareIntegrityPlan(options: {
     const physicalAfter = physicalRead.exists && !physicalRead.error
       ? (physicalRead.value as { intendedAfterClose?: SprintFile }).intendedAfterClose
       : null;
+    const replay = resolveRemediationReplayState(scope, physicalAfter ?? after);
+    if (replay.kind === 'broken') {
+      const blocker: IntegrityFinding = {
+        class: 'blocker',
+        code: 'diverged',
+        summary: `${scope}: ${replay.detail}`,
+      };
+      blockers.push(blocker);
+      findings.push(blocker);
+      continue;
+    }
     // Lifecycle records are not authority by themselves. Completion/reopen is structurally coherent
-    // only when one verifier reproduces both durable layers from the same checkpoint after-image.
+    // only when one verifier reproduces both durable layers from the checkpoint after-image, after
+    // any valid append-only remediation chain has first been replayed.
+    let lifecycleVerification: ReturnType<typeof verifyScopeLifecycleEvolution> | null = null;
     if (hasLifecycleEvidence(live)) {
-      const lifecycleBase = physicalAfter ?? after;
+      const lifecycleBase = replay.kind === 'remediated'
+        ? replay.state as unknown as SprintFile
+        : physicalAfter ?? after;
       const lifecycleEntryBase = resolved.checkpoint?.projectScopeAfter ?? rebuilt?.projection.projectScopeAfter;
       const liveEntry = readProjectState()?.scopes.find((entry) => entry.id === scope);
-      const lifecycleVerification = verifyScopeLifecycleEvolution(
+      lifecycleVerification = verifyScopeLifecycleEvolution(
         lifecycleBase,
         lifecycleEntryBase,
         live,
@@ -390,18 +422,10 @@ export function prepareIntegrityPlan(options: {
         continue;
       }
     }
-    const replay = resolveRemediationReplayState(scope, physicalAfter ?? after);
-    if (replay.kind === 'broken') {
-      const blocker: IntegrityFinding = {
-        class: 'blocker',
-        code: 'diverged',
-        summary: `${scope}: ${replay.detail}`,
-      };
-      blockers.push(blocker);
-      findings.push(blocker);
-      continue;
-    }
-    const baseline = replay.state as unknown as SprintFile;
+    const baseline = lifecycleVerification?.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED
+      && lifecycleVerification.sprint
+      ? lifecycleVerification.sprint
+      : replay.state as unknown as SprintFile;
     const liveOps = planLiveEvolution(scope, live, baseline, { includeReanchor: Boolean(resolved.checkpoint) });
     for (const op of liveOps) operations.push(op);
     if (liveOps.length > 0) {
@@ -516,6 +540,26 @@ function validateIntegrityOperations(value: unknown, path: string, issues: strin
         if (asRecord(operation.entry)?.id !== operation.scope) issues.push(`${operationPath}.entry.id must match operation scope`);
         requireNonEmptyString(operation.reason, `${operationPath}.reason`, issues);
         return;
+      case 'scope.completion.restore-from-legacy': {
+        requireExactKeys(operation, ['kind', 'scope', 'sourcePath', 'sourceEntry', 'expectedSprintSha256', 'checkpointPath', 'checkpointSha256', 'completion', 'reason'], operationPath, issues);
+        if (operation.sourcePath !== PROJECT_STATE_PATH && operation.sourcePath !== KYRO_STATE_PATH) issues.push(`${operationPath}.sourcePath is not a legacy project state file`);
+        requireDigest(operation.expectedSprintSha256, `${operationPath}.expectedSprintSha256`, issues);
+        requireNonEmptyString(operation.checkpointPath, `${operationPath}.checkpointPath`, issues);
+        requireDigest(operation.checkpointSha256, `${operationPath}.checkpointSha256`, issues);
+        requireNonEmptyString(operation.reason, `${operationPath}.reason`, issues);
+        const completion = asRecord(operation.completion);
+        if (!completion) issues.push(`${operationPath}.completion must be an object`);
+        else {
+          requireExactKeys(completion, ['completedAt', 'by', 'summary', 'requestDigest', 'beforeEntryDigest'], `${operationPath}.completion`, issues, ['summary']);
+          requireNonEmptyString(completion.completedAt, `${operationPath}.completion.completedAt`, issues);
+          requireNonEmptyString(completion.by, `${operationPath}.completion.by`, issues);
+          if (completion.summary !== undefined) requireNonEmptyString(completion.summary, `${operationPath}.completion.summary`, issues);
+          requireDigest(completion.requestDigest, `${operationPath}.completion.requestDigest`, issues);
+          requireDigest(completion.beforeEntryDigest, `${operationPath}.completion.beforeEntryDigest`, issues);
+        }
+        if (asRecord(operation.sourceEntry)?.id !== operation.scope) issues.push(`${operationPath}.sourceEntry.id must match operation scope`);
+        return;
+      }
       case 'checkpoint.canonicalize':
         requireExactKeys(operation, ['kind', 'scope', 'sprintN', 'sprintSlug', 'originalPath', 'originalSha256', 'reason'], operationPath, issues);
         requirePositiveInteger(operation.sprintN, `${operationPath}.sprintN`, issues);
@@ -675,6 +719,124 @@ function hasLifecycleEvidence(sprint: SprintFile): boolean {
   return sprint.completion !== undefined || (sprint.completionHistory?.length ?? 0) > 0;
 }
 
+/**
+ * A legacy registry can contain a completion written by an older CLI before the paired
+ * sprint.json write existed. Restore that fact only when the close checkpoint replays the exact
+ * completion into both derived layers; otherwise leave the conflict blocked for human recovery.
+ */
+function planLegacyCompletionReconciliation(
+  requested: string | null,
+  rawReason: string | undefined,
+  operations: IntegrityOperation[],
+  findings: IntegrityFinding[],
+  blockers: IntegrityFinding[],
+): void {
+  const reason = rawReason?.trim() ?? '';
+  const sources = ([
+    [PROJECT_STATE_PATH, readSharedProjectState()],
+    [KYRO_STATE_PATH, readMonolitoProjectState()],
+  ] as const).filter(([, value]) => Array.isArray(value?.scopes));
+
+  for (const [sourcePath, value] of sources) {
+    const entries = value?.scopes as unknown[];
+    for (const rawEntry of entries) {
+      const entry = asRecord(rawEntry);
+      const scope = entry?.id;
+      if (typeof scope !== 'string' || !scope || (requested !== null && requested !== scope)) continue;
+      const rawCompletion = asRecord(entry.completion);
+      if (!rawCompletion) continue;
+      const read = readScopeSprint(scope);
+      if (read.kind !== 'valid' || read.sprint.completion !== undefined) continue;
+
+      const diskEntry = scopeEntryFromDisk(scope);
+      if (!diskEntry) continue;
+      const completion = rawCompletion as unknown as ScopeCompletion;
+      const expectedEntry = completedScopeEntry(diskEntry, completion);
+      if (canonicalJson(entry) !== canonicalJson(expectedEntry)) {
+        const blocker: IntegrityFinding = {
+          class: 'blocker',
+          code: 'diverged',
+          summary: `${scope}: legacy completion conflicts with additional registry fields; no automatic reconciliation is safe`,
+        };
+        blockers.push(blocker);
+        findings.push(blocker);
+        continue;
+      }
+
+      if (requested !== scope || !reason) {
+        const blocker: IntegrityFinding = {
+          class: 'blocker',
+          code: 'diverged',
+          summary: `${scope}: project registry has a completion missing from sprint.json; prepare an explicit scoped reconciliation with --reason`,
+        };
+        blockers.push(blocker);
+        findings.push(blocker);
+        continue;
+      }
+
+      const checkpointPath = latestCheckpointPath(scope);
+      if (!checkpointPath) {
+        const blocker: IntegrityFinding = {
+          class: 'blocker',
+          code: 'unrecoverable',
+          summary: `${scope}: legacy completion has no close checkpoint to prove its transition`,
+        };
+        blockers.push(blocker);
+        findings.push(blocker);
+        continue;
+      }
+      const checkpointRead = readJsonSafely(checkpointPath);
+      const resolved = resolveEffectiveCheckpointAtPath(scope, checkpointPath);
+      const after = resolved.checkpoint?.intendedAfterClose;
+      const afterEntry = resolved.checkpoint?.projectScopeAfter;
+      if (
+        !checkpointRead.exists
+        || checkpointRead.error
+        || !after
+        || !afterEntry
+        || (resolved.status !== EFFECTIVE_CHECKPOINT_STATUS.VALID && resolved.status !== EFFECTIVE_CHECKPOINT_STATUS.CANONICALIZED)
+      ) {
+        const blocker: IntegrityFinding = {
+          class: 'blocker',
+          code: 'diverged',
+          summary: `${scope}: latest close checkpoint cannot authorize the legacy completion`,
+        };
+        blockers.push(blocker);
+        findings.push(blocker);
+        continue;
+      }
+
+      const completedSprint = completedSprintState(read.sprint, completion);
+      const completedEntry = completedScopeEntry(diskEntry, completion);
+      const shapeIssues = validateSprintFile(completedSprint, `${scope}/sprint.json`);
+      const replay = verifyScopeLifecycleEvolution(after, afterEntry, completedSprint, completedEntry);
+      if (shapeIssues.length > 0 || replay.status !== SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED) {
+        const blocker: IntegrityFinding = {
+          class: 'blocker',
+          code: 'diverged',
+          summary: `${scope}: checkpoint cannot replay the legacy completion (${replay.reason}${shapeIssues.length > 0 ? `; ${shapeIssues.join('; ')}` : ''})`,
+        };
+        blockers.push(blocker);
+        findings.push(blocker);
+        continue;
+      }
+
+      operations.push({
+        kind: 'scope.completion.restore-from-legacy',
+        scope,
+        sourcePath,
+        sourceEntry: entry,
+        expectedSprintSha256: sha256(read.sprint),
+        checkpointPath,
+        checkpointSha256: sha256(checkpointRead.value),
+        completion,
+        reason,
+      });
+      findings.push({ class: 'live', summary: `${scope}: restore the checkpoint-proven completion into sprint.json` });
+    }
+  }
+}
+
 function planLiveEvolution(scope: string, live: SprintFile, after: SprintFile, options: { includeReanchor: boolean }): IntegrityOperation[] {
   const operations: IntegrityOperation[] = [];
   const afterIds = new Set(after.conventions.map((convention) => convention.id));
@@ -768,6 +930,19 @@ export function formatIntegritySummary(plan: IntegrityPlan): string {
       lines.push(`  motivo: ${operation.reason}`);
       lines.push(`  archivo antes: ${operation.sourceSha256}`);
       lines.push(`  entrada completa: ${JSON.stringify(operation.entry)}`);
+    }
+    lines.push('');
+  }
+  const completionRestores = plan.operations.filter(
+    (operation): operation is Extract<IntegrityOperation, { kind: 'scope.completion.restore-from-legacy' }> => operation.kind === 'scope.completion.restore-from-legacy',
+  );
+  if (completionRestores.length > 0) {
+    lines.push('Restaurar finalizaciones heredadas solo cuando el checkpoint prueba la transición:');
+    for (const operation of completionRestores) {
+      lines.push(`- ${operation.scope}: ${operation.sourcePath} → .agents/kyro/scopes/${operation.scope}/sprint.json`);
+      lines.push(`  completion: ${operation.completion.completedAt} (${operation.completion.by})`);
+      lines.push(`  checkpoint: ${operation.checkpointPath} / ${operation.checkpointSha256.slice(0, 12)}…`);
+      lines.push(`  motivo: ${operation.reason}`);
     }
     lines.push('');
   }

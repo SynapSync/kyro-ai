@@ -33,7 +33,7 @@ import {
   surveyScopeCheckpoints,
 } from '../checkpoints/discovery';
 import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
-import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase } from '../remediation/plan';
+import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase, resolveRemediationReplayState } from '../remediation/plan';
 import {
   SCOPE_LIFECYCLE_VERIFICATION_STATUS,
   verifyScopeLifecycleEvolution,
@@ -411,6 +411,12 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
     const physicalAfter = asRecord(read.value)?.intendedAfterClose;
     if (physicalAfter && sprintDigest === sha256(physicalAfter)) sprintPosition = 'after';
   }
+  const physicalAfterImage = asRecord(read.value)?.intendedAfterClose ?? checkpoint.intendedAfterClose;
+  const liveSprint = sprintRead.value as SprintFile | null | undefined;
+  const lifecycleEvidence = liveSprint?.completion !== undefined || (liveSprint?.completionHistory?.length ?? 0) > 0;
+  const remediationBeforeLifecycle = sprintPosition === 'other' && lifecycleEvidence
+    ? resolveRemediationReplayState(scope, physicalAfterImage)
+    : null;
   // An append-only remediation is expected to move live state off the checkpoint's after-image, so
   // two narrow allowances keep an audited correction from reading as tampering. Neither may ever be
   // reachable by drift that Kyro did not itself produce.
@@ -420,7 +426,9 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   // two readers disagree about the same lifecycle transition.
   const lifecycleVerification = sprintPosition === 'other' && projectEntry
     ? verifyScopeLifecycleEvolution(
-      canonicalized ? asRecord(read.value)?.intendedAfterClose : checkpoint.intendedAfterClose,
+      remediationBeforeLifecycle?.kind === 'remediated'
+        ? remediationBeforeLifecycle.state as unknown as SprintFile
+        : physicalAfterImage,
       checkpoint.projectScopeAfter,
       sprintRead.value,
       projectEntry,
@@ -429,7 +437,10 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   let lifecycleLabel: string | null = null;
   if (lifecycleVerification?.status === SCOPE_LIFECYCLE_VERIFICATION_STATUS.LIFECYCLE_REPLAYED) {
     sprintPosition = 'after';
-    lifecycleLabel = 'after (structurally replayed lifecycle; actor identity unverified)';
+    const remediationPrefix = remediationBeforeLifecycle?.kind === 'remediated'
+      ? `replayed through ${remediationBeforeLifecycle.through}; `
+      : '';
+    lifecycleLabel = `after (${remediationPrefix}structurally replayed lifecycle; actor identity unverified)`;
   }
   if (sprintPosition === 'other') {
     // 1. Anchor-only difference: the business state (remediations[] excluded) still matches an image
@@ -447,11 +458,16 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
       // 2. Replay: re-execute the chain from the checkpoint's after-image and require it to
       //    reproduce the live state exactly. A record cannot be believed about a transformation it
       //    could not perform, and drift outside the declared operations never replays.
-      const physicalAfterImage = asRecord(read.value)?.intendedAfterClose ?? checkpoint.intendedAfterClose;
-      const rebase = resolveRemediationRebase(scope, canonicalized ? physicalAfterImage : checkpoint.intendedAfterClose);
-      if (rebase.kind === 'remediated') {
+      const replay = remediationBeforeLifecycle;
+      if (replay?.kind === 'remediated') {
         sprintPosition = 'after';
-        remediationLabel = `after (replayed through ${rebase.through})`;
+        remediationLabel = `after (replayed through ${replay.through})`;
+      } else {
+        const rebase = resolveRemediationRebase(scope, physicalAfterImage);
+        if (rebase.kind === 'remediated') {
+          sprintPosition = 'after';
+          remediationLabel = `after (replayed through ${rebase.through})`;
+        }
       }
     }
   }
@@ -462,14 +478,24 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   ) {
     scopePosition = 'after';
   }
-  let legacyScopeNormalized = false;
+  let scopeNormalizationLabel: string | null = null;
   // Historical intermediate v1 residual: checkpoint stores projectScopeAfter.status=active while
   // the canonical live after-image (and repair) use planning. Treat exact normalized live match as after.
   if (scopePosition === 'other' && projectEntry && isLegacyIntermediateActiveScopeAfter(checkpoint)) {
     const normalized = legacyNormalizedProjectScopeAfter(checkpoint);
     if (normalized && sha256(projectEntry) === sha256(normalized)) {
       scopePosition = 'after';
-      legacyScopeNormalized = true;
+      scopeNormalizationLabel = 'after (legacy v1 intermediate scope status active→planning)';
+    }
+  }
+  if (scopePosition === 'other' && projectEntry && typeof sprintRead.value === 'object' && sprintRead.value !== null) {
+    const liveTitle = (sprintRead.value as { title?: unknown }).title;
+    if (typeof liveTitle === 'string' && liveTitle !== checkpoint.projectScopeAfter.title) {
+      const titleSynchronizedAfter = { ...checkpoint.projectScopeAfter, title: liveTitle };
+      if (sha256(projectEntry) === sha256(titleSynchronizedAfter)) {
+        scopePosition = 'after';
+        scopeNormalizationLabel = 'after (scope title synchronized from the live sprint)';
+      }
     }
   }
   let status: SprintCloseTransactionStatus;
@@ -482,9 +508,7 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   } else {
     status = SPRINT_CLOSE_TRANSACTION_STATUS.PARTIAL;
   }
-  const scopeLabel = legacyScopeNormalized
-    ? 'after (legacy v1 intermediate scope status active→planning)'
-    : scopePosition;
+  const scopeLabel = scopeNormalizationLabel ?? scopePosition;
   const sprintLabel = remediationLabel ?? lifecycleLabel ?? sprintPosition;
   return checkpointResult(scope, path, status, withHistoricalNote(`sprint=${sprintLabel}, scope=${scopeLabel}, snapshot=${snapshotState}, narrative=${narrativeState}`));
 }
