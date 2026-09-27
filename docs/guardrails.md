@@ -4,7 +4,7 @@ Kyro guardrails classify dangerous operations and enforce the decision inside Ky
 
 ## Important honesty note
 
-Kyro still ships Claude plugin hook assets, but the CLI adapter registry does not project or manage Claude hooks. Plan 04 does not depend on host hooks. It creates the first portable in-process guardrail layer shared by CLI and MCP.
+The CLI-managed Claude adapter does not install host hooks. Kyro's portable guards apply to Kyro CLI/MCP operations, not to arbitrary Claude Bash commands. The retired plugin's unbounded-search and sprint-close `PreToolUse` interceptions are no longer distributed; users must bound search output and use the CLI's managed write verbs. This is an explicit reduction in host-level interception, not a claim of equivalent coverage.
 
 ## Policy file
 
@@ -67,7 +67,7 @@ Policy denials emit `blocked_reason`; approvals emit `gate_approved`. Trace is b
 an open scope, its current unclosed sprint, a read-only preview digest and explicit confirmation.
 The apply re-reads under the state-writer lease and atomically replaces the live sprint together
 with affected approval invalidation. Historical artifacts and parent lifecycle fields are not
-editable input. Existing Claude editor protections remain in place; no new host hook is required.
+editable input. No Claude-specific editor hook is installed; the CLI protects only its own managed write path.
 
 ## Error codes
 

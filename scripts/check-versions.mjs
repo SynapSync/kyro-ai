@@ -16,21 +16,12 @@ function readYamlVersion(file) {
 }
 
 const pkg = readJson('package.json');
-const plugin = readJson('.claude-plugin/plugin.json');
 const lock = readJson('package-lock.json');
 const workflowVersion = readYamlVersion('WORKFLOW.yaml');
 
 const pkgVersion = pkg.version;
-const pluginVersion = plugin.version;
 
 let failed = false;
-
-if (pkgVersion !== pluginVersion) {
-  console.error(`ERROR: Version mismatch`);
-  console.error(`  package.json:                  ${pkgVersion}`);
-  console.error(`  .claude-plugin/plugin.json:    ${pluginVersion}`);
-  failed = true;
-}
 
 if (pkgVersion !== workflowVersion) {
   console.error(`ERROR: Version mismatch`);

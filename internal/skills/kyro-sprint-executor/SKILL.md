@@ -19,7 +19,7 @@ Execute the active Kyro sprint exclusively through the Kyro CLI. All state lives
 
 ## Step 0 — Capability handshake (MANDATORY, once per session)
 
-**First, resolve `{{KYRO_CLI}}` if it remains literal.** Try `kyro --version`; if available, use `kyro`. Else use `node ~/.agents/kyro/current/dist/cli.js` if present. For a Claude plugin alone, use `node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js"` if that file exists. Otherwise STOP and advise `npm install -g kyro-ai`, then from the project root global `kyro` with `install --scope workspace --init-workspace --yes`. Never hand-edit `sprint.json` or bypass a missing verb.
+**First, resolve `{{KYRO_CLI}}` if it remains literal.** Try `kyro --version`; if available, use `kyro`. Else use `node ~/.agents/kyro/current/dist/cli.js` if present. Otherwise STOP and advise `npm install -g kyro-ai`, then from the project root global `kyro` with `install --scope workspace --init-workspace --yes`. Never hand-edit `sprint.json` or bypass a missing verb.
 
 Run `{{KYRO_CLI}} capabilities --json`.
 

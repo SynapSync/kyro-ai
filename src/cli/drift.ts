@@ -140,6 +140,7 @@ function detectOrphanedFiles(oldManifest: KyroManifest, currentManagedFiles: str
 
 function isPrunableOrphanFile(file: string): boolean {
   return file.startsWith('~/.agents/skills/kyro-')
+    || file.startsWith('~/.claude/skills/kyro-')
     || file.startsWith('~/.config/opencode/skills/kyro-')
     || file.startsWith('~/.config/opencode/commands/kyro/');
 }

@@ -1,0 +1,8 @@
+{
+  "checkedCriteria": [
+    "Current documentation identifies `kyro install --agent claude` and `kyro update` as the Claude installation and update path and maps former plugin commands to native Kyro skills.",
+    "Migration guidance is non-destructive, names possible duplicate commands, and explains user-controlled removal of the old plugin.",
+    "Current safety documentation distinguishes CLI-owned guardrails from the removed Claude-only hooks, and documentation links pass."
+  ],
+  "findings": []
+}

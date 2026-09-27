@@ -131,7 +131,7 @@ Kyro has two CLI roots. They share the same `dist/cli.js` entrypoint but differe
 
 | Root | How you get it | Layout highlights |
 | ---- | -------------- | ----------------- |
-| **Full npm package** | Global `kyro` after `npm install -g kyro-ai` | Root `agents/`, `.claude-plugin/`, full package tree |
+| **Full npm package** | Global `kyro` after `npm install -g kyro-ai` | Root `agents/`, command routers, adapters, full package tree |
 | **Projected runtime** | `node ~/.agents/kyro/current/dist/cli.js` (agent fallback when no durable `kyro` is on PATH) | `manifest.json`, `KYRO.md`, `core/agents/`, `core/WORKFLOW.yaml`, projected `skills/` + `dist/` — **not** a full package mirror |
 
 ### CLI invocation persistence (`kyroInvocation`)
@@ -468,9 +468,9 @@ Behavior notes:
 - `update` is operator surface like `install` and `sync`: it is not a tool-owned verb, so the
   capability handshake is untouched and agents never self-update mid-sprint.
 
-## Claude Plugin Support
+## Claude Code Adapter
 
-The Claude plugin adapter remains first-class through `.claude-plugin/`. The CLI does not replace it; it complements Kyro's adapter story for agents that need workspace-installed commands, skills, root `AGENTS.md` managed blocks, and core assets.
+Run `kyro install --agent claude --scope workspace --init-workspace --yes` from the project root to project native `~/.claude/skills/kyro-*` entrypoints. `kyro sync --scope workspace` refreshes the installed adapter, and `kyro update` upgrades the published package and runtime. The CLI owns these skills but not Claude's plugin registry or user settings. Existing plugin users should verify `/kyro-forge` and the other new skills before disabling or uninstalling the old plugin in Claude Code. See [Agent adapters](agent-adapters.md#claude).
 
 ## Unsupported Generic Adapter
 
@@ -814,7 +814,7 @@ kyro plan --update-active --from active-update.json --kyro-scope auth-refactor -
   is a no-op. If an I/O error occurs after the rename, inspect/re-preview: the whole state may have
   committed even though no success was reported. There is no durable update request receipt.
 
-Direct edits to `sprint.json` remain forbidden, and the existing Claude hook remains unchanged.
+Direct edits to `sprint.json` remain forbidden. The CLI enforces its managed write path; no Claude host hook is installed by this adapter.
 For implementation-only corrections, use `review --verdict fail` on the same active task and repeat
 execution/evidence/review; no plan update or emergent task is needed solely because it was done.
 
@@ -837,6 +837,7 @@ that leaves an immutable record of itself.
 | **4.44.0 and later** (candidate: **5.0.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 | **5.0.1** | update-time compatibility migration | Removes redundant `resolvedSprint` only when it equals `targetSprint`; contradictory values remain blocked. |
 | **5.1.0** | retains protocol v3 remediation | Preserves `debt.canonicalize` and the 5.0.1 compatibility migration; neither rewrites scopes during install or Doctor. |
+| **6.0.0 release candidate** | retains protocol v3 remediation | Preserves `debt.canonicalize` and the 5.0.1 compatibility migration while moving Claude Code to CLI-managed skills; neither rewrites scopes during install or Doctor. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

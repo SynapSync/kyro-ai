@@ -1,0 +1,10 @@
+{
+  "summary": "Updated English user, developer, CLI, Work, guardrail, getting-started, and release guidance for CLI-managed Claude skills and a non-destructive migration from the retired plugin.",
+  "validations": [
+    { "command": "npm run check:links", "result": "passed", "note": "All 91 checked Markdown files have valid relative links." },
+    { "command": "npm run check:adapters", "result": "passed", "note": "The documented native Claude projection remains aligned with adapter fixtures." },
+    { "command": "git diff --check", "result": "passed", "note": null }
+  ],
+  "filesChanged": ["README.md", "AGENTS.md", "CLAUDE.md", "docs/agent-adapters.md", "docs/cli.md", "docs/work.md", "docs/guardrails.md", "docs/context-management.md", "docs/getting-started.md", "docs/release-checklist.md"],
+  "notes": "Historical plans and revision-pinned diagrams remain historical records. A real Claude Code UI smoke is a separate release gate; filesystem fixtures do not prove host discovery."
+}

@@ -1,0 +1,18 @@
+{
+  "summary": "Implemented the CLI-managed Claude adapter with native router skills, guarded projection writes, migration warning, doctor checks, drift ownership, and disposable install/sync/uninstall regressions.",
+  "validations": [
+    { "command": "npm run build", "result": "passed", "note": "TypeScript compiled and the workspace CLI was refreshed." },
+    { "command": "npm run check:adapters", "result": "passed", "note": "Disposable adapter fixtures covered collisions, symlinks, repair, repeat sync, coexistence preview, and legacy-plugin preservation." }
+  ],
+  "filesChanged": [
+    "src/cli/adapters/claude.ts",
+    "src/cli/adapters/registry.ts",
+    "src/cli/options.ts",
+    "src/cli/drift.ts",
+    "src/cli/types.ts",
+    "src/cli/pipeline/operation-steps.ts",
+    "src/cli/commands/preflight.ts",
+    "scripts/check-adapter-fixtures.mjs"
+  ],
+  "notes": "This is maker-reported task evidence. A real Claude UI discovery smoke remains a separate release gate."
+}

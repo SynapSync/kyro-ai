@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // The startup handshake must be self-contained in BOTH entry points.
 //
-// The packaged sprint-forge source must retain the startup contract even though Claude only
-// exposes the public command wrappers. Standard/Codex/OpenCode runtime projections still load it.
+// The packaged sprint-forge source must retain the startup contract for all CLI-managed adapters.
 // `agents/orchestrator.md` is never loaded. It used to carry no startup steps at all — only a
 // parenthetical "(Startup handshake)" pointing at the orchestrator — so an agent entering through
 // the skill saw unsubstituted {{KYRO_CLI}} tokens, no capability handshake, and no routing call.
@@ -27,7 +26,6 @@ const REQUIRED_ELEMENTS = [
   ['placeholder token present verbatim', /\{\{KYRO_CLI\}\}/],
   ['CLI resolution ladder — probe step', /kyro --version/],
   ['CLI resolution ladder — runtime fallback path', /~\/\.agents\/kyro\/current\/dist\/cli\.js/],
-  ['CLI resolution ladder — standalone Claude plugin', /CLAUDE_PLUGIN_ROOT\}\/dist\/cli\.js/],
   ['CLI resolution ladder — install remedy when absent', /npm install -g kyro-ai/],
   ['capability handshake', /\{\{KYRO_CLI\}\} capabilities --json/],
   ['handshake guards the tool-owned verbs', /record-evidence/],

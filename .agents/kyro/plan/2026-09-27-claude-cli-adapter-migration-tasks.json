@@ -1,0 +1,56 @@
+{
+  "tasks": [
+    {
+      "id": "W1",
+      "title": "Implement a safe CLI-managed Claude adapter",
+      "description": "Make Claude installable through the existing adapter registry, projecting all seven router-first command skills into the native Claude skills root and integrating install, sync, doctor, and uninstall ownership.",
+      "context": "Reuse the shared command-skill projection and existing operation-plan safeguards. Preserve unrelated Claude files and never remove an external plugin. Test fresh installation, idempotence, collisions, stale projection diagnostics, and coexistence with other adapters.",
+      "filesToTouch": ["src/cli/adapters/claude.ts", "src/cli/adapters/registry.ts", "src/cli/options.ts", "src/cli/drift.ts", "scripts/check-adapter-fixtures.mjs"],
+      "acceptanceCriteria": [
+        "Claude is an implemented adapter and `kyro install --agent claude` projects exactly the seven public Kyro command skills through the shared runtime.",
+        "Install, sync, doctor, and uninstall preserve unrelated Claude content, detect missing or stale managed skills, and fail closed on unsafe or foreign paths.",
+        "Disposable fixtures prove repeat installation, coexistence with standard/Codex/OpenCode, and no automatic legacy-plugin removal."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "W2",
+      "title": "Retire Claude plugin packaging and plugin-only fallbacks",
+      "description": "Remove plugin manifests, wrappers, hooks, and their active package entries; replace plugin-specific doctor, version, startup, bundle, and packaging assumptions with adapter-focused checks.",
+      "context": "Do not remove historical plans or changelog facts. Preserve portable CLI guard checks and root runtime assets. The tarball must not contain retired plugin assets, and the active instructions must not invoke CLAUDE_PLUGIN_ROOT.",
+      "filesToTouch": ["package.json", "src/cli/commands/doctor.ts", "src/cli/adapters/command-skills.ts", "scripts/check-versions.mjs", "scripts/check-startup-contract.mjs", "scripts/check-cli-bundle.mjs", "agents/orchestrator.md", "internal/skills/sprint-forge/SKILL.md", "internal/skills/qa-review/SKILL.md", "internal/skills/kyro-sprint-executor/SKILL.md"],
+      "acceptanceCriteria": [
+        "The npm package excludes `.claude-plugin`, `providers/claude/commands`, and `hooks`, with automated absence assertions.",
+        "Doctor, version, startup, and bundle checks pass without plugin metadata or plugin-only CLI fallbacks.",
+        "The retired Claude-only Bash hooks are not represented as portable CLI enforcement, and existing Forge/Work CLI guard checks remain green."
+      ],
+      "dependsOn": ["W1"]
+    },
+    {
+      "id": "W3",
+      "title": "Document Claude adapter installation and safe plugin migration",
+      "description": "Update current user and developer guidance in English for Claude skills, install/update commands, command-name migration, duplicate-plugin warnings, and the removed-hook safety boundary.",
+      "context": "Keep historical release records intact. Explain that Kyro will not disable or uninstall a user's legacy plugin, and that real Claude UI discovery is a later release smoke gate rather than a claim proved by repository fixtures.",
+      "filesToTouch": ["README.md", "AGENTS.md", "CLAUDE.md", "docs/agent-adapters.md", "docs/cli.md", "docs/work.md", "docs/guardrails.md", "docs/context-management.md", "docs/getting-started.md", "docs/release-checklist.md"],
+      "acceptanceCriteria": [
+        "Current documentation identifies `kyro install --agent claude` and `kyro update` as the Claude installation and update path and maps former plugin commands to native Kyro skills.",
+        "Migration guidance is non-destructive, names possible duplicate commands, and explains user-controlled removal of the old plugin.",
+        "Current safety documentation distinguishes CLI-owned guardrails from the removed Claude-only hooks, and documentation links pass."
+      ],
+      "dependsOn": ["W2"]
+    },
+    {
+      "id": "W4",
+      "title": "Verify plugin-free Claude integration and portable workflow parity",
+      "description": "Run targeted and aggregate checks, isolated package/adapter smoke, artifact diagnostics, and source/package scans; fix regressions found before recording the final Work review.",
+      "context": "Use the workspace build and disposable homes; do not install globally, release, commit, or push. Treat a real Claude host UI smoke as an explicit later release gate. Distinguish environmental doctor skew from implementation failures.",
+      "filesToTouch": ["scripts/check-adapter-fixtures.mjs", "scripts/check-cli-bundle.mjs", "scripts/check-versions.mjs", "package.json", "docs/release-checklist.md"],
+      "acceptanceCriteria": [
+        "Build, targeted adapter and package checks, full `npm run check`, artifact doctor, analyze, package dry run, and `git diff --check` pass or any failure is reported without a pass claim.",
+        "Disposable package and adapter probes prove a plugin-free tarball, seven Claude skills, safe repeated installation/removal, and unchanged Forge/Work behavior.",
+        "The final evidence names verification limits and confirms no version bump, release, global installation, commit, or push occurred."
+      ],
+      "dependsOn": ["W3"]
+    }
+  ]
+}

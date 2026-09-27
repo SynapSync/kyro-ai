@@ -1,0 +1,8 @@
+{
+  "checkedCriteria": [
+    "Claude is an implemented adapter and `kyro install --agent claude` projects exactly the seven public Kyro command skills through the shared runtime.",
+    "Install, sync, doctor, and uninstall preserve unrelated Claude content, detect missing or stale managed skills, and fail closed on unsafe or foreign paths.",
+    "Disposable fixtures prove repeat installation, coexistence with standard/Codex/OpenCode, and no automatic legacy-plugin removal."
+  ],
+  "findings": []
+}

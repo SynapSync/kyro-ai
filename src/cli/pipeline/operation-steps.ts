@@ -24,6 +24,7 @@ import type { OperationPlan } from '../types';
 import { PipelineOrchestrator } from './orchestrator';
 import type { PipelineResult, StagePlan, Step } from './types';
 import { assertStateWriterLeaseHealthy, withStateWriterLock } from './state-writer-lock';
+import { assertSafeClaudeSkillWrite } from '../adapters/claude';
 
 interface OperationExecutionContext {
   packageRoot: string;
@@ -85,6 +86,7 @@ class OperationStep implements Step {
   run(): void {
     assertStateWriterLeaseHealthy();
     const target = this.context.resolveManagedPath(this.operation.path);
+    if (this.operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
     if (this.operation.action !== 'mkdir' && this.operation.action !== 'rmdir-if-empty') {
       assertNotRetiredSprintOverwrite(target);
     }
@@ -118,6 +120,7 @@ class OperationStep implements Step {
 }
 
 function applyOperation(operation: OperationPlan, target: string, context: OperationExecutionContext): void {
+  if (operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
   if (operation.action === 'mkdir') {
     assertStateWriterLeaseHealthy();
     mkdirSync(target, { recursive: true });

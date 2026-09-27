@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-09-27
+
+### Added
+
+- Added a CLI-managed Claude Code adapter that projects seven native `kyro-*` command skills and the executor skill into `~/.claude/skills/`, using the same shared Kyro runtime as other hosts.
+- Added adapter checks for repeated installation, sync, removal, foreign-file collisions, symlink refusal, legacy-plugin coexistence, and package contents.
+
+### Changed
+
+- Claude Code installation now uses `kyro install --agent claude` instead of the Kyro plugin marketplace. Existing plugin users can verify the new skills before removing the old plugin themselves; Kyro does not change Claude plugin settings or caches.
+- Retired the Claude-only `PreToolUse` hooks, plugin manifest, marketplace metadata, and plugin command wrappers. The CLI's managed-state protections remain, but arbitrary Claude shell commands are no longer intercepted by those hooks.
+- Updated installation, migration, guardrail, and release guidance for the native adapter and `/kyro-*` command names.
+
 ## [5.1.0] - 2026-09-27
 
 ### Added
