@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "kind": "organic-work",
+  "id": "organic-work-smoke",
+  "title": "Kyro Work — camino alternativo de ejecución",
+  "objective": "---\ndocType: plan\ndate: 2026-09-26\nslug: organic-work\ntitle: Kyro Work — camino alternativo de ejecución\nmaturedFrom: mature\nagents: []\n---",
+  "brief": {
+    "path": "brief.md",
+    "digest": "5ad082c3f313ae5a13ceb50f07116aff17ef19701c89e866406bf9f7e432c888",
+    "sourceIdea": {
+      "path": ".agents/kyro/plan/2026-09-26-organic-work.md",
+      "digest": "5ad082c3f313ae5a13ceb50f07116aff17ef19701c89e866406bf9f7e432c888",
+      "title": "Kyro Work — camino alternativo de ejecución"
+    }
+  },
+  "state": "draft",
+  "revision": 1,
+  "createdAt": "2026-09-26T15:13:34.696Z",
+  "updatedAt": "2026-09-26T15:13:34.696Z",
+  "handoff": {
+    "nextAction": "plan_tasks",
+    "nextTaskId": null,
+    "blockedReason": null
+  },
+  "tasks": [],
+  "activity": [
+    {
+      "seq": 1,
+      "at": "2026-09-26T15:13:34.696Z",
+      "event": "created",
+      "taskId": null,
+      "by": "cli",
+      "reason": "Created through the Work CLI.",
+      "revision": 1
+    }
+  ],
+  "closure": null,
+  "promotion": null
+}
