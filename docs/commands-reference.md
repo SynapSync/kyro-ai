@@ -1,6 +1,8 @@
 # Commands Reference
 
-Kyro provides 6 slash commands, most of them thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. `/kyro:idea` is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid. `/kyro:qa` is an independent **certification audit** that can be run anytime to validate a scope against its specification, standing outside the forge gate lifecycle. `/kyro:scope-retire` is an operator-only flow for obsolete, superseded, or discarded scopes and is never selected by Forge or a handoff. Completing finished work is Forge (`kyro scope complete`).
+Kyro provides 7 slash commands, most of them thin routers over the single source of truth: each reads structured state first, then loads only the mode/helper/template required for the current action. `/kyro:idea` is an optional **pre-scope** step that runs before any scope or `sprint.json` exists — it never reads or creates project state, and going straight to `/kyro:forge` without it is equally valid. `/kyro:qa` is an independent **certification audit** that can be run anytime to validate a scope against its specification, standing outside the forge gate lifecycle. `/kyro:scope-retire` is an operator-only flow for obsolete, superseded, or discarded scopes and is never selected by Forge or a handoff. `/kyro:work` is an explicitly selected, isolated Work task lifecycle; its task reviews are not Forge QA. Completing finished Forge work remains Forge-owned (`kyro scope complete`).
+
+For Work flags, exact JSON input shapes, and failure recovery, see [Work CLI](work.md).
 
 ## Cost-Aware Routing
 

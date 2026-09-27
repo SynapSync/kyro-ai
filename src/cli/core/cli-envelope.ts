@@ -1,4 +1,3 @@
-import { writeSync } from 'node:fs';
 import { TOOL_OWNED_VERBS } from './capabilities';
 import { toErrorEnvelope } from './errors';
 
@@ -141,11 +140,14 @@ export function emitMachineError(command: string, error: unknown): void {
 }
 
 function writeEnvelope(envelope: CliEnvelopeV1<unknown>): void {
-  writeSync(1, `${JSON.stringify(envelope)}\n`);
+  // Node drains an asynchronous pipe write before natural process exit. A single
+  // writeSync can stop at pipe capacity or throw EAGAIN, truncating large JSON.
+  process.stdout.write(`${JSON.stringify(envelope)}\n`);
 }
 
 function commandName(argv: string[]): string {
   const [command = '', subcommand = ''] = argv;
+  if (command === 'work' && subcommand && !subcommand.startsWith('-')) return `work ${subcommand}`;
   if (['scope', 'repair', 'debt', 'scenario', 'adr', 'rule'].includes(command) && subcommand && !subcommand.startsWith('-')) {
     return `${command} ${subcommand}`;
   }
@@ -161,6 +163,7 @@ function derivePhase(argv: string[], output: string): CliPhase {
 function isMutating(argv: string[]): boolean {
   const command = argv[0] ?? '';
   if (!TOOL_OWNED_VERBS.includes(command as (typeof TOOL_OWNED_VERBS)[number])) return false;
+  if (command === 'work') return !['status', 'context-pack', 'help', '--help', '-h'].includes(argv[1] ?? '');
   if (READ_ONLY_VERBS.has(command)) return false;
   if (command === 'scope' && !['set-active', 'retire', 'complete', 'reopen'].includes(argv[1] ?? '')) return false;
   return true;

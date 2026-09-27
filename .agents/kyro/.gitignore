@@ -6,3 +6,6 @@ kyro.json
 kyro.json.migrated
 .kyro-state-writer.lock
 .kyro-state-writer.lock/
+work/*/.pending-brief-amendment.json
+work/*/.pending-promotion.json
+work/*/.promotion-stage/

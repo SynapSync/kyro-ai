@@ -25,6 +25,7 @@ import { runClarifyCommand } from './commands/clarify';
 import { runAdrCommand } from './commands/adr';
 import { runRuleCommand } from './commands/rule';
 import { runCapabilitiesCommand } from './commands/capabilities';
+import { runWorkCommand } from './commands/work';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
 import { parseOptions } from './options';
 import { KyroCoreError } from './core/errors';
@@ -58,6 +59,11 @@ export async function runCli(): Promise<void> {
 
   if (command === 'capabilities') {
     runCapabilitiesCommand(args);
+    return;
+  }
+
+  if (command === 'work') {
+    runWorkCommand(args);
     return;
   }
 
@@ -203,5 +209,6 @@ function isMutatingInvocation(command: string, args: string[]): boolean {
   if (command === 'scope' && args[0] === 'discard' && args.includes('--yes')) return true;
   if (command === 'scope' && args[0] === 'complete' && args.includes('--yes')) return true;
   if (command === 'scope' && args[0] === 'reopen' && args.includes('--yes')) return true;
+  if (command === 'work' && args[0] === 'create') return true;
   return command === 'trace' && args.includes('--clear');
 }

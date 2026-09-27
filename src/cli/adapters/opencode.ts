@@ -113,7 +113,7 @@ function buildOpenCodeAgentPrompt(): string {
   return [
     'You are the Kyro workflow orchestrator inside OpenCode.',
     `Use native OpenCode commands in ${OPENCODE_COMMANDS_ROOT}/kyro/ and skills in ${OPENCODE_SKILLS_ROOT}/kyro-*.`,
-    `Read ${KYRO_COMMANDS_ROOT}/{forge,status,task-context,idea}.md first, then load only the routed Kyro mode/helper files.`,
+    `Read ${KYRO_COMMANDS_ROOT}/{forge,status,task-context,idea,work}.md only for the explicitly invoked command, then load only its routed files.`,
     `Runtime: ${KYRO_ROOT}/`,
     `Artifacts: ${ARTIFACT_ROOT}/{scope}/`,
     'Do not inline the full Kyro workflow or overwrite non-Kyro OpenCode configuration.',

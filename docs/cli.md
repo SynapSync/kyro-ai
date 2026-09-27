@@ -836,6 +836,7 @@ that leaves an immutable record of itself.
 | **4.43.5 and earlier** | `debt.origin.set` (protocol v1/v2) | A wrong or non-numeric `origin`, and nothing else. |
 | **4.44.0 and later** (candidate: **5.0.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 | **5.0.1** | update-time compatibility migration | Removes redundant `resolvedSprint` only when it equals `targetSprint`; contradictory values remain blocked. |
+| **5.1.0** | retains protocol v3 remediation | Preserves `debt.canonicalize` and the 5.0.1 compatibility migration; neither rewrites scopes during install or Doctor. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

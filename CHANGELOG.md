@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-09-27
+
+### Added
+
+- Introduced opt-in Kyro Work as a separate workflow from Forge. The `kyro work` CLI owns the strict `work.json` v1 contract, task planning and dependency routing, evidence and criterion-level reviews, amendments, dispositions, close/reopen, and resumable context packs.
+- Added recoverable Work-to-Forge promotion with a reciprocal provenance link. Promotion transfers selected unfinished tasks into a new Forge scope without carrying over Work approvals or changing the active Forge scope.
+- Added the public `/kyro:work` command, projected host skills, user guidance, and disposable lifecycle, isolation, and recovery checks.
+
+### Fixed
+
+- Artifact doctor now audits Work-only workspaces and fails closed when a present Work root is unsafe or unreadable instead of silently omitting Work diagnostics.
+
 ## [5.0.1] - 2026-09-23
 
 ### Fixed

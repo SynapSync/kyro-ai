@@ -29,6 +29,8 @@ Usage:
   kyro clarify --from <file>   Tool-owned clarification resolution write
   kyro context-pack [options]  Emit a context package for a scope from sprint.json
   kyro capabilities [--json]   List supported tool-owned verbs (runtime handshake)
+  kyro work <subcommand>       Plan, execute, record evidence, and review isolated Work tasks
+  /kyro:work                   Explicit public Work workflow (supported host command/skill)
   kyro eval [options]          Run deterministic behavioral eval cases
   kyro mcp <subcommand>        Run or inspect the Kyro MCP server
   kyro trace [options]          Read or clear the append-only scope trace
@@ -84,10 +86,28 @@ Examples:
   kyro eval --json
   kyro trace --kyro-scope auth-refactor --tail 20
   kyro scope list
+  kyro work create --id sample-work --from brief.md
 `);
 }
 
 export function printCommandHelp(command: string): void {
+  if (command === 'work') {
+    console.log(`Usage:
+  kyro work create --id <slug> --from <brief-or-idea> [--by <actor>] [--dry-run] [--json]
+  kyro work plan --work <slug> --from <proposal.json> --expect-revision <n> [--by <actor>] [--dry-run] [--json]
+  kyro work start|block|unblock --work <slug> --task Wn --expect-revision <n> [--by <actor>] [--dry-run] [--json]
+  kyro work record-evidence --work <slug> --task Wn --from <evidence.json> --expect-revision <n> --by <maker> [--dry-run] [--json]
+  kyro work review --work <slug> --task Wn --from <review.json> --verdict pass|fail --expect-revision <n> --by <checker> [--dry-run] [--json]
+  kyro work amend-task --work <slug> --task Wn --from <proposal.json> --reason <text> --expect-revision <n> --by <actor> [--dry-run] [--json]
+  kyro work amend-brief --work <slug> --from <brief.md> --reason <text> --expect-revision <n> --by <actor> [--dry-run] [--json]
+  kyro work dispose --work <slug> --task Wn --kind cancelled|superseded --reason <text> --expect-revision <n> --by <actor> [--replacement-task Wn] [--dry-run] [--json]
+  kyro work close --work <slug> --outcome completed|stopped --reason <text> --expect-revision <n> --by <actor> [--dry-run | --yes] [--json]
+  kyro work reopen --work <slug> --reason <text> --expect-revision <n> --by <actor> [--dry-run | --yes] [--json]
+  kyro work promote --work <slug> --to-scope <new-forge-scope> --expect-revision <n> --by <actor> [--dry-run | --yes] [--json]
+  kyro work status|context-pack --work <slug> [--task Wn] [--json]
+  Promotion carries no approval into Forge and never turns a Work pass into Forge QA. An interrupted promotion blocks other mutations; status prints the exact retry. The complete target directory is published atomically; status and doctor verify its initial origin copy, reciprocal link, and current Forge shape. Later Forge progress does not change the origin digest. Until the installed runtime gains work, use the workspace build (node dist/cli.js).`);
+    return;
+  }
   if (command === 'install') {
     console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--init-workspace|--no-init-workspace] [--dry-run] [--yes]');
   } else if (command === 'detect') {

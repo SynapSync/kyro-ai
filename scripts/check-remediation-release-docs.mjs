@@ -45,14 +45,14 @@ function mustNot(file, text, pattern, what) {
   if (match !== null) failures.push(`${file}: ${what}\n    found: "${match[0].trim()}"`);
 }
 
-// A candidate that adds operations must be tellable apart from the origin-only runtime, or every
-// claim below is ambiguous no matter how carefully it is worded.
+// A candidate that supports record-level remediation must be distinguishable from the origin-only
+// runtime, or every claim below is ambiguous no matter how carefully it is worded.
 checked += 1;
 if (CANDIDATE_VERSION === ORIGIN_ONLY_VERSION) {
   failures.push(
     `package.json: the candidate version is ${CANDIDATE_VERSION}, the same as the documented ` +
     `origin-only release. Docs cannot truthfully say "${ORIGIN_ONLY_VERSION} is origin-only" and ` +
-    `"${CANDIDATE_VERSION} adds debt.canonicalize" at once. Bump the version.`,
+    `"${CANDIDATE_VERSION} supports debt.canonicalize" at once. Bump the version.`,
   );
 }
 
@@ -68,7 +68,7 @@ const candidate = new RegExp(escaped(CANDIDATE_VERSION));
   const text = read(file);
   must(file, text, originOnly, `the origin-only version ${ORIGIN_ONLY_VERSION}`);
   must(file, text, /origin-only/i, 'the phrase "origin-only"');
-  must(file, text, candidate, `the candidate version ${CANDIDATE_VERSION} that adds debt.canonicalize`);
+  must(file, text, candidate, `the candidate version ${CANDIDATE_VERSION} that supports debt.canonicalize`);
   must(file, text, /debt\.canonicalize/, 'the name of the operation that repairs the full record');
   must(file, text, /never rewrites an existing scope|Nothing is migrated for you/i,
     'the statement that upgrading does not migrate scopes automatically');
@@ -239,4 +239,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`check:remediation-release-docs — ${checked} documentation assertions passed (${ORIGIN_ONLY_VERSION} origin-only, ${CANDIDATE_VERSION} adds debt.canonicalize)`);
+console.log(`check:remediation-release-docs — ${checked} documentation assertions passed (${ORIGIN_ONLY_VERSION} origin-only, ${CANDIDATE_VERSION} supports debt.canonicalize)`);

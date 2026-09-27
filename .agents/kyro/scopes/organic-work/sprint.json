@@ -1,0 +1,471 @@
+{
+  "schemaVersion": 4,
+  "scope": "organic-work",
+  "title": "Kyro Work",
+  "status": "completed",
+  "objective": "Entregar un camino Kyro Work de elección explícita para ejecutar cualquier plan mediante tareas verificables y estado escrito sólo por CLI, preservando los contratos actuales de Forge.",
+  "successCriteria": [
+    "Una persona puede elegir Work para un plan de cualquier tamaño y completar tareas con dependencias, evidencia y revisión sin crear un scope o sprint para ese plan.",
+    "Cada cambio de work.json proviene de un comando CLI que valida el esquema exacto, la revisión esperada y la transición antes de persistir.",
+    "Después de una sesión nueva, un context pack de Work identifica la próxima acción y tarea elegible sin consultar un scope.",
+    "Cambios de brief, tarea o evidencia invalidan aprobaciones afectadas y el cierre nunca oculta trabajo pendiente.",
+    "Los comandos Work no modifican estado Forge existente, y la promoción explícita a Forge mantiene un enlace de origen y destino verificable."
+  ],
+  "spec": {
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "Work se crea y continúa únicamente por elección explícita del usuario, sin restricciones de complejidad, duración o número conceptual de tareas.",
+        "priority": "must",
+        "rationale": "Decisión del usuario: Forge y Work son métodos distintos; la complejidad no selecciona el camino."
+      },
+      {
+        "id": "R2",
+        "statement": "El estado Work usa un work.json v1 de claves exactas, tipos concretos, referencias válidas y transiciones coherentes.",
+        "priority": "must",
+        "rationale": "El contrato normativo y todos los campos se definen en el plan Idea 2026-09-26-organic-work.md; rechazar claves desconocidas evita ambigüedad."
+      },
+      {
+        "id": "R3",
+        "statement": "El CLI es el único escritor de work.json y protege cada mutación mediante validación, revisión esperada, bloqueo y persistencia segura.",
+        "priority": "must",
+        "rationale": "Evita que agentes construyan manualmente estados o aprobaciones inválidos; dry-run debe permanecer de sólo lectura."
+      },
+      {
+        "id": "R4",
+        "statement": "Cada Work mantiene un brief legible ligado por digest a su estado y, si existe, a la Idea de origen.",
+        "priority": "must",
+        "rationale": "La intención humana permanece rastreable y las ediciones externas del brief no cambian silenciosamente el contrato vigente."
+      },
+      {
+        "id": "R5",
+        "statement": "Work permite planificar y ejecutar tareas con criterios, dependencias acíclicas y bloqueo explícito sin habilitar dependientes de tareas no verificadas.",
+        "priority": "must",
+        "rationale": "Un plan puede evolucionar, pero el orden y la cobertura deben reflejar el grafo de trabajo real."
+      },
+      {
+        "id": "R6",
+        "statement": "La evidencia y la revisión de cada tarea son registradas por CLI y un pass cubre todos los criterios vigentes y material no obsoleto.",
+        "priority": "must",
+        "rationale": "Reutiliza la garantía maker/checker de Kyro sin heredar sprint.json ni afirmar certificación integral."
+      },
+      {
+        "id": "R7",
+        "statement": "Las enmiendas al brief o a tareas invalidan aprobaciones afectadas y preservan razón e historial de cambio.",
+        "priority": "must",
+        "rationale": "La adaptación orgánica no puede conservar un pass anterior sobre un contrato distinto."
+      },
+      {
+        "id": "R8",
+        "statement": "El cierre distingue trabajo verificado, dispuesto y pendiente, y exige una razón explícita para detener trabajo incompleto.",
+        "priority": "must",
+        "rationale": "Ninguna tarea desaparece ni un cierre parcial se presenta como resultado completo."
+      },
+      {
+        "id": "R9",
+        "statement": "Status y context pack Work muestran un siguiente paso determinista y suficiente para reanudar sin leer estado Forge.",
+        "priority": "must",
+        "rationale": "La reanudación debe funcionar después de compactación o cambio de agente con contexto acotado."
+      },
+      {
+        "id": "R10",
+        "statement": "Los artefactos Work pueden versionarse en Git y se instalan/proyectan mediante los hosts soportados sin cambiar comandos Forge existentes.",
+        "priority": "must",
+        "rationale": "La configuración ignore actual excluye .agents/kyro/work; empaquetado y proyección requieren pruebas de compatibilidad."
+      },
+      {
+        "id": "R11",
+        "statement": "Todas las operaciones Work mantienen aislados project.json, local.json y sprint.json y rechazan rutas inseguras, symlinks y estados corruptos.",
+        "priority": "must",
+        "rationale": "Protege seguridad y comportamiento actual de Forge; se comprueba con snapshots y pruebas de fallos."
+      },
+      {
+        "id": "R12",
+        "statement": "Una promoción Work a Forge requiere solicitud explícita, vista previa y vínculo recíproco verificable antes de marcar Work como promovido.",
+        "priority": "must",
+        "rationale": "La convergencia futura transfiere sólo trabajo pendiente válido y nunca equipara revisión Work con QA Forge."
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "S1",
+        "requirement": "R2",
+        "given": "un documento work.json v1 con todas las claves y referencias válidas",
+        "when": "el CLI valida su forma y coherencia",
+        "then": "lo acepta sin agregar ni eliminar campos"
+      },
+      {
+        "id": "S2",
+        "requirement": "R2",
+        "given": "un documento con clave extra, ID duplicado, ciclo o estado incompatible con su evidencia",
+        "when": "el CLI lo valida",
+        "then": "rechaza la entrada con ubicación precisa y sin escritura"
+      },
+      {
+        "id": "S3",
+        "requirement": "R3",
+        "given": "dos escrituras sobre la misma revisión Work",
+        "when": "la primera se aplica y la segunda usa la revisión anterior",
+        "then": "la segunda falla como conflicto y conserva el resultado de la primera"
+      },
+      {
+        "id": "S4",
+        "requirement": "R11",
+        "given": "un ID o ruta con escape, symlink o componente no-directorio",
+        "when": "se prepara una mutación Work",
+        "then": "se rechaza antes de escribir dentro o fuera del workspace"
+      },
+      {
+        "id": "S5",
+        "requirement": "R3",
+        "given": "un Work existente válido y un fallo inyectado en validación o persistencia",
+        "when": "se intenta actualizar o hacer dry-run",
+        "then": "el Work previo sigue íntegro y dry-run no modifica disco"
+      },
+      {
+        "id": "S6",
+        "requirement": "R4",
+        "given": "una Idea o brief suficiente y un ID libre",
+        "when": "el usuario invoca kyro work create",
+        "then": "el CLI genera brief.md y work.json ligados por digest sin registrar un scope"
+      },
+      {
+        "id": "S7",
+        "requirement": "R9",
+        "given": "un Work draft sin tareas",
+        "when": "otra sesión consulta status o context-pack",
+        "then": "recibe plan_tasks con ID y revisión, nunca done"
+      },
+      {
+        "id": "S8",
+        "requirement": "R4",
+        "given": "un brief ausente o cambiado fuera del CLI",
+        "when": "se consulta o muta el Work",
+        "then": "se expone mismatch o fallo sin aprobar trabajo obsoleto"
+      },
+      {
+        "id": "S9",
+        "requirement": "R10",
+        "given": "un workspace con .gitignore actual y un nuevo Work",
+        "when": "se revisa git check-ignore",
+        "then": "brief.md y work.json son rastreables y local.json/trace siguen ignorados"
+      },
+      {
+        "id": "S10",
+        "requirement": "R11",
+        "given": "un workspace con scope/sprint Forge preexistentes",
+        "when": "se ejecutan create, status y context-pack Work",
+        "then": "los bytes de project.json, local.json y todos los sprint.json permanecen idénticos"
+      },
+      {
+        "id": "S11",
+        "requirement": "R1",
+        "given": "Un usuario tiene un plan de cualquier tamaño",
+        "when": "invoca Work explícitamente",
+        "then": "Work se inicia sin aplicar una heurística de complejidad y Forge no cambia de ruta"
+      },
+      {
+        "id": "S12",
+        "requirement": "R5",
+        "given": "Un Work contiene tareas con dependencias y una predecesora sin verificar",
+        "when": "el CLI calcula tareas elegibles",
+        "then": "la dependiente permanece bloqueada y las independientes pueden continuar"
+      },
+      {
+        "id": "S13",
+        "requirement": "R6",
+        "given": "Una tarea tiene criterios vigentes y evidencia registrada",
+        "when": "el checker intenta aprobarla",
+        "then": "el CLI exige cobertura de todos los criterios y digest vigente antes de guardar pass"
+      },
+      {
+        "id": "S14",
+        "requirement": "R7",
+        "given": "Una tarea tiene veredicto pass",
+        "when": "se enmienda su brief, criterio o evidencia",
+        "then": "la aprobación afectada se invalida y se exige revisión nueva"
+      },
+      {
+        "id": "S15",
+        "requirement": "R8",
+        "given": "Un Work contiene tareas verificadas y tareas pendientes",
+        "when": "el usuario solicita cierre",
+        "then": "el CLI distingue completed de stopped y hace visibles las tareas sin resolver"
+      },
+      {
+        "id": "S16",
+        "requirement": "R12",
+        "given": "Un Work tiene trabajo pendiente y un destino Forge elegido",
+        "when": "el usuario solicita promoción explícita",
+        "then": "el CLI previsualiza la transferencia y sólo confirma promoted con enlace recíproco verificable"
+      },
+      {
+        "id": "S17",
+        "requirement": "R5",
+        "given": "A Work plan proposal has duplicate task IDs, a missing dependency, or a cycle",
+        "when": "the CLI previews or applies the plan",
+        "then": "it reports the invalid graph and preserves the prior Work state"
+      },
+      {
+        "id": "S18",
+        "requirement": "R5",
+        "given": "A task is explicitly blocked while another independent task is eligible",
+        "when": "the CLI derives the next task and an agent tries to start a dependent task",
+        "then": "the independent task remains runnable and the dependent start is rejected until its prerequisite is verified"
+      },
+      {
+        "id": "S19",
+        "requirement": "R6",
+        "given": "Task evidence is stale, incomplete, failed, or not_run for a current criterion",
+        "when": "a checker requests pass",
+        "then": "the CLI rejects approval without a verified state or a misleading pass verdict"
+      },
+      {
+        "id": "S20",
+        "requirement": "R7",
+        "given": "A verified task or a Work brief has a current digest and a passing review",
+        "when": "the CLI applies a reasoned task or brief amendment at the expected revision",
+        "then": "the affected approval becomes non-current, the new contract is digest-bound, and historical activity remains auditable"
+      },
+      {
+        "id": "S21",
+        "requirement": "R5",
+        "given": "A dependent task references a prerequisite that is changed or disposed",
+        "when": "the CLI recomputes graph eligibility and handoff",
+        "then": "it never auto-rewires dependencies or starts the dependent before an explicit valid amendment"
+      },
+      {
+        "id": "S22",
+        "requirement": "R3",
+        "given": "A brief and work.json are valid before an amendment",
+        "when": "the update encounters a stale revision or an injected publication failure",
+        "then": "readers observe the prior accepted contract or a recoverable transaction, never an apparently approved mixed revision"
+      },
+      {
+        "id": "S23",
+        "requirement": "R8",
+        "given": "A task is cancelled or superseded with an explicit reason",
+        "when": "the Work is summarized or closed",
+        "then": "the task is counted as disposed rather than verified and unresolved dependents remain visible"
+      },
+      {
+        "id": "S24",
+        "requirement": "R8",
+        "given": "A Work is closed with a reason and retained closure provenance",
+        "when": "the user explicitly reopens it",
+        "then": "the CLI restores a valid actionable state without erasing the earlier closure or allowing a promoted Work to reopen"
+      },
+      {
+        "id": "S25",
+        "requirement": "R10",
+        "given": "A supported host installs or syncs Kyro assets in a workspace",
+        "when": "a user explicitly invokes the Work entry point",
+        "then": "the Work router is available and Forge command assets and state remain unchanged"
+      },
+      {
+        "id": "S26",
+        "requirement": "R12",
+        "given": "A Work has unfinished tasks and a fresh Forge target has been explicitly chosen",
+        "when": "the CLI previews promotion",
+        "then": "it shows deterministic task and dependency mapping, excluded source history, approval reset, and exact reciprocal identities without writing either workflow"
+      },
+      {
+        "id": "S27",
+        "requirement": "R12",
+        "given": "A promotion is interrupted or its source, pending record, staged target, or reciprocal link is changed",
+        "when": "the CLI reads or retries the transaction",
+        "then": "only a matching retry completes; every mismatch fails closed without reporting a healthy promoted Work or an incomplete runnable Forge scope"
+      },
+      {
+        "id": "S28",
+        "requirement": "R12",
+        "given": "A Work has verified, disposed, blocked, and unfinished tasks with dependencies",
+        "when": "the user chooses a new Forge scope for promotion",
+        "then": "only eligible unfinished tasks become pending Forge tasks, disposed prerequisites block promotion, verified dependencies are disclosed and adjudicated explicitly, and no Work pass becomes Forge QA"
+      },
+      {
+        "id": "S29",
+        "requirement": "R4",
+        "given": "A create source contains malformed UTF-8, a symlink, or valid Unicode and CRLF bytes",
+        "when": "the CLI reads and publishes the initial brief",
+        "then": "invalid or unsafe sources are rejected without publication and valid original bytes are preserved with the matching digest"
+      },
+      {
+        "id": "S30",
+        "requirement": "R8",
+        "given": "A Work has been promoted with a valid reciprocal link",
+        "when": "the user attempts to reopen it",
+        "then": "the CLI rejects reopening without altering either Work or Forge state and an automated fixture protects this rule"
+      },
+      {
+        "id": "S31",
+        "requirement": "R11",
+        "given": "A workspace has an absent, healthy, or unsafe Work root, with or without Forge scopes",
+        "when": "artifact doctor audits the workspace",
+        "then": "it skips only a genuinely absent root, verifies healthy Work, and reports every present unsafe or unreadable root as a failure without changing Work or Forge bytes"
+      }
+    ],
+    "nonGoals": [
+      "Seleccionar Work o Forge automáticamente según tamaño o dificultad.",
+      "Permitir edición manual de work.json como parte del flujo normal o reparación.",
+      "Cambiar el esquema, enrutamiento, cierre o QA actual de Forge.",
+      "Migrar Forge a Work en la primera versión o mantener estado vivo compartido entre ambos.",
+      "Ejecutar delegados por defecto o declarar QA integral a partir de revisiones de tarea."
+    ],
+    "openQuestions": []
+  },
+  "clarifications": [],
+  "conventions": [],
+  "adrs": [],
+  "roadmap": {
+    "plannedSprintCount": 5,
+    "sizingRationale": "Cuatro incrementos con objetivos verificables: (1) contrato exacto, persistencia segura, create/status/context pack e aislamiento; (2) grafo de tareas, evidencia y revisión; (3) enmiendas, cierre, entrada pública e instalación; (4) promoción Work a Forge y certificación integral. La promoción depende de los contratos y pruebas previos; los sprints posteriores pueden ajustarse mediante CLI tras la evidencia, sin adelantar ejecución ni cierre.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "contract-and-safe-foundation",
+        "title": "Contrato Work y base segura",
+        "state": "closed"
+      },
+      {
+        "n": 2,
+        "slug": "task-execution-and-review",
+        "title": "Task Execution and Review",
+        "state": "closed"
+      },
+      {
+        "n": 3,
+        "slug": "organic-change-and-public-entry",
+        "title": "Organic Change, Closure, and Public Entry",
+        "state": "closed"
+      },
+      {
+        "n": 4,
+        "slug": "forge-promotion-and-certification",
+        "title": "Forge Promotion and Certification",
+        "state": "closed"
+      },
+      {
+        "n": 5,
+        "slug": "work-artifact-doctor-hardening",
+        "title": "Work Artifact Doctor Hardening",
+        "state": "closed"
+      }
+    ]
+  },
+  "ledger": [
+    {
+      "n": 1,
+      "slug": "contract-and-safe-foundation",
+      "outcome": "shipped",
+      "closedAt": "2026-09-26",
+      "archive": "archive/sprint-001-contract-and-safe-foundation.md",
+      "snapshot": "archive/sprint-001-contract-and-safe-foundation.json",
+      "checkpoint": "archive/sprint-001-contract-and-safe-foundation.checkpoint.json",
+      "checkpointSha256": "ce512aeeb44698d7b802988f1fffcd4ae880ebc294e6703571814fdbb576bdab"
+    },
+    {
+      "n": 2,
+      "slug": "task-execution-and-review",
+      "outcome": "shipped",
+      "closedAt": "2026-09-26",
+      "archive": "archive/sprint-002-task-execution-and-review.md",
+      "snapshot": "archive/sprint-002-task-execution-and-review.json",
+      "checkpoint": "archive/sprint-002-task-execution-and-review.checkpoint.json",
+      "recommendations": [
+        "Implement CLI-owned brief and task amendments with revision invalidation and preserved history.",
+        "Implement Work closure with explicit dispositions and truthful partial outcomes.",
+        "Expose Work through the supported public command and installation surfaces without changing Forge behavior."
+      ],
+      "checkpointSha256": "d51a40f52667d4362200a6c6768c7f9e6807ac54a0f5f89175ba8f9cbb8f9bda"
+    },
+    {
+      "n": 3,
+      "slug": "organic-change-and-public-entry",
+      "outcome": "shipped",
+      "closedAt": "2026-09-27",
+      "archive": "archive/sprint-003-organic-change-and-public-entry.md",
+      "snapshot": "archive/sprint-003-organic-change-and-public-entry.json",
+      "checkpoint": "archive/sprint-003-organic-change-and-public-entry.checkpoint.json",
+      "recommendations": [
+        "Plan Sprint 4 around explicit, previewed Work-to-Forge promotion with reciprocal links and S16 coverage.",
+        "Resolve debt-1 and debt-2 before release; then bump the package version and verify an authorized install/sync and doctor handshake."
+      ],
+      "checkpointSha256": "ec55a7386f466e39145896ada67de7b979c17d330b33127e907f5c699df827cf"
+    },
+    {
+      "n": 4,
+      "slug": "forge-promotion-and-certification",
+      "outcome": "shipped",
+      "closedAt": "2026-09-27",
+      "archive": "archive/sprint-004-forge-promotion-and-certification.md",
+      "snapshot": "archive/sprint-004-forge-promotion-and-certification.json",
+      "checkpoint": "archive/sprint-004-forge-promotion-and-certification.checkpoint.json",
+      "recommendations": [
+        "At a separate release gate, decide whether to bump and publish the workspace build, install/sync the global runtime and kyro-work adapter, then rerun workspace artifact doctor.",
+        "Ask the scope owner whether to complete organic-work or explicitly expand it; do not start another sprint automatically."
+      ],
+      "checkpointSha256": "dd363ebfe8c8004d074f884aba6203491836d6a4a4b762c7c39cc48c717361e2"
+    },
+    {
+      "n": 5,
+      "slug": "work-artifact-doctor-hardening",
+      "outcome": "shipped",
+      "closedAt": "2026-09-27",
+      "archive": "archive/sprint-005-work-artifact-doctor-hardening.md",
+      "snapshot": "archive/sprint-005-work-artifact-doctor-hardening.json",
+      "checkpoint": "archive/sprint-005-work-artifact-doctor-hardening.checkpoint.json",
+      "recommendations": [
+        "Review the scope-completion preview and decide whether to complete organic-work; defer commit, push, version bump, release, and global installation to separate authorization."
+      ],
+      "checkpointSha256": "fe1d6869d35a88523ff77a356a8cb2a4dcf8b4ab447c3cdd3241eb0d5e73e865"
+    }
+  ],
+  "previousSprint": {
+    "n": 5,
+    "slug": "work-artifact-doctor-hardening",
+    "outcome": "shipped",
+    "summary": "Hardened artifact doctor Work-root discovery and Work-only auditing with independent senior QA approval."
+  },
+  "activeSprint": null,
+  "debt": [
+    {
+      "id": "debt-1",
+      "title": "Harden work create source ingestion to reject malformed UTF-8 and preserve original brief bytes",
+      "origin": 3,
+      "priority": "medium",
+      "status": "resolved",
+      "targetSprint": 4,
+      "note": "Bounded no-follow lossless UTF-8 ingestion applied to work create with byte-exact publication and digest over original bytes; check-work-store, check-work-isolation, and check-work-amend pass."
+    },
+    {
+      "id": "debt-2",
+      "title": "Add schema-valid promoted Work reopen rejection regression",
+      "origin": 3,
+      "priority": "low",
+      "status": "resolved",
+      "targetSprint": 4,
+      "note": "Added schema-valid CLI-promoted reopen-refusal regression in check-work-closure plus status/doctor reciprocal diagnostics; fixtures pass."
+    }
+  ],
+  "handoff": {
+    "nextAction": "done",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "Scope explicitly completed: Organic Work delivered as an explicitly selected CLI-owned workflow alongside Forge: exact Work v1 state, task lifecycle, amendments, close/reopen, recoverable promotion, public command/skill, artifact diagnostics, and regression fixtures. Five sprints closed; independent senior QA approved the final repair. Feature commit: 82e26444dbfcbeecc3e9fe7fdf087191a01c0941. No release or global installation was performed.",
+    "lastUpdated": "2026-09-27"
+  },
+  "author": {
+    "name": "Roimer Peraza",
+    "email": "joisephdev@gmail.com",
+    "source": "git",
+    "capturedAt": "2026-09-26T13:07:07.681Z"
+  },
+  "completion": {
+    "completedAt": "2026-09-27T14:44:34.204Z",
+    "by": "maker",
+    "summary": "Organic Work delivered as an explicitly selected CLI-owned workflow alongside Forge: exact Work v1 state, task lifecycle, amendments, close/reopen, recoverable promotion, public command/skill, artifact diagnostics, and regression fixtures. Five sprints closed; independent senior QA approved the final repair. Feature commit: 82e26444dbfcbeecc3e9fe7fdf087191a01c0941. No release or global installation was performed.",
+    "requestDigest": "3407ae03418e5bb8c784a11b45f75ef34b73e7d14285e44aa4a036c95edd9a19",
+    "beforeEntryDigest": "90968bb8339c68ac140baab12dac5790c901cab64854398073a95fbdc753fbdf"
+  }
+}
