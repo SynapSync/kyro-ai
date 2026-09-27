@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "scope": "organic-work",
   "title": "Kyro Work",
-  "status": "planning",
+  "status": "completed",
   "objective": "Entregar un camino Kyro Work de elección explícita para ejecutar cualquier plan mediante tareas verificables y estado escrito sólo por CLI, preservando los contratos actuales de Forge.",
   "successCriteria": [
     "Una persona puede elegir Work para un plan de cualquier tamaño y completar tareas con dependencias, evidencia y revisión sin crear un scope o sprint para ese plan.",
@@ -449,10 +449,10 @@
     }
   ],
   "handoff": {
-    "nextAction": "await_scope_completion",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
-    "note": "Sprint 5 closed after independent QA approval. Present scope-completion preview for the final human gate; do not release or install globally without separate authorization.",
+    "note": "Scope explicitly completed: Organic Work delivered as an explicitly selected CLI-owned workflow alongside Forge: exact Work v1 state, task lifecycle, amendments, close/reopen, recoverable promotion, public command/skill, artifact diagnostics, and regression fixtures. Five sprints closed; independent senior QA approved the final repair. Feature commit: 82e26444dbfcbeecc3e9fe7fdf087191a01c0941. No release or global installation was performed.",
     "lastUpdated": "2026-09-27"
   },
   "author": {
@@ -460,5 +460,12 @@
     "email": "joisephdev@gmail.com",
     "source": "git",
     "capturedAt": "2026-09-26T13:07:07.681Z"
+  },
+  "completion": {
+    "completedAt": "2026-09-27T14:44:34.204Z",
+    "by": "maker",
+    "summary": "Organic Work delivered as an explicitly selected CLI-owned workflow alongside Forge: exact Work v1 state, task lifecycle, amendments, close/reopen, recoverable promotion, public command/skill, artifact diagnostics, and regression fixtures. Five sprints closed; independent senior QA approved the final repair. Feature commit: 82e26444dbfcbeecc3e9fe7fdf087191a01c0941. No release or global installation was performed.",
+    "requestDigest": "3407ae03418e5bb8c784a11b45f75ef34b73e7d14285e44aa4a036c95edd9a19",
+    "beforeEntryDigest": "90968bb8339c68ac140baab12dac5790c901cab64854398073a95fbdc753fbdf"
   }
 }
