@@ -1,0 +1,170 @@
+{
+  "sprint": {
+    "n": 3,
+    "slug": "organic-change-and-public-entry",
+    "title": "Organic Change, Closure, and Public Entry",
+    "objective": "Deliver CLI-owned Work amendments, explicit task disposition and closure, and supported public entry points while preserving Work history and Forge isolation."
+  },
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Controlled amendments",
+      "objective": "Change Work definitions through validated CLI operations without retaining stale approvals.",
+      "tasks": [
+        {
+          "id": "T3.1",
+          "title": "Amend task definitions through the CLI",
+          "description": "Implement previewable, revision-guarded task amendments for title, description, context, files, criteria, and dependencies. Preserve task identity and order, validate the entire resulting graph, advance definitionRevision only for a material definition change, and invalidate affected current evidence and verdicts without rewriting prior activity.",
+          "files_to_touch": ["src/cli/commands/work.ts", "src/cli/work/schema.ts", "src/cli/work/store.ts", "src/cli/types.ts", "scripts/check-work-amend.mjs"],
+          "context": "Use the existing Work writer, path confinement, expected-revision gate, and exact v1 schema. A changed dependency can affect downstream eligibility; recompute the handoff and reject cycles or missing references before any write. Keep amendment reason and actor in activity. Apply the scope convention: lifecycle records are evidence, not authority; derive current state with the same builders used by the writer.",
+          "acceptance_criteria": [
+            "A CLI-owned amend-task proposal has an exact documented shape, a required nonempty reason, an expected revision, a read-only preview, and an atomic apply path; malformed, stale, or unsafe input leaves Work bytes unchanged.",
+            "A material task-definition change increments that task's definitionRevision, records a task_amended event, and invalidates its stale evidence and pass verdict; unchanged input is rejected or handled as a documented no-op without manufacturing a new approval.",
+            "The full post-amendment dependency graph and deterministic handoff are validated; removed prerequisites, new cycles, and downstream eligibility changes are covered by adversarial tests.",
+            "A previous pass remains auditable as historical activity but is never treated as a current approval after an affected change."
+          ],
+          "depends_on": [],
+          "scenario_refs": ["S14", "S20", "S21"]
+        },
+        {
+          "id": "T3.2",
+          "title": "Amend the brief with digest-bound invalidation",
+          "description": "Implement a previewable, revision-guarded amend-brief operation that copies new brief bytes through the CLI, updates the brief digest, and invalidates every current approval unless the CLI can prove a narrower impact. Preserve a reasoned amendment event and fail closed on out-of-band brief changes.",
+          "files_to_touch": ["src/cli/commands/work.ts", "src/cli/work/store.ts", "src/cli/work/schema.ts", "scripts/check-work-amend.mjs"],
+          "context": "The brief is the human contract. Do not allow an agent to edit work.json or to repair a digest mismatch by silently accepting altered bytes. Treat the brief and work.json update as one recoverable publication; test interruption and retry behavior. A task's material digest binds its definition to the current brief digest.",
+          "acceptance_criteria": [
+            "amend-brief requires a source file, explicit reason, actor, and expected revision; preview does not write and apply copies exact source bytes while updating brief.digest and revision through the CLI.",
+            "A changed brief invalidates affected current evidence and pass verdicts before the Work is readable as current; the default is to invalidate all tasks when narrower impact cannot be proven.",
+            "An out-of-band brief edit, stale revision, symlink, oversized or unreadable source, and injected publication failure never produce a partially accepted contract or a false current pass.",
+            "Activity identifies the amendment reason and revision without embedding the full brief or secrets."
+          ],
+          "depends_on": ["T3.1"],
+          "scenario_refs": ["S8", "S14", "S20", "S22"]
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Disposition and truthful closure",
+      "objective": "Make abandoned and completed Work outcomes explicit, reversible where allowed, and distinguishable from verified work.",
+      "tasks": [
+        {
+          "id": "T3.3",
+          "title": "Dispose of tasks without implying verification",
+          "description": "Implement explicit cancelled and superseded dispositions with reason, actor, timestamp, and replacement reference where required. Preserve dependencies as written so cancelled or superseded prerequisites do not silently unblock dependents.",
+          "files_to_touch": ["src/cli/commands/work.ts", "src/cli/work/schema.ts", "src/cli/types.ts", "scripts/check-work-disposition.mjs"],
+          "context": "Disposal is terminal but not success. It must respect task status, current review history, expected revision, and the exact Work v1 disposition object. A replacement task must exist and cannot be inferred or auto-rewire existing dependencies.",
+          "acceptance_criteria": [
+            "dispose previews and applies only with an explicit kind, reason, actor, and expected revision; superseded requires a valid existing replacementTaskId, while cancelled has null replacementTaskId.",
+            "Disposed tasks are not eligible, are never counted as verified, and retain a task_disposed activity event; dependents remain blocked until an explicit task amendment changes their dependencies.",
+            "Invalid status, missing replacement, stale revision, and conflicting dependency cases fail without modifying Work bytes."
+          ],
+          "depends_on": ["T3.1"],
+          "scenario_refs": ["S15", "S21", "S23"]
+        },
+        {
+          "id": "T3.4",
+          "title": "Close and reopen Work with honest outcomes",
+          "description": "Implement preview-and-confirm Work close for completed or stopped outcomes, plus explicit reasoned reopen for closed Work. Derive verified, disposed, pending, blocked, and review-waiting counts from tasks; preserve closure history and reject reopening promoted Work.",
+          "files_to_touch": ["src/cli/commands/work.ts", "src/cli/work/schema.ts", "src/cli/work/store.ts", "scripts/check-work-closure.mjs"],
+          "context": "This closes Work only, never a Forge sprint or scope. completed requires every task to be verified or explicitly disposed; stopped may retain unfinished tasks but must list them. Closure state, handoff, activity, digest, finalRevision, and brief bytes must agree. If reopen cannot preserve the required closure metadata in v1, use a CLI-owned versioned history artifact before enabling it rather than losing history.",
+          "acceptance_criteria": [
+            "close requires explicit outcome, nonempty reason, actor, expected revision, and confirmation; preview enumerates verified, disposed, and every unresolved task without writing.",
+            "completed rejects pending, in-progress, blocked, or awaiting-review tasks; stopped identifies them and never reports the Work as completed. Both outcomes populate exact closure fields and a work_closed event.",
+            "reopen requires explicit preview, reason, actor, revision, and confirmation; it preserves prior closure provenance, clears current closure, derives a valid active or draft handoff, and rejects promoted Work.",
+            "Brief mismatch, stale revision, invalid transition, injected write failure, and retry are tested; no close or reopen path modifies Forge state."
+          ],
+          "depends_on": ["T3.2", "T3.3"],
+          "scenario_refs": ["S8", "S10", "S15", "S24"]
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Public entry and integration",
+      "objective": "Expose the Work path explicitly in supported hosts and prove that the complete lifecycle remains isolated from Forge.",
+      "tasks": [
+        {
+          "id": "T3.5",
+          "title": "Expose Work through supported command and skill surfaces",
+          "description": "Add an explicit Kyro Work public entry point and project it through supported adapter/install surfaces without changing existing Forge routing. The entry point must teach agents to request fresh Work context and write work.json only through the CLI.",
+          "files_to_touch": ["commands/work.md", "internal/skills/organic-work/SKILL.md", "providers/claude/commands/work.md", "src/cli/help.ts", "src/cli/core/capabilities.ts", "scripts/check-adapter-fixtures.mjs", "package.json"],
+          "context": "Inspect the existing command-to-skill and install projection contracts before choosing exact asset paths. New SKILL.md files require the repository's YAML frontmatter fields. Do not auto-select Work by plan size, alter Forge command behavior, install globally, bump a release version, or claim that task review is independent Forge QA. The workspace CLI already exposes core Work operations; this task is the supported public host surface.",
+          "acceptance_criteria": [
+            "A user can explicitly invoke Work from every supported host surface, and the documented router selects Work only on that invocation; existing Forge, Idea, QA, status, and install routes remain behaviorally unchanged.",
+            "The installed/projected Work skill and command assets have valid metadata, help, package inclusion, and bounded context guidance; fresh context routes to CLI status/context-pack before mutation.",
+            "Adapter and install/sync fixture tests prove additive projection, re-projection, and clean uninstall behavior without altering user-owned files or Forge state.",
+            "No release, global installation, or version bump occurs as part of this sprint without separate authorization."
+          ],
+          "depends_on": ["T3.4"],
+          "scenario_refs": ["S9", "S10", "S11", "S25"]
+        },
+        {
+          "id": "T3.6",
+          "title": "Verify the complete Sprint 3 lifecycle and documentation",
+          "description": "Update English Work documentation and run end-to-end disposable-workspace regression for amendment, disposition, close/reopen, public entry, packaging, and Forge byte isolation. Capture observed outcomes, limitations, and supported runtime boundaries before task review.",
+          "files_to_touch": ["docs/work.md", "scripts/check-work-lifecycle.mjs", "scripts/check-work-isolation.mjs", "scripts/check-cli-envelope.mjs", "package.json"],
+          "context": "Use the workspace build as the implementation under test; an older installed global runtime is not proof of new Work functionality. Keep maker-reported validations distinct from commands actually executed in the regression. Do not modify the existing smoke Work or the closed sprint archives merely to make tests pass.",
+          "acceptance_criteria": [
+            "A disposable workspace exercises plan, evidence, pass, task amendment, brief amendment, failed/stale re-review, disposal, completed/stopped close, and allowed reopen; each state and handoff validates after every mutation.",
+            "Security and crash/failure fixtures cover path confinement, atomicity, stale revisions, large-input bounds, and exact-key rejection for the new verbs, with Forge project/local/sprint bytes unchanged.",
+            "English CLI help and docs match required flags, truthful outcomes, unsupported global-runtime boundaries, and the explicit Work-vs-Forge QA distinction.",
+            "The workspace build, targeted Work checks, aggregate npm run check, artifact doctor, package dry-run, and git diff --check pass; any environment-only failure is reported with an exact reproduction and is not marked green."
+          ],
+          "depends_on": ["T3.2", "T3.3", "T3.4", "T3.5"],
+          "scenario_refs": ["S3", "S4", "S5", "S9", "S10", "S14", "S15", "S22", "S23", "S24", "S25"]
+        }
+      ]
+    }
+  ],
+  "definitionOfDone": [
+    "Every Sprint 3 task has current CLI-recorded evidence and a passing criterion-complete checker verdict.",
+    "Work amendments, disposition, close/reopen, and public entry pass adversarial lifecycle and Forge-isolation regression checks.",
+    "The workspace build and aggregate check suite pass, package and adapter artifacts are verified, and artifact doctor/analyze show no critical or high findings.",
+    "Independent Kyro QA is offered before sprint close; any blocking finding is remediated and re-reviewed before closure."
+  ],
+  "scenarios": [
+    {
+      "id": "S20",
+      "requirement": "R7",
+      "given": "A verified task or a Work brief has a current digest and a passing review",
+      "when": "the CLI applies a reasoned task or brief amendment at the expected revision",
+      "then": "the affected approval becomes non-current, the new contract is digest-bound, and historical activity remains auditable"
+    },
+    {
+      "id": "S21",
+      "requirement": "R5",
+      "given": "A dependent task references a prerequisite that is changed or disposed",
+      "when": "the CLI recomputes graph eligibility and handoff",
+      "then": "it never auto-rewires dependencies or starts the dependent before an explicit valid amendment"
+    },
+    {
+      "id": "S22",
+      "requirement": "R3",
+      "given": "A brief and work.json are valid before an amendment",
+      "when": "the update encounters a stale revision or an injected publication failure",
+      "then": "readers observe the prior accepted contract or a recoverable transaction, never an apparently approved mixed revision"
+    },
+    {
+      "id": "S23",
+      "requirement": "R8",
+      "given": "A task is cancelled or superseded with an explicit reason",
+      "when": "the Work is summarized or closed",
+      "then": "the task is counted as disposed rather than verified and unresolved dependents remain visible"
+    },
+    {
+      "id": "S24",
+      "requirement": "R8",
+      "given": "A Work is closed with a reason and retained closure provenance",
+      "when": "the user explicitly reopens it",
+      "then": "the CLI restores a valid actionable state without erasing the earlier closure or allowing a promoted Work to reopen"
+    },
+    {
+      "id": "S25",
+      "requirement": "R10",
+      "given": "A supported host installs or syncs Kyro assets in a workspace",
+      "when": "a user explicitly invokes the Work entry point",
+      "then": "the Work router is available and Forge command assets and state remain unchanged"
+    }
+  ]
+}

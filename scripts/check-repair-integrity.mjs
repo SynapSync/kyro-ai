@@ -36,6 +36,21 @@ function run(cwd, args) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', env: process.env });
 }
 
+function doctorPreservesIntegrity(result, scope) {
+  const output = result.stdout ?? '';
+  const failures = output.split(/\r?\n/).filter((line) => line.startsWith('[FAIL]'));
+  const requiredPasses = [
+    `[PASS] ${scope}/sprint.json:`,
+    `[PASS] ${scope}/checkpoint/`,
+    `[PASS] ${scope}/remediation/`,
+  ];
+  if (result.stderr?.trim() || !requiredPasses.every((marker) => output.includes(marker))) return false;
+  if (result.status === 0) return failures.length === 0;
+  return result.status === 1
+    && failures.length === 1
+    && /^\[FAIL\] CLI capabilities: installed runtime \([^)]+\) is missing tool-owned verb\(s\): work$/.test(failures[0]);
+}
+
 function sha256(value) {
   const input = typeof value === 'string' ? value : JSON.stringify(value);
   return createHash('sha256').update(input, 'utf8').digest('hex');
@@ -203,6 +218,16 @@ function registrySandbox() {
 
 function main() {
   if (!existsSync(cli)) throw new Error('dist/cli.js missing; run npm run build first');
+  const integrityPasses = [
+    '[PASS] live-scope/sprint.json: Schema shapes are valid.',
+    '[PASS] live-scope/checkpoint/sprint-001: APPLIED',
+    '[PASS] live-scope/remediation/R-001: APPLIED',
+  ].join('\n');
+  const knownCapabilitySkew = '[FAIL] CLI capabilities: installed runtime (5.0.1) is missing tool-owned verb(s): work';
+  assert(doctorPreservesIntegrity({ status: 1, stdout: `${knownCapabilitySkew}\n${integrityPasses}`, stderr: '' }, 'live-scope'), 'only the known external capability skew may be tolerated');
+  assert(!doctorPreservesIntegrity({ status: 1, stdout: `${knownCapabilitySkew}\n[FAIL] live-scope/checkpoint: broken\n${integrityPasses}`, stderr: '' }, 'live-scope'), 'an integrity failure must never be masked');
+  assert(!doctorPreservesIntegrity({ status: 1, stdout: knownCapabilitySkew, stderr: '' }, 'live-scope'), 'missing integrity PASS markers must fail');
+  assert(!doctorPreservesIntegrity({ status: 2, stdout: `${knownCapabilitySkew}\n${integrityPasses}`, stderr: '' }, 'live-scope'), 'unexpected doctor exit must fail');
   const identities = family.scopes.flatMap((scope) => scope.sprints.map((sprint) => ({ scope: scope.id, ...sprint })));
   assert(identities.length === 11, `family must list 11 checkpoints, got ${identities.length}`);
 
@@ -440,7 +465,7 @@ function main() {
     assert(readFileSync(firstRecordPath).equals(firstRecordBytes), 'same digest preserves remediation record bytes');
     assert(readFileSync(join(liveRoot, `.agents/kyro/scopes/${scope}/sprint.json`)).equals(firstSprintBytes), 'same digest preserves sprint bytes');
     const retryDoctor = run(liveRoot, ['doctor', '--artifacts', '--kyro-scope', scope]);
-    assert(retryDoctor.status === 0, `same digest must preserve doctor PASS: ${retryDoctor.stdout}\n${retryDoctor.stderr}`);
+    assert(doctorPreservesIntegrity(retryDoctor, scope), `same digest must preserve integrity doctor PASS: ${retryDoctor.stdout}\n${retryDoctor.stderr}`);
 
     const liveAfter = JSON.parse(readFileSync(join(liveRoot, `.agents/kyro/scopes/${scope}/sprint.json`), 'utf8'));
     delete liveAfter.remediations;
@@ -450,7 +475,7 @@ function main() {
     assert(readdirSync(remediationsDir).filter((file) => file.endsWith('.json')).length === 1, 'prepared resume reuses R-001');
     assert(readFileSync(firstRecordPath).equals(firstRecordBytes), 'prepared resume preserves R-001 bytes');
     const resumeDoctor = run(liveRoot, ['doctor', '--artifacts', '--kyro-scope', scope]);
-    assert(resumeDoctor.status === 0, `prepared resume must restore doctor PASS: ${resumeDoctor.stdout}\n${resumeDoctor.stderr}`);
+    assert(doctorPreservesIntegrity(resumeDoctor, scope), `prepared resume must restore integrity doctor PASS: ${resumeDoctor.stdout}\n${resumeDoctor.stderr}`);
 
     const evolved = JSON.parse(readFileSync(join(liveRoot, `.agents/kyro/scopes/${scope}/sprint.json`), 'utf8'));
     evolved.conventions.push({ id: 'process-3', rule: 'Third post-close convention.', tags: ['process'], addedSprint: 1 });
@@ -471,7 +496,7 @@ function main() {
     const secondRecord = JSON.parse(readFileSync(join(remediationsDir, recordsAfterSecond[1]), 'utf8'));
     assert(secondRecord.base.stateSha256 === firstRecord.result.stateSha256, 'R-002 base must equal R-001 result');
     const secondDoctor = run(liveRoot, ['doctor', '--artifacts', '--kyro-scope', scope]);
-    assert(secondDoctor.status === 0, `second evolution must preserve doctor PASS: ${secondDoctor.stdout}\n${secondDoctor.stderr}`);
+    assert(doctorPreservesIntegrity(secondDoctor, scope), `second evolution must preserve integrity doctor PASS: ${secondDoctor.stdout}\n${secondDoctor.stderr}`);
 
     const bogus = executeRemediationOperations(after, [{
       id: 'OP-001',

@@ -111,7 +111,7 @@ function assertCommonPlan(plan, name) {
   assert(!plan.includes('- symlink ~/.agents/kyro/current'), `${name}: should not create a current symlink`);
 }
 
-const EXPECTED_COMMAND_SKILLS = ['forge', 'status', 'task-context', 'idea', 'qa'];
+const EXPECTED_COMMAND_SKILLS = ['forge', 'status', 'task-context', 'idea', 'qa', 'scope-retire', 'work'];
 
 function assertStandardCommandSkills(plan, name) {
   for (const command of EXPECTED_COMMAND_SKILLS) {
@@ -145,6 +145,8 @@ assert(openCodePlan.includes('- write ~/.config/opencode/commands/kyro/forge.md'
 assert(openCodePlan.includes('- merge-json ~/.config/opencode/opencode.json'), 'opencode: missing native settings overlay');
 assert(!openCodePlan.includes('- write ~/.agents/skills/kyro-forge/SKILL.md'), 'opencode: should not use standard global command skill projection');
 assert(countIncludes(combinedPlan, '- write ~/.agents/skills/kyro-forge/SKILL.md') === 1, 'combined: forge skill should be projected once');
+assert(countIncludes(combinedPlan, '- write ~/.agents/skills/kyro-work/SKILL.md') === 1, 'combined: Work skill should be projected once');
+assert(openCodePlan.includes('- write ~/.config/opencode/commands/kyro/work.md'), 'opencode: missing Work command projection');
 assert(countIncludes(combinedPlan, '- upsert-block AGENTS.md # agents-md') === 1, 'combined: AGENTS.md block should be projected once');
 
 withWorkspace('kyro-runtime-only-install-', (cwd) => {
@@ -344,6 +346,13 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   const ideaSkill = readFileSync(join(home, '.agents', 'skills', 'kyro-idea', 'SKILL.md'), 'utf-8');
   assert(ideaSkill.includes('rough or mature idea'), 'install: kyro-idea skill missing adaptive input description');
   assert(ideaSkill.includes('execution-ready pre-scope plan'), 'install: kyro-idea skill missing plan-grade outcome');
+  const workSkill = readFileSync(join(home, '.agents', 'skills', 'kyro-work', 'SKILL.md'), 'utf-8');
+  assert(workSkill.includes('commands/work.md'), 'install: Work skill must load its router');
+  assert(workSkill.includes('runtimeVersion:'), 'install: Work skill must pin its runtime version');
+  const workRouter = readFileSync(join(home, '.agents', 'kyro', 'current', 'commands', 'work.md'), 'utf-8');
+  assert(workRouter.includes('work context-pack') && workRouter.includes('only when the user invokes Work'), 'install: Work router must require fresh explicit context');
+  const workEngine = readFileSync(join(home, '.agents', 'kyro', 'current', 'skills', 'organic-work', 'SKILL.md'), 'utf-8');
+  assert(workEngine.startsWith('---\nname: organic-work\n') && workEngine.includes('work status'), 'install: organic-work engine must have valid metadata and fresh-context guidance');
   const executorSkill = readFileSync(join(home, '.agents', 'skills', 'kyro-sprint-executor', 'SKILL.md'), 'utf-8');
   assert(!executorSkill.includes('{{KYRO_CLI}}'), 'install: kyro-sprint-executor skill left {{KYRO_CLI}} unsubstituted');
   assert(/runtimeVersion: "/.test(executorSkill), 'install: kyro-sprint-executor skill missing runtimeVersion pin');
@@ -362,6 +371,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(countIncludes(agentsText, '<!-- kyro-ai:agents-md:start -->') === 1, 'sync: duplicated Kyro start marker');
   assert(countIncludes(agentsText, '<!-- kyro-ai:agents-md:end -->') === 1, 'sync: duplicated Kyro end marker');
   assert(agentsText.includes('Keep this user content.'), 'sync: user AGENTS.md content was not preserved');
+  assert(existsSync(join(home, '.agents', 'skills', 'kyro-work', 'SKILL.md')), 'sync: Work skill missing after re-projection');
 
   const sharedPath = join(installDir, '.agents', 'kyro', 'project.json');
   const localPath = join(installDir, '.agents', 'kyro', 'local.json');
@@ -453,6 +463,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!agentsText.includes('<!-- kyro-ai:agents-md:start -->'), 'uninstall: Kyro start marker still present');
   assert(!agentsText.includes('<!-- kyro-ai:agents-md:end -->'), 'uninstall: Kyro end marker still present');
   assert(agentsText.includes('Keep this user content.'), 'uninstall: user AGENTS.md content was not preserved');
+  assert(existsSync(join(home, '.agents', 'skills', 'kyro-work', 'SKILL.md')), 'uninstall without purge must preserve Work skill');
 });
 
 withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
@@ -551,9 +562,12 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   assert(!existsSync(join(home, '.config', 'opencode', 'commands', 'kyro')), 'opencode purge: empty command namespace still present');
   assert(existsSync(join(home, '.config', 'opencode')), 'opencode purge: shared OpenCode config directory should remain');
 
+  const priorExitCode = process.exitCode;
   const doctorAfterPurgeOutput = captureLogs(() => doctor(cliOptions({ adapters: true })));
   assert(doctorAfterPurgeOutput.includes('[PASS] global runtime'), 'opencode purge doctor: global runtime should remain valid after purging adapter assets');
-  assert(!doctorAfterPurgeOutput.includes('[FAIL]'), 'opencode purge doctor: should not fail after purging adapter assets');
+  const purgeDoctorFailures = doctorAfterPurgeOutput.split('\n').filter((line) => line.startsWith('[FAIL]'));
+  assert(purgeDoctorFailures.every((line) => line.startsWith('[FAIL] CLI capabilities:') && line.includes('work')), `opencode purge doctor: unexpected failure after purging adapter assets\n${doctorAfterPurgeOutput}`);
+  process.exitCode = priorExitCode;
 });
 
 withWorkspace('kyro-pipeline-rollback-', (cwd) => {

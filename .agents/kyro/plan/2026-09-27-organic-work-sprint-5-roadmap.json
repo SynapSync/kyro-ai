@@ -1,0 +1,9 @@
+{
+  "reason": "Expand organic-work after the senior cross-feature audit found that artifact doctor silently skips an unsafe Work root and does not audit Work-only workspaces. Sprint 4 remains immutable; release and global installation remain separate owner-gated work.",
+  "add": [
+    {
+      "slug": "work-artifact-doctor-hardening",
+      "title": "Work Artifact Doctor Hardening"
+    }
+  ]
+}

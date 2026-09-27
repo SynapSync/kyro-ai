@@ -30,6 +30,7 @@ export const TOOL_OWNED_VERBS = [
   'scenario',
   'scope',
   'status',
+  'work',
 ] as const;
 
 export interface CapabilitiesPayload {

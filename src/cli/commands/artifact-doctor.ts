@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
@@ -46,6 +46,8 @@ import {
   hasPersistedProjectStateOnDisk,
   readProjectState,
 } from '../state';
+import { assertBriefIntegrity, assertPromotionReciprocal, readWork } from '../work/store';
+import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 
 export interface ArtifactAuditOptions {
   kyroScope: string | null;
@@ -142,11 +144,74 @@ export function runArtifactAuditChecks(options: ArtifactAuditOptions): CheckResu
   const scopeNames = resolveScopeNames(projectState.scopes, projectState.activeScope, options.kyroScope);
   if (scopeNames.length === 0) {
     checks.push(warn('artifact scopes', 'no scopes found', 'Run /kyro:forge (INIT) to create the first scope.'));
+    checks.push(...checkWorkPromotionLinks());
     return checks;
   }
 
   for (const scope of scopeNames) checks.push(...checkScope(scope));
+  checks.push(...checkWorkPromotionLinks());
   return checks;
+}
+
+/**
+ * Work promotion link audit. Returns no checks when no Work directories exist
+ * so Forge-only workspaces see zero behavior change. Otherwise every Work
+ * with a pending intent or a promoted state must verify exactly like
+ * `work status` does: a promoted Work is never healthy on work.json activity
+ * alone, and a pending intent is a blocker with a concrete retry remedy.
+ */
+function checkWorkPromotionLinks(): CheckResult[] {
+  const rootPath = '.agents/kyro/work';
+  const root = resolveManagedPath(rootPath);
+  const remedy = 'Restore a real, readable Work directory inside this workspace; do not replace managed paths with symbolic links.';
+  let before: ReturnType<typeof lstatSync>;
+  try {
+    before = lstatSync(root);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    return [fail('Work root', `cannot inspect ${rootPath}: ${messageOf(error)}`, remedy)];
+  }
+  if (before.isSymbolicLink()) return [fail('Work root', `${rootPath} is a symbolic link`, remedy)];
+  if (!before.isDirectory()) return [fail('Work root', `${rootPath} is not a directory`, remedy)];
+  let entries: string[];
+  try {
+    assertSafeManagedPath(rootPath);
+    entries = readdirSync(root);
+    const after = lstatSync(root);
+    if (!after.isDirectory() || after.isSymbolicLink() || after.dev !== before.dev || after.ino !== before.ino) {
+      return [fail('Work root', `${rootPath} changed while being listed`, remedy)];
+    }
+  } catch (error) {
+    return [fail('Work root', `cannot safely list ${rootPath}: ${messageOf(error)}`, remedy)];
+  }
+  const workIds = entries.filter((entry) => !entry.startsWith('.'));
+  if (workIds.length === 0) return [];
+  const checks: CheckResult[] = [];
+  for (const id of workIds) {
+    const name = `Work ${id} promotion`;
+    if (!existsSync(resolveManagedPath(`.agents/kyro/work/${id}/work.json`))) {
+      checks.push(warn(name, 'no work.json found in the Work directory', 'Remove the leftover directory or recreate the Work through kyro work create.'));
+      continue;
+    }
+    try {
+      const work = readWork(id);
+      assertBriefIntegrity(work);
+      assertPromotionReciprocal(work);
+      checks.push(pass(name, work.state === 'promoted' ? 'promotion state verified against its reciprocal link.' : 'no pending promotion; reciprocal check not applicable.'));
+    } catch (error) {
+      checks.push(fail(name, messageOf(error), remedyOf(error)));
+    }
+  }
+  return checks;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function remedyOf(error: unknown): string {
+  const remedy = (error as { remedy?: unknown }).remedy;
+  return typeof remedy === 'string' && remedy ? remedy : 'Restore the CLI-published Work and reciprocal link; never hand-edit managed state.';
 }
 
 export function inspectScope(scope: string): CheckResult[] {

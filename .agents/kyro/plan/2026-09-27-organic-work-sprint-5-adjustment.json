@@ -1,0 +1,18 @@
+{
+  "sprint": {
+    "n": 5,
+    "slug": "work-artifact-doctor-hardening"
+  },
+  "reason": "The shared managed-path guard rejects a symlinked .agents/kyro ancestor before artifact doctor emits checks. Require that earlier failure while retaining a named Work-root check when the Work root itself is unsafe or unreadable.",
+  "tasks": [
+    {
+      "id": "T5.1",
+      "acceptance_criteria": [
+        "A Forge-only workspace with no Work root retains the existing no-Work behavior; a healthy Work-only workspace receives a Work diagnostic despite having no Forge scope.",
+        "A Work root that is a symlink, a regular file, or unreadable fails doctor with a named Work-root check and actionable remedy instead of silently producing zero Work checks; an unsafe symlink ancestor fails closed in the shared managed-path guard before artifact checks.",
+        "Disposable fixtures prove the unsafe-root cases, healthy Work with Forge scopes, Work status fail-closed behavior, and byte isolation of unrelated Forge project/local/sprint files.",
+        "Build, targeted Work and Forge checks, full npm run check, adapter checks, artifact doctor, analyze, package dry-run, and git diff --check pass or have explicitly reported environment-only limits; no release, version bump, global installation, commit, or push is claimed."
+      ]
+    }
+  ]
+}

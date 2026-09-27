@@ -1,0 +1,1396 @@
+{
+  "schemaVersion": 1,
+  "kind": "kyro.sprint-close-checkpoint",
+  "checkpointId": "b0fd92b6ad59beafe0137672225ac8f68c677790bcccd56603cb89b7b84879d9",
+  "createdAt": "2026-09-26T23:28:26.917Z",
+  "identity": {
+    "scope": "organic-work",
+    "sprintN": 2,
+    "sprintSlug": "task-execution-and-review"
+  },
+  "close": {
+    "outcome": "shipped",
+    "note": "Sprint 2 shipped after approved-with-notes QA. Plan Sprint 3 for amendments, closure, public entry, and installation; retain future scenario coverage S14-S16 for Sprint 4.",
+    "summary": "Delivered CLI-owned Work task planning, dependency-safe execution, evidence capture, and criterion-complete review with Forge isolation.",
+    "recommendations": [
+      "Implement CLI-owned brief and task amendments with revision invalidation and preserved history.",
+      "Implement Work closure with explicit dispositions and truthful partial outcomes.",
+      "Expose Work through the supported public command and installation surfaces without changing Forge behavior."
+    ],
+    "learnings": [
+      "Action-specific context packs and dependency handoffs need adversarial lifecycle tests, not only schema validation.",
+      "Evidence provenance and reviewer identity are workflow claims, not authenticated execution or independent QA.",
+      "Large Work graphs require bounded input, iterative cycle detection, indexed lookup, and complete JSON output."
+    ]
+  },
+  "paths": {
+    "legacySnapshot": ".agents/kyro/scopes/organic-work/archive/sprint-002-task-execution-and-review.json",
+    "narrative": ".agents/kyro/scopes/organic-work/archive/sprint-002-task-execution-and-review.md"
+  },
+  "beforeClose": {
+    "schemaVersion": 4,
+    "scope": "organic-work",
+    "title": "Kyro Work",
+    "status": "planning",
+    "objective": "Entregar un camino Kyro Work de elección explícita para ejecutar cualquier plan mediante tareas verificables y estado escrito sólo por CLI, preservando los contratos actuales de Forge.",
+    "successCriteria": [
+      "Una persona puede elegir Work para un plan de cualquier tamaño y completar tareas con dependencias, evidencia y revisión sin crear un scope o sprint para ese plan.",
+      "Cada cambio de work.json proviene de un comando CLI que valida el esquema exacto, la revisión esperada y la transición antes de persistir.",
+      "Después de una sesión nueva, un context pack de Work identifica la próxima acción y tarea elegible sin consultar un scope.",
+      "Cambios de brief, tarea o evidencia invalidan aprobaciones afectadas y el cierre nunca oculta trabajo pendiente.",
+      "Los comandos Work no modifican estado Forge existente, y la promoción explícita a Forge mantiene un enlace de origen y destino verificable."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Work se crea y continúa únicamente por elección explícita del usuario, sin restricciones de complejidad, duración o número conceptual de tareas.",
+          "priority": "must",
+          "rationale": "Decisión del usuario: Forge y Work son métodos distintos; la complejidad no selecciona el camino."
+        },
+        {
+          "id": "R2",
+          "statement": "El estado Work usa un work.json v1 de claves exactas, tipos concretos, referencias válidas y transiciones coherentes.",
+          "priority": "must",
+          "rationale": "El contrato normativo y todos los campos se definen en el plan Idea 2026-09-26-organic-work.md; rechazar claves desconocidas evita ambigüedad."
+        },
+        {
+          "id": "R3",
+          "statement": "El CLI es el único escritor de work.json y protege cada mutación mediante validación, revisión esperada, bloqueo y persistencia segura.",
+          "priority": "must",
+          "rationale": "Evita que agentes construyan manualmente estados o aprobaciones inválidos; dry-run debe permanecer de sólo lectura."
+        },
+        {
+          "id": "R4",
+          "statement": "Cada Work mantiene un brief legible ligado por digest a su estado y, si existe, a la Idea de origen.",
+          "priority": "must",
+          "rationale": "La intención humana permanece rastreable y las ediciones externas del brief no cambian silenciosamente el contrato vigente."
+        },
+        {
+          "id": "R5",
+          "statement": "Work permite planificar y ejecutar tareas con criterios, dependencias acíclicas y bloqueo explícito sin habilitar dependientes de tareas no verificadas.",
+          "priority": "must",
+          "rationale": "Un plan puede evolucionar, pero el orden y la cobertura deben reflejar el grafo de trabajo real."
+        },
+        {
+          "id": "R6",
+          "statement": "La evidencia y la revisión de cada tarea son registradas por CLI y un pass cubre todos los criterios vigentes y material no obsoleto.",
+          "priority": "must",
+          "rationale": "Reutiliza la garantía maker/checker de Kyro sin heredar sprint.json ni afirmar certificación integral."
+        },
+        {
+          "id": "R7",
+          "statement": "Las enmiendas al brief o a tareas invalidan aprobaciones afectadas y preservan razón e historial de cambio.",
+          "priority": "must",
+          "rationale": "La adaptación orgánica no puede conservar un pass anterior sobre un contrato distinto."
+        },
+        {
+          "id": "R8",
+          "statement": "El cierre distingue trabajo verificado, dispuesto y pendiente, y exige una razón explícita para detener trabajo incompleto.",
+          "priority": "must",
+          "rationale": "Ninguna tarea desaparece ni un cierre parcial se presenta como resultado completo."
+        },
+        {
+          "id": "R9",
+          "statement": "Status y context pack Work muestran un siguiente paso determinista y suficiente para reanudar sin leer estado Forge.",
+          "priority": "must",
+          "rationale": "La reanudación debe funcionar después de compactación o cambio de agente con contexto acotado."
+        },
+        {
+          "id": "R10",
+          "statement": "Los artefactos Work pueden versionarse en Git y se instalan/proyectan mediante los hosts soportados sin cambiar comandos Forge existentes.",
+          "priority": "must",
+          "rationale": "La configuración ignore actual excluye .agents/kyro/work; empaquetado y proyección requieren pruebas de compatibilidad."
+        },
+        {
+          "id": "R11",
+          "statement": "Todas las operaciones Work mantienen aislados project.json, local.json y sprint.json y rechazan rutas inseguras, symlinks y estados corruptos.",
+          "priority": "must",
+          "rationale": "Protege seguridad y comportamiento actual de Forge; se comprueba con snapshots y pruebas de fallos."
+        },
+        {
+          "id": "R12",
+          "statement": "Una promoción Work a Forge requiere solicitud explícita, vista previa y vínculo recíproco verificable antes de marcar Work como promovido.",
+          "priority": "must",
+          "rationale": "La convergencia futura transfiere sólo trabajo pendiente válido y nunca equipara revisión Work con QA Forge."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R2",
+          "given": "un documento work.json v1 con todas las claves y referencias válidas",
+          "when": "el CLI valida su forma y coherencia",
+          "then": "lo acepta sin agregar ni eliminar campos"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "un documento con clave extra, ID duplicado, ciclo o estado incompatible con su evidencia",
+          "when": "el CLI lo valida",
+          "then": "rechaza la entrada con ubicación precisa y sin escritura"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "dos escrituras sobre la misma revisión Work",
+          "when": "la primera se aplica y la segunda usa la revisión anterior",
+          "then": "la segunda falla como conflicto y conserva el resultado de la primera"
+        },
+        {
+          "id": "S4",
+          "requirement": "R11",
+          "given": "un ID o ruta con escape, symlink o componente no-directorio",
+          "when": "se prepara una mutación Work",
+          "then": "se rechaza antes de escribir dentro o fuera del workspace"
+        },
+        {
+          "id": "S5",
+          "requirement": "R3",
+          "given": "un Work existente válido y un fallo inyectado en validación o persistencia",
+          "when": "se intenta actualizar o hacer dry-run",
+          "then": "el Work previo sigue íntegro y dry-run no modifica disco"
+        },
+        {
+          "id": "S6",
+          "requirement": "R4",
+          "given": "una Idea o brief suficiente y un ID libre",
+          "when": "el usuario invoca kyro work create",
+          "then": "el CLI genera brief.md y work.json ligados por digest sin registrar un scope"
+        },
+        {
+          "id": "S7",
+          "requirement": "R9",
+          "given": "un Work draft sin tareas",
+          "when": "otra sesión consulta status o context-pack",
+          "then": "recibe plan_tasks con ID y revisión, nunca done"
+        },
+        {
+          "id": "S8",
+          "requirement": "R4",
+          "given": "un brief ausente o cambiado fuera del CLI",
+          "when": "se consulta o muta el Work",
+          "then": "se expone mismatch o fallo sin aprobar trabajo obsoleto"
+        },
+        {
+          "id": "S9",
+          "requirement": "R10",
+          "given": "un workspace con .gitignore actual y un nuevo Work",
+          "when": "se revisa git check-ignore",
+          "then": "brief.md y work.json son rastreables y local.json/trace siguen ignorados"
+        },
+        {
+          "id": "S10",
+          "requirement": "R11",
+          "given": "un workspace con scope/sprint Forge preexistentes",
+          "when": "se ejecutan create, status y context-pack Work",
+          "then": "los bytes de project.json, local.json y todos los sprint.json permanecen idénticos"
+        },
+        {
+          "id": "S11",
+          "requirement": "R1",
+          "given": "Un usuario tiene un plan de cualquier tamaño",
+          "when": "invoca Work explícitamente",
+          "then": "Work se inicia sin aplicar una heurística de complejidad y Forge no cambia de ruta"
+        },
+        {
+          "id": "S12",
+          "requirement": "R5",
+          "given": "Un Work contiene tareas con dependencias y una predecesora sin verificar",
+          "when": "el CLI calcula tareas elegibles",
+          "then": "la dependiente permanece bloqueada y las independientes pueden continuar"
+        },
+        {
+          "id": "S13",
+          "requirement": "R6",
+          "given": "Una tarea tiene criterios vigentes y evidencia registrada",
+          "when": "el checker intenta aprobarla",
+          "then": "el CLI exige cobertura de todos los criterios y digest vigente antes de guardar pass"
+        },
+        {
+          "id": "S14",
+          "requirement": "R7",
+          "given": "Una tarea tiene veredicto pass",
+          "when": "se enmienda su brief, criterio o evidencia",
+          "then": "la aprobación afectada se invalida y se exige revisión nueva"
+        },
+        {
+          "id": "S15",
+          "requirement": "R8",
+          "given": "Un Work contiene tareas verificadas y tareas pendientes",
+          "when": "el usuario solicita cierre",
+          "then": "el CLI distingue completed de stopped y hace visibles las tareas sin resolver"
+        },
+        {
+          "id": "S16",
+          "requirement": "R12",
+          "given": "Un Work tiene trabajo pendiente y un destino Forge elegido",
+          "when": "el usuario solicita promoción explícita",
+          "then": "el CLI previsualiza la transferencia y sólo confirma promoted con enlace recíproco verificable"
+        },
+        {
+          "id": "S17",
+          "requirement": "R5",
+          "given": "A Work plan proposal has duplicate task IDs, a missing dependency, or a cycle",
+          "when": "the CLI previews or applies the plan",
+          "then": "it reports the invalid graph and preserves the prior Work state"
+        },
+        {
+          "id": "S18",
+          "requirement": "R5",
+          "given": "A task is explicitly blocked while another independent task is eligible",
+          "when": "the CLI derives the next task and an agent tries to start a dependent task",
+          "then": "the independent task remains runnable and the dependent start is rejected until its prerequisite is verified"
+        },
+        {
+          "id": "S19",
+          "requirement": "R6",
+          "given": "Task evidence is stale, incomplete, failed, or not_run for a current criterion",
+          "when": "a checker requests pass",
+          "then": "the CLI rejects approval without a verified state or a misleading pass verdict"
+        }
+      ],
+      "nonGoals": [
+        "Seleccionar Work o Forge automáticamente según tamaño o dificultad.",
+        "Permitir edición manual de work.json como parte del flujo normal o reparación.",
+        "Cambiar el esquema, enrutamiento, cierre o QA actual de Forge.",
+        "Migrar Forge a Work en la primera versión o mantener estado vivo compartido entre ambos.",
+        "Ejecutar delegados por defecto o declarar QA integral a partir de revisiones de tarea."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 4,
+      "sizingRationale": "Cuatro incrementos con objetivos verificables: (1) contrato exacto, persistencia segura, create/status/context pack e aislamiento; (2) grafo de tareas, evidencia y revisión; (3) enmiendas, cierre, entrada pública e instalación; (4) promoción Work a Forge y certificación integral. La promoción depende de los contratos y pruebas previos; los sprints posteriores pueden ajustarse mediante CLI tras la evidencia, sin adelantar ejecución ni cierre.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "contract-and-safe-foundation",
+          "title": "Contrato Work y base segura",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "task-execution-and-review",
+          "title": "Task Execution and Review",
+          "state": "active"
+        },
+        {
+          "n": 3,
+          "slug": "organic-change-and-public-entry",
+          "title": "Cambio orgánico, cierre y entrada pública",
+          "state": "planned"
+        },
+        {
+          "n": 4,
+          "slug": "forge-promotion-and-certification",
+          "title": "Promoción a Forge y certificación",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "contract-and-safe-foundation",
+        "outcome": "shipped",
+        "closedAt": "2026-09-26",
+        "archive": "archive/sprint-001-contract-and-safe-foundation.md",
+        "snapshot": "archive/sprint-001-contract-and-safe-foundation.json",
+        "checkpoint": "archive/sprint-001-contract-and-safe-foundation.checkpoint.json",
+        "checkpointSha256": "ce512aeeb44698d7b802988f1fffcd4ae880ebc294e6703571814fdbb576bdab"
+      }
+    ],
+    "previousSprint": {
+      "n": 1,
+      "slug": "contract-and-safe-foundation",
+      "outcome": "shipped",
+      "summary": "Definir y probar el contrato Work v1, materializar de forma segura un Work y reanudarlo mediante status/context pack sin alterar estado Forge."
+    },
+    "activeSprint": {
+      "n": 2,
+      "slug": "task-execution-and-review",
+      "title": "Task Execution and Review",
+      "objective": "Deliver CLI-owned Work task planning, dependency-safe execution, evidence recording, and criterion-complete review while preserving the independent Forge state.",
+      "status": "complete",
+      "phases": [
+        {
+          "id": "P1",
+          "title": "Validated task graph",
+          "objective": "Turn an explicit Work plan proposal into a valid, durable task graph and deterministic handoff.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.1",
+              "title": "Plan Work tasks through the CLI",
+              "description": "Implement kyro work plan using a structured proposal and expected revision. Validate exact task definitions, ordered Wn identifiers, nonempty unique criteria, safe file references, existing dependencies, and an acyclic graph before one atomic update. Activate a draft Work, append tasks_planned activity, and derive the handoff from the committed graph.",
+              "files_to_touch": [
+                "src/cli/commands/work.ts",
+                "src/cli/work/schema.ts",
+                "src/cli/work/store.ts",
+                "src/cli/types.ts",
+                "scripts/check-work-contract.mjs",
+                "scripts/check-work-store.mjs"
+              ],
+              "context": "The 2026-09-26 organic-work Idea plan is normative for work.json v1 and the proposed Work verbs. Preserve the exact schema, CLI-only writes, read-only dry-run, lock, expected-revision conflict, and confined atomic persistence established in Sprint 1. Work is chosen explicitly for any plan size; no scope or sprint is created. The project convention requires post-close live transitions to replay from checkpoint after-images through writer builders; this task does not alter the closed Sprint 1 or Forge lifecycle.",
+              "acceptance_criteria": [
+                "A valid proposal creates W1..Wn in stable order with definitionRevision 1, pending status, null evidence and verdict, a single revision increment, tasks_planned activity, and an active Work handoff.",
+                "Unknown fields, duplicate or skipped task IDs, duplicate criteria after normalization, unsafe paths, missing dependencies, self-dependencies, and cycles fail with a precise field or graph error and preserve the prior Work bytes.",
+                "Preview or dry-run reports the proposed graph without changing Work or Forge files; a stale expected revision or concurrent same-ID writer fails while preserving the winning update.",
+                "A valid graph with multiple tasks and independent branches is accepted without a policy limit on conceptual task count or complexity."
+              ],
+              "depends_on": [],
+              "scenario_refs": [
+                "S2",
+                "S3",
+                "S5",
+                "S12",
+                "S17"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Implemented CLI-owned Work task planning with exact proposal validation, normalized unique criteria, ordered W1..Wn identifiers, safe paths, dependency checks, cycle rejection, read-only preview, expected-revision conflict checks, atomic persistence, and deterministic handoff.",
+                "validation": [
+                  "npm run build — passed.",
+                  "npm run check:work-contract — passed.",
+                  "npm run check:work-plan — passed, including valid independent branches, preview preservation, invalid proposal rejection with unchanged bytes, and stale revision preservation.",
+                  "npm run check:work-store — passed.",
+                  "npm run check:work-isolation — passed.",
+                  "kyro doctor --artifacts --kyro-scope organic-work --json — passed all artifact checks."
+                ],
+                "files_changed": [
+                  "src/cli/commands/work.ts",
+                  "src/cli/work/schema.ts",
+                  "src/cli/work/store.ts",
+                  "src/cli/types.ts",
+                  "scripts/check-work-plan.mjs",
+                  "package.json"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-09-26T19:40:28.312Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "A valid proposal creates W1..Wn in stable order with definitionRevision 1, pending status, null evidence and verdict, a single revision increment, tasks_planned activity, and an active Work handoff.",
+                  "Unknown fields, duplicate or skipped task IDs, duplicate criteria after normalization, unsafe paths, missing dependencies, self-dependencies, and cycles fail with a precise field or graph error and preserve the prior Work bytes.",
+                  "Preview or dry-run reports the proposed graph without changing Work or Forge files; a stale expected revision or concurrent same-ID writer fails while preserving the winning update.",
+                  "A valid graph with multiple tasks and independent branches is accepted without a policy limit on conceptual task count or complexity."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-26T19:40:38.351Z",
+                "requestDigest": "72676a47e7a0b1c48ba342d3fa2356be214d331ee88e7980be7e440545a617b9",
+                "reviewedMaterialDigest": "ff83ba79cedda020c9b74e791e0567c69bfa4dbc2f01f8dcaf96ae035dcef301"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "title": "Dependency-safe execution",
+          "objective": "Expose eligible tasks and govern start, block, and unblock transitions without bypassing prerequisites.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.2",
+              "title": "Implement task eligibility and execution transitions",
+              "description": "Add CLI-owned start, block, and unblock transitions with expected revision and task activity. Derive eligible tasks and deterministic nextAction from task order, dependencies, blocked states, and review priority. Expose current task criteria, prerequisites, blockers, and executable CLI recipes in Work status and context-pack.",
+              "files_to_touch": [
+                "src/cli/commands/work.ts",
+                "src/cli/work/schema.ts",
+                "src/cli/work/store.ts",
+                "scripts/check-work-contract.mjs",
+                "scripts/check-work-store.mjs"
+              ],
+              "context": "Use the existing Work-only read model and never route through Forge. A predecessor enables a dependent only when verified; blocked, pending, cancelled, and superseded predecessors do not grant eligibility. A disposed dependency requires an explicit later plan change, not silent redirection. Sprint 3 owns task disposition and amendments; Sprint 2 must preserve their schema semantics. Keep the project checkpoint replay convention in mind if any Forge lifecycle path is touched; no such change is planned here.",
+              "acceptance_criteria": [
+                "The CLI can start an eligible pending task and records task_started with one revision increment; it rejects an ineligible dependent before writing.",
+                "Blocking records a nonempty reason and task_blocked activity; unblocking records task_unblocked and restores only the task's proper eligibility, with independent tasks still runnable.",
+                "Work status and context-pack identify the same deterministic next task, current revision, prerequisites, criteria, and blocker or review action after a fresh read.",
+                "A stale expected revision, unsafe task reference, or failed validation leaves Work and Forge bytes unchanged."
+              ],
+              "depends_on": [
+                "T2.1"
+              ],
+              "scenario_refs": [
+                "S3",
+                "S10",
+                "S12",
+                "S18"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Implemented Work start, block, and unblock transitions with CLI-stamped activity, revision preconditions, prerequisite eligibility checks, deterministic handoff, and task-aware status/context-pack views.",
+                "validation": [
+                  "npm run build — passed.",
+                  "npm run check:work-execution — passed; blocked W1 left independent W2 runnable, dependent W3 start failed without changing bytes, unblock restored W1 to pending, and stale revisions were rejected.",
+                  "npm run check:work-plan — passed.",
+                  "npm run check:work-contract — passed.",
+                  "npm run check:work-store — passed.",
+                  "npm run check:work-isolation — passed.",
+                  "kyro doctor --artifacts --kyro-scope organic-work --json — passed during T2.1 preflight; no Forge lifecycle source changed."
+                ],
+                "files_changed": [
+                  "src/cli/commands/work.ts",
+                  "src/cli/work/schema.ts",
+                  "scripts/check-work-execution.mjs",
+                  "package.json"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-09-26T19:43:44.428Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "The CLI can start an eligible pending task and records task_started with one revision increment; it rejects an ineligible dependent before writing.",
+                  "Blocking records a nonempty reason and task_blocked activity; unblocking records task_unblocked and restores only the task's proper eligibility, with independent tasks still runnable.",
+                  "Work status and context-pack identify the same deterministic next task, current revision, prerequisites, criteria, and blocker or review action after a fresh read.",
+                  "A stale expected revision, unsafe task reference, or failed validation leaves Work and Forge bytes unchanged."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-26T19:43:48.389Z",
+                "requestDigest": "d850cae0a2f05bd03e241979222fbae21d1b41c68749c7d4f1999e80ea6f123e",
+                "reviewedMaterialDigest": "aa7a6f9dca97b28781b566fc60561379ff77cdedf04d58ac4918552fa0165cbf"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P3",
+          "title": "Evidence and review",
+          "objective": "Bind real task evidence and independent review results to the current criteria and material digest.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.3",
+              "title": "Record current task evidence",
+              "description": "Implement kyro work record-evidence for an eligible in-progress task. Accept a bounded structured evidence proposal, retain the actual validation outcome and notes, calculate the material digest from the current brief and task definition, append evidence_recorded activity, and route the task to awaiting_review.",
+              "files_to_touch": [
+                "src/cli/commands/work.ts",
+                "src/cli/work/schema.ts",
+                "src/cli/work/store.ts",
+                "scripts/check-work-contract.mjs",
+                "scripts/check-work-store.mjs"
+              ],
+              "context": "Use the normative evidence object from the Idea plan: summary, nonempty validations with passed/failed/not_run results, filesChanged, notes, actor, CLI time, definitionRevision, and CLI-computed materialDigest. Keep failed and not_run results truthful. Do not persist raw tool transcripts or secrets. Evidence replacement after a pass belongs with Sprint 3 invalidation work; reject that transition until it is implemented. Preserve Work-only writes and the project checkpoint replay convention.",
+              "acceptance_criteria": [
+                "A valid evidence command creates exactly the normative evidence fields, binds the current brief and task definition, increments Work revision once, records evidence_recorded, and changes only the target task to awaiting_review.",
+                "Failed or not_run validations remain visible with their stated results and cannot be represented as passed by serialization or status routing.",
+                "A stale revision, brief digest mismatch, invalid evidence shape, unsafe file reference, or persistence failure leaves the prior Work and Forge state intact.",
+                "A pending dependency or verified task cannot receive evidence through an unsupported transition."
+              ],
+              "depends_on": [
+                "T2.1",
+                "T2.2"
+              ],
+              "scenario_refs": [
+                "S3",
+                "S5",
+                "S8",
+                "S12",
+                "S13"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Implemented bounded CLI-owned task evidence proposals. The command enforces exact input shape and truthful validation outcomes, computes material digests from the current brief and task definition, records CLI actor/time and evidence activity, and transitions only an eligible in-progress task to awaiting_review.",
+                "validation": [
+                  "npm run build — passed.",
+                  "npm run check:work-evidence — passed for pending-task rejection, read-only preview, exact evidence fields, digest binding, not_run visibility, invalid path preservation, and stale-revision preservation.",
+                  "npm run check:work-execution — passed.",
+                  "npm run check:work-plan — passed.",
+                  "npm run check:work-contract — passed.",
+                  "npm run check:work-store — passed.",
+                  "npm run check:work-isolation — passed.",
+                  "kyro doctor --artifacts --kyro-scope organic-work --json — passed."
+                ],
+                "files_changed": [
+                  "src/cli/commands/work.ts",
+                  "src/cli/work/schema.ts",
+                  "scripts/check-work-evidence.mjs",
+                  "package.json"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-09-26T19:46:51.338Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "A valid evidence command creates exactly the normative evidence fields, binds the current brief and task definition, increments Work revision once, records evidence_recorded, and changes only the target task to awaiting_review.",
+                  "Failed or not_run validations remain visible with their stated results and cannot be represented as passed by serialization or status routing.",
+                  "A stale revision, brief digest mismatch, invalid evidence shape, unsafe file reference, or persistence failure leaves the prior Work and Forge state intact.",
+                  "A pending dependency or verified task cannot receive evidence through an unsupported transition."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-26T19:46:55.820Z",
+                "requestDigest": "c35b3b4ff86f53ed22deeb8cff20d4ff707a9c8c2b8b3d302f1ae11a71c6432d",
+                "reviewedMaterialDigest": "17ef300562a00314890782c38ce6d8b5e187c36a92b2956ed68c8ff8d366fd02"
+              }
+            },
+            {
+              "id": "T2.4",
+              "title": "Review evidence against every current criterion",
+              "description": "Implement kyro work review for awaiting_review tasks. Verify exact criterion coverage, current definition revision, evidence digest, reviewed material digest, validation outcomes, and findings before a pass can mark a task verified. Record a fail verdict and return the task to in_progress when review fails.",
+              "files_to_touch": [
+                "src/cli/commands/work.ts",
+                "src/cli/work/schema.ts",
+                "src/cli/work/store.ts",
+                "scripts/check-work-contract.mjs",
+                "scripts/check-work-store.mjs"
+              ],
+              "context": "The Idea plan distinguishes task review from independent Forge QA. The CLI computes digests and timestamps; checker input reports actual checked criteria and findings. Enforce maker/checker separation only where an explicit policy requires it. A review must not certify absent tests, obsolete material, or a merely well-formed object. Sprint 3 owns invalidation after later brief/task/evidence amendments. Preserve the project checkpoint replay convention and Forge isolation.",
+              "acceptance_criteria": [
+                "Pass requires each current criterion exactly once, current evidence and material digests, passed recorded validations, and no critical finding; it stores a bound verdict and marks only the reviewed task verified.",
+                "Missing or extra checked criteria, a stale revision or digest, a critical finding, or failed/not_run validation prevents pass and leaves a precise diagnostic without a false approval.",
+                "Fail records review_recorded with findings and returns the task to in_progress; fresh evidence is required before another pass.",
+                "A newly verified predecessor can make its dependent eligible on the next derived handoff; task review never reports Forge QA certification."
+              ],
+              "depends_on": [
+                "T2.3"
+              ],
+              "scenario_refs": [
+                "S12",
+                "S13",
+                "S19"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Implemented CLI-owned Work task review with exact current-criterion coverage, fresh material/evidence digest checks, validation-result and critical-finding pass vetoes, tool-stamped verdicts, and fail-to-in_progress retry behavior requiring fresh evidence.",
+                "validation": [
+                  "npm run build — passed.",
+                  "npm run check:work-review — passed for incomplete/extra criteria, critical and not_run vetoes, failure routing, fresh evidence, digest binding, and dependent release.",
+                  "npm run check:work-evidence — passed.",
+                  "npm run check:work-execution — passed.",
+                  "npm run check:work-plan — passed.",
+                  "npm run check:work-contract — passed.",
+                  "npm run check:work-store — passed.",
+                  "npm run check:work-isolation — passed.",
+                  "kyro doctor --artifacts --kyro-scope organic-work --json — passed."
+                ],
+                "files_changed": [
+                  "src/cli/commands/work.ts",
+                  "src/cli/work/schema.ts",
+                  "scripts/check-work-review.mjs",
+                  "package.json"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-09-26T19:50:33.508Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "Pass requires each current criterion exactly once, current evidence and material digests, passed recorded validations, and no critical finding; it stores a bound verdict and marks only the reviewed task verified.",
+                  "Missing or extra checked criteria, a stale revision or digest, a critical finding, or failed/not_run validation prevents pass and leaves a precise diagnostic without a false approval.",
+                  "Fail records review_recorded with findings and returns the task to in_progress; fresh evidence is required before another pass.",
+                  "A newly verified predecessor can make its dependent eligible on the next derived handoff; task review never reports Forge QA certification."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-26T19:50:37.428Z",
+                "requestDigest": "187c885201cd2e1f39065822e6b39725171b629765a52e65adca6e1ec1caed90",
+                "reviewedMaterialDigest": "0f91baea8eecde5bb5bf99fddd0d1f0422cc50aa968eb1abd9c9eee7cafdb4ef"
+              }
+            }
+          ]
+        },
+        {
+          "id": "P4",
+          "title": "End-to-end verification",
+          "objective": "Prove the complete task lifecycle, isolated state, and honest failure handling before handing off later Work features.",
+          "status": "done",
+          "tasks": [
+            {
+              "id": "T2.5",
+              "title": "Verify the Work task lifecycle and document its CLI flow",
+              "description": "Run a real CLI sequence from create through plan, start, evidence, fail or pass review, and dependency release using disposable test workspaces. Add targeted regression checks and concise English CLI guidance for implementers and reviewers. Record actual commands and outcomes in Kyro task evidence during execution.",
+              "files_to_touch": [
+                "scripts/check-work-lifecycle.mjs",
+                "package.json",
+                "src/cli/help.ts",
+                "docs/work.md"
+              ],
+              "context": "The installed global Kyro 5.0.1 lacks the workspace Work command; use the checkout build for Work verification and report that distinction. Do not install or update the global runtime during this sprint without separate authorization. Preserve the historical smoke Work artifact. Sprint 3 owns amendments, dispose/close, public command projection and installation; Sprint 4 owns promotion. The Sprint 1 QA follow-ups require task_disposed for terminal dispositions before dispose and reject work_promoted on non-promoted Work before promotion. Record them as later acceptance gates. The project checkpoint replay convention remains applicable to any future Forge lifecycle transition.",
+              "acceptance_criteria": [
+                "A disposable multi-task Work proves that an independent task can progress while a dependent waits, and that a dependent becomes eligible only after its predecessor receives a valid pass.",
+                "Negative CLI runs cover invalid graphs, blocked predecessors, stale revisions, incomplete or stale evidence, failed review, and validation or write failure without corrupting the prior Work.",
+                "Before and after snapshots prove project.json, local.json, and all pre-existing sprint.json files are byte-identical across Work commands.",
+                "Targeted Work checks, build, relevant Forge regressions, and package checks have recorded real outcomes; documentation distinguishes Work task review from Forge QA and identifies the later Sprint 3 and Sprint 4 features."
+              ],
+              "depends_on": [
+                "T2.1",
+                "T2.2",
+                "T2.3",
+                "T2.4"
+              ],
+              "scenario_refs": [
+                "S3",
+                "S5",
+                "S10",
+                "S12",
+                "S13",
+                "S17",
+                "S18",
+                "S19"
+              ],
+              "status": "done",
+              "evidence": {
+                "summary": "Completed the disposable Work lifecycle regression, Forge-state byte snapshots, English CLI guidance, and task lifecycle help. The workspace build exposes Work; the installed global Kyro 5.0.1 still does not, and no global install/update was performed.",
+                "validation": [
+                  "npm run build — passed; dist/ freshness was also confirmed by npm run check:dist during the aggregate check.",
+                  "node dist/cli.js work --help — passed; all implemented task lifecycle commands are listed.",
+                  "npm run check:work-lifecycle — passed; plan/start/block/unblock/evidence/fail/pass/recovery/dependency-release flow and project.json/local.json/pre-existing sprint.json byte snapshots were verified in a disposable workspace.",
+                  "npm run check:work-review — passed.",
+                  "npm run check:work-evidence — passed.",
+                  "npm run check:work-execution — passed.",
+                  "npm run check:work-plan — passed.",
+                  "npm run check:work-contract — passed.",
+                  "npm run check:work-store — passed.",
+                  "npm run check:work-isolation — passed.",
+                  "npm run check:git-trackability — passed.",
+                  "npm run check:links — passed; all relative links valid across 89 files.",
+                  "Forge regressions: check:record-evidence, check:maker-checker, check:status, check:plan, check:lifecycle-replay, check:operation-snapshots, and check:capabilities all passed.",
+                  "npm run check — failed at check:repair-integrity because installed global Kyro 5.0.1 lacks the work capability; later checks were run separately where relevant and passed. No global update was performed."
+                ],
+                "files_changed": [
+                  "scripts/check-work-lifecycle.mjs",
+                  "package.json",
+                  "src/cli/help.ts",
+                  "docs/work.md"
+                ],
+                "by": "maker",
+                "recordedAt": "2026-09-26T19:58:49.738Z"
+              },
+              "verdict": {
+                "result": "pass",
+                "checked_criteria": [
+                  "A disposable multi-task Work proves that an independent task can progress while a dependent waits, and that a dependent becomes eligible only after its predecessor receives a valid pass.",
+                  "Negative CLI runs cover invalid graphs, blocked predecessors, stale revisions, incomplete or stale evidence, failed review, and validation or write failure without corrupting the prior Work.",
+                  "Before and after snapshots prove project.json, local.json, and all pre-existing sprint.json files are byte-identical across Work commands.",
+                  "Targeted Work checks, build, relevant Forge regressions, and package checks have recorded real outcomes; documentation distinguishes Work task review from Forge QA and identifies the later Sprint 3 and Sprint 4 features."
+                ],
+                "findings": [],
+                "by": "checker",
+                "reviewedAt": "2026-09-26T19:59:06.276Z",
+                "requestDigest": "fb99244eedf18804eca17feece493773b598eebf1347dbf42ad9f37fc5d77e3d",
+                "reviewedMaterialDigest": "5bfaa65ba7eca33604a2ec7fdb37533d85f92e52e12d32dc644608e497a890a3"
+              }
+            }
+          ]
+        }
+      ],
+      "emergentTasks": [
+        {
+          "id": "E1",
+          "title": "Make Work status and context-pack actionably correct",
+          "description": "Derive task eligibility and CLI recipes from actual state; provide sufficient task context and suppress mutations on brief anomalies.",
+          "files_to_touch": [
+            "src/cli/commands/work.ts",
+            "scripts/check-work-execution.mjs",
+            "docs/work.md"
+          ],
+          "context": "Owner review remediation E1; see English remediation plan.",
+          "acceptance_criteria": [
+            "Pending, in-progress, blocked, awaiting-review, and draft states expose only legal current-revision recipes, including evidence and review routes.",
+            "The selected task read model includes description, context, files to touch, criteria, prerequisites, and blocker; a brief anomaly exposes no mutation recipe.",
+            "State-by-state and default-handoff regression fixtures pass without changing Forge bytes."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S7",
+            "S8"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Corrected Work read-model eligibility and state-specific context-pack recipes, added task context and anomaly-safe routing, and covered draft, active, blocked, review, and anomaly states.",
+            "validation": [
+              "npm run build: passed",
+              "node scripts/check-work-execution.mjs: passed",
+              "node scripts/check-work-lifecycle.mjs: passed"
+            ],
+            "files_changed": [
+              "src/cli/commands/work.ts",
+              "scripts/check-work-execution.mjs",
+              "scripts/check-work-lifecycle.mjs",
+              "docs/work.md"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-26T21:30:47.572Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Pending, in-progress, blocked, awaiting-review, and draft states expose only legal current-revision recipes, including evidence and review routes.",
+              "The selected task read model includes description, context, files to touch, criteria, prerequisites, and blocker; a brief anomaly exposes no mutation recipe.",
+              "State-by-state and default-handoff regression fixtures pass without changing Forge bytes."
+            ],
+            "findings": [],
+            "by": "codex",
+            "reviewedAt": "2026-09-26T21:35:09.454Z",
+            "requestDigest": "31cfbf67929237d01ea6edc71642d24b02ba57888e912353c6ddc0c9323d65ad",
+            "reviewedMaterialDigest": "5a23c1c09acb99a1995bc5c2a380d6704c83e6e00038326680bb58d4ef51e64f"
+          }
+        },
+        {
+          "id": "E2",
+          "title": "Make failed-review blocking transitions coherent",
+          "description": "Preserve a failed review when an in-progress task is blocked and restore the valid remediation state on unblock.",
+          "files_to_touch": [
+            "src/cli/commands/work.ts",
+            "src/cli/work/schema.ts",
+            "scripts/check-work-execution.mjs"
+          ],
+          "context": "Owner review remediation E2; see English remediation plan.",
+          "acceptance_criteria": [
+            "Fail-review, block, status/context-pack, unblock, new evidence, and pass form a valid CLI-only lifecycle with coherent activity and revision increments.",
+            "Invalid or stale transitions fail with precise diagnostics and preserve Work and Forge bytes."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S18"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Preserved failed review evidence and verdict through block/unblock, restoring in-progress remediation and testing the complete retry lifecycle.",
+            "validation": [
+              "node scripts/check-work-review.mjs: passed",
+              "node scripts/check-work-contract.mjs: passed"
+            ],
+            "files_changed": [
+              "src/cli/commands/work.ts",
+              "src/cli/work/schema.ts",
+              "scripts/check-work-review.mjs"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-26T21:30:47.767Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Fail-review, block, status/context-pack, unblock, new evidence, and pass form a valid CLI-only lifecycle with coherent activity and revision increments.",
+              "Invalid or stale transitions fail with precise diagnostics and preserve Work and Forge bytes."
+            ],
+            "findings": [],
+            "by": "codex",
+            "reviewedAt": "2026-09-26T21:35:09.799Z",
+            "requestDigest": "c016077bbab116a1a134fdc6f94159dc857515097a35aa1b68fbcbc86cb7d616",
+            "reviewedMaterialDigest": "0acf09a980927420bdd828fc1b192137689602c7a0d895b837c35d8380129076"
+          }
+        },
+        {
+          "id": "E3",
+          "title": "Make Work evidence and checker trust boundary explicit",
+          "description": "Require explicit maker/checker identities for new evidence and review writes; prevent self-approval and document that validation outcomes are reported attestations, not CLI-executed tests.",
+          "files_to_touch": [
+            "src/cli/commands/work.ts",
+            "scripts/check-work-evidence.mjs",
+            "scripts/check-work-review.mjs",
+            "docs/work.md"
+          ],
+          "context": "Owner review remediation E3; see English remediation plan.",
+          "acceptance_criteria": [
+            "New evidence and review writes reject missing or placeholder actor identities, and pass rejects the evidence maker as checker without mutating Work.",
+            "Status and context-pack show actor and provenance accurately; docs/help distinguish reported validation from verified execution and task review from Forge QA.",
+            "Existing Work v1 files remain readable; negative and positive evidence/review fixtures pass."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S13",
+            "S19"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Required explicit maker/checker identities for new evidence and review writes, rejected self-approval, exposed maker-reported provenance, and documented the trust boundary without changing Work v1 stored keys.",
+            "validation": [
+              "node scripts/check-work-evidence.mjs: passed",
+              "node scripts/check-work-review.mjs: passed",
+              "node scripts/check-work-lifecycle.mjs: passed"
+            ],
+            "files_changed": [
+              "src/cli/commands/work.ts",
+              "scripts/check-work-evidence.mjs",
+              "scripts/check-work-review.mjs",
+              "docs/work.md"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-26T21:30:47.979Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "New evidence and review writes reject missing or placeholder actor identities, and pass rejects the evidence maker as checker without mutating Work.",
+              "Status and context-pack show actor and provenance accurately; docs/help distinguish reported validation from verified execution and task review from Forge QA.",
+              "Existing Work v1 files remain readable; negative and positive evidence/review fixtures pass."
+            ],
+            "findings": [],
+            "by": "codex",
+            "reviewedAt": "2026-09-26T21:35:10.175Z",
+            "requestDigest": "9e157956aa7d1ccebbd6100c747500a24028a63a77d305043fa3d0977dbdae51",
+            "reviewedMaterialDigest": "fe38e8efaaeb05341de926fd943c4f778a1879d3326db04c8211612902c7fe8c"
+          }
+        },
+        {
+          "id": "E4",
+          "title": "Harden large Work graphs and validate integration",
+          "description": "Remove recursive cycle detection and repeated dependency scans, enforce a clear proposal resource budget, and run long-chain/broad-graph regressions plus integration checks.",
+          "files_to_touch": [
+            "src/cli/commands/work.ts",
+            "src/cli/work/schema.ts",
+            "scripts/check-work-plan.mjs",
+            "scripts/check-work-contract.mjs"
+          ],
+          "context": "Owner review remediation E4; see English remediation plan.",
+          "acceptance_criteria": [
+            "Deep acyclic graphs and deep cycles are handled without stack overflow; broad independent graphs produce deterministic handoffs.",
+            "Oversized proposals fail clearly before state changes, with no conceptual policy cap on task count.",
+            "Focused Work checks, build, package, Forge isolation, artifact integrity, and diff hygiene pass or any environmental limitation is reported precisely."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S17",
+            "S11"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Replaced recursive cycle detection with iterative graph traversal, indexed status dependencies, bounded proposal bytes, and exercised long, deep-cycle, broad, and oversized proposals.",
+            "validation": [
+              "node scripts/check-work-plan.mjs: passed",
+              "npm run typecheck: passed",
+              "npm run check:dist: passed",
+              "npm run check:cli-envelope: passed",
+              "npm run check:cli-bundle: passed",
+              "npm run check:git-trackability: passed",
+              "kyro doctor --artifacts --kyro-scope organic-work --json: passed",
+              "npm pack --dry-run --json: passed",
+              "git diff --check: passed"
+            ],
+            "files_changed": [
+              "src/cli/commands/work.ts",
+              "src/cli/work/schema.ts",
+              "scripts/check-work-plan.mjs",
+              "docs/work.md"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-26T21:30:48.189Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Deep acyclic graphs and deep cycles are handled without stack overflow; broad independent graphs produce deterministic handoffs.",
+              "Oversized proposals fail clearly before state changes, with no conceptual policy cap on task count.",
+              "Focused Work checks, build, package, Forge isolation, artifact integrity, and diff hygiene pass or any environmental limitation is reported precisely."
+            ],
+            "findings": [],
+            "by": "codex",
+            "reviewedAt": "2026-09-26T21:35:10.533Z",
+            "requestDigest": "a1691229d7fa5fc9619e1398b78f28825ca3223e6dd15f99282849112df0801b",
+            "reviewedMaterialDigest": "9cef463e061c90a7e0d7663775b95cfe3a740f75ec0765027a3afd97078ec367"
+          }
+        },
+        {
+          "id": "E5",
+          "title": "Preserve complete large Work JSON envelopes",
+          "description": "Make machine-envelope stdout writes handle partial pipe writes so large Work plan/status responses remain valid JSON.",
+          "files_to_touch": [
+            "src/cli/core/cli-envelope.ts",
+            "scripts/check-work-plan.mjs",
+            "scripts/check-cli-envelope.mjs"
+          ],
+          "context": "Discovered while executing E4 long-graph verification; required for the same scalability objective.",
+          "acceptance_criteria": [
+            "A Work graph with thousands of tasks produces complete, parseable plan and status JSON envelopes through a piped CLI process.",
+            "Machine error and success envelopes remain single well-formed JSON lines without changing existing command phases.",
+            "Large-output and CLI envelope regressions pass, with no Forge state changes."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S17"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Changed machine JSON envelope output to use buffered stdout draining, preventing partial synchronous pipe writes; verified complete plan/status envelopes for a 2,500-task Work graph.",
+            "validation": [
+              "npm run build: passed",
+              "node scripts/check-work-plan.mjs: passed with 2500-task CLI JSON responses and 20000-node cycle detector probes",
+              "npm run check:cli-envelope: passed",
+              "node scripts/check-work-lifecycle.mjs: passed",
+              "npm run check:dist: passed",
+              "git diff --check: passed"
+            ],
+            "files_changed": [
+              "src/cli/core/cli-envelope.ts",
+              "scripts/check-work-plan.mjs",
+              ".agents/kyro/plan/2026-09-26-organic-work-sprint-2-remediation.md"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-26T21:34:26.932Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A Work graph with thousands of tasks produces complete, parseable plan and status JSON envelopes through a piped CLI process.",
+              "Machine error and success envelopes remain single well-formed JSON lines without changing existing command phases.",
+              "Large-output and CLI envelope regressions pass, with no Forge state changes."
+            ],
+            "findings": [],
+            "by": "codex",
+            "reviewedAt": "2026-09-26T21:35:10.854Z",
+            "requestDigest": "a9f0e01f4264774a544584f265e4b2441be037bd21ce8ff47de012ed590949d1",
+            "reviewedMaterialDigest": "902cbfa4853c84d68b5f22d94672af0ef7e152be941ec21cd59f742c573e8ab1"
+          }
+        },
+        {
+          "id": "E6",
+          "title": "Align Work help with required actor flags",
+          "description": "Correct Work usage syntax for evidence and review actor requirements and protect it with CLI help regression coverage.",
+          "files_to_touch": [
+            "src/cli/commands/work.ts",
+            "scripts/check-cli-envelope.mjs"
+          ],
+          "context": "Blocking Kyro QA finding; English remediation plan E6.",
+          "acceptance_criteria": [
+            "work --help marks --by <actor> required for record-evidence and review and optional for other Work mutations.",
+            "Help explains maker-reported validation and checker separation; CLI help and actor regression checks pass."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S19"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Replaced the contradictory Work usage line with state-specific command forms that require maker and checker actor flags only for evidence and review; added textual help regression assertions.",
+            "validation": [
+              "npm run build: passed",
+              "npm run check:cli-envelope: passed",
+              "npm run check:work-evidence: passed",
+              "npm run check:work-review: passed",
+              "npm run check: passed"
+            ],
+            "files_changed": [
+              "src/cli/commands/work.ts",
+              "scripts/check-cli-envelope.mjs"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-26T23:17:49.102Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "work --help marks --by <actor> required for record-evidence and review and optional for other Work mutations.",
+              "Help explains maker-reported validation and checker separation; CLI help and actor regression checks pass."
+            ],
+            "findings": [],
+            "by": "codex",
+            "reviewedAt": "2026-09-26T23:18:12.318Z",
+            "requestDigest": "19bc3479c785189aa16b4a00a6ad91aa1ac4007722a4d8dc2dc9a0cad27b89f0",
+            "reviewedMaterialDigest": "8471d35277d80115bcd65b6ca6deeec04e5b61f0f499a16c5dea9a6ac50b86cb"
+          }
+        },
+        {
+          "id": "E7",
+          "title": "Make integrity-repair regression independent of installed runtime skew",
+          "description": "Keep production doctor strict while making the integrity-repair fixture distinguish repair integrity failures from a separately installed CLI missing Work.",
+          "files_to_touch": [
+            "scripts/check-repair-integrity.mjs"
+          ],
+          "context": "Blocking Kyro QA finding; English remediation plan E7.",
+          "acceptance_criteria": [
+            "check:repair-integrity passes when the fixture doctor has only the known external CLI capability mismatch and all integrity checks pass.",
+            "The fixture still fails for any other doctor FAIL, missing required integrity PASS, or unexpected exit; production doctor behavior remains unchanged.",
+            "npm run check passes end to end, or the exact remaining failure is diagnosed and reported without a false pass."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S10"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Kept production doctor strict and made the integrity-repair fixture accept only the known external Work capability skew while requiring every relevant integrity PASS and rejecting unrelated failures or exits.",
+            "validation": [
+              "npm run check:repair-integrity: passed with 99 assertions",
+              "npm run check: passed end to end",
+              "kyro doctor --artifacts --kyro-scope organic-work --json: passed",
+              "npm pack --dry-run --json: passed",
+              "git diff --check: passed"
+            ],
+            "files_changed": [
+              "scripts/check-repair-integrity.mjs"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-26T23:17:49.289Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "check:repair-integrity passes when the fixture doctor has only the known external CLI capability mismatch and all integrity checks pass.",
+              "The fixture still fails for any other doctor FAIL, missing required integrity PASS, or unexpected exit; production doctor behavior remains unchanged.",
+              "npm run check passes end to end, or the exact remaining failure is diagnosed and reported without a false pass."
+            ],
+            "findings": [],
+            "by": "codex",
+            "reviewedAt": "2026-09-26T23:18:12.739Z",
+            "requestDigest": "d7e3a87468c1b3bb8bf1d9e2c1c6a697b01904fc1163f803007ff6b4eb6a3f52",
+            "reviewedMaterialDigest": "4c47a3f245f51a0bd6e73ba791e19dcf55fcc2277695a9b321f734fa3615fa55"
+          }
+        }
+      ],
+      "definitionOfDone": [
+        "Every Sprint 2 task has real CLI-recorded evidence and a passing task review against its stated criteria.",
+        "S12, S13, S17, S18, and S19 are demonstrated by executable Work CLI scenarios, including negative transitions and current digest checks.",
+        "The Work task lifecycle preserves exact work.json v1 semantics, expected revisions, atomic writes, honest validation results, and byte-identical Forge state.",
+        "The checkout build and targeted Work and Forge regressions have recorded outcomes; an installed-runtime capability mismatch is reported separately if still present.",
+        "Sprint 3 task disposition and amendment invalidation and Sprint 4 promotion checks remain explicit future gates; this sprint does not claim closure or Forge QA certification."
+      ]
+    },
+    "debt": [],
+    "handoff": {
+      "nextAction": "qa_or_close",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Task E7 passed checker review.",
+      "lastUpdated": "2026-09-26T23:18:12.739Z"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-09-26T13:07:07.681Z"
+    }
+  },
+  "intendedAfterClose": {
+    "schemaVersion": 4,
+    "scope": "organic-work",
+    "title": "Kyro Work",
+    "status": "planning",
+    "objective": "Entregar un camino Kyro Work de elección explícita para ejecutar cualquier plan mediante tareas verificables y estado escrito sólo por CLI, preservando los contratos actuales de Forge.",
+    "successCriteria": [
+      "Una persona puede elegir Work para un plan de cualquier tamaño y completar tareas con dependencias, evidencia y revisión sin crear un scope o sprint para ese plan.",
+      "Cada cambio de work.json proviene de un comando CLI que valida el esquema exacto, la revisión esperada y la transición antes de persistir.",
+      "Después de una sesión nueva, un context pack de Work identifica la próxima acción y tarea elegible sin consultar un scope.",
+      "Cambios de brief, tarea o evidencia invalidan aprobaciones afectadas y el cierre nunca oculta trabajo pendiente.",
+      "Los comandos Work no modifican estado Forge existente, y la promoción explícita a Forge mantiene un enlace de origen y destino verificable."
+    ],
+    "spec": {
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Work se crea y continúa únicamente por elección explícita del usuario, sin restricciones de complejidad, duración o número conceptual de tareas.",
+          "priority": "must",
+          "rationale": "Decisión del usuario: Forge y Work son métodos distintos; la complejidad no selecciona el camino."
+        },
+        {
+          "id": "R2",
+          "statement": "El estado Work usa un work.json v1 de claves exactas, tipos concretos, referencias válidas y transiciones coherentes.",
+          "priority": "must",
+          "rationale": "El contrato normativo y todos los campos se definen en el plan Idea 2026-09-26-organic-work.md; rechazar claves desconocidas evita ambigüedad."
+        },
+        {
+          "id": "R3",
+          "statement": "El CLI es el único escritor de work.json y protege cada mutación mediante validación, revisión esperada, bloqueo y persistencia segura.",
+          "priority": "must",
+          "rationale": "Evita que agentes construyan manualmente estados o aprobaciones inválidos; dry-run debe permanecer de sólo lectura."
+        },
+        {
+          "id": "R4",
+          "statement": "Cada Work mantiene un brief legible ligado por digest a su estado y, si existe, a la Idea de origen.",
+          "priority": "must",
+          "rationale": "La intención humana permanece rastreable y las ediciones externas del brief no cambian silenciosamente el contrato vigente."
+        },
+        {
+          "id": "R5",
+          "statement": "Work permite planificar y ejecutar tareas con criterios, dependencias acíclicas y bloqueo explícito sin habilitar dependientes de tareas no verificadas.",
+          "priority": "must",
+          "rationale": "Un plan puede evolucionar, pero el orden y la cobertura deben reflejar el grafo de trabajo real."
+        },
+        {
+          "id": "R6",
+          "statement": "La evidencia y la revisión de cada tarea son registradas por CLI y un pass cubre todos los criterios vigentes y material no obsoleto.",
+          "priority": "must",
+          "rationale": "Reutiliza la garantía maker/checker de Kyro sin heredar sprint.json ni afirmar certificación integral."
+        },
+        {
+          "id": "R7",
+          "statement": "Las enmiendas al brief o a tareas invalidan aprobaciones afectadas y preservan razón e historial de cambio.",
+          "priority": "must",
+          "rationale": "La adaptación orgánica no puede conservar un pass anterior sobre un contrato distinto."
+        },
+        {
+          "id": "R8",
+          "statement": "El cierre distingue trabajo verificado, dispuesto y pendiente, y exige una razón explícita para detener trabajo incompleto.",
+          "priority": "must",
+          "rationale": "Ninguna tarea desaparece ni un cierre parcial se presenta como resultado completo."
+        },
+        {
+          "id": "R9",
+          "statement": "Status y context pack Work muestran un siguiente paso determinista y suficiente para reanudar sin leer estado Forge.",
+          "priority": "must",
+          "rationale": "La reanudación debe funcionar después de compactación o cambio de agente con contexto acotado."
+        },
+        {
+          "id": "R10",
+          "statement": "Los artefactos Work pueden versionarse en Git y se instalan/proyectan mediante los hosts soportados sin cambiar comandos Forge existentes.",
+          "priority": "must",
+          "rationale": "La configuración ignore actual excluye .agents/kyro/work; empaquetado y proyección requieren pruebas de compatibilidad."
+        },
+        {
+          "id": "R11",
+          "statement": "Todas las operaciones Work mantienen aislados project.json, local.json y sprint.json y rechazan rutas inseguras, symlinks y estados corruptos.",
+          "priority": "must",
+          "rationale": "Protege seguridad y comportamiento actual de Forge; se comprueba con snapshots y pruebas de fallos."
+        },
+        {
+          "id": "R12",
+          "statement": "Una promoción Work a Forge requiere solicitud explícita, vista previa y vínculo recíproco verificable antes de marcar Work como promovido.",
+          "priority": "must",
+          "rationale": "La convergencia futura transfiere sólo trabajo pendiente válido y nunca equipara revisión Work con QA Forge."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "S1",
+          "requirement": "R2",
+          "given": "un documento work.json v1 con todas las claves y referencias válidas",
+          "when": "el CLI valida su forma y coherencia",
+          "then": "lo acepta sin agregar ni eliminar campos"
+        },
+        {
+          "id": "S2",
+          "requirement": "R2",
+          "given": "un documento con clave extra, ID duplicado, ciclo o estado incompatible con su evidencia",
+          "when": "el CLI lo valida",
+          "then": "rechaza la entrada con ubicación precisa y sin escritura"
+        },
+        {
+          "id": "S3",
+          "requirement": "R3",
+          "given": "dos escrituras sobre la misma revisión Work",
+          "when": "la primera se aplica y la segunda usa la revisión anterior",
+          "then": "la segunda falla como conflicto y conserva el resultado de la primera"
+        },
+        {
+          "id": "S4",
+          "requirement": "R11",
+          "given": "un ID o ruta con escape, symlink o componente no-directorio",
+          "when": "se prepara una mutación Work",
+          "then": "se rechaza antes de escribir dentro o fuera del workspace"
+        },
+        {
+          "id": "S5",
+          "requirement": "R3",
+          "given": "un Work existente válido y un fallo inyectado en validación o persistencia",
+          "when": "se intenta actualizar o hacer dry-run",
+          "then": "el Work previo sigue íntegro y dry-run no modifica disco"
+        },
+        {
+          "id": "S6",
+          "requirement": "R4",
+          "given": "una Idea o brief suficiente y un ID libre",
+          "when": "el usuario invoca kyro work create",
+          "then": "el CLI genera brief.md y work.json ligados por digest sin registrar un scope"
+        },
+        {
+          "id": "S7",
+          "requirement": "R9",
+          "given": "un Work draft sin tareas",
+          "when": "otra sesión consulta status o context-pack",
+          "then": "recibe plan_tasks con ID y revisión, nunca done"
+        },
+        {
+          "id": "S8",
+          "requirement": "R4",
+          "given": "un brief ausente o cambiado fuera del CLI",
+          "when": "se consulta o muta el Work",
+          "then": "se expone mismatch o fallo sin aprobar trabajo obsoleto"
+        },
+        {
+          "id": "S9",
+          "requirement": "R10",
+          "given": "un workspace con .gitignore actual y un nuevo Work",
+          "when": "se revisa git check-ignore",
+          "then": "brief.md y work.json son rastreables y local.json/trace siguen ignorados"
+        },
+        {
+          "id": "S10",
+          "requirement": "R11",
+          "given": "un workspace con scope/sprint Forge preexistentes",
+          "when": "se ejecutan create, status y context-pack Work",
+          "then": "los bytes de project.json, local.json y todos los sprint.json permanecen idénticos"
+        },
+        {
+          "id": "S11",
+          "requirement": "R1",
+          "given": "Un usuario tiene un plan de cualquier tamaño",
+          "when": "invoca Work explícitamente",
+          "then": "Work se inicia sin aplicar una heurística de complejidad y Forge no cambia de ruta"
+        },
+        {
+          "id": "S12",
+          "requirement": "R5",
+          "given": "Un Work contiene tareas con dependencias y una predecesora sin verificar",
+          "when": "el CLI calcula tareas elegibles",
+          "then": "la dependiente permanece bloqueada y las independientes pueden continuar"
+        },
+        {
+          "id": "S13",
+          "requirement": "R6",
+          "given": "Una tarea tiene criterios vigentes y evidencia registrada",
+          "when": "el checker intenta aprobarla",
+          "then": "el CLI exige cobertura de todos los criterios y digest vigente antes de guardar pass"
+        },
+        {
+          "id": "S14",
+          "requirement": "R7",
+          "given": "Una tarea tiene veredicto pass",
+          "when": "se enmienda su brief, criterio o evidencia",
+          "then": "la aprobación afectada se invalida y se exige revisión nueva"
+        },
+        {
+          "id": "S15",
+          "requirement": "R8",
+          "given": "Un Work contiene tareas verificadas y tareas pendientes",
+          "when": "el usuario solicita cierre",
+          "then": "el CLI distingue completed de stopped y hace visibles las tareas sin resolver"
+        },
+        {
+          "id": "S16",
+          "requirement": "R12",
+          "given": "Un Work tiene trabajo pendiente y un destino Forge elegido",
+          "when": "el usuario solicita promoción explícita",
+          "then": "el CLI previsualiza la transferencia y sólo confirma promoted con enlace recíproco verificable"
+        },
+        {
+          "id": "S17",
+          "requirement": "R5",
+          "given": "A Work plan proposal has duplicate task IDs, a missing dependency, or a cycle",
+          "when": "the CLI previews or applies the plan",
+          "then": "it reports the invalid graph and preserves the prior Work state"
+        },
+        {
+          "id": "S18",
+          "requirement": "R5",
+          "given": "A task is explicitly blocked while another independent task is eligible",
+          "when": "the CLI derives the next task and an agent tries to start a dependent task",
+          "then": "the independent task remains runnable and the dependent start is rejected until its prerequisite is verified"
+        },
+        {
+          "id": "S19",
+          "requirement": "R6",
+          "given": "Task evidence is stale, incomplete, failed, or not_run for a current criterion",
+          "when": "a checker requests pass",
+          "then": "the CLI rejects approval without a verified state or a misleading pass verdict"
+        }
+      ],
+      "nonGoals": [
+        "Seleccionar Work o Forge automáticamente según tamaño o dificultad.",
+        "Permitir edición manual de work.json como parte del flujo normal o reparación.",
+        "Cambiar el esquema, enrutamiento, cierre o QA actual de Forge.",
+        "Migrar Forge a Work en la primera versión o mantener estado vivo compartido entre ambos.",
+        "Ejecutar delegados por defecto o declarar QA integral a partir de revisiones de tarea."
+      ],
+      "openQuestions": []
+    },
+    "clarifications": [],
+    "conventions": [],
+    "adrs": [],
+    "roadmap": {
+      "plannedSprintCount": 4,
+      "sizingRationale": "Cuatro incrementos con objetivos verificables: (1) contrato exacto, persistencia segura, create/status/context pack e aislamiento; (2) grafo de tareas, evidencia y revisión; (3) enmiendas, cierre, entrada pública e instalación; (4) promoción Work a Forge y certificación integral. La promoción depende de los contratos y pruebas previos; los sprints posteriores pueden ajustarse mediante CLI tras la evidencia, sin adelantar ejecución ni cierre.",
+      "sprints": [
+        {
+          "n": 1,
+          "slug": "contract-and-safe-foundation",
+          "title": "Contrato Work y base segura",
+          "state": "closed"
+        },
+        {
+          "n": 2,
+          "slug": "task-execution-and-review",
+          "title": "Task Execution and Review",
+          "state": "closed"
+        },
+        {
+          "n": 3,
+          "slug": "organic-change-and-public-entry",
+          "title": "Cambio orgánico, cierre y entrada pública",
+          "state": "planned"
+        },
+        {
+          "n": 4,
+          "slug": "forge-promotion-and-certification",
+          "title": "Promoción a Forge y certificación",
+          "state": "planned"
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "n": 1,
+        "slug": "contract-and-safe-foundation",
+        "outcome": "shipped",
+        "closedAt": "2026-09-26",
+        "archive": "archive/sprint-001-contract-and-safe-foundation.md",
+        "snapshot": "archive/sprint-001-contract-and-safe-foundation.json",
+        "checkpoint": "archive/sprint-001-contract-and-safe-foundation.checkpoint.json",
+        "checkpointSha256": "ce512aeeb44698d7b802988f1fffcd4ae880ebc294e6703571814fdbb576bdab"
+      },
+      {
+        "n": 2,
+        "slug": "task-execution-and-review",
+        "outcome": "shipped",
+        "closedAt": "2026-09-26",
+        "archive": "archive/sprint-002-task-execution-and-review.md",
+        "snapshot": "archive/sprint-002-task-execution-and-review.json",
+        "checkpoint": "archive/sprint-002-task-execution-and-review.checkpoint.json",
+        "recommendations": [
+          "Implement CLI-owned brief and task amendments with revision invalidation and preserved history.",
+          "Implement Work closure with explicit dispositions and truthful partial outcomes.",
+          "Expose Work through the supported public command and installation surfaces without changing Forge behavior."
+        ],
+        "checkpointSha256": "d51a40f52667d4362200a6c6768c7f9e6807ac54a0f5f89175ba8f9cbb8f9bda"
+      }
+    ],
+    "previousSprint": {
+      "n": 2,
+      "slug": "task-execution-and-review",
+      "outcome": "shipped",
+      "summary": "Delivered CLI-owned Work task planning, dependency-safe execution, evidence capture, and criterion-complete review with Forge isolation."
+    },
+    "activeSprint": null,
+    "debt": [],
+    "handoff": {
+      "nextAction": "plan_sprint",
+      "nextTaskId": null,
+      "blockers": [],
+      "note": "Sprint 2 shipped after approved-with-notes QA. Plan Sprint 3 for amendments, closure, public entry, and installation; retain future scenario coverage S14-S16 for Sprint 4.",
+      "lastUpdated": "2026-09-26"
+    },
+    "author": {
+      "name": "Roimer Peraza",
+      "email": "joisephdev@gmail.com",
+      "source": "git",
+      "capturedAt": "2026-09-26T13:07:07.681Z"
+    }
+  },
+  "projectScopeBefore": {
+    "id": "organic-work",
+    "title": "Kyro Work",
+    "status": "active"
+  },
+  "projectScopeAfter": {
+    "id": "organic-work",
+    "title": "Kyro Work",
+    "status": "planning"
+  },
+  "digests": {
+    "beforeClose": "1ead8d7dcc4f68dfc4dd65b9ff67b82d709360ee7a72b25c9d15f4a0f007a4f4",
+    "intendedAfterClose": "b8122b9ff2a43813c67e6bc0e428c1c06deef431392e0abc13e461fdf96f4ced",
+    "projectScopeBefore": "44d3c0dc96f28b5c91359488ae30d31dd62ba94bfacc9b9792d4d761aaf6cb34",
+    "projectScopeAfter": "5aa318d68c70c3dcdd05163e4ce91e4ea9a20deaa03102afce748906918e4055",
+    "legacySnapshot": "22213b6a56c8f928632cb06305a1cca4ff09c584fcfeda88af7492fa5a91a884",
+    "narrative": "ee6c2a50d12c471634589af2daceb543232f320afbcb56219e440be7504ccac6"
+  }
+}

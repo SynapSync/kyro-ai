@@ -1,0 +1,13 @@
+{
+  "reason": "Use English titles for upcoming software artifacts while preserving closed sprint history and the planned roadmap sequence.",
+  "updates": [
+    {
+      "n": 3,
+      "title": "Organic Change, Closure, and Public Entry"
+    },
+    {
+      "n": 4,
+      "title": "Forge Promotion and Certification"
+    }
+  ]
+}

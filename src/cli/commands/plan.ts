@@ -319,14 +319,19 @@ function runPlanSprintMode(raw: unknown, scope: string, currentSprint: SprintFil
   console.log(`Sprint ${active.n} planned for "${scope}": ${phaseCount} phase(s), ${taskCount} task(s). Next action: ${sprint.handoff.nextAction}.`);
 }
 
-export function buildPlanInitPlan(scope: string, input: LeanPlanInput): { sprint: SprintFile; plan: OperationPlan[] } {
-  const existing = readJsonSafely(sprintJsonPath(scope));
-  if (existing.exists) {
-    throw new KyroCoreError(
-      'SCOPE_ALREADY_INITIALIZED',
-      `Scope "${scope}" already has a sprint.json.`,
-      'Per-sprint planning via kyro plan is not yet available; use the plan-sprint workflow. To re-bootstrap, remove the scope first.',
-    );
+export function buildPlanInitPlan(scope: string, input: LeanPlanInput, options: { allowExistingScope?: boolean } = {}): { sprint: SprintFile; plan: OperationPlan[] } {
+  // Promotion resume rebuilds a byte-identical destination after the target
+  // was legitimately published; only that explicit caller sets
+  // allowExistingScope. Every other path keeps the fresh-scope probe.
+  if (!options.allowExistingScope) {
+    const existing = readJsonSafely(sprintJsonPath(scope));
+    if (existing.exists) {
+      throw new KyroCoreError(
+        'SCOPE_ALREADY_INITIALIZED',
+        `Scope "${scope}" already has a sprint.json.`,
+        'Per-sprint planning via kyro plan is not yet available; use the plan-sprint workflow. To re-bootstrap, remove the scope first.',
+      );
+    }
   }
 
   const today = new Date().toISOString().slice(0, 10);

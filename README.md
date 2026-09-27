@@ -24,7 +24,7 @@ Kyro is a **sprint harness** for AI coding agents. Install once, every agent use
 - **One scope file** — `.agents/kyro/scopes/{scope}/sprint.json` is the single source of truth
 - **CLI-owned state** — schema and gates run every time; agents can't invent enums or hand-edit
 - **Team-safe by default** — commit `project.json` + scopes; each dev has personal `local.json`
-- **6 slash commands** — `/kyro:forge` (full cycle), `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context`, `/kyro:scope-retire`
+- **7 slash commands** — `/kyro:forge` (full cycle), `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context`, `/kyro:scope-retire`, and explicitly selected `/kyro:work`
 
 **Why it matters:** AI agents forget context, invent process, and edit planning files by hand. Across Claude, Codex, OpenCode, and others you re-explain the same workflow every session. Kyro stops this.
 
@@ -138,7 +138,7 @@ kyro doctor
 
 | Host | How to install | Invocation |
 | ---- | --------------- | ---------- |
-| **Claude Code** ⭐ | **Plugin** (recommended): `/plugin marketplace add SynapSync/kyro-ai` → `/plugin install kyro-ai` → `/reload-plugins` | `/kyro:forge`, `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context`, `/kyro:scope-retire` |
+| **Claude Code** ⭐ | **Plugin** (recommended): `/plugin marketplace add SynapSync/kyro-ai` → `/plugin install kyro-ai` → `/reload-plugins` | `/kyro:forge`, `/kyro:status`, `/kyro:qa`, `/kyro:idea`, `/kyro:task-context`, `/kyro:scope-retire`, `/kyro:work` |
 | **Claude Code** (CLI) | Install `npm install -g kyro-ai`; from project root: `kyro install --init-workspace --yes` | Commands via terminal or `~/.agents/skills/kyro-*` |
 | **Codex** | Install `npm install -g kyro-ai`; from project root: `kyro install --agent codex --init-workspace --yes` | Skills `kyro-*` (auto-loaded in root `AGENTS.md`) |
 | **OpenCode** | Install `npm install -g kyro-ai`; from project root: `kyro install --agent opencode --init-workspace --yes` | Native `/kyro/*` commands |
@@ -169,6 +169,7 @@ claude --plugin-dir /path/to/kyro-ai
 | Get a summary before switching contexts | `/kyro:task-context` (copy-paste into a fresh session) |
 | Audit code & architecture independently | `/kyro:qa` (runs outside the forge cycle) |
 | Mature a rough idea into a plan | `/kyro:idea design a rate-limiting strategy` |
+| Explicitly run a Work | `/kyro:work <work-id-or-brief>` (isolated CLI-owned task lifecycle; never auto-selected) |
 | Complete a finished scope | `/kyro:forge` (runs `kyro scope complete`; not retirement) |
 | Retire an obsolete/superseded scope | `/kyro:scope-retire <scope>` (prepare, show plan, require fresh human approval) |
 | Record evidence on a task | `kyro record-evidence <task> --evidence "…"` |
@@ -192,6 +193,7 @@ Thin routers over scope state — they load only what the current step needs.
 | `/kyro:qa` · `kyro-qa` | Independent certification audit (not the forge review gate) |
 | `/kyro:task-context` · `kyro-task-context` | Copy-paste prompt to continue in a fresh context |
 | `/kyro:scope-retire` · `kyro-scope-retire` | Two-phase retirement of an obsolete/superseded/discarded scope |
+| `/kyro:work` · `kyro-work` | Explicit isolated Work task lifecycle; task review does not replace Forge QA |
 
 ### Tool-owned CLI (required for state changes)
 

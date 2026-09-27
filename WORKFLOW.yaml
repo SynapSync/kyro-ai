@@ -18,6 +18,7 @@ commands:
   - idea # Optional evidence-grounded idea maturation before starting a scope
   - qa # Certification audit — code, architecture, security, testing, planning sync (independent of forge cycle)
   - scope-retire # Human-gated, auditable terminal scope retirement
+  - work # Explicit Work task workflow; never auto-selected by complexity
 
 agents:
   - orchestrator # Full cycle coordination — analysis, review, debugging, and sprint execution
@@ -26,6 +27,7 @@ skills:
   - sprint-forge # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
   - seedbed # Evidence-grounded planning for rough or mature ideas (loaded only via /kyro:idea)
   - qa-review # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
+  - organic-work # Explicit Work router guidance; CLI remains the sole Work state writer
 
 artifacts:
   root: .agents/kyro/scopes/ # Rules and sprint documents (per-scope)

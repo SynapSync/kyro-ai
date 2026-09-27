@@ -1,0 +1,13 @@
+{
+  "sprint": {
+    "n": 5,
+    "slug": "work-artifact-doctor-hardening"
+  },
+  "reason": "Independent QA found that the active task context retained the former unsafe-ancestor instruction. Align it with the approved acceptance criterion without changing the verified implementation.",
+  "tasks": [
+    {
+      "id": "T5.1",
+      "context": "A senior cross-feature QA reproduced a false omission: replacing an existing Work root with a symlink to an empty directory removes its doctor check. Only ENOENT for the root is a normal absence. A present root symlink, non-directory, or listing error must be a named Work-root failure with a remedy; an unsafe ancestor is rejected earlier by the shared managed-path guard. Work-only workspaces must be audited even if Forge scope discovery returns none. Keep Sprint 4 archives immutable. Prior Sprint 4 release and global-install recommendations remain deferred to a separate owner gate; the user explicitly authorized this corrective scope expansion."
+    }
+  ]
+}

@@ -34,7 +34,7 @@ for (const command of canonicalCommands) {
   );
 }
 
-for (const internalSkill of ['sprint-forge', 'seedbed', 'qa-review', 'kyro-sprint-executor']) {
+for (const internalSkill of ['sprint-forge', 'seedbed', 'qa-review', 'kyro-sprint-executor', 'organic-work']) {
   assert(
     existsSync(resolve(root, 'internal/skills', internalSkill, 'SKILL.md')),
     `missing internal skill source: ${internalSkill}`,

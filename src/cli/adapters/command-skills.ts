@@ -132,6 +132,7 @@ export function getCommandDescription(command: KyroCommandName): string {
   if (command === 'idea') return 'Mature a rough or mature idea into an evidence-grounded, execution-ready pre-scope plan (optional)';
   if (command === 'qa') return 'Certify a scope\'s implementation and planning against its full specification (independent audit)';
   if (command === 'scope-retire') return 'Permanently retire an obsolete, superseded, or discarded Kyro scope. Irreversible. Not for finished work.';
+  if (command === 'work') return 'Run an explicitly chosen, CLI-owned Kyro Work without changing Forge routing or state.';
   return 'Generate a fresh-context prompt for continuing Kyro work';
 }
 

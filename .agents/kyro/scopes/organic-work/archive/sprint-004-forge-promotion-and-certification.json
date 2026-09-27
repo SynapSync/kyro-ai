@@ -1,0 +1,422 @@
+{
+  "n": 4,
+  "slug": "forge-promotion-and-certification",
+  "title": "Forge Promotion and Certification",
+  "objective": "Promote explicitly selected unfinished Work into a new Forge scope through a recoverable, reciprocal CLI transaction, resolve Sprint 3 QA debt, and certify the Work and Forge boundaries without releasing or installing globally.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Source integrity and promotion contract",
+      "objective": "Make the source brief trustworthy and define an exact, previewable translation that never inherits Work approval as Forge certification.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T4.1",
+          "title": "Harden Work creation source ingestion",
+          "description": "Resolve debt-1 by applying bounded, no-follow, lossless UTF-8 ingestion to work create. Hash and publish the original brief bytes, including valid Unicode and CRLF, without changing the Work v1 JSON shape or the shared digest helper.",
+          "files_to_touch": [
+            "src/cli/commands/work.ts",
+            "src/cli/work/store.ts",
+            "scripts/check-work-store.mjs",
+            "scripts/check-work-isolation.mjs",
+            "docs/work.md"
+          ],
+          "context": "Independent Sprint 3 QA reproduced source byte 0xff being accepted and stored as U+FFFD. Reuse or extract the tested amend-brief descriptor reader instead of a second weaker path. A source symlink, oversized or growing file, malformed UTF-8, or source swap must fail before publication. Use the CLI-owned writer and preserve Forge bytes. Debt-1 remains open until actual validation and review, then resolve it through kyro debt resolve.",
+          "acceptance_criteria": [
+            "work create opens one regular source without following symbolic links, checks the opened descriptor, reads at most the documented bound plus one rejection byte, and rejects malformed or non-round-trippable UTF-8 before any Work directory is published.",
+            "Valid Unicode, UTF-8 BOM where supported by the documented contract, and CRLF input are copied byte-for-byte; brief.digest equals SHA-256 of the original source bytes and objective/title extraction does not alter published bytes.",
+            "Disposable fixtures prove malformed bytes, symlink, oversize, post-size-check growth, missing source, and failed create leave no partial Work and preserve Forge project/local/sprint bytes."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S4",
+            "S5",
+            "S6",
+            "S10",
+            "S29"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Hardened Work creation source ingestion: new shared bounded no-follow lossless UTF-8 reader used by work create and work amend-brief, byte-exact writer path, strict malformed/symlink/oversize/growth/swap rejection before publication, Unicode/CRLF/BOM preservation with digest over original bytes.",
+            "validation": [
+              "npm run build",
+              "npm run check:work-store",
+              "npm run check:work-isolation",
+              "npm run check:work-amend"
+            ],
+            "files_changed": [
+              "src/cli/work/brief-source.ts",
+              "src/cli/commands/work.ts",
+              "src/cli/work/store.ts",
+              "scripts/check-work-store.mjs",
+              "scripts/check-work-isolation.mjs",
+              "docs/work.md"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-09-27T09:35:46.037Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "work create opens one regular source without following symbolic links, checks the opened descriptor, reads at most the documented bound plus one rejection byte, and rejects malformed or non-round-trippable UTF-8 before any Work directory is published.",
+              "Valid Unicode, UTF-8 BOM where supported by the documented contract, and CRLF input are copied byte-for-byte; brief.digest equals SHA-256 of the original source bytes and objective/title extraction does not alter published bytes.",
+              "Disposable fixtures prove malformed bytes, symlink, oversize, post-size-check growth, missing source, and failed create leave no partial Work and preserve Forge project/local/sprint bytes."
+            ],
+            "findings": [],
+            "by": "sprint-checker",
+            "reviewedAt": "2026-09-27T09:35:51.984Z",
+            "requestDigest": "b371fbf54ff3d1b3383cb2289280f4c00b915b632bb552569d010c7279f8bfeb",
+            "reviewedMaterialDigest": "4f89aac13e09523457ae242a3b623d594ebb2260648f186e019997794359313e"
+          }
+        },
+        {
+          "id": "T4.2",
+          "title": "Define and validate the Work-to-Forge promotion contract",
+          "description": "Implement a pure promotion planner and exact validators for the source fingerprint, task mapping, reciprocal destination link, and CLI-owned pending transaction record. Make the preview disclose every transferred, omitted, blocked, and dependency-adjusted task before confirmation.",
+          "files_to_touch": [
+            "src/cli/work/promotion.ts",
+            "src/cli/work/schema.ts",
+            "src/cli/types.ts",
+            "src/cli/commands/work.ts",
+            "scripts/check-work-promotion-contract.mjs",
+            "docs/work.md"
+          ],
+          "context": "Promotion is explicit only: --work, a fresh --to-scope slug, actor, expected Work revision, read-only preview, and separate confirmation. A pre-existing target, zero transferable tasks, unresolved disposed prerequisite, corrupt source, stale revision, or changed brief fails closed. Transfer only nonterminal Work tasks. Forge tasks begin pending without Work evidence/verdict/pass; map Wn to deterministic T1.n IDs. Preserve edges among transferred tasks. A dependency on verified source work may be omitted only when the preview and reciprocal record explicitly name that adjudication; disposed dependencies never auto-rewire. A blocked Work task must be resolved before promotion; in-progress or awaiting-review tasks reset to pending with that loss of approval stated in preview. Define a versioned reciprocal sidecar under the target scope instead of adding undocumented keys to sprint.json. Define a versioned pending promotion journal under the Work directory and a non-self-referential source digest bound to exact source bytes/revision. The current Work validator requires promotion.sourceRevision to match the promoted Work revision; preserve historical closure.finalRevision when promoting a stopped Work and make the validator explicitly account for the later promotion revision. Apply the existing scope convention: lifecycle records are evidence, never authority; derive state from the same builders as the writer.",
+          "acceptance_criteria": [
+            "The pure preview has exact documented fields and deterministic mapping of every eligible Work task, acceptance criterion, file path, and dependency to a fresh Forge Sprint 1 task; it explicitly distinguishes Work-verified/disposed history from Forge pending tasks and never imports Work verdicts as Forge passes or QA.",
+            "The reciprocal sidecar and pending journal have versioned exact-key schemas, safe relative paths, source and target identities/revisions/digests, actor, prepared timestamp, and a defined non-circular digest formula; malformed, conflicting, or stale records reject with field-specific diagnostics.",
+            "Preview is read-only and rejects target collision, unsafe slug/path, no transferable task, blocked source task, disposed prerequisite, missing or changed brief, and invalid dependency mapping without changing either Work or Forge bytes.",
+            "A stopped Work remains eligible only when it has unfinished transferable tasks; its original closure metadata is preserved, and promotion schema validation remains coherent after the new revision."
+          ],
+          "depends_on": [
+            "T4.1"
+          ],
+          "scenario_refs": [
+            "S8",
+            "S16",
+            "S26",
+            "S28"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Implemented pure Work-to-Forge promotion planner with deterministic Wn to T1.n mapping, explicit verified/disposed omission and verified-dependency adjudication, versioned reciprocal sidecar and pending journal schemas with non-circular digest formulas, closure-finalRevision coherence for promoted stopped Work, and read-only work promote dry-run preview CLI.",
+            "validation": [
+              "npm run build",
+              "npm run check:work-promotion-contract",
+              "npm run check:work-contract",
+              "npm run check:work-closure",
+              "npm run check:cli-envelope"
+            ],
+            "files_changed": [
+              "src/cli/work/promotion.ts",
+              "src/cli/work/schema.ts",
+              "src/cli/types.ts",
+              "src/cli/commands/work.ts",
+              "scripts/check-work-promotion-contract.mjs",
+              "docs/work.md",
+              "package.json"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-09-27T09:43:45.647Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "The pure preview has exact documented fields and deterministic mapping of every eligible Work task, acceptance criterion, file path, and dependency to a fresh Forge Sprint 1 task; it explicitly distinguishes Work-verified/disposed history from Forge pending tasks and never imports Work verdicts as Forge passes or QA.",
+              "The reciprocal sidecar and pending journal have versioned exact-key schemas, safe relative paths, source and target identities/revisions/digests, actor, prepared timestamp, and a defined non-circular digest formula; malformed, conflicting, or stale records reject with field-specific diagnostics.",
+              "Preview is read-only and rejects target collision, unsafe slug/path, no transferable task, blocked source task, disposed prerequisite, missing or changed brief, and invalid dependency mapping without changing either Work or Forge bytes.",
+              "A stopped Work remains eligible only when it has unfinished transferable tasks; its original closure metadata is preserved, and promotion schema validation remains coherent after the new revision."
+            ],
+            "findings": [],
+            "by": "sprint-checker",
+            "reviewedAt": "2026-09-27T09:43:52.820Z",
+            "requestDigest": "a41234d8d039de45a3bb2cc1b139027d6643015f942edfebf7f448baa7635d81",
+            "reviewedMaterialDigest": "0e528cbd6f857ac3cd43567ce9228965a95529ea7e44ec62cd2493f34b69590a"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Reciprocal publication and recovery",
+      "objective": "Publish a new Forge scope and a promoted Work only as a verifiable, retryable cross-artifact operation.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T4.3",
+          "title": "Stage a validated Forge destination without changing the active scope",
+          "description": "Build a dedicated promotion adapter around the existing Forge schema and plan builders. Stage a new destination scope with an initial pending Sprint 1 and a reciprocal source link, while preserving current project.json and local.json bytes until an explicitly authorized Forge operation requires otherwise.",
+          "files_to_touch": [
+            "src/cli/work/promotion.ts",
+            "src/cli/commands/plan.ts",
+            "src/cli/artifacts/schema.ts",
+            "src/cli/pipeline/state-writer-lock.ts",
+            "scripts/check-work-promotion.mjs"
+          ],
+          "context": "The ordinary kyro plan init path updates local.json.activeScope; promotion must not call that path as an uncontrolled side effect. Reuse pure builders or extract a targeted shared builder without changing existing plan behavior. The destination must be a new scope, never an implicit merge into an existing or retired scope. Stage complete validated sprint.json and the reciprocal sidecar under a confined hidden directory; do not expose an incomplete runnable scope. Every imported Forge task starts pending with null evidence/verdict and exact source identity in context/link, not a Forge approval. Preserve target title/objective and source brief provenance. No scope registry or global active selection should change during preview or staging.",
+          "acceptance_criteria": [
+            "A fresh target is staged with a schema-valid Forge scope and Sprint 1 whose task graph, scenario references, acceptance criteria, and handoff derive correctly from the source mapping; no task is marked done or reviewed because it passed in Work.",
+            "Existing target, retired target, unsafe path, symlink, malformed generated Forge state, or injected staging failure leaves the published Forge tree, project.json, local.json, and Work bytes unchanged.",
+            "The reciprocal link binds the exact source Work ID/path/revision/digest and target scope/path/digest; readers can verify both directions without changing Forge sprint.json's established schema.",
+            "The existing Forge plan/init command retains its previous routing and active-scope behavior; promotion never silently switches local.json.activeScope."
+          ],
+          "depends_on": [
+            "T4.2"
+          ],
+          "scenario_refs": [
+            "S10",
+            "S16",
+            "S26",
+            "S28"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Built dedicated promotion staging adapter around unmodified Forge plan builders: destination SprintFile via buildPlanInitPlan/buildPlanSprintPlan with mapped pending tasks and provenance context, hidden Work-local staging with reciprocal sidecar, collision/symlink/malformed/injected failure safety, no activeScope switch, ordinary plan init behavior preserved.",
+            "validation": [
+              "npm run build",
+              "npm run check:work-promotion",
+              "npm run check:work-promotion-contract",
+              "npm run check:plan",
+              "npm run check:active-plan"
+            ],
+            "files_changed": [
+              "src/cli/work/promotion.ts",
+              "src/cli/types.ts",
+              "scripts/check-work-promotion.mjs",
+              "package.json"
+            ],
+            "by": "maker",
+            "recordedAt": "2026-09-27T09:51:39.204Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A fresh target is staged with a schema-valid Forge scope and Sprint 1 whose task graph, scenario references, acceptance criteria, and handoff derive correctly from the source mapping; no task is marked done or reviewed because it passed in Work.",
+              "Existing target, retired target, unsafe path, symlink, malformed generated Forge state, or injected staging failure leaves the published Forge tree, project.json, local.json, and Work bytes unchanged.",
+              "The reciprocal link binds the exact source Work ID/path/revision/digest and target scope/path/digest; readers can verify both directions without changing Forge sprint.json's established schema.",
+              "The existing Forge plan/init command retains its previous routing and active-scope behavior; promotion never silently switches local.json.activeScope."
+            ],
+            "findings": [],
+            "by": "sprint-checker",
+            "reviewedAt": "2026-09-27T09:51:43.061Z",
+            "requestDigest": "b37ffe04f5a5dbd51804e349baade98d1d6331952044a28b2aa56227b5908dea",
+            "reviewedMaterialDigest": "4fb599f585527af0cc41fa11591ee82fbe9e8c82a1055b8a24057dd320e2f299"
+          }
+        },
+        {
+          "id": "T4.4",
+          "title": "Commit and recover promotion through the Work CLI",
+          "description": "Implement work promote with a durable pending journal, revision/digest compare-and-swap, scoped writer lock, explicit confirmation, reciprocal verification, and idempotent retry. The Work must not appear successfully promoted until the target is published and linked.",
+          "files_to_touch": [
+            "src/cli/commands/work.ts",
+            "src/cli/work/store.ts",
+            "src/cli/work/promotion.ts",
+            "src/cli/work/schema.ts",
+            "src/cli/core/cli-envelope.ts",
+            "scripts/check-work-promotion.mjs",
+            ".agents/kyro/.gitignore"
+          ],
+          "context": "Under the writer lock: durably record intent, stage target files, publish the final Work revision, publish the complete destination, verify reciprocal digests, then durably clear intent. While intent exists, all Work reads that could imply success and all non-recovery mutations fail closed; an unpublished staged directory is not a Forge scope. A retry accepts only exact observed boundaries and the same source, target, actor, revision, and request digest; any external edit or corrupt journal fails without overwriting. Injections must cover before journal, after journal, after staging, after Work publication, after target publication, and before cleanup. Scope-local checkpoint/registry derivation must stay coherent. Promotion remains forbidden for a Work with no transferable tasks, and cannot reopen or be repeated against a different target. Keep the v1 work.json keys exact.",
+          "acceptance_criteria": [
+            "work promote has an explicit dry-run preview and a separate confirmed apply requiring current revision, actor, and chosen new target scope; status/context-pack show a blocker rather than done while a pending promotion exists.",
+            "After successful apply, Work is promoted with exact promotion fields and work_promoted activity, the destination has a verifiable reciprocal link and only pending Forge tasks, and both documents agree on identities, revisions, digests, and transferred task IDs.",
+            "Every injected publication boundary and matching retry is tested in disposable workspaces; conflicting retry, corrupt journal, changed brief, edited Work, target collision, and target tampering fail closed without a false promoted or certified state.",
+            "Unrelated existing Forge scopes and project/local state remain byte-identical, and the pending journal is ignored by Git while the final Work and reciprocal link are trackable."
+          ],
+          "depends_on": [
+            "T4.3"
+          ],
+          "scenario_refs": [
+            "S3",
+            "S4",
+            "S5",
+            "S9",
+            "S10",
+            "S16",
+            "S27",
+            "S28"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Published complete promotion destinations by one durable directory rename, with atomic staging, exact journal recovery, and no incomplete runnable Forge scope.",
+            "validation": [
+              "npm run build: passed",
+              "npm run check: passed, including promotion recovery and Forge discovery fixtures"
+            ],
+            "files_changed": [
+              "src/cli/work/store.ts",
+              "src/cli/work/promotion.ts",
+              "scripts/check-work-promotion.mjs"
+            ],
+            "by": "codex-maker",
+            "recordedAt": "2026-09-27T11:18:28.657Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "work promote has an explicit dry-run preview and a separate confirmed apply requiring current revision, actor, and chosen new target scope; status/context-pack show a blocker rather than done while a pending promotion exists.",
+              "After successful apply, Work is promoted with exact promotion fields and work_promoted activity, the destination has a verifiable reciprocal link and only pending Forge tasks, and both documents agree on identities, revisions, digests, and transferred task IDs.",
+              "Every injected publication boundary and matching retry is tested in disposable workspaces; conflicting retry, corrupt journal, changed brief, edited Work, target collision, and target tampering fail closed without a false promoted or certified state.",
+              "Unrelated existing Forge scopes and project/local state remain byte-identical, and the pending journal is ignored by Git while the final Work and reciprocal link are trackable."
+            ],
+            "findings": [],
+            "by": "codex-senior-checker",
+            "reviewedAt": "2026-09-27T11:18:35.661Z",
+            "requestDigest": "bc92d3d8624240363525b6cfffa34886770cfb7bb5d3e87957093dcfb1a517f1",
+            "reviewedMaterialDigest": "d794c82418a3c6605fd862adcd69bafa60814bde96a264d8b924bb377fd37e96"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Certification and debt closure",
+      "objective": "Prove the promotion behavior and prior QA notes under realistic failure and host boundaries before considering release readiness.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T4.5",
+          "title": "Close the promoted-reopen test gap and verify reciprocal diagnostics",
+          "description": "Resolve debt-2 with a schema-valid promoted Work fixture and exercise reopen refusal. Extend doctor/status diagnostics so stale or missing reciprocal promotion material is reported as a blocker rather than an apparently healthy success.",
+          "files_to_touch": [
+            "scripts/check-work-closure.mjs",
+            "scripts/check-work-promotion.mjs",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/work.ts",
+            "src/cli/work/promotion.ts"
+          ],
+          "context": "Independent Sprint 3 QA proved reopen rejects promoted Work but found no fixture. This task must test the real promoted artifact produced by the CLI, not a hand-crafted impossible document. A direct sidecar edit, removal, or digest mismatch must be detectable without treating activity logs as authority. Resolve debt-2 via kyro debt resolve only after its fixture and diagnostics pass.",
+          "acceptance_criteria": [
+            "An automated disposable fixture promotes a schema-valid Work, proves work reopen rejects it without changing bytes, and proves a stopped but non-promoted Work can still reopen with its closure history.",
+            "Status/doctor detect a missing, corrupt, or mismatched reciprocal target link or pending promotion intent and fail closed with a concrete remedy; they do not report a promoted Work as healthy based only on work.json activity.",
+            "Debt-2 is resolved through the Kyro CLI only after the regression and diagnostic checks pass; previously closed Sprint 3 artifacts remain unchanged."
+          ],
+          "depends_on": [
+            "T4.4"
+          ],
+          "scenario_refs": [
+            "S16",
+            "S24",
+            "S27",
+            "S30"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Restored fail-closed reciprocal diagnostics for canonical source path, actor, promotion timestamps, and recomputed request digest; schema-valid tampering now blocks both Work status and artifact doctor while legitimate Forge progress remains healthy.",
+            "validation": [
+              "npm run build: PASS",
+              "npm run check:work-promotion: PASS",
+              "npm run check: PASS",
+              "kyro doctor --artifacts --kyro-scope organic-work: PASS",
+              "Workspace doctor: only known installed-runtime Work capability and adapter skew"
+            ],
+            "files_changed": [
+              "src/cli/work/store.ts",
+              "scripts/check-work-promotion.mjs"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-27T12:15:24.806Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "An automated disposable fixture promotes a schema-valid Work, proves work reopen rejects it without changing bytes, and proves a stopped but non-promoted Work can still reopen with its closure history.",
+              "Status/doctor detect a missing, corrupt, or mismatched reciprocal target link or pending promotion intent and fail closed with a concrete remedy; they do not report a promoted Work as healthy based only on work.json activity.",
+              "Debt-2 is resolved through the Kyro CLI only after the regression and diagnostic checks pass; previously closed Sprint 3 artifacts remain unchanged."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-09-27T12:15:31.731Z",
+            "requestDigest": "33d52a6de92fd34a61e5bcfc6335a7138b05136d582c9ef76a8b5881754dddb5",
+            "reviewedMaterialDigest": "91c8850d17523f75004b7bf67c4e0ea794aab64b838d6225e5f4b47e13e381a7"
+          }
+        },
+        {
+          "id": "T4.6",
+          "title": "Run full promotion, clone, adapter, and package certification checks",
+          "description": "Exercise the complete explicit Work-to-Forge path in disposable workspaces and two clones, update English help/docs/router guidance, and validate Work, Forge, adapters, packaging, and artifact integrity before independent QA is requested.",
+          "files_to_touch": [
+            "scripts/check-work-promotion.mjs",
+            "scripts/check-work-isolation.mjs",
+            "scripts/check-adapter-fixtures.mjs",
+            "scripts/check-cli-envelope.mjs",
+            "src/cli/help.ts",
+            "commands/work.md",
+            "internal/skills/organic-work/SKILL.md",
+            "docs/work.md",
+            "package.json"
+          ],
+          "context": "Do not release, bump version, install/sync globally, close the Sprint, or complete the scope as a side effect of implementation. The last Sprint 3 recommendation to bump version and verify an authorized install is explicitly deferred to a separate human release gate; document workspace-build versus installed-runtime capability skew until then. Keep Work and Forge as explicit routes. Two distinct Work IDs in two clones must remain independent; same-ID divergent promotion must fail by revision/digest or target collision, not merge approvals. Mark debt-1 resolved through the CLI only after T4.1 validation is independently checked. Apply the global process convention: post-close state transitions must replay from checkpoints through writer builders; lifecycle records are evidence, not authority.",
+          "acceptance_criteria": [
+            "Disposable end-to-end tests cover a valid promotion, eligible and excluded task mapping, verified-source dependency adjudication, conflict/rollback/retry boundaries, target tampering, symlink/path escape, two-clone divergence, and byte isolation of unrelated Forge state.",
+            "Work help, public router, host projections, and documentation describe exact promotion flags, explicit target choice and preview, pending recovery, reciprocal verification, Work-review versus Forge-QA distinction, and the unsupported global-runtime boundary in English.",
+            "The final workspace build, targeted Work/Forge/adapters tests, full npm run check, artifact doctor, analyze, package dry-run, and git diff --check pass or have honestly documented environment-only limits; no critical or high finding remains.",
+            "Debt-1 is CLI-resolved only after source-ingestion tests pass; release/version bump/global install remain separately authorized work and are not claimed as complete."
+          ],
+          "depends_on": [
+            "T4.1",
+            "T4.2",
+            "T4.3",
+            "T4.4",
+            "T4.5"
+          ],
+          "scenario_refs": [
+            "S9",
+            "S10",
+            "S11",
+            "S16",
+            "S25",
+            "S26",
+            "S27",
+            "S28",
+            "S29",
+            "S30"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Extended disposable promotion certification to reject schema-valid reciprocal sidecar identity substitutions through both Work status and artifact doctor; retained real Forge progress, atomic publication, retry, and isolation coverage.",
+            "validation": [
+              "npm run build: PASS",
+              "npm run check:work-promotion: PASS, including five schema-valid sidecar identity substitutions",
+              "npm run check: PASS",
+              "kyro doctor --artifacts --kyro-scope organic-work: PASS",
+              "node dist/cli.js doctor --artifacts: environmental installed runtime and skill projection skew only",
+              "kyro analyze: no CRITICAL or HIGH findings; transient MEDIUM phase status while T4.5/T4.6 are under remediation",
+              "npm pack --dry-run: PASS",
+              "git diff --check: PASS (untracked Sprint 1-4 files are not covered by git diff)"
+            ],
+            "files_changed": [
+              "scripts/check-work-promotion.mjs",
+              "src/cli/work/store.ts"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-27T12:15:44.818Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Disposable end-to-end tests cover a valid promotion, eligible and excluded task mapping, verified-source dependency adjudication, conflict/rollback/retry boundaries, target tampering, symlink/path escape, two-clone divergence, and byte isolation of unrelated Forge state.",
+              "Work help, public router, host projections, and documentation describe exact promotion flags, explicit target choice and preview, pending recovery, reciprocal verification, Work-review versus Forge-QA distinction, and the unsupported global-runtime boundary in English.",
+              "The final workspace build, targeted Work/Forge/adapters tests, full npm run check, artifact doctor, analyze, package dry-run, and git diff --check pass or have honestly documented environment-only limits; no critical or high finding remains.",
+              "Debt-1 is CLI-resolved only after source-ingestion tests pass; release/version bump/global install remain separately authorized work and are not claimed as complete."
+            ],
+            "findings": [],
+            "by": "codex-checker",
+            "reviewedAt": "2026-09-27T12:15:47.979Z",
+            "requestDigest": "78dd8fa76c6862e8bd073974a3c4dda825154c99535d5536b3a0ff01421da657",
+            "reviewedMaterialDigest": "df9da667bab8288d1ee764e53810bef5a7e59852eea2d6e628da65ee940bfa9c"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "Every Sprint 4 task has current CLI-recorded evidence and a criterion-complete passing checker verdict; debt-1 and debt-2 are resolved only after their fixes are tested.",
+    "Explicit promotion creates a new Forge scope with a reciprocal verified link and only pending Forge tasks, while interrupted or conflicting transactions never appear successful.",
+    "Disposable and two-clone regressions cover Work source integrity, safe promotion/recovery, Forge isolation, adapters, packaging, and historical checkpoint coherence.",
+    "The workspace build and full check suite pass, doctor/analyze report no critical or high findings, and independent Kyro QA is offered before a user-gated Sprint close.",
+    "No release, version bump, global installation, or scope completion occurs without separate user authorization."
+  ]
+}

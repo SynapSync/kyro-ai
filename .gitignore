@@ -18,6 +18,8 @@ dist/
 !/.agents/kyro/.gitignore
 !/.agents/kyro/project.json
 !/.agents/kyro/scopes/
+!/.agents/kyro/work/
+!/.agents/kyro/plan/
 /.agents/kyro/**/trace/
 /.agents/kyro/local.json
 .cursor/

@@ -47,6 +47,7 @@ There is intentionally no generic adapter. Root `AGENTS.md` is the standard cros
 | idea maturation and executable planning | `kyro-idea` | `/kyro:idea` |
 | certification and quality audit | `kyro-qa` | `/kyro:qa` |
 | human-gated retirement of an obsolete scope | `kyro-scope-retire` | `/kyro:scope-retire` |
+| explicitly chosen Work task lifecycle | `kyro-work` | `/kyro:work` |
 
 Each skill loads its command router first. The router then names the exact mode/helper/template needed for the current step.
 
@@ -87,16 +88,16 @@ cd /path/to/your-app
 kyro install --agent opencode --scope workspace --yes
 ```
 
-OpenCode should invoke the native `/kyro/forge`, `/kyro/status`, `/kyro/task-context`, `/kyro/idea`, `/kyro/qa`, and `/kyro/scope-retire` commands, or the installed `kyro-*` skills under `~/.config/opencode/skills/`. It should not copy Kyro core into the project.
+OpenCode should invoke the native `/kyro/forge`, `/kyro/status`, `/kyro/task-context`, `/kyro/idea`, `/kyro/qa`, `/kyro/scope-retire`, and explicitly chosen `/kyro/work` commands, or the installed `kyro-*` skills under `~/.config/opencode/skills/`. It should not copy Kyro core into the project.
 
 Kyro preserves existing `opencode.json` content and owns only `agent.kyro-orchestrator`. MCP merge is not enabled until there is a concrete Kyro MCP server contract.
 
 ## Claude
 
 Claude plugin support remains first-class through `.claude-plugin/`. Its public surface is exactly
-`/kyro-ai:forge`, `/kyro-ai:status`, `/kyro-ai:task-context`, `/kyro-ai:idea`, `/kyro-ai:qa`, and `/kyro-ai:scope-retire`.
+`/kyro-ai:forge`, `/kyro-ai:status`, `/kyro-ai:task-context`, `/kyro-ai:idea`, `/kyro-ai:qa`, `/kyro-ai:scope-retire`, and `/kyro-ai:work`.
 Provider wrappers delegate to the canonical command routers; `sprint-forge`, `seedbed`, `qa-review`,
-and `kyro-sprint-executor` remain internal assets and must not appear in Claude's command menu. The
+`kyro-sprint-executor`, and `organic-work` remain internal assets and must not appear in Claude's command menu.
 The plugin works without installing the npm CLI. The CLI adapter path remains available when a
 project needs shared state and projected runtime assets.
 

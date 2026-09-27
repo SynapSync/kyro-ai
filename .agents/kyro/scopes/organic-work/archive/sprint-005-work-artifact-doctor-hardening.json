@@ -1,0 +1,71 @@
+{
+  "n": 5,
+  "slug": "work-artifact-doctor-hardening",
+  "title": "Work Artifact Doctor Hardening",
+  "objective": "Make artifact doctor fail closed for unsafe Work roots and audit Work-only workspaces without changing Work or Forge state contracts.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Fail-closed Work discovery",
+      "objective": "Correct Work-root discovery and certify it with disposable workspaces.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T5.1",
+          "title": "Audit Work roots independently of Forge scopes",
+          "description": "Distinguish a genuinely absent Work root from an unsafe or unreadable one, include Work checks in Work-only workspaces, and add regression coverage for discovery and isolation.",
+          "files_to_touch": [
+            "src/cli/commands/artifact-doctor.ts",
+            "scripts/check-work-doctor.mjs",
+            "package.json"
+          ],
+          "context": "A senior cross-feature QA reproduced a false omission: replacing an existing Work root with a symlink to an empty directory removes its doctor check. Only ENOENT for the root is a normal absence. A present root symlink, non-directory, or listing error must be a named Work-root failure with a remedy; an unsafe ancestor is rejected earlier by the shared managed-path guard. Work-only workspaces must be audited even if Forge scope discovery returns none. Keep Sprint 4 archives immutable. Prior Sprint 4 release and global-install recommendations remain deferred to a separate owner gate; the user explicitly authorized this corrective scope expansion.",
+          "acceptance_criteria": [
+            "A Forge-only workspace with no Work root retains the existing no-Work behavior; a healthy Work-only workspace receives a Work diagnostic despite having no Forge scope.",
+            "A Work root that is a symlink, a regular file, or unreadable fails doctor with a named Work-root check and actionable remedy instead of silently producing zero Work checks; an unsafe symlink ancestor fails closed in the shared managed-path guard before artifact checks.",
+            "Disposable fixtures prove the unsafe-root cases, healthy Work with Forge scopes, Work status fail-closed behavior, and byte isolation of unrelated Forge project/local/sprint files.",
+            "Build, targeted Work and Forge checks, full npm run check, adapter checks, artifact doctor, analyze, package dry-run, and git diff --check pass or have explicitly reported environment-only limits; no release, version bump, global installation, commit, or push is claimed."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S31"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Aligned the active task context with the approved unsafe-ancestor behavior; the Work-root doctor implementation and regression suite remain unchanged and passing.",
+            "validation": "The independent seven-configuration S31 probe passed. npm run check:work-doctor passed after the context correction. Earlier build, full npm run check, adapters, installed artifact doctor, package dry-run, and git diff --check passed on the unchanged source; analyze will be repeated after review.",
+            "files_changed": [
+              ".agents/kyro/plan/2026-09-27-organic-work-sprint-5-context-correction.json",
+              ".agents/kyro/plan/2026-09-27-organic-work-sprint-5.json",
+              "src/cli/commands/artifact-doctor.ts",
+              "scripts/check-work-doctor.mjs"
+            ],
+            "by": "codex",
+            "recordedAt": "2026-09-27T14:26:25.956Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A Forge-only workspace with no Work root retains the existing no-Work behavior; a healthy Work-only workspace receives a Work diagnostic despite having no Forge scope.",
+              "A Work root that is a symlink, a regular file, or unreadable fails doctor with a named Work-root check and actionable remedy instead of silently producing zero Work checks; an unsafe symlink ancestor fails closed in the shared managed-path guard before artifact checks.",
+              "Disposable fixtures prove the unsafe-root cases, healthy Work with Forge scopes, Work status fail-closed behavior, and byte isolation of unrelated Forge project/local/sprint files.",
+              "Build, targeted Work and Forge checks, full npm run check, adapter checks, artifact doctor, analyze, package dry-run, and git diff --check pass or have explicitly reported environment-only limits; no release, version bump, global installation, commit, or push is claimed."
+            ],
+            "findings": [],
+            "by": "codex",
+            "reviewedAt": "2026-09-27T14:26:33.495Z",
+            "requestDigest": "f6b9c19a8ef60e381eb972b6f7a1350ba352bfe1d0a52efc07df646717cc8623",
+            "reviewedMaterialDigest": "2971cb992c02da564cc9ffdb5b48465ccd8cc69f9b20d57bce85f0b7b240477a"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "T5.1 has CLI-recorded evidence and a passing checker review.",
+    "The new disposable fixture and aggregate checks pass without Forge-state changes.",
+    "Independent read-only Kyro QA approves the Work-root remediation before Sprint 5 closes."
+  ]
+}
