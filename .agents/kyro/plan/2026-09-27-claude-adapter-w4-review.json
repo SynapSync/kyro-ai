@@ -1,0 +1,8 @@
+{
+  "checkedCriteria": [
+    "Build, targeted adapter and package checks, full `npm run check`, artifact doctor, analyze, package dry run, and `git diff --check` pass or any failure is reported without a pass claim.",
+    "Disposable package and adapter probes prove a plugin-free tarball, seven Claude skills, safe repeated installation/removal, and unchanged Forge/Work behavior.",
+    "The final evidence names verification limits and confirms no version bump, release, global installation, commit, or push occurred."
+  ],
+  "findings": []
+}

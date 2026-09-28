@@ -8,6 +8,7 @@ This checklist is for maintainers who cut releases of `kyro-ai`. It documents th
 - The committed or packed `dist/` must always match a fresh build from the current `src/`.
 - `npm run check:dist` enforces this by building `dist/` into a temporary directory and comparing it byte-for-byte with the existing `dist/`.
 - `npm run check:adapters` enforces adapter projection behavior against the built runtime.
+- The Claude adapter fixture verifies native skill projection and non-destructive legacy-plugin coexistence; `check:cli-bundle` rejects retired plugin assets in the tarball.
 - `npm pack --dry-run` must run only after both gates pass.
 
 ## Release gate ordering
@@ -83,6 +84,9 @@ This means a local `npm publish` also rebuilds, proves freshness, and validates 
 - [ ] `npm run build` produces no unexpected changes in `dist/`.
 - [ ] `npm run check:adapters` passes.
 - [ ] `npm pack --dry-run` succeeds.
+- [ ] The packed file list excludes `.claude-plugin/`, `providers/claude/`, and `hooks/`.
+- [ ] In a disposable Claude profile, verify all seven `/kyro-*` skills are discoverable and route to the candidate runtime. Filesystem fixtures do not establish Claude UI discovery.
+- [ ] If an older Kyro plugin is installed, verify the new skills before asking the user to disable or uninstall it in Claude Code. Do not alter plugin settings automatically.
 - [ ] `npm run check:links` passes.
 
 ## Notes

@@ -1,0 +1,14 @@
+{
+  "summary": "Retired Claude plugin manifests, wrappers, and host-only hooks from the package; removed plugin CLI fallbacks and converted version, doctor, startup, and bundle checks to the CLI-managed adapter contract.",
+  "validations": [
+    { "command": "npm run build", "result": "passed", "note": "Workspace CLI compiled after plugin retirement." },
+    { "command": "npm run check:versions", "result": "passed", "note": "Package, lockfile, and workflow versions agree without plugin metadata." },
+    { "command": "npm run check:startup-contract", "result": "passed", "note": "Both active entrypoints resolve only CLI-owned runtimes." },
+    { "command": "npm run check:cli-bundle", "result": "passed", "note": "The isolated tarball fixture rejects retired Claude plugin paths." },
+    { "command": "npm run check:guardrails", "result": "passed", "note": "Portable CLI guard invariants remain green without Claude hooks." },
+    { "command": "npm run check:work-lifecycle", "result": "passed", "note": "Work lifecycle and Forge isolation remain green." },
+    { "command": "git diff --check", "result": "passed", "note": null }
+  ],
+  "filesChanged": ["package.json", "src/cli/commands/doctor.ts", "src/cli/adapters/command-skills.ts", "scripts/check-versions.mjs", "scripts/check-startup-contract.mjs", "scripts/check-cli-bundle.mjs", "agents/orchestrator.md", "internal/skills/sprint-forge/SKILL.md", "internal/skills/qa-review/SKILL.md", "internal/skills/kyro-sprint-executor/SKILL.md", ".claude-plugin/plugin.json", ".claude-plugin/settings.json", ".claude-plugin/marketplace.json", ".claude-plugin/README.md", "hooks/hooks.json", "hooks/guard-bash-output.mjs", "hooks/guard-sprint-close.mjs", "providers/claude/commands/forge.md", "providers/claude/commands/status.md", "providers/claude/commands/task-context.md", "providers/claude/commands/idea.md", "providers/claude/commands/qa.md", "providers/claude/commands/scope-retire.md", "providers/claude/commands/work.md", "scripts/check-claude-plugin-surface.mjs", "scripts/check-bash-guard.mjs", "scripts/check-sprint-guard.mjs"],
+  "notes": "The removed files are repository package assets, not any user's installed Claude plugin. Full aggregate verification remains W4."
+}

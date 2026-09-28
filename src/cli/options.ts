@@ -191,7 +191,7 @@ export function assertInstallableAgents(agents: Agent[]): void {
   if (unsupported.length > 0) {
     throw invalidInput(
       `Agent adapter not implemented yet: ${unsupported.join(', ')}.`,
-      `Implemented now: ${getInstallableAdapters().map((adapter) => adapter.agent).join(', ')}. Claude plugin remains first-class through .claude-plugin/.`,
+      `Implemented now: ${getInstallableAdapters().map((adapter) => adapter.agent).join(', ')}.`,
     );
   }
 }

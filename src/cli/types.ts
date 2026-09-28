@@ -817,6 +817,10 @@ export interface OperationPlan {
   jsonPath?: string;
   /** Literal token -> value replacements applied to `copy` operations at apply time (e.g. `{{KYRO_CLI}}`). */
   substitutions?: Record<string, string>;
+  /** A host-owned write guard enforced immediately before publication. */
+  guard?: 'claude-skill';
+  /** Existing Claude skills may be replaced only when the previous manifest owned them. */
+  allowExistingManagedSkill?: boolean;
 }
 
 

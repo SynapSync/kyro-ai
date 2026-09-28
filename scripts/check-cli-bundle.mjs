@@ -168,10 +168,12 @@ function main() {
       for (const path of [
         'dist/cli.js', 'agents/orchestrator.md', 'internal/skills/sprint-forge/SKILL.md',
         'internal/skills/kyro-sprint-executor/SKILL.md', 'commands/forge.md',
-        'providers/claude/commands/forge.md', '.claude-plugin/plugin.json',
         'config.json', 'WORKFLOW.yaml',
       ]) {
         assert(packedPaths.has(path), `check-cli-bundle: tarball missing distributive asset ${path}`);
+      }
+      for (const path of packedPaths) {
+        assert(!path.startsWith('.claude-plugin/') && !path.startsWith('providers/claude/') && !path.startsWith('hooks/'), `check-cli-bundle: retired Claude plugin asset in tarball: ${path}`);
       }
       const tarball = join(root, packed.filename);
       const globalInstall = spawnSync('npm', ['install', '-g', tarball, '--prefix', npmPrefix, '--ignore-scripts', '--offline', '--no-audit', '--no-fund'], {

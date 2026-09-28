@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -122,11 +122,13 @@ function assertStandardCommandSkills(plan, name) {
 const standardPlan = dryRunPlan('standard');
 const openCodePlan = dryRunPlan('opencode');
 const codexPlan = dryRunPlan('codex');
-const combinedPlan = dryRunPlan('standard,opencode,codex');
+const claudePlan = dryRunPlan('claude');
+const combinedPlan = dryRunPlan('standard,opencode,codex,claude');
 
 assertCommonPlan(standardPlan, 'standard');
 assertCommonPlan(openCodePlan, 'opencode');
 assertCommonPlan(codexPlan, 'codex');
+assertCommonPlan(claudePlan, 'claude');
 assertCommonPlan(combinedPlan, 'combined');
 assertStandardCommandSkills(standardPlan, 'standard');
 assertStandardCommandSkills(codexPlan, 'codex');
@@ -135,6 +137,9 @@ assertStandardCommandSkills(combinedPlan, 'combined');
 assert(!standardPlan.includes('- upsert-block AGENTS.md # agents-md'), 'standard: should not manage AGENTS.md block');
 assert(!openCodePlan.includes('- upsert-block AGENTS.md # agents-md'), 'opencode: should not manage AGENTS.md block');
 assert(codexPlan.includes('- upsert-block AGENTS.md # agents-md'), 'codex: should manage AGENTS.md block');
+assert(claudePlan.includes('- write ~/.claude/skills/kyro-forge/SKILL.md'), 'claude: missing native forge skill');
+assert(claudePlan.includes('- write ~/.claude/skills/kyro-work/SKILL.md'), 'claude: missing native Work skill');
+assert(!claudePlan.includes('providers/claude/commands'), 'claude: must not project plugin wrappers');
 assert(combinedPlan.includes('- upsert-block AGENTS.md # agents-md'), 'combined: should manage AGENTS.md block once');
 
 assert(standardPlan.includes('- standard: status=implemented;'), 'standard: missing preflight status');
@@ -190,18 +195,107 @@ withWorkspace('kyro-runtime-only-install-', (cwd) => {
   assert(!existsSync(monoPath), 'init-workspace: should not leave live monolito kyro.json');
 });
 
-withWorkspace('kyro-adapter-preflight-', () => {
+withWorkspace('kyro-claude-adapter-', (cwd) => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install, sync } = require(join(repo, 'dist/cli/commands/install.js'));
+  const { uninstall } = require(join(repo, 'dist/cli/commands/uninstall.js'));
+  const { getAdapterDefinition } = require(join(repo, 'dist/cli/adapters/registry.js'));
+  const claude = parseAgent('claude');
+  const home = join(cwd, '.home');
+  const claudeRoot = join(home, '.claude');
+  const skillsRoot = join(claudeRoot, 'skills');
+  const settings = join(claudeRoot, 'settings.json');
+  const userSkill = join(skillsRoot, 'my-skill', 'SKILL.md');
+  const legacyPlugin = join(claudeRoot, 'plugins', 'installed_plugins.json');
+  mkdirSync(resolve(userSkill, '..'), { recursive: true });
+  mkdirSync(resolve(legacyPlugin, '..'), { recursive: true });
+  writeFileSync(settings, '{"theme":"dark"}\n');
+  writeFileSync(userSkill, 'My skill\n');
+  writeFileSync(legacyPlugin, '{"plugins":{"kyro-ai@marketplace":[]}}\n');
+  const preserved = [settings, userSkill, legacyPlugin].map((path) => readFileSync(path));
+  const foreign = join(skillsRoot, 'kyro-forge', 'SKILL.md');
+  mkdirSync(resolve(foreign, '..'), { recursive: true });
+  writeFileSync(foreign, 'Foreign skill\n');
+  assert(!existsSync(join(cwd, '.agents', 'kyro', 'project.json')), 'claude: unexpected workspace state before install');
+  let refused = false;
+  try {
+    captureLogs(() => install(cliOptions({ agents: [claude], initWorkspace: true })));
+  } catch (error) {
+    refused = true;
+    assert(String(error).includes('Foreign Claude skill target'), 'claude: foreign collision should be named');
+  }
+  assert(refused && readFileSync(foreign, 'utf8') === 'Foreign skill\n', 'claude: foreign skill must not be overwritten');
+  writeFileSync(foreign, '---\nname: kyro-forge\nmetadata:\n  runtimeVersion: "0.0.0"\n---\nForeign content\n');
+  refused = false;
+  try {
+    captureLogs(() => install(cliOptions({ agents: [claude], initWorkspace: true })));
+  } catch (error) {
+    refused = true;
+    assert(String(error).includes('Foreign Claude skill target'), 'claude: forged skill metadata must not prove ownership');
+  }
+  assert(refused && readFileSync(foreign, 'utf8').includes('Foreign content'), 'claude: forged skill must remain unchanged');
+  rmSync(resolve(foreign, '..'), { recursive: true });
+  const installOutput = captureLogs(() => install(cliOptions({ agents: [claude], initWorkspace: true })));
+  assert(installOutput.includes('legacy Kyro Claude plugin'), 'claude: legacy plugin should be reported without removal');
+  const manifest = JSON.parse(readFileSync(join(home, '.agents', 'kyro', 'current', 'manifest.json'), 'utf8'));
+  const adapter = getAdapterDefinition(claude);
+  assert(manifest.adapters.some((item) => item.agent === 'claude'), 'claude: manifest missing adapter');
+  assert(adapter.doctor(manifest).status === 'warn', 'claude: doctor should warn about the legacy plugin');
+  for (const command of EXPECTED_COMMAND_SKILLS) {
+    const file = join(skillsRoot, `kyro-${command}`, 'SKILL.md');
+    assert(existsSync(file), `claude: missing ${command} skill`);
+    assert(readFileSync(file, 'utf8').includes(`commands/${command}.md`), `claude: ${command} must route to runtime`);
+  }
+  captureLogs(() => sync(cliOptions({ agents: [claude] })));
+  assert(adapter.doctor(manifest).status === 'warn', 'claude: repeat sync should retain migration warning');
+  for (const [index, file] of [settings, userSkill, legacyPlugin].entries()) {
+    assert(readFileSync(file).equals(preserved[index]), `claude: unrelated file changed: ${file}`);
+  }
+  const workSkill = join(skillsRoot, 'kyro-work', 'SKILL.md');
+  rmSync(workSkill);
+  assert(adapter.doctor(manifest).status === 'fail', 'claude: missing skill must fail doctor');
+  captureLogs(() => sync(cliOptions({ agents: [claude] })));
+  assert(adapter.doctor(manifest).status === 'warn', 'claude: sync should repair missing skill and retain migration warning');
+  writeFileSync(workSkill, readFileSync(workSkill, 'utf8').replace(`runtimeVersion: "${manifest.packageVersion}"`, 'runtimeVersion: "0.0.0"'));
+  assert(adapter.doctor(manifest).status === 'fail', 'claude: stale skill must fail doctor');
+  captureLogs(() => sync(cliOptions({ agents: [claude] })));
+  rmSync(workSkill);
+  symlinkSync(userSkill, workSkill);
+  refused = false;
+  try {
+    captureLogs(() => sync(cliOptions({ agents: [claude] })));
+  } catch (error) {
+    refused = true;
+    assert(String(error).includes('Unsafe Claude skill target'), 'claude: symlink refusal should be named');
+  }
+  assert(refused && readFileSync(userSkill, 'utf8') === 'My skill\n', 'claude: symlink target must remain unchanged');
+  rmSync(workSkill);
+  captureLogs(() => sync(cliOptions({ agents: [claude] })));
+  captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true })));
+  assert(!existsSync(join(skillsRoot, 'kyro-forge')), 'claude: purge should remove managed skills');
+  for (const [index, file] of [settings, userSkill, legacyPlugin].entries()) {
+    assert(readFileSync(file).equals(preserved[index]), `claude: purge touched unrelated file: ${file}`);
+  }
+});
+
+withWorkspace('kyro-claude-symlink-root-', (cwd) => {
   const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
   const { install } = require(join(repo, 'dist/cli/commands/install.js'));
-  let failed = false;
+  const home = join(cwd, '.home');
+  const external = join(cwd, 'external-skills');
+  const externalSkill = join(external, 'kyro-forge', 'SKILL.md');
+  mkdirSync(resolve(externalSkill, '..'), { recursive: true });
+  mkdirSync(join(home, '.claude'), { recursive: true });
+  writeFileSync(externalSkill, 'External skill\n');
+  symlinkSync(external, join(home, '.claude', 'skills'));
+  let refused = false;
   try {
-    captureLogs(() => install(cliOptions({ agents: [parseAgent('claude')], dryRun: true })));
+    captureLogs(() => install(cliOptions({ agents: [parseAgent('claude')], initWorkspace: true })));
   } catch (error) {
-    failed = true;
-    assert(String(error).includes('not implemented yet: claude'), 'preflight: planned adapter failure should name claude');
-    assert(error?.remedy?.includes('native projection'), 'preflight: planned adapter failure should mention native projection in remedy');
+    refused = true;
+    assert(String(error).includes('Unsafe Claude skill directory'), 'claude: symlink root refusal should be named');
   }
-  assert(failed, 'preflight: expected planned adapter install to fail');
+  assert(refused && readFileSync(externalSkill, 'utf8') === 'External skill\n', 'claude: symlink root must leave external bytes unchanged');
 });
 
 {
@@ -320,8 +414,8 @@ withWorkspace('kyro-adapter-contract-', (cwd) => {
   assert(byAgent.codex.mcpStrategy() === 'toml-file', 'codex: unexpected MCP strategy');
   assert(byAgent.codex.detect({ homeDir, envPath: '' }).configFound === true, 'codex: expected config detection');
 
-  assert(byAgent.claude.status === 'planned', 'claude: expected planned status');
-  assert(byAgent.claude.paths(homeDir).subAgentsDir.endsWith('/.claude/agents'), 'claude: unexpected sub-agent path');
+  assert(byAgent.claude.status === 'implemented', 'claude: expected implemented status');
+  assert(byAgent.claude.paths(homeDir).skillsDir.endsWith('/.claude/skills'), 'claude: unexpected native skills path');
   assert(byAgent.cursor.status === 'planned', 'cursor: expected planned status');
   assert(byAgent.cursor.systemPromptStrategy() === 'instructions-file', 'cursor: unexpected system prompt strategy');
 });

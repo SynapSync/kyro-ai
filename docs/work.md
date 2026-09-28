@@ -2,7 +2,7 @@
 
 Kyro Work is an explicit, isolated workflow for plans that need durable tasks, dependencies, evidence, and task review. Kyro does not choose Work or Forge based on plan size. Work task review applies to one task; it does not certify a scope or replace Forge QA.
 
-On a supported host, invoke `/kyro:work` explicitly (or the projected `kyro-work` skill). The router checks CLI capabilities and requests fresh `work status` and `work context-pack` before any continuation. It never selects Work automatically or changes the Forge, Idea, QA, status, or install routes. Claude uses the plugin command; OpenCode has a native slash command and skill; Codex and standard `.agents` hosts use the projected command skill. The host entry point is a guide to the same `kyro work` CLI, not a separate state writer.
+On a supported host, invoke Work explicitly through its projected skill (Claude `/kyro-work`, Codex or standard `kyro-work`) or OpenCode's native `/kyro/work` command. The router checks CLI capabilities and requests fresh `work status` and `work context-pack` before any continuation. It never selects Work automatically or changes the Forge, Idea, QA, status, or install routes. The host entry point is a guide to the same `kyro work` CLI, not a separate state writer.
 
 ## Build and verify the command
 

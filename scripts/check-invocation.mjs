@@ -208,7 +208,8 @@ assert(JSON.stringify(splitInvocation('node "~/a b/c.js" --x')) === JSON.stringi
   assert(skill.includes(`runtimeVersion: "${version}"`), `skill stub must pin runtimeVersion ${version}`);
   assert(parseSkillRuntimeVersion(skill) === version, 'parseSkillRuntimeVersion must read pin');
   assert(skill.includes('CLI: `'), 'skill stub must print CLI entrypoint line');
-  assert(skill.includes('prefer this projected runtime over any host plugin cache path'), 'skill stub must warn against plugin cache paths');
+  assert(skill.includes('projected runtime as the Kyro source of truth'), 'skill stub must identify the CLI-owned runtime');
+  assert(!skill.includes('plugin cache path'), 'skill stub must not route through retired plugin caches');
   assert(parseSkillRuntimeVersion('---\nname: x\n---\n') === null, 'missing pin parses as null');
   assert(parseSkillRuntimeVersion('runtimeVersion: "9.9.9"') === '9.9.9', 'parse bare pin line');
 }

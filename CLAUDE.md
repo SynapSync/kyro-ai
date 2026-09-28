@@ -2,14 +2,15 @@
 
 ## Overview
 
-Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based project execution through one orchestrator agent, built-in checkpoints, and persistent learning.
+Kyro is a **workflow** (not a standalone skill) with separate Forge and Work paths, CLI-owned state, built-in checkpoints, and persistent learning.
 
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/kyro:forge, /kyro:status, /kyro:task-context)
-  └── Agent (orchestrator)
-        └── Skill (core)
+User Command (/kyro-forge, /kyro-status, /kyro-work, and other native skills)
+  └── Projected command skill
+        └── Canonical runtime router
+              └── Routed workflow engine
 ```
 
 ## Directory Structure
@@ -18,24 +19,22 @@ User Command (/kyro:forge, /kyro:status, /kyro:task-context)
 kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
-├── commands/         # 5 slash commands
+├── commands/         # 7 canonical command routers
 │   ├── forge.md      # /kyro:forge — full cycle with gates
 │   ├── status.md     # /kyro:status — progress and debt summary
 │   ├── idea.md       # /kyro:idea — idea maturation pre-scope (optional)
 │   ├── qa.md         # /kyro:qa — certification and quality audit (independent)
-│   └── task-context.md # /kyro:task-context — fresh-context continuation prompt
-├── internal/skills/  # 4 workflow engines; not Claude slash commands
+│   ├── task-context.md # /kyro:task-context — fresh-context continuation prompt
+│   ├── scope-retire.md # /kyro:scope-retire — human-gated obsolete-scope retirement
+│   └── work.md      # /kyro:work — explicitly selected Work lifecycle
+├── internal/skills/  # workflow engines; not public Claude commands
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │   ├── seedbed/           # Idea maturation pre-scope — matures a rough idea into a structured brief (loaded only via /kyro:idea)
 │   ├── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
-│   └── kyro-sprint-executor/ # Strict standalone sprint executor for external hosts — projected to agent skill roots on install/sync
-├── providers/claude/commands/ # 5 public Claude wrappers over canonical command routers
-├── .claude-plugin/   # Claude Code adapter packaging
-│   ├── plugin.json   # Plugin manifest (version must match package.json)
-│   ├── marketplace.json # Marketplace listing metadata
-│   ├── settings.json # Default permissions
-│   └── README.md     # Installation instructions
-├── docs/             # 10 markdown guides plus architecture.mmd
+│   ├── kyro-sprint-executor/ # Strict standalone sprint executor for external hosts — projected to agent skill roots on install/sync
+│   └── organic-work/ # Explicitly selected Work lifecycle
+├── src/cli/adapters/claude.ts # CLI-managed Claude skill projection
+├── docs/             # User, developer, and release guides
 ├── config.json       # Workflow configuration
 ├── package.json      # NPM package definition
 └── WORKFLOW.yaml     # Workflow definition (version must match package.json)
@@ -83,13 +82,12 @@ npm install
 npm run build
 ```
 
-## Plugin Metadata
+## Release Metadata
 
-Claude Code adapter metadata lives in the `.claude-plugin/` directory. When updating version, description, or capabilities, keep these files in sync:
+Claude Code uses the CLI-managed adapter, not a plugin. When updating version, description, or capabilities, keep these files in sync:
 
 - `package.json` — canonical version and description (source of truth)
-- `.claude-plugin/plugin.json` — plugin manifest (version must match package.json)
-- `.claude-plugin/marketplace.json` — marketplace listing (description and agent/command/skill counts)
+- `package-lock.json` — root package version and reproducible dependencies
 - `WORKFLOW.yaml` — human-readable workflow definition (version, agents list)
 
 ### Version & Description Update Checklist
@@ -100,10 +98,10 @@ When bumping version or changing the description:
    - Change `"version": "X.Y.Z"`
    - Change `"description": "..."`
 
-2. **Sync 3 other files** to match:
-   - `.claude-plugin/plugin.json` — update `"version"`
-   - `.claude-plugin/marketplace.json` — update `"description"`
+2. **Sync release files** to match:
+   - `package-lock.json` — update root package versions
    - `WORKFLOW.yaml` — update `version:` and optionally `description:`
+   - `docs/agent-adapters.md` — update migration guidance when behavior changes
 
 3. **Compile and verify:**
    ```bash
@@ -113,4 +111,4 @@ When bumping version or changing the description:
 
 4. **Commit with message** containing: "chore: bump version to X.Y.Z" or "docs: update descriptions"
 
-⚠️ **Important:** All 4 files must be kept in sync. Mismatched versions will cause installation issues.
+⚠️ **Important:** Package, lockfile, and workflow versions must stay in sync. Mismatches cause installation issues.

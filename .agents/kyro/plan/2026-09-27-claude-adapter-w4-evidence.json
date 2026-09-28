@@ -1,0 +1,15 @@
+{
+  "summary": "Verified the CLI-managed Claude adapter, retired plugin packaging, documentation, and Forge/Work compatibility against the workspace build and disposable homes.",
+  "validations": [
+    { "command": "npm run build", "result": "passed", "note": "Built the final source tree." },
+    { "command": "npm run check:adapters", "result": "passed", "note": "Covered seven projected Claude skills, repeat install/sync/uninstall, collisions, symlinks, and preservation of unrelated user state." },
+    { "command": "npm run check:cli-bundle", "result": "passed", "note": "Verified package contents omit retired Claude plugin, provider wrappers, and hooks." },
+    { "command": "npm run check", "result": "passed", "note": "The complete suite passed on the final source tree, including Forge and Work regressions." },
+    { "command": "node dist/cli.js doctor --artifacts --json", "result": "passed", "note": "133 checks; no failures or warnings." },
+    { "command": "node dist/cli.js analyze --kyro-scope organic-work --json", "result": "passed", "note": "No findings." },
+    { "command": "npm pack --dry-run --json", "result": "passed", "note": "Version remains 5.1.0; required runtime assets are present and retired plugin paths are absent." },
+    { "command": "git diff --check", "result": "passed", "note": null }
+  ],
+  "filesChanged": ["scripts/check-adapter-fixtures.mjs", "scripts/check-cli-bundle.mjs", "scripts/check-versions.mjs", "scripts/check-startup-contract.mjs", "scripts/check-invocation.mjs", "package.json", "docs/release-checklist.md"],
+  "notes": "These are workspace and disposable-filesystem checks, not a real Claude Code host UI discovery test or independent QA. No version bump, release, global installation, commit, or push occurred. Existing user-installed Claude plugins were not modified. This evidence is maker-reported; the task review is not independent certification."
+}

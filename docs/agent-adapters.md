@@ -9,6 +9,7 @@ Kyro's adapter contract is: global runtime, adapter command entrypoints, and loc
 | `~/.agents/kyro/current/commands/*.md` | Thin command routers |
 | `~/.agents/kyro/current/skills/sprint-forge/` | Lazy-loaded workflow modes, helpers, templates |
 | `~/.agents/skills/kyro-*` | Standard global command skills discovered by compatible agents |
+| `~/.claude/skills/kyro-*` | Native Claude Code command skills projected by the CLI |
 | `~/.config/opencode/skills/kyro-*` | Native OpenCode command skills |
 | `~/.config/opencode/commands/kyro/*.md` | Native OpenCode slash commands |
 | `~/.config/opencode/opencode.json` `agent.kyro-orchestrator` | Kyro-owned OpenCode agent overlay |
@@ -25,6 +26,7 @@ cd /path/to/your-app
 kyro install --scope workspace --init-workspace --yes
 kyro install --agent opencode --scope workspace --init-workspace --yes
 kyro install --agent codex --scope workspace --init-workspace --yes
+kyro install --agent claude --scope workspace --init-workspace --yes
 ```
 
 Implemented adapters:
@@ -34,6 +36,7 @@ Implemented adapters:
 | `standard` | Installs global `kyro-*` command skills for compatible agents. |
 | `opencode` | Installs native OpenCode skills, `/kyro/*` command markdown, and a Kyro-owned `agent.kyro-orchestrator` overlay. |
 | `codex` | Adds global command skills plus a small Kyro block in root `AGENTS.md`. |
+| `claude` | Projects native Claude Code command skills from the shared runtime; no plugin installation. |
 
 There is intentionally no generic adapter. Root `AGENTS.md` is the standard cross-agent bootstrap.
 
@@ -94,12 +97,20 @@ Kyro preserves existing `opencode.json` content and owns only `agent.kyro-orches
 
 ## Claude
 
-Claude plugin support remains first-class through `.claude-plugin/`. Its public surface is exactly
-`/kyro-ai:forge`, `/kyro-ai:status`, `/kyro-ai:task-context`, `/kyro-ai:idea`, `/kyro-ai:qa`, `/kyro-ai:scope-retire`, and `/kyro-ai:work`.
-Provider wrappers delegate to the canonical command routers; `sprint-forge`, `seedbed`, `qa-review`,
-`kyro-sprint-executor`, and `organic-work` remain internal assets and must not appear in Claude's command menu.
-The plugin works without installing the npm CLI. The CLI adapter path remains available when a
-project needs shared state and projected runtime assets.
+Claude Code uses the same npm-installed Kyro CLI and single active runtime as other hosts:
+
+```bash
+npm install -g kyro-ai
+cd /path/to/your-app
+kyro install --agent claude --scope workspace --init-workspace --yes
+kyro doctor --adapters
+```
+
+The adapter projects seven `kyro-*` router skills under `~/.claude/skills/`. Claude users can invoke `/kyro-forge`, `/kyro-status`, `/kyro-task-context`, `/kyro-idea`, `/kyro-qa`, `/kyro-scope-retire`, and `/kyro-work`. Internal workflow engines remain in `~/.agents/kyro/current/skills/` and are not public Claude commands. Use `kyro update` to adopt a later published package; the currently running CLI and projected skill pins should match.
+
+### Migrating from the retired plugin
+
+The former plugin commands `/kyro-ai:forge`, `/kyro-ai:status`, `/kyro-ai:task-context`, `/kyro-ai:idea`, `/kyro-ai:qa`, `/kyro-ai:scope-retire`, and `/kyro-ai:work` map by suffix to `/kyro-forge`, `/kyro-status`, `/kyro-task-context`, `/kyro-idea`, `/kyro-qa`, `/kyro-scope-retire`, and `/kyro-work`. First install the CLI adapter and verify the new skills in Claude Code. Then disable or uninstall the old Kyro plugin using Claude Code's plugin manager, and restart Claude Code if it still shows cached commands. Kyro deliberately does not edit `~/.claude/settings.json`, remove marketplace registrations, or delete any plugin cache; a legacy plugin may coexist and present duplicate or stale entrypoints until you remove it. Install and doctor warn when the standard Claude plugin registry visibly mentions `kyro-ai`, but an unrecognized registry layout may not be detected. Keep plugin removal user-controlled.
 
 ## Cursor
 
@@ -119,4 +130,4 @@ All adapters can inspect Kyro's append-only trace through `kyro trace`. Trace fi
 
 Adapters report guardrail enforcement tiers through `kyro doctor --adapters`. MCP-capable adapters receive host-native MCP registration so Kyro can enforce confirm-level operations through typed tools. Text-only adapters are reported honestly as advisory where an agent could pass `--yes` unattended. See [guardrails.md](guardrails.md).
 
-The core deterministic gates (tool-owned write paths, policy `confirm`/`blocked` levels, the maker/checker boundary) live in Kyro's CLI/MCP core, so they are portable to Codex and OpenCode exactly as they are to Claude. Claude additionally ships two Claude Code plugin `PreToolUse` hooks — `guard-bash-output` (bounds unscoped recursive search) and `guard-sprint-close` (extra protection on writes near sprint close) — declared in `hooks/hooks.json` at the plugin root. These two hooks are Claude-only reinforcements, not part of the portability contract: Codex and OpenCode agents get the same CLI-enforced correctness guarantees, minus those two extra safety nets.
+The core deterministic gates (tool-owned write paths, policy `confirm`/`blocked` levels, and the maker/checker boundary) live in Kyro's CLI/MCP core and are portable to Claude, Codex, and OpenCode. The retired Claude plugin previously added two `PreToolUse` hooks for unbounded Bash search and writes near sprint close. The CLI adapter does not install these host-level interceptions: arbitrary shell commands outside Kyro's CLI are not blocked by Kyro. Use bounded search output and supported CLI verbs; do not describe removal of the hooks as equivalent host protection.

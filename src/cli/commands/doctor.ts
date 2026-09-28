@@ -18,7 +18,7 @@ import {
   resolveInvocationSpawn,
   resolveKyroBinaryPath,
 } from '../invocation';
-import { managedPathExists, readJsonFromPackage, readPackageText, resolveManagedPath } from '../fs';
+import { managedPathExists, readPackageText, resolveManagedPath } from '../fs';
 import { readPackageVersion } from '../help';
 import {
   assertPersistedLegacyScopeCachesMigratable,
@@ -84,7 +84,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
   const rootMode = detectPackageRootMode();
   const packagingChecks =
     rootMode === 'full-package'
-      ? [checkPackageVersionSync(), checkPackageAssets(), checkClaudePlugin()]
+      ? [checkPackageVersionSync(), checkPackageAssets()]
       : rootMode === 'projected-runtime'
         ? [checkProjectedRuntimeRoot(), checkProjectedRuntimeShape()]
         : [checkUnknownRoot()];
@@ -204,13 +204,12 @@ function checkTraceSummary(kyroScope: string | null): CheckResult[] {
 function checkPackageVersionSync(): CheckResult {
   try {
     const pkgVersion = readPackageVersion();
-    const pluginVersion = readJsonFromPackage<{ version: string }>('.claude-plugin/plugin.json').version;
     const workflowVersion = readYamlVersion('WORKFLOW.yaml');
-    if (pkgVersion !== pluginVersion || pkgVersion !== workflowVersion) {
+    if (pkgVersion !== workflowVersion) {
       return {
         status: 'fail',
         name: 'package versions',
-        detail: `package=${pkgVersion}, plugin=${pluginVersion}, workflow=${workflowVersion}`,
+        detail: `package=${pkgVersion}, workflow=${workflowVersion}`,
         remedy: 'Run npm run check:versions and align version fields.',
       };
     }
@@ -227,14 +226,6 @@ function checkPackageAssets(): CheckResult {
     return { status: 'fail', name: 'package assets', detail: `missing ${missing.join(', ')}` };
   }
   return { status: 'pass', name: 'package assets', detail: 'required Kyro assets exist' };
-}
-
-function checkClaudePlugin(): CheckResult {
-  const pluginPath = resolve(PACKAGE_ROOT, '.claude-plugin/plugin.json');
-  if (!existsSync(pluginPath)) {
-    return { status: 'fail', name: 'Claude plugin adapter', detail: '.claude-plugin/plugin.json missing' };
-  }
-  return { status: 'pass', name: 'Claude plugin adapter', detail: 'first-class adapter assets present' };
 }
 
 /**

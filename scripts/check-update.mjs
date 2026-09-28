@@ -219,7 +219,8 @@ if (process.platform !== 'win32') {
     writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${npmLog}"\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${packageVersion}"\\n' ;;\nesac\n`);
     chmodSync(npmStub, 0o755);
     const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
-    for (const [runtimeVersion, expected] of [[null, 'refresh'], ['4.0.0', 'refresh'], [packageVersion, 'latest'], ['6.0.0', 'blocked']]) {
+    const newerRuntimeVersion = `${Number(packageVersion.split('.')[0]) + 1}.0.0`;
+    for (const [runtimeVersion, expected] of [[null, 'refresh'], ['4.0.0', 'refresh'], [packageVersion, 'latest'], [newerRuntimeVersion, 'blocked']]) {
       if (runtimeVersion === null) rmSync(manifest, { force: true });
       else writeFileSync(manifest, JSON.stringify({ packageVersion: runtimeVersion }));
       for (const flag of ['--check', '--dry-run', '--yes']) {
@@ -227,7 +228,7 @@ if (process.platform !== 'win32') {
         const result = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', flag], { cwd: fixture, env, encoding: 'utf8' });
         const output = result.stdout + result.stderr;
         if (expected === 'blocked') {
-          assert(output.includes('6.0.0') && !output.includes('latest release'), `${flag} must diagnose newer runtime: ${output}`);
+          assert(output.includes(newerRuntimeVersion) && !output.includes('latest release'), `${flag} must diagnose newer runtime: ${output}`);
           assert(result.status === (flag === '--yes' ? 1 : 0), `${flag} returned unexpected status for newer runtime: ${result.status}`);
         } else if (expected === 'refresh') {
           assert(result.status === 0 && output.includes('refresh'), `${flag} must refresh or preview missing/older runtime: ${output}`);

@@ -3,6 +3,7 @@ import { getAdapterDefinition } from '../adapters/registry';
 import { KyroCoreError } from '../core/errors';
 import type { AdapterDefinition, DetectionResult } from '../adapters/registry-types';
 import type { Agent, OperationPlan } from '../types';
+import { legacyClaudePluginDetected } from '../adapters/claude';
 
 export interface AdapterPreflightResult {
   adapter: AdapterDefinition;
@@ -34,6 +35,9 @@ function printAdapterPreflight(command: 'install' | 'sync', results: AdapterPref
     const detectionText = result.detection.installed ? 'detected' : 'not-detected';
     const nativeTargets = describeNativeTargets(result);
     console.log(`- ${result.adapter.agent}: status=${result.adapter.status}; detection=${detectionText}; config=${result.detection.configPath ?? 'none'}; binary=${result.detection.binaryPath ?? 'not-found'}; capabilities=${capabilityText}; nativeTargets=${nativeTargets}`);
+    if (result.adapter.agent === 'claude' && legacyClaudePluginDetected()) {
+      console.log('  Warning: a legacy Kyro Claude plugin may also be installed. Verify the new /kyro-* skills, then disable or uninstall the old plugin in Claude Code; Kyro will not change plugin settings.');
+    }
   }
 }
 

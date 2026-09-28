@@ -37,9 +37,10 @@ Agent-specific installs (still from the project root):
 ```bash
 kyro install --agent opencode --scope workspace --init-workspace --yes
 kyro install --agent codex --scope workspace --init-workspace --yes
+kyro install --agent claude --scope workspace --init-workspace --yes
 ```
 
-Claude Code can use the first-class plugin independently, without installing the npm CLI (see [README](../README.md#install-claude-code-plugin)). Install the CLI only when you want its projected runtime or shared project state.
+Claude Code receives native `kyro-*` skills under `~/.claude/skills/` from its CLI adapter. If you have an older Kyro plugin, verify the new skills before disabling or uninstalling the plugin in Claude Code. Kyro never changes those plugin settings automatically; see [Agent adapters](agent-adapters.md#claude).
 
 ## What gets installed
 
@@ -67,10 +68,12 @@ Global command skills:
 ├── kyro-task-context/SKILL.md
 ├── kyro-idea/SKILL.md
 ├── kyro-qa/SKILL.md
-└── kyro-scope-retire/SKILL.md
+├── kyro-scope-retire/SKILL.md
+└── kyro-work/SKILL.md
 ```
 
 OpenCode installs equivalent native entrypoints under `~/.config/opencode/` when you use `--agent opencode`.
+Claude projects the same command skills under `~/.claude/skills/` when you use `--agent claude`.
 
 Project state (layered):
 
@@ -95,7 +98,7 @@ Full multi-dev commit matrix: [Teams](teams.md).
 
 `npm install -g kyro-ai` provides the durable CLI. `kyro install` records an agent-safe invocation in the global runtime `manifest.json`; on Windows, that invocation uses Node and the projected CLI because a `.cmd` shim cannot be spawned directly by Node. Project state files do not store the CLI string. A one-time install refreshes it for projected agent modes across workspaces.
 
-Installed as a **Claude Code plugin** instead? Its plugin commands work without the npm CLI or projected runtime; CLI-only operations still require the full npm package.
+The old Claude plugin-only path is not part of the current distribution. Use the global npm CLI for new Claude installations and `kyro update` for published upgrades.
 
 Upgrading (from the project root) is one command — it checks the registry for the latest
 release, updates the global package when behind, and refreshes the runtime plus the current
@@ -122,10 +125,10 @@ Use the installed command skill or slash command:
 kyro-forge auth-refactor
 ```
 
-or, in Claude-style slash command environments:
+or, in Claude Code after installing its adapter:
 
 ```text
-/kyro:forge auth-refactor
+/kyro-forge auth-refactor
 ```
 
 Kyro routes progressively:

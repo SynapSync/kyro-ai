@@ -89,7 +89,7 @@ If the work is not acceptable, reject it or request changes with specific remedi
 
 ## Operating Context — kyro-ai Integration
 
-**Resolve `{{KYRO_CLI}}` before use.** Install/sync substitutes it. Otherwise try `kyro --version`; if available, use `kyro`. Else use `node ~/.agents/kyro/current/dist/cli.js` if present. For a Claude plugin alone, use `node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js"` if that file exists. Otherwise stop and advise `npm install -g kyro-ai`, then from the project root global `kyro` with `install --scope workspace --init-workspace --yes`.
+**Resolve `{{KYRO_CLI}}` before use.** Install/sync substitutes it. Otherwise try `kyro --version`; if available, use `kyro`. Else use `node ~/.agents/kyro/current/dist/cli.js` if present. Otherwise stop and advise `npm install -g kyro-ai`, then from the project root global `kyro` with `install --scope workspace --init-workspace --yes`.
 
 This skill is part of the **kyro-ai** system. Sprint artifacts live at:
 

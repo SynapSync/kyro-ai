@@ -1,0 +1,537 @@
+{
+  "schemaVersion": 1,
+  "kind": "organic-work",
+  "id": "claude-cli-adapter-migration",
+  "title": "Migrate Claude from plugin distribution to a CLI-managed adapter",
+  "objective": "Claude users should receive the same CLI-owned Kyro runtime, skill routing, updates, and diagnostics as other hosts. Removing the separately installed Claude plugin eliminates a second release channel and stale plugin caches, while a documented, non-destructive migration prevents existing users from losing access or seeing duplicate commands.",
+  "brief": {
+    "path": "brief.md",
+    "digest": "78f703547e19db884a29b7f137629f9724791851f12e36afc3e798f2d8275d49",
+    "sourceIdea": {
+      "path": ".agents/kyro/plan/2026-09-27-claude-cli-adapter-migration.md",
+      "digest": "78f703547e19db884a29b7f137629f9724791851f12e36afc3e798f2d8275d49",
+      "title": "Migrate Claude from plugin distribution to a CLI-managed adapter"
+    }
+  },
+  "state": "closed",
+  "revision": 15,
+  "createdAt": "2026-09-27T17:28:06.780Z",
+  "updatedAt": "2026-09-27T18:07:30.643Z",
+  "handoff": {
+    "nextAction": "done",
+    "nextTaskId": null,
+    "blockedReason": null
+  },
+  "tasks": [
+    {
+      "id": "W1",
+      "title": "Implement a safe CLI-managed Claude adapter",
+      "description": "Make Claude installable through the existing adapter registry, projecting all seven router-first command skills into the native Claude skills root and integrating install, sync, doctor, and uninstall ownership.",
+      "context": "Reuse the shared command-skill projection and existing operation-plan safeguards. Preserve unrelated Claude files and never remove an external plugin. Test fresh installation, idempotence, collisions, stale projection diagnostics, and coexistence with other adapters.",
+      "filesToTouch": [
+        "src/cli/adapters/claude.ts",
+        "src/cli/adapters/registry.ts",
+        "src/cli/options.ts",
+        "src/cli/drift.ts",
+        "scripts/check-adapter-fixtures.mjs"
+      ],
+      "acceptanceCriteria": [
+        "Claude is an implemented adapter and `kyro install --agent claude` projects exactly the seven public Kyro command skills through the shared runtime.",
+        "Install, sync, doctor, and uninstall preserve unrelated Claude content, detect missing or stale managed skills, and fail closed on unsafe or foreign paths.",
+        "Disposable fixtures prove repeat installation, coexistence with standard/Codex/OpenCode, and no automatic legacy-plugin removal."
+      ],
+      "dependsOn": [],
+      "definitionRevision": 1,
+      "status": "verified",
+      "blocker": null,
+      "evidence": {
+        "summary": "Implemented the CLI-managed Claude adapter with native router skills, guarded projection writes, migration warning, doctor checks, drift ownership, and disposable install/sync/uninstall regressions.",
+        "validations": [
+          {
+            "command": "npm run build",
+            "result": "passed",
+            "note": "TypeScript compiled and the workspace CLI was refreshed."
+          },
+          {
+            "command": "npm run check:adapters",
+            "result": "passed",
+            "note": "Disposable adapter fixtures covered collisions, symlinks, repair, repeat sync, coexistence preview, and legacy-plugin preservation."
+          }
+        ],
+        "filesChanged": [
+          "src/cli/adapters/claude.ts",
+          "src/cli/adapters/registry.ts",
+          "src/cli/options.ts",
+          "src/cli/drift.ts",
+          "src/cli/types.ts",
+          "src/cli/pipeline/operation-steps.ts",
+          "src/cli/commands/preflight.ts",
+          "scripts/check-adapter-fixtures.mjs"
+        ],
+        "notes": "This is maker-reported task evidence. A real Claude UI discovery smoke remains a separate release gate.",
+        "by": "codex-maker",
+        "recordedAt": "2026-09-27T17:33:39.428Z",
+        "definitionRevision": 1,
+        "materialDigest": "114f24783eaf5e14a1d8d861f9c414d4a9db9e87ecee308830fab2c14d655344"
+      },
+      "verdict": {
+        "result": "pass",
+        "checkedCriteria": [
+          "Claude is an implemented adapter and `kyro install --agent claude` projects exactly the seven public Kyro command skills through the shared runtime.",
+          "Install, sync, doctor, and uninstall preserve unrelated Claude content, detect missing or stale managed skills, and fail closed on unsafe or foreign paths.",
+          "Disposable fixtures prove repeat installation, coexistence with standard/Codex/OpenCode, and no automatic legacy-plugin removal."
+        ],
+        "findings": [],
+        "by": "codex-checker",
+        "reviewedAt": "2026-09-27T17:33:45.219Z",
+        "definitionRevision": 1,
+        "evidenceDigest": "fc889edce74e5c050545c9b1dfa44b1a9fdf6f6b71188860383c1062866e5ec5",
+        "reviewedMaterialDigest": "114f24783eaf5e14a1d8d861f9c414d4a9db9e87ecee308830fab2c14d655344"
+      },
+      "disposition": null
+    },
+    {
+      "id": "W2",
+      "title": "Retire Claude plugin packaging and plugin-only fallbacks",
+      "description": "Remove plugin manifests, wrappers, hooks, and their active package entries; replace plugin-specific doctor, version, startup, bundle, and packaging assumptions with adapter-focused checks.",
+      "context": "Do not remove historical plans or changelog facts. Preserve portable CLI guard checks and root runtime assets. The tarball must not contain retired plugin assets, and the active instructions must not invoke CLAUDE_PLUGIN_ROOT.",
+      "filesToTouch": [
+        "package.json",
+        "src/cli/commands/doctor.ts",
+        "src/cli/adapters/command-skills.ts",
+        "scripts/check-versions.mjs",
+        "scripts/check-startup-contract.mjs",
+        "scripts/check-cli-bundle.mjs",
+        "agents/orchestrator.md",
+        "internal/skills/sprint-forge/SKILL.md",
+        "internal/skills/qa-review/SKILL.md",
+        "internal/skills/kyro-sprint-executor/SKILL.md"
+      ],
+      "acceptanceCriteria": [
+        "The npm package excludes `.claude-plugin`, `providers/claude/commands`, and `hooks`, with automated absence assertions.",
+        "Doctor, version, startup, and bundle checks pass without plugin metadata or plugin-only CLI fallbacks.",
+        "The retired Claude-only Bash hooks are not represented as portable CLI enforcement, and existing Forge/Work CLI guard checks remain green."
+      ],
+      "dependsOn": [
+        "W1"
+      ],
+      "definitionRevision": 1,
+      "status": "verified",
+      "blocker": null,
+      "evidence": {
+        "summary": "Retired Claude plugin manifests, wrappers, and host-only hooks from the package; removed plugin CLI fallbacks and converted version, doctor, startup, and bundle checks to the CLI-managed adapter contract.",
+        "validations": [
+          {
+            "command": "npm run build",
+            "result": "passed",
+            "note": "Workspace CLI compiled after plugin retirement."
+          },
+          {
+            "command": "npm run check:versions",
+            "result": "passed",
+            "note": "Package, lockfile, and workflow versions agree without plugin metadata."
+          },
+          {
+            "command": "npm run check:startup-contract",
+            "result": "passed",
+            "note": "Both active entrypoints resolve only CLI-owned runtimes."
+          },
+          {
+            "command": "npm run check:cli-bundle",
+            "result": "passed",
+            "note": "The isolated tarball fixture rejects retired Claude plugin paths."
+          },
+          {
+            "command": "npm run check:guardrails",
+            "result": "passed",
+            "note": "Portable CLI guard invariants remain green without Claude hooks."
+          },
+          {
+            "command": "npm run check:work-lifecycle",
+            "result": "passed",
+            "note": "Work lifecycle and Forge isolation remain green."
+          },
+          {
+            "command": "git diff --check",
+            "result": "passed",
+            "note": null
+          }
+        ],
+        "filesChanged": [
+          "package.json",
+          "src/cli/commands/doctor.ts",
+          "src/cli/adapters/command-skills.ts",
+          "scripts/check-versions.mjs",
+          "scripts/check-startup-contract.mjs",
+          "scripts/check-cli-bundle.mjs",
+          "agents/orchestrator.md",
+          "internal/skills/sprint-forge/SKILL.md",
+          "internal/skills/qa-review/SKILL.md",
+          "internal/skills/kyro-sprint-executor/SKILL.md",
+          ".claude-plugin/plugin.json",
+          ".claude-plugin/settings.json",
+          ".claude-plugin/marketplace.json",
+          ".claude-plugin/README.md",
+          "hooks/hooks.json",
+          "hooks/guard-bash-output.mjs",
+          "hooks/guard-sprint-close.mjs",
+          "providers/claude/commands/forge.md",
+          "providers/claude/commands/status.md",
+          "providers/claude/commands/task-context.md",
+          "providers/claude/commands/idea.md",
+          "providers/claude/commands/qa.md",
+          "providers/claude/commands/scope-retire.md",
+          "providers/claude/commands/work.md",
+          "scripts/check-claude-plugin-surface.mjs",
+          "scripts/check-bash-guard.mjs",
+          "scripts/check-sprint-guard.mjs"
+        ],
+        "notes": "The removed files are repository package assets, not any user's installed Claude plugin. Full aggregate verification remains W4.",
+        "by": "codex-maker",
+        "recordedAt": "2026-09-27T17:36:41.360Z",
+        "definitionRevision": 1,
+        "materialDigest": "affabe8d31570bc61511df3c53be206eddfeec2a5065c2f24fa266cf6611c2c1"
+      },
+      "verdict": {
+        "result": "pass",
+        "checkedCriteria": [
+          "The npm package excludes `.claude-plugin`, `providers/claude/commands`, and `hooks`, with automated absence assertions.",
+          "Doctor, version, startup, and bundle checks pass without plugin metadata or plugin-only CLI fallbacks.",
+          "The retired Claude-only Bash hooks are not represented as portable CLI enforcement, and existing Forge/Work CLI guard checks remain green."
+        ],
+        "findings": [],
+        "by": "codex-checker",
+        "reviewedAt": "2026-09-27T17:36:41.721Z",
+        "definitionRevision": 1,
+        "evidenceDigest": "9219340dab593c93d6fe0dc58b50636d4baa5b309d86d52184cdb4a29261f76f",
+        "reviewedMaterialDigest": "affabe8d31570bc61511df3c53be206eddfeec2a5065c2f24fa266cf6611c2c1"
+      },
+      "disposition": null
+    },
+    {
+      "id": "W3",
+      "title": "Document Claude adapter installation and safe plugin migration",
+      "description": "Update current user and developer guidance in English for Claude skills, install/update commands, command-name migration, duplicate-plugin warnings, and the removed-hook safety boundary.",
+      "context": "Keep historical release records intact. Explain that Kyro will not disable or uninstall a user's legacy plugin, and that real Claude UI discovery is a later release smoke gate rather than a claim proved by repository fixtures.",
+      "filesToTouch": [
+        "README.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "docs/agent-adapters.md",
+        "docs/cli.md",
+        "docs/work.md",
+        "docs/guardrails.md",
+        "docs/context-management.md",
+        "docs/getting-started.md",
+        "docs/release-checklist.md"
+      ],
+      "acceptanceCriteria": [
+        "Current documentation identifies `kyro install --agent claude` and `kyro update` as the Claude installation and update path and maps former plugin commands to native Kyro skills.",
+        "Migration guidance is non-destructive, names possible duplicate commands, and explains user-controlled removal of the old plugin.",
+        "Current safety documentation distinguishes CLI-owned guardrails from the removed Claude-only hooks, and documentation links pass."
+      ],
+      "dependsOn": [
+        "W2"
+      ],
+      "definitionRevision": 1,
+      "status": "verified",
+      "blocker": null,
+      "evidence": {
+        "summary": "Updated English user, developer, CLI, Work, guardrail, getting-started, and release guidance for CLI-managed Claude skills and a non-destructive migration from the retired plugin.",
+        "validations": [
+          {
+            "command": "npm run check:links",
+            "result": "passed",
+            "note": "All 91 checked Markdown files have valid relative links."
+          },
+          {
+            "command": "npm run check:adapters",
+            "result": "passed",
+            "note": "The documented native Claude projection remains aligned with adapter fixtures."
+          },
+          {
+            "command": "git diff --check",
+            "result": "passed",
+            "note": null
+          }
+        ],
+        "filesChanged": [
+          "README.md",
+          "AGENTS.md",
+          "CLAUDE.md",
+          "docs/agent-adapters.md",
+          "docs/cli.md",
+          "docs/work.md",
+          "docs/guardrails.md",
+          "docs/context-management.md",
+          "docs/getting-started.md",
+          "docs/release-checklist.md"
+        ],
+        "notes": "Historical plans and revision-pinned diagrams remain historical records. A real Claude Code UI smoke is a separate release gate; filesystem fixtures do not prove host discovery.",
+        "by": "codex-maker",
+        "recordedAt": "2026-09-27T17:39:16.318Z",
+        "definitionRevision": 1,
+        "materialDigest": "d4bd3eafcf79ab91ec53a6161c9950c2e7cc5ebc06a6a245b5c03a054c8583c5"
+      },
+      "verdict": {
+        "result": "pass",
+        "checkedCriteria": [
+          "Current documentation identifies `kyro install --agent claude` and `kyro update` as the Claude installation and update path and maps former plugin commands to native Kyro skills.",
+          "Migration guidance is non-destructive, names possible duplicate commands, and explains user-controlled removal of the old plugin.",
+          "Current safety documentation distinguishes CLI-owned guardrails from the removed Claude-only hooks, and documentation links pass."
+        ],
+        "findings": [],
+        "by": "codex-checker",
+        "reviewedAt": "2026-09-27T17:39:17.075Z",
+        "definitionRevision": 1,
+        "evidenceDigest": "40ad4504f14322caed5f1083398027a1ec1e1edcdb5ce73c935b8bbfc34e2811",
+        "reviewedMaterialDigest": "d4bd3eafcf79ab91ec53a6161c9950c2e7cc5ebc06a6a245b5c03a054c8583c5"
+      },
+      "disposition": null
+    },
+    {
+      "id": "W4",
+      "title": "Verify plugin-free Claude integration and portable workflow parity",
+      "description": "Run targeted and aggregate checks, isolated package/adapter smoke, artifact diagnostics, and source/package scans; fix regressions found before recording the final Work review.",
+      "context": "Use the workspace build and disposable homes; do not install globally, release, commit, or push. Treat a real Claude host UI smoke as an explicit later release gate. Distinguish environmental doctor skew from implementation failures.",
+      "filesToTouch": [
+        "scripts/check-adapter-fixtures.mjs",
+        "scripts/check-cli-bundle.mjs",
+        "scripts/check-versions.mjs",
+        "package.json",
+        "docs/release-checklist.md"
+      ],
+      "acceptanceCriteria": [
+        "Build, targeted adapter and package checks, full `npm run check`, artifact doctor, analyze, package dry run, and `git diff --check` pass or any failure is reported without a pass claim.",
+        "Disposable package and adapter probes prove a plugin-free tarball, seven Claude skills, safe repeated installation/removal, and unchanged Forge/Work behavior.",
+        "The final evidence names verification limits and confirms no version bump, release, global installation, commit, or push occurred."
+      ],
+      "dependsOn": [
+        "W3"
+      ],
+      "definitionRevision": 1,
+      "status": "verified",
+      "blocker": null,
+      "evidence": {
+        "summary": "Verified the CLI-managed Claude adapter, retired plugin packaging, documentation, and Forge/Work compatibility against the workspace build and disposable homes.",
+        "validations": [
+          {
+            "command": "npm run build",
+            "result": "passed",
+            "note": "Built the final source tree."
+          },
+          {
+            "command": "npm run check:adapters",
+            "result": "passed",
+            "note": "Covered seven projected Claude skills, repeat install/sync/uninstall, collisions, symlinks, and preservation of unrelated user state."
+          },
+          {
+            "command": "npm run check:cli-bundle",
+            "result": "passed",
+            "note": "Verified package contents omit retired Claude plugin, provider wrappers, and hooks."
+          },
+          {
+            "command": "npm run check",
+            "result": "passed",
+            "note": "The complete suite passed on the final source tree, including Forge and Work regressions."
+          },
+          {
+            "command": "node dist/cli.js doctor --artifacts --json",
+            "result": "passed",
+            "note": "133 checks; no failures or warnings."
+          },
+          {
+            "command": "node dist/cli.js analyze --kyro-scope organic-work --json",
+            "result": "passed",
+            "note": "No findings."
+          },
+          {
+            "command": "npm pack --dry-run --json",
+            "result": "passed",
+            "note": "Version remains 5.1.0; required runtime assets are present and retired plugin paths are absent."
+          },
+          {
+            "command": "git diff --check",
+            "result": "passed",
+            "note": null
+          }
+        ],
+        "filesChanged": [
+          "scripts/check-adapter-fixtures.mjs",
+          "scripts/check-cli-bundle.mjs",
+          "scripts/check-versions.mjs",
+          "scripts/check-startup-contract.mjs",
+          "scripts/check-invocation.mjs",
+          "package.json",
+          "docs/release-checklist.md"
+        ],
+        "notes": "These are workspace and disposable-filesystem checks, not a real Claude Code host UI discovery test or independent QA. No version bump, release, global installation, commit, or push occurred. Existing user-installed Claude plugins were not modified. This evidence is maker-reported; the task review is not independent certification.",
+        "by": "codex-maker",
+        "recordedAt": "2026-09-27T18:07:17.013Z",
+        "definitionRevision": 1,
+        "materialDigest": "6af60a1a8d083f5fe67d9c54ffc60d5104d2eef3e06c3c6e40c294f0d1343547"
+      },
+      "verdict": {
+        "result": "pass",
+        "checkedCriteria": [
+          "Build, targeted adapter and package checks, full `npm run check`, artifact doctor, analyze, package dry run, and `git diff --check` pass or any failure is reported without a pass claim.",
+          "Disposable package and adapter probes prove a plugin-free tarball, seven Claude skills, safe repeated installation/removal, and unchanged Forge/Work behavior.",
+          "The final evidence names verification limits and confirms no version bump, release, global installation, commit, or push occurred."
+        ],
+        "findings": [],
+        "by": "codex-checker",
+        "reviewedAt": "2026-09-27T18:07:21.242Z",
+        "definitionRevision": 1,
+        "evidenceDigest": "1b7540243d41eab4d52efa986a9a397bad70f83af385206e30629844860bd579",
+        "reviewedMaterialDigest": "6af60a1a8d083f5fe67d9c54ffc60d5104d2eef3e06c3c6e40c294f0d1343547"
+      },
+      "disposition": null
+    }
+  ],
+  "activity": [
+    {
+      "seq": 1,
+      "at": "2026-09-27T17:28:06.780Z",
+      "event": "created",
+      "taskId": null,
+      "by": "maintainer",
+      "reason": "Created through the Work CLI.",
+      "revision": 1
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-27T17:28:56.212Z",
+      "event": "tasks_planned",
+      "taskId": null,
+      "by": "maintainer",
+      "reason": "Planned 4 Work tasks.",
+      "revision": 2
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-27T17:29:00.427Z",
+      "event": "task_started",
+      "taskId": "W1",
+      "by": "maintainer",
+      "reason": "Task started through the Work CLI.",
+      "revision": 3
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-27T17:33:39.428Z",
+      "event": "evidence_recorded",
+      "taskId": "W1",
+      "by": "codex-maker",
+      "reason": "Evidence recorded with 2 validation results.",
+      "revision": 4
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-27T17:33:45.219Z",
+      "event": "review_recorded",
+      "taskId": "W1",
+      "by": "codex-checker",
+      "reason": "Task review recorded with pass.",
+      "revision": 5
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-27T17:33:54.606Z",
+      "event": "task_started",
+      "taskId": "W2",
+      "by": "maintainer",
+      "reason": "Task started through the Work CLI.",
+      "revision": 6
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-27T17:36:41.360Z",
+      "event": "evidence_recorded",
+      "taskId": "W2",
+      "by": "codex-maker",
+      "reason": "Evidence recorded with 7 validation results.",
+      "revision": 7
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-27T17:36:41.721Z",
+      "event": "review_recorded",
+      "taskId": "W2",
+      "by": "codex-checker",
+      "reason": "Task review recorded with pass.",
+      "revision": 8
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-27T17:36:47.054Z",
+      "event": "task_started",
+      "taskId": "W3",
+      "by": "maintainer",
+      "reason": "Task started through the Work CLI.",
+      "revision": 9
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-27T17:39:16.318Z",
+      "event": "evidence_recorded",
+      "taskId": "W3",
+      "by": "codex-maker",
+      "reason": "Evidence recorded with 3 validation results.",
+      "revision": 10
+    },
+    {
+      "seq": 11,
+      "at": "2026-09-27T17:39:17.075Z",
+      "event": "review_recorded",
+      "taskId": "W3",
+      "by": "codex-checker",
+      "reason": "Task review recorded with pass.",
+      "revision": 11
+    },
+    {
+      "seq": 12,
+      "at": "2026-09-27T17:39:21.651Z",
+      "event": "task_started",
+      "taskId": "W4",
+      "by": "maintainer",
+      "reason": "Task started through the Work CLI.",
+      "revision": 12
+    },
+    {
+      "seq": 13,
+      "at": "2026-09-27T18:07:17.013Z",
+      "event": "evidence_recorded",
+      "taskId": "W4",
+      "by": "codex-maker",
+      "reason": "Evidence recorded with 8 validation results.",
+      "revision": 13
+    },
+    {
+      "seq": 14,
+      "at": "2026-09-27T18:07:21.242Z",
+      "event": "review_recorded",
+      "taskId": "W4",
+      "by": "codex-checker",
+      "reason": "Task review recorded with pass.",
+      "revision": 14
+    },
+    {
+      "seq": 15,
+      "at": "2026-09-27T18:07:30.643Z",
+      "event": "work_closed",
+      "taskId": null,
+      "by": "codex-maker",
+      "reason": "All four migration tasks are verified; workspace checks pass, with real Claude host discovery and independent QA reserved for release certification.",
+      "revision": 15
+    }
+  ],
+  "closure": {
+    "outcome": "completed",
+    "reason": "All four migration tasks are verified; workspace checks pass, with real Claude host discovery and independent QA reserved for release certification.",
+    "by": "codex-maker",
+    "closedAt": "2026-09-27T18:07:30.643Z",
+    "briefDigest": "78f703547e19db884a29b7f137629f9724791851f12e36afc3e798f2d8275d49",
+    "finalRevision": 15
+  },
+  "promotion": null
+}

@@ -1,0 +1,8 @@
+{
+  "checkedCriteria": [
+    "The npm package excludes `.claude-plugin`, `providers/claude/commands`, and `hooks`, with automated absence assertions.",
+    "Doctor, version, startup, and bundle checks pass without plugin metadata or plugin-only CLI fallbacks.",
+    "The retired Claude-only Bash hooks are not represented as portable CLI enforcement, and existing Forge/Work CLI guard checks remain green."
+  ],
+  "findings": []
+}

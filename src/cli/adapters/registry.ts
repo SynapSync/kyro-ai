@@ -1,6 +1,7 @@
 import { AGENT } from '../constants';
 import type { Agent } from '../types';
 import { codexAdapter } from './codex';
+import { claudeAdapter } from './claude';
 import { detectFromPaths } from './detection';
 import { openCodeAdapter } from './opencode';
 import { standardAgentsAdapter } from './standard';
@@ -54,23 +55,7 @@ export const ADAPTERS: AdapterDefinition[] = [
   standardAgentsAdapter,
   openCodeAdapter,
   codexAdapter,
-  plannedAdapter(
-    AGENT.CLAUDE,
-    'Claude plugin',
-    (homeDir) => ({
-      globalConfigDir: `${homeDir}/.claude`,
-      systemPromptPath: `${homeDir}/.claude/CLAUDE.md`,
-      skillsDir: `${homeDir}/.claude/skills`,
-      commandsDir: `${homeDir}/.claude/commands`,
-      settingsPath: `${homeDir}/.claude/settings.json`,
-      mcpConfigPath: `${homeDir}/.claude/mcp`,
-      subAgentsDir: `${homeDir}/.claude/agents`,
-      outputStylesDir: `${homeDir}/.claude/output-styles`,
-    }),
-    'managed-block',
-    'separate-files',
-    'claude',
-  ),
+  claudeAdapter,
   plannedAdapter(
     AGENT.CURSOR,
     'Cursor',

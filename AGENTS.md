@@ -2,14 +2,15 @@
 
 ## Overview
 
-Kyro is a **workflow** (not a standalone skill) that orchestrates sprint-based project execution through one orchestrator agent, built-in checkpoints, and persistent learning.
+Kyro is a **workflow** (not a standalone skill) with separate Forge and Work paths, CLI-owned state, built-in checkpoints, and persistent learning.
 
 ## Architecture: Command → Agent → Skill
 
 ```
-User Command (/kyro:forge, /kyro:status, /kyro:task-context, /kyro:qa, /kyro:idea, /kyro:scope-retire, /kyro:work)
-  └── Agent (orchestrator, or direct skill load for qa and idea)
-        └── Skill (core)
+Host command or skill (Claude /kyro-*, OpenCode /kyro/*, standard kyro-*)
+  └── Projected command skill
+        └── Canonical runtime router
+              └── Routed workflow engine
 ```
 
 ## Directory Structure
@@ -18,7 +19,7 @@ User Command (/kyro:forge, /kyro:status, /kyro:task-context, /kyro:qa, /kyro:ide
 kyro-ai/
 ├── agents/           # 1 agent
 │   ├── orchestrator.md # Full cycle coordinator — handles analysis, review, debugging, and sprint execution
-├── commands/         # 7 slash commands
+├── commands/         # 7 canonical command routers
 │   ├── forge.md      # /kyro:forge — full cycle with gates
 │   ├── status.md     # /kyro:status — progress and debt summary
 │   ├── task-context.md # /kyro:task-context — fresh-context prompt generation
@@ -26,18 +27,14 @@ kyro-ai/
 │   ├── qa.md         # /kyro:qa — certification audit (independent)
 │   ├── scope-retire.md # /kyro:scope-retire — human-gated scope retirement
 │   └── work.md      # /kyro:work — explicitly selected Work lifecycle
-├── internal/skills/  # 4 workflow engines; not Claude slash commands
+├── internal/skills/  # workflow engines; projected command skills route here
 │   ├── sprint-forge/      # Core orchestration — modes, helpers (analyzer, reviewer, learner, metrics, handoff), templates
 │   ├── seedbed/           # Idea maturation pre-scope — matures a rough idea into a structured brief
 │   ├── qa-review/         # Senior QA auditor — code review, architecture validation, security audit, sprint-forge verification
-│   └── kyro-sprint-executor/ # Strict standalone executor projected to external agent skill roots
-├── providers/claude/commands/ # 7 public Claude wrappers over canonical command routers
-├── .claude-plugin/  # Claude Code adapter packaging
-│   ├── plugin.json   # Plugin manifest (version must match package.json)
-│   ├── marketplace.json # Marketplace listing metadata
-│   ├── settings.json # Default permissions
-│   └── README.md     # Installation instructions
-├── docs/             # 10 markdown guides plus architecture.mmd
+│   ├── kyro-sprint-executor/ # Strict standalone executor projected to external agent skill roots
+│   └── organic-work/ # Explicitly selected Work lifecycle
+├── src/cli/adapters/claude.ts # CLI-managed Claude Code skill adapter
+├── docs/             # User, developer, and release guides
 ├── config.json       # Workflow configuration
 ├── package.json      # NPM package definition
 └── WORKFLOW.yaml     # Workflow definition (version must match package.json)
@@ -84,13 +81,12 @@ npm install
 npm run build
 ```
 
-## Plugin Metadata
+## Release Metadata
 
-Claude Code adapter metadata lives in the `.claude-plugin/` directory. When updating version, description, or capabilities, keep these files in sync:
+Claude Code uses the CLI-managed adapter, not a plugin. When updating version, description, or capabilities, keep these files in sync:
 
 - `package.json` — canonical version and description (source of truth)
-- `.claude-plugin/plugin.json` — plugin manifest (version must match package.json)
-- `.claude-plugin/marketplace.json` — marketplace listing (description and agent/command/skill counts)
+- `package-lock.json` — root package version and reproducible dependencies
 - `WORKFLOW.yaml` — human-readable workflow definition (version, agents list)
 
 ### Version & Description Update Checklist
@@ -103,12 +99,11 @@ When bumping version or changing the description:
 
 2. **Sync version-bearing files:**
    - `package-lock.json` — update the root package version entries
-   - `.claude-plugin/plugin.json` — update `"version"`
    - `WORKFLOW.yaml` — update `version:`
 
 3. **Sync release-facing docs/metadata when behavior changed:**
    - `CHANGELOG.md` — add the new version section under `Unreleased`
-   - `.claude-plugin/marketplace.json` — update descriptions only when capabilities/positioning changed
+   - `docs/agent-adapters.md` — update Claude migration guidance when adapter behavior changes
    - `AGENTS.md` / `docs/*` — update workflow guidance that release users or agents rely on
 
 4. **Compile and verify:**
