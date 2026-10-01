@@ -18,7 +18,7 @@ import {
 import { detectPackageRootMode } from '../package-root-mode';
 import type { CliOptions } from '../types';
 import { compareSemverLike } from './doctor';
-import { hasSafelyMigratableLegacySprintFiles } from '../migrations/legacy-sprints';
+import { previewLegacySprintMigrationEntries } from '../migrations/legacy-sprints';
 
 /**
  * Friendly one-step updater (`kyro update`).
@@ -468,7 +468,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     ownership,
   };
   const plan = buildUpdatePlan(facts);
-  if (facts.hasLegacyScopeCache && !hasSafelyMigratableLegacySprintFiles()) assertPersistedLegacyScopeCachesMigratable();
+  if (facts.hasLegacyScopeCache) assertPersistedLegacyScopeCachesMigratable(previewLegacySprintMigrationEntries());
   if (options.check) {
     printPlan(plan);
     return;

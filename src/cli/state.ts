@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
   ARTIFACT_ROOT,
@@ -12,6 +12,7 @@ import { readJsonFromManagedPath, readJsonFromWorkspace, resolveManagedPath } fr
 import { KyroCoreError } from './core/errors';
 import { canonicalJson } from './core/digest';
 import { scopeEntriesFromDisk, scopeEntryFromDisk } from './core/scope-entries';
+import { classifyScopeDirectory, readScopeSprint, SCOPE_DIR_CLASS } from './artifacts/scopes';
 import { assertSafeManagedPath, assertStateWriterLeaseHealthy, withStateWriterLock } from './pipeline/state-writer-lock';
 import type {
   KyroLocalProjectState,
@@ -52,29 +53,47 @@ export function readMonolitoProjectState(): KyroProjectState | null {
 }
 
 /** Refuse to discard the only persisted identity of a legacy scope during migration. */
-export function assertLegacyScopeCacheMigratable(source: unknown, path: string): void {
+export function assertLegacyScopeCacheMigratable(source: unknown, path: string, projectedEntries: ReadonlyMap<string, KyroScopeEntry> = new Map()): void {
   if (!source || typeof source !== 'object' || !Object.prototype.hasOwnProperty.call(source, 'scopes')) return;
   const cache = (source as { scopes?: unknown }).scopes;
   if (!Array.isArray(cache)) {
     throw new KyroCoreError('INVALID_INPUT', `${path}.scopes is not an array.`,
       'Repair the legacy scope registry before migrating project state. No files were changed.');
   }
+  const seen = new Set<string>();
+  const guidance: string[] = [];
   const unresolved = cache.flatMap((entry: unknown, index: number) => {
     const id = entry && typeof entry === 'object' ? (entry as { id?: unknown }).id : null;
-    if (typeof id !== 'string' || !id) return [`entry ${index} has no valid id`];
+    if (typeof id !== 'string' || !id) {
+      guidance.push(`entry ${index}: inspect the malformed legacy entry manually; it has no valid id.`);
+      return [`entry ${index} has no valid id`];
+    }
+    if (seen.has(id)) {
+      guidance.push(`${id}: duplicate legacy entries require manual review before migration.`);
+      return [`${id} (duplicate legacy entry)`];
+    }
+    seen.add(id);
     try {
-      const disk = scopeEntryFromDisk(id);
-      if (!disk) return [id];
+      const disk = scopeEntryFromDisk(id) ?? projectedEntries.get(id);
+      if (!disk) {
+        guidance.push(describeUnresolvedLegacyScope(id));
+        return [id];
+      }
       const legacy = entry as Record<string, unknown>;
       const unknownFields = Object.keys(legacy).filter((key) => !['id', 'title', 'status', 'completion', 'completionHistory', 'retirement'].includes(key));
-      if (unknownFields.length > 0) return [`${id} (unmigrated fields: ${unknownFields.join(', ')})`];
+      if (unknownFields.length > 0) {
+        guidance.push(`${id}: preserve and reconcile unmigrated fields (${unknownFields.join(', ')}) before migration.`);
+        return [`${id} (unmigrated fields: ${unknownFields.join(', ')})`];
+      }
       for (const field of ['completion', 'completionHistory', 'retirement'] as const) {
         if (legacy[field] !== undefined && canonicalJson(legacy[field]) !== canonicalJson(disk[field])) {
+          guidance.push(`${id}: reconcile ${field} against sprint.json; do not discard the legacy record.`);
           return [`${id} (${field} differs from sprint.json)`];
         }
       }
       return [];
     } catch {
+      guidance.push(`${id}: inspect the scope path and legacy entry manually; Kyro could not verify a safe migration.`);
       return [id];
     }
   });
@@ -82,14 +101,39 @@ export function assertLegacyScopeCacheMigratable(source: unknown, path: string):
     throw new KyroCoreError(
       'INVALID_INPUT',
       `Cannot remove ${path}.scopes: unresolved legacy entries ${unresolved.join(', ')}.`,
-      'Restore missing sprint.json files or reconcile metadata against them, then retry. Keep the legacy state for investigation; no files were changed.',
+      `Inspect each entry:\n  - ${guidance.join('\n  - ')}\nRun kyro repair integrity prepare --json for all findings. For an irrecoverable orphan, prepare an explicit discard with --kyro-scope <id> and --reason <text>; review its operation and digest before applying that exact digest with --yes. No files were changed.`,
     );
   }
 }
 
-export function assertPersistedLegacyScopeCachesMigratable(): void {
-  assertLegacyScopeCacheMigratable(readSharedProjectState(), PROJECT_STATE_PATH);
-  assertLegacyScopeCacheMigratable(readMonolitoProjectState(), KYRO_STATE_PATH);
+function describeUnresolvedLegacyScope(id: string): string {
+  const sprint = readScopeSprint(id);
+  if (sprint.kind === 'valid' && sprint.sprint.scope !== id) {
+    return `${id}: sprint.scope is ${sprint.sprint.scope}; resolve the identity conflict manually.`;
+  }
+  const path = `${ARTIFACT_ROOT}/${id}`;
+  let present = false;
+  try {
+    lstatSync(resolveManagedPath(path));
+    present = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      return `${id}: cannot inspect ${path}; check its permissions and path safety manually.`;
+    }
+  }
+  if (!present) return `${id}: scope directory is absent. Restore sprint.json or inspect an explicit legacy discard with kyro repair integrity prepare --kyro-scope ${id} --reason "<reason>" --json.`;
+  const directory = classifyScopeDirectory(id);
+  if (directory.issues.length > 0) return `${id}: unsafe Kyro path (${directory.detail}); inspect manually.`;
+  if (directory.class === SCOPE_DIR_CLASS.FOREIGN) return `${id}: directory has no Kyro artifacts. Restore sprint.json or inspect an explicit legacy discard with kyro repair integrity prepare --kyro-scope ${id} --reason "<reason>" --json.`;
+  if (directory.class === SCOPE_DIR_CLASS.RECOVERABLE) return `${id}: sprint.json is absent but a close checkpoint can recover it; inspect archive/ and restore the sprint before retrying.`;
+  if (directory.class === SCOPE_DIR_CLASS.OWNED_DAMAGED) return `${id}: Kyro artifacts are damaged or incomplete (${directory.detail}); investigate and restore them manually.`;
+  if (sprint.kind === 'invalid') return `${id}: sprint.json is invalid (${sprint.detail}); repair or restore it manually.`;
+  return `${id}: no valid matching sprint.json (${directory.detail}); inspect and restore the scope identity manually.`;
+}
+
+export function assertPersistedLegacyScopeCachesMigratable(projectedEntries: ReadonlyMap<string, KyroScopeEntry> = new Map()): void {
+  assertLegacyScopeCacheMigratable(readSharedProjectState(), PROJECT_STATE_PATH, projectedEntries);
+  assertLegacyScopeCacheMigratable(readMonolitoProjectState(), KYRO_STATE_PATH, projectedEntries);
 }
 
 export function hasLayeredProjectStateOnDisk(): boolean {

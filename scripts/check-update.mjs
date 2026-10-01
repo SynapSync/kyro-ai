@@ -449,16 +449,44 @@ if (process.platform !== 'win32') {
       PATH: `${fakeBin}${delimiter}${process.env.PATH ?? ''}`,
     };
     const cli = resolve(repo, 'dist/cli.js');
+    const originalProject = readFileSync(projectPath);
     for (const flag of ['--check', '--dry-run']) {
       const blocked = spawnSync(process.execPath, [cli, 'update', flag], { cwd: root, env, encoding: 'utf8' });
       assert(blocked.status !== 0 && blocked.stderr.includes('unresolved legacy entries legacy'),
         `${flag} must report blocked migration: ${blocked.stderr}\n${blocked.stdout}`);
+      assert(blocked.stderr.includes('scope directory is absent') && blocked.stderr.includes('repair integrity prepare --kyro-scope legacy'),
+        `${flag} must explain the orphan and explicit repair route: ${blocked.stderr}`);
       assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${flag} must not change project.json`);
     }
     const blocked = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
     assert(blocked.status !== 0 && blocked.stderr.includes('unresolved legacy entries legacy'),
       `update must refuse to discard orphaned legacy scope: ${blocked.stderr}\n${blocked.stdout}`);
     assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'refused update preserves shared scopes[]');
+    for (const args of [['sync', '--dry-run'], ['sync'], ['install', '--init-workspace', '--dry-run'], ['install', '--init-workspace', '--yes']]) {
+      const refused = spawnSync(process.execPath, [cli, ...args], { cwd: root, env, encoding: 'utf8' });
+      assert(refused.status !== 0 && refused.stderr.includes('repair integrity prepare --kyro-scope legacy'),
+        `${args.join(' ')} must guide repair: ${refused.stderr}\n${refused.stdout}`);
+      assert(readFileSync(projectPath).equals(originalProject), `${args.join(' ')} must preserve legacy metadata`);
+      assert(!existsSync(join(projectDir, 'legacy-migrations')), `${args.join(' ')} must not migrate before preflight`);
+    }
+
+    const badDir = join(projectDir, 'scopes', 'damaged');
+    const foreignDir = join(projectDir, 'scopes', 'foreign');
+    const mismatchDir = join(projectDir, 'scopes', 'mismatch');
+    mkdirSync(badDir, { recursive: true });
+    mkdirSync(foreignDir, { recursive: true });
+    mkdirSync(mismatchDir, { recursive: true });
+    writeFileSync(join(badDir, 'sprint.json'), '{broken');
+    writeFileSync(join(foreignDir, 'README.txt'), 'unrelated data');
+    const demo = JSON.parse(readFileSync(join(repo, 'fixtures/evals/close-sprint-happy/state/.agents/kyro/scopes/demo/sprint.json'), 'utf8'));
+    writeFileSync(join(mismatchDir, 'sprint.json'), JSON.stringify({ ...demo, scope: 'other' }));
+    writeFileSync(projectPath, JSON.stringify({ schemaVersion: 4, scopes: ['damaged', 'foreign', 'mismatch'].map((id) => ({ id, title: id, status: 'planning' })) }));
+    const classified = spawnSync(process.execPath, [cli, 'update', '--check'], { cwd: root, env, encoding: 'utf8' });
+    assert(classified.status !== 0 && classified.stderr.includes('sprint.json is invalid')
+      && classified.stderr.includes('directory has no Kyro artifacts')
+      && classified.stderr.includes('identity conflict'),
+    `legacy diagnostics distinguish damaged, foreign, and identity conflict: ${classified.stderr}`);
+    writeFileSync(projectPath, originalProject);
     const scopeDir = join(projectDir, 'scopes', 'legacy');
     mkdirSync(scopeDir, { recursive: true });
     writeFileSync(join(scopeDir, 'sprint.json'), `${JSON.stringify({
@@ -478,6 +506,20 @@ if (process.platform !== 'win32') {
       debt: [{ id: 'legacy-debt', title: 'Legacy debt', origin: 1, priority: 'medium', status: 'resolved', targetSprint: 1, resolvedSprint: 1, note: 'historical' }],
       handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-09-22' },
     }, null, 2)}\n`);
+    const legacySprintBefore = readFileSync(join(scopeDir, 'sprint.json'));
+    writeFileSync(projectPath, JSON.stringify({ schemaVersion: 4, scopes: [
+      { id: 'legacy', title: 'Legacy', status: 'planning' },
+      { id: 'another-orphan', title: 'Another orphan', status: 'planning' },
+    ] }));
+    for (const args of [['sync'], ['install', '--init-workspace', '--yes']]) {
+      const refused = spawnSync(process.execPath, [cli, ...args], { cwd: root, env, encoding: 'utf8' });
+      assert(refused.status !== 0 && refused.stderr.includes('another-orphan'),
+        `${args.join(' ')} must detect the second orphan before migrating a valid candidate: ${refused.stderr}`);
+      assert(readFileSync(join(scopeDir, 'sprint.json')).equals(legacySprintBefore),
+        `${args.join(' ')} must leave the migrable sprint untouched when another entry blocks`);
+      assert(!existsSync(join(projectDir, 'legacy-migrations')), 'no migration backup before successful preflight');
+    }
+    writeFileSync(projectPath, originalProject);
     const manifestDir = join(home, '.agents', 'kyro', 'current');
     mkdirSync(manifestDir, { recursive: true });
     writeFileSync(join(manifestDir, 'manifest.json'), JSON.stringify({

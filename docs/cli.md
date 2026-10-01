@@ -277,7 +277,7 @@ They do not create per-scope files. Each scope's `sprint.json` (the single sourc
 
 **Read from disk:** scopes come from valid matching `.agents/kyro/scopes/{id}/sprint.json` files. Title and status come from each sprint file. Install/sync removes legacy `project.json.scopes[]` only when every old ID has a valid matching sprint file and no lifecycle or custom metadata would be lost; otherwise it stops before writing and names the unresolved entries. `activeScope` is only auto-set when it is currently null and exactly one scope is known — with multiple scopes it stays null until `kyro scope set-active <scope> --yes`.
 
-If an old `scopes[]` entry has no recoverable scope on disk, inspect it with `kyro repair integrity prepare --kyro-scope <id> --reason "<reason>"`. Review the full entry, source path, and digest before running `kyro repair integrity apply --kyro-scope <id> --reason "<same reason>" --digest <sha256> --yes`. Apply records the original entry as reconciliation evidence and removes only that approved cache entry; it never deletes a scope directory. Damaged or recoverable Kyro artifacts block this discard.
+`kyro update --check`, `kyro update --dry-run`, `kyro sync --dry-run`, and workspace initialization report unresolved legacy entries without changing project files. The diagnosis distinguishes missing directories, foreign directories, invalid sprints, recoverable checkpoints, identity conflicts, and metadata that differs from `sprint.json`. If an old `scopes[]` entry has no recoverable scope on disk, inspect it with `kyro repair integrity prepare --kyro-scope <id> --reason "<reason>" --json`. Review the full entry, source path, and digest before running `kyro repair integrity apply --kyro-scope <id> --reason "<same reason>" --digest <sha256> --yes`. Apply records the original entry as reconciliation evidence and removes only that approved cache entry; it never deletes a scope directory. Damaged or recoverable Kyro artifacts block this discard.
 
 For the 5.0.0 upgrade, update every writer in a shared workspace before running sync. Kyro 5.0.1 also migrates redundant `resolvedSprint` debt metadata when it matches `targetSprint`, preserving a backup before writing. An older runtime can write the legacy cache again.
 
@@ -837,7 +837,8 @@ that leaves an immutable record of itself.
 | **4.44.0 and later** (candidate: **5.0.0**) | adds `debt.canonicalize` (protocol v3) | A whole legacy debt record: broken or absent canonical fields *and* legacy-only keys such as `detail`, `resolution`, `addedSprint`. |
 | **5.0.1** | update-time compatibility migration | Removes redundant `resolvedSprint` only when it equals `targetSprint`; contradictory values remain blocked. |
 | **5.1.0** | retains protocol v3 remediation | Preserves `debt.canonicalize` and the 5.0.1 compatibility migration; neither rewrites scopes during install or Doctor. |
-| **6.0.0 release candidate** | retains protocol v3 remediation | Preserves `debt.canonicalize` and the 5.0.1 compatibility migration while moving Claude Code to CLI-managed skills; neither rewrites scopes during install or Doctor. |
+| **6.0.0** | retains protocol v3 remediation | Preserves `debt.canonicalize` and the 5.0.1 compatibility migration while moving Claude Code to CLI-managed skills; neither rewrites scopes during install or Doctor. |
+| **6.0.1 release candidate** | retains protocol v3 remediation | Preserves explicit `debt.canonicalize` repair and adds guided diagnostics for legacy scope migration. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

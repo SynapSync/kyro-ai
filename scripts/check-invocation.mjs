@@ -23,6 +23,7 @@ const {
   isEphemeralPackageManagerPath,
   resolveInvocationSpawn,
   resolveKyroInvocation,
+  selectWindowsKyroCommandPath,
   splitInvocation,
 } = require(resolve(repo, 'dist/cli/invocation.js'));
 
@@ -51,6 +52,18 @@ const winOwner = {
 };
 assert(classifyGlobalKyroOwnership(winOwner) === 'npm-owned', 'Windows npm cmd shim is owned');
 assert(classifyGlobalKyroOwnership({ ...winOwner, shimContents: '@ECHO off\r\npnpm kyro' }) === 'foreign', 'Windows foreign cmd shim is rejected');
+const npmWhere = 'C:\\npm\\kyro\r\nC:\\npm\\kyro.cmd\r\n';
+assert(selectWindowsKyroCommandPath(npmWhere) === winOwner.commandPath,
+  'where must select the npm cmd shim even when the sh shim appears first');
+assert(classifyGlobalKyroOwnership({ ...winOwner, commandPath: selectWindowsKyroCommandPath(npmWhere) }) === 'npm-owned',
+  'the selected Windows npm shim passes ownership verification');
+const foreignWhere = 'C:\\other\\kyro\r\nC:\\npm\\kyro.cmd\r\n';
+assert(selectWindowsKyroCommandPath(foreignWhere) === 'C:\\other\\kyro',
+  'a later npm shim cannot override a foreign PATH entry');
+assert(classifyGlobalKyroOwnership({ ...winOwner, commandPath: selectWindowsKyroCommandPath(foreignWhere) }) === 'foreign',
+  'foreign PATH command remains blocked');
+assert(selectWindowsKyroCommandPath('C:\\npm\\kyro.exe\r\nC:\\npm\\kyro.cmd\r\n') === 'C:\\npm\\kyro.exe',
+  'an executable from another manager is not replaced by an npm cmd sibling');
 
 // --- isEphemeralPackageManagerPath ---
 const ephemeralSamples = [

@@ -493,6 +493,14 @@ function assertRegistryMatrixIsClassifiedByBothAxes() {
     assert(codeFor('reg-corrupt') === 'irreconcilable', `registered + corrupt sprint.json must report irreconcilable: ${prepare.stdout}`);
     assert(codeFor('reg-foreign') === 'legacy-registered-orphan' && codeFor('reg-absent') === 'legacy-registered-orphan',
       `registered + foreign and registered + absent must remain visible blockers: ${prepare.stdout}`);
+    const beforeSync = hashTree(sandbox);
+    const syncPreview = spawnCli(['sync', '--dry-run'], sandbox);
+    assert(syncPreview.status !== 0 && syncPreview.stderr.includes('close checkpoint can recover it')
+      && syncPreview.stderr.includes('sprint.json is invalid')
+      && syncPreview.stderr.includes('directory has no Kyro artifacts')
+      && syncPreview.stderr.includes('scope directory is absent'),
+    `sync preview must distinguish recoverable, corrupt, foreign, and absent scopes: ${syncPreview.stderr}`);
+    assert(hashTree(sandbox) === beforeSync, 'blocked sync preview must preserve all workspace files');
     assert(plan.targets.unregister.length === 0, 'legacy orphan cleanup is not automatic');
     const recoverableDiscard = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--reason', 'discard', '--json'], sandbox);
     assert(recoverableDiscard.status === 0, `recoverable prepare should diagnose: ${recoverableDiscard.stderr}`);

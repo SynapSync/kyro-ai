@@ -29,7 +29,7 @@ import {
   sanitizeSharedForWrite,
   splitMonolitoToLayers,
 } from './state';
-import type { Agent, InstallScope, KyroManifest, KyroProjectState, OperationPlan } from './types';
+import type { Agent, InstallScope, KyroManifest, KyroProjectState, KyroScopeEntry, OperationPlan } from './types';
 
 /** Project-local gitignore under `.agents/kyro/` (never the consumer repo root). */
 export const KYRO_PROJECT_GITIGNORE_PATH = `${KYRO_PROJECT_ROOT}/.gitignore`;
@@ -46,8 +46,8 @@ export const KYRO_PROJECT_GITIGNORE_ENTRIES = [
   '.kyro-state-writer.lock/',
 ] as const;
 
-export function buildInstallPlan(agents: Agent[], scope: InstallScope): OperationPlan[] {
-  return buildInstallPlanForMode(agents, scope, { includeWorkspace: true });
+export function buildInstallPlan(agents: Agent[], scope: InstallScope, projectedEntries: ReadonlyMap<string, KyroScopeEntry> = new Map()): OperationPlan[] {
+  return buildInstallPlanForMode(agents, scope, { includeWorkspace: true, projectedEntries });
 }
 
 export function buildRuntimeInstallPlan(scope: InstallScope): OperationPlan[] {
@@ -57,9 +57,9 @@ export function buildRuntimeInstallPlan(scope: InstallScope): OperationPlan[] {
 function buildInstallPlanForMode(
   agents: Agent[],
   scope: InstallScope,
-  options: { includeWorkspace: boolean },
+  options: { includeWorkspace: boolean; projectedEntries?: ReadonlyMap<string, KyroScopeEntry> },
 ): OperationPlan[] {
-  if (options.includeWorkspace) assertPersistedLegacyScopeCachesMigratable();
+  if (options.includeWorkspace) assertPersistedLegacyScopeCachesMigratable(options.projectedEntries);
   const now = new Date().toISOString();
   const packageVersion = readPackageVersion();
   const runtimeRoot = KYRO_ROOT;
