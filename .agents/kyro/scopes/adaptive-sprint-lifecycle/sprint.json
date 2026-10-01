@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "scope": "adaptive-sprint-lifecycle",
   "title": "Adaptive sprint lifecycle",
-  "status": "planning",
+  "status": "completed",
   "objective": "Make Kyro record changing work truthfully without treating a partial sprint or exhausted roadmap as a terminal scope failure.",
   "successCriteria": [
     "Every unfinished task has a typed, reasoned disposition before sprint closure.",
@@ -185,16 +185,22 @@
   "activeSprint": null,
   "debt": [],
   "handoff": {
-    "nextAction": "plan_sprint",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
-    "note": "Sprint 3 (integrity-certification) closed as shipped. Scope remains open for planning.",
-    "lastUpdated": "2026-08-26"
+    "note": "Scope explicitly completed.",
+    "lastUpdated": "2026-09-29"
   },
   "author": {
     "name": "Roimer Peraza",
     "email": "joisephdev@gmail.com",
     "source": "git",
     "capturedAt": "2026-08-23T18:22:46.918Z"
+  },
+  "completion": {
+    "completedAt": "2026-09-29T21:04:43.477Z",
+    "by": "maker",
+    "requestDigest": "23c132bdf582b221db9fccb4d63109a91ce443dd61115534f462c9be7c2c05a6",
+    "beforeEntryDigest": "90e332d98893400a3ba71446c47b72d7687ccd00fd49e3bb676c0098f457bf40"
   }
 }

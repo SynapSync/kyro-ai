@@ -20,6 +20,22 @@ try {
   write('.agents/kyro/scopes/existing/sprint.json', '{"unchanged":true}\n');
   const forge = ['.agents/kyro/project.json', '.agents/kyro/local.json', '.agents/kyro/scopes/existing/sprint.json'];
   const forgeBefore = forge.map((entry) => readFileSync(join(root, entry)));
+
+  // An explicitly stopped empty draft is a valid terminal discard; no fake task plan is needed.
+  ok(['create', '--id', 'empty-draft', '--from', 'brief.md']);
+  const emptyBefore = readFileSync(path('empty-draft'));
+  const emptyPreview = ok(close('empty-draft', 'stopped', 1, ['--dry-run']));
+  assert.equal(emptyPreview.state, 'closed');
+  assert.deepEqual(emptyPreview.summary.unresolved, []);
+  assert.deepEqual(readFileSync(path('empty-draft')), emptyBefore);
+  const emptyClosed = ok(close('empty-draft', 'stopped', 1));
+  assert.equal(emptyClosed.closure.outcome, 'stopped');
+  assert.equal(emptyClosed.revision, 2);
+  const emptyOpened = ok(reopen('empty-draft', 2));
+  assert.equal(emptyOpened.state, 'draft');
+  assert.equal(emptyOpened.revision, 3);
+  bad(/only be stopped/i, close('empty-draft', 'completed', 3, ['--dry-run']));
+
   write('plan.json', JSON.stringify({ tasks: [
     { id: 'W1', title: 'First', description: 'First task.', context: '', filesToTouch: [], acceptanceCriteria: ['First is complete.'], dependsOn: [] },
     { id: 'W2', title: 'Second', description: 'Second task.', context: '', filesToTouch: [], acceptanceCriteria: ['Second is complete.'], dependsOn: [] },

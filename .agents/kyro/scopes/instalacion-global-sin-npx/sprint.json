@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "scope": "instalacion-global-sin-npx",
   "title": "Instalación global de Kyro sin dependencia de npx",
-  "status": "planning",
+  "status": "completed",
   "objective": "Permitir instalar y actualizar el CLI de Kyro mediante npm global con un comando durable y verificable, sin depender internamente de npx ni anunciar éxito sobre otra instalación.",
   "successCriteria": [
     "Una persona instala Kyro una vez, usa kyro desde una terminal nueva e inicializa un proyecto desde su raíz.",
@@ -209,16 +209,22 @@
   "activeSprint": null,
   "debt": [],
   "handoff": {
-    "nextAction": "await_scope_completion",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
-    "note": "Sprint 2 cerrado y QA APPROVED WITH NOTES para PR #138; roadmap agotado, pendiente decidir completion del scope.",
-    "lastUpdated": "2026-09-23"
+    "note": "Scope explicitly completed.",
+    "lastUpdated": "2026-09-29"
   },
   "author": {
     "name": "Roimer Peraza",
     "email": "joisephdev@gmail.com",
     "source": "git",
     "capturedAt": "2026-09-23T00:05:22.293Z"
+  },
+  "completion": {
+    "completedAt": "2026-09-29T21:04:42.750Z",
+    "by": "maker",
+    "requestDigest": "51094d7d3d108bd79e5194f97fcf56749f9245245a0f0c4904dcae4863b72003",
+    "beforeEntryDigest": "15ceb0bfa30ef33f3c1a89b36ac3b812e7cb7c61e8fc5c9b6f64db1aff491579"
   }
 }

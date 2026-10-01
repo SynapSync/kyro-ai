@@ -324,7 +324,8 @@ function validateActivity(work: Record<string, unknown>, tasks: Record<string, u
   if (previousRevision !== work.revision) issue(path, 'activity', 'latest activity revision must match the current Work revision', issues);
   const events = new Set(work.activity.filter(record).map((item) => item.event));
   if (events.has('tasks_planned') && (work.state === 'draft' || tasks.length === 0)) issue(path, 'activity', 'tasks_planned requires a non-draft Work with at least one task', issues);
-  if (events.has('work_closed') && (work.state === 'draft' || tasks.length === 0)) issue(path, 'activity', 'work_closed requires a non-draft Work with at least one task', issues);
+  if (events.has('work_closed') && work.state === 'draft' && !events.has('work_reopened')) issue(path, 'activity', 'draft Work may only retain work_closed as reopened history', issues);
+
   for (const taskValue of tasks) {
     const id = typeof taskValue.id === 'string' ? taskValue.id : null;
     if (!id) continue;

@@ -62,7 +62,9 @@ function closeWork(args: string[]): void {
   if (outcome !== 'completed' && outcome !== 'stopped') throw new KyroCoreError('INVALID_INPUT', '--outcome must be completed or stopped.', 'Choose the truthful Work outcome.');
   const { reason, by, expectedRevision, dryRun } = closeOptions(options);
   const result = updateWork(id, expectedRevision, (current) => {
-    if (current.state !== 'active') throw new KyroCoreError('INVALID_INPUT', `Work ${id} is not active and cannot be closed.`, 'Only active Work can close.');
+    const draftEmpty = current.state === 'draft' && current.tasks.length === 0;
+    if (current.state !== 'active' && !draftEmpty) throw new KyroCoreError('INVALID_INPUT', `Work ${id} is not active and cannot be closed.`, 'Only active Work can close, except an empty draft may be stopped.');
+    if (draftEmpty && outcome !== 'stopped') throw new KyroCoreError('INVALID_INPUT', 'An empty draft Work can only be stopped.', 'Use --outcome stopped with an explicit reason.');
     const unresolved = current.tasks.filter((task) => !['verified', 'cancelled', 'superseded'].includes(task.status));
     if (outcome === 'completed' && unresolved.length) throw new KyroCoreError('INVALID_INPUT', `Completed closure has ${unresolved.length} unresolved task(s): ${unresolved.map((task) => task.id).join(', ')}.`, 'Use stopped or resolve every task explicitly.');
     const now = new Date().toISOString();

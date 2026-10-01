@@ -131,7 +131,9 @@ rejects('activity cannot repeat created', { ...base, activity: [...base.activity
 const draftTasksPlanned = { ...base, activity: [...base.activity, { seq: 2, at, event: 'tasks_planned', taskId: null, by: 'cli', reason: 'Tasks planned.', revision: 1 }] };
 rejects('empty draft cannot claim tasks were planned', draftTasksPlanned, 'activity');
 const draftWorkClosed = { ...base, activity: [...base.activity, { seq: 2, at, event: 'work_closed', taskId: null, by: 'cli', reason: 'Work closed.', revision: 1 }] };
-rejects('empty draft cannot claim work was closed', draftWorkClosed, 'activity');
+rejects('empty draft cannot claim work was closed without reopen history', draftWorkClosed, 'activity');
+const stoppedEmptyDraft = { ...base, state: 'closed', revision: 2, updatedAt: at, handoff: { nextAction: 'done', nextTaskId: null, blockedReason: null }, closure: { outcome: 'stopped', reason: 'Discarded before planning.', by: 'cli', closedAt: at, briefDigest: base.brief.digest, finalRevision: 2 }, activity: [...base.activity, { seq: 2, at, event: 'work_closed', taskId: null, by: 'cli', reason: 'Discarded before planning.', revision: 2 }] };
+assert.deepEqual(validateWorkFile(stoppedEmptyDraft), [], 'an empty draft may be explicitly stopped and closed');
 const missingEvidenceEvent = active([taskFor({ status: 'awaiting_review', evidence: evidenceFor() })]);
 missingEvidenceEvent.activity = missingEvidenceEvent.activity.filter((item) => item.event !== 'evidence_recorded').map((item, index) => ({ ...item, seq: index + 1 }));
 rejects('evidence requires matching activity event', missingEvidenceEvent, 'tasks.W1.evidence');
