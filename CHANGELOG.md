@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.0.2] - 2026-10-02
+
+### Fixed
+
+- `kyro update`, `sync`, and workspace initialization remove `project.json.scopes[]` even when legacy entries are unresolved, reporting problems as final warnings instead of blocking the runtime refresh. They no longer create `legacy-migrations/` backups or automatically migrate sprint files; preview modes remain read-only and existing scope files stay unchanged.
+
 ## [6.0.1] - 2026-10-01
 
 ### Fixed

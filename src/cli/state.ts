@@ -54,12 +54,29 @@ export function readMonolitoProjectState(): KyroProjectState | null {
 
 /** Refuse to discard the only persisted identity of a legacy scope during migration. */
 export function assertLegacyScopeCacheMigratable(source: unknown, path: string, projectedEntries: ReadonlyMap<string, KyroScopeEntry> = new Map()): void {
-  if (!source || typeof source !== 'object' || !Object.prototype.hasOwnProperty.call(source, 'scopes')) return;
-  const cache = (source as { scopes?: unknown }).scopes;
-  if (!Array.isArray(cache)) {
+  const { unresolved, guidance, invalidArray } = inspectLegacyScopeCache(source, projectedEntries);
+  if (invalidArray) {
     throw new KyroCoreError('INVALID_INPUT', `${path}.scopes is not an array.`,
       'Repair the legacy scope registry before migrating project state. No files were changed.');
   }
+  if (unresolved.length > 0) {
+    throw new KyroCoreError(
+      'INVALID_INPUT',
+      `Cannot remove ${path}.scopes: unresolved legacy entries ${unresolved.join(', ')}.`,
+      `Inspect each entry:\n  - ${guidance.join('\n  - ')}\nRun kyro repair integrity prepare --json for all findings. For an irrecoverable orphan, prepare an explicit discard with --kyro-scope <id> and --reason <text>; review its operation and digest before applying that exact digest with --yes. No files were changed.`,
+    );
+  }
+}
+
+function inspectLegacyScopeCache(source: unknown, projectedEntries: ReadonlyMap<string, KyroScopeEntry>): {
+  unresolved: string[];
+  guidance: string[];
+  invalidArray: boolean;
+} {
+  const empty = { unresolved: [], guidance: [], invalidArray: false };
+  if (!source || typeof source !== 'object' || !Object.prototype.hasOwnProperty.call(source, 'scopes')) return empty;
+  const cache = (source as { scopes?: unknown }).scopes;
+  if (!Array.isArray(cache)) return { ...empty, invalidArray: true };
   const seen = new Set<string>();
   const guidance: string[] = [];
   const unresolved = cache.flatMap((entry: unknown, index: number) => {
@@ -97,13 +114,7 @@ export function assertLegacyScopeCacheMigratable(source: unknown, path: string, 
       return [id];
     }
   });
-  if (unresolved.length > 0) {
-    throw new KyroCoreError(
-      'INVALID_INPUT',
-      `Cannot remove ${path}.scopes: unresolved legacy entries ${unresolved.join(', ')}.`,
-      `Inspect each entry:\n  - ${guidance.join('\n  - ')}\nRun kyro repair integrity prepare --json for all findings. For an irrecoverable orphan, prepare an explicit discard with --kyro-scope <id> and --reason <text>; review its operation and digest before applying that exact digest with --yes. No files were changed.`,
-    );
-  }
+  return { unresolved, guidance, invalidArray: false };
 }
 
 function describeUnresolvedLegacyScope(id: string): string {
@@ -134,6 +145,34 @@ function describeUnresolvedLegacyScope(id: string): string {
 export function assertPersistedLegacyScopeCachesMigratable(projectedEntries: ReadonlyMap<string, KyroScopeEntry> = new Map()): void {
   assertLegacyScopeCacheMigratable(readSharedProjectState(), PROJECT_STATE_PATH, projectedEntries);
   assertLegacyScopeCacheMigratable(readMonolitoProjectState(), KYRO_STATE_PATH, projectedEntries);
+}
+
+/** Diagnostics for install/sync/update before the legacy cache is removed. */
+export function legacyScopeCacheWarnings(projectedEntries: ReadonlyMap<string, KyroScopeEntry> = new Map()): string[] {
+  const warnings: string[] = [];
+  for (const [source, path] of [
+    [readSharedProjectState(), PROJECT_STATE_PATH],
+    [readMonolitoProjectState(), KYRO_STATE_PATH],
+  ] as const) {
+    const result = inspectLegacyScopeCache(source, projectedEntries);
+    if (result.invalidArray) warnings.push(`${path}.scopes is not an array; it will be removed without a legacy-migrations backup.`);
+    else warnings.push(...result.guidance.map((detail) => `${path}.scopes: ${summarizeLegacyWarning(detail)}`));
+  }
+  return warnings;
+}
+
+function summarizeLegacyWarning(detail: string): string {
+  const warning = detail
+    .replace(/Restore sprint\.json or inspect an explicit legacy discard with kyro repair integrity prepare --kyro-scope \S+ --reason "<reason>" --json\./,
+      'Restore sprint.json to recover this scope.')
+    .replace('before retrying.', 'to recover this scope.')
+    .replace('before migration.', 'if needed; this legacy entry is being removed.')
+    .replace('do not discard the legacy record.', 'recover the old metadata from Git if needed.');
+  const invalidSprint = warning.match(/^(.*sprint\.json is invalid) \((.*)\); repair or restore it manually\.$/);
+  if (!invalidSprint) return warning;
+  const findings = invalidSprint[2].split('; ');
+  const scope = invalidSprint[1].split(':', 1)[0];
+  return `${invalidSprint[1]} (${findings.length} schema findings; first: ${findings.slice(0, 2).join('; ')}). Run kyro doctor --artifacts --kyro-scope ${scope} for the full diagnosis.`;
 }
 
 export function hasLayeredProjectStateOnDisk(): boolean {

@@ -112,7 +112,7 @@ kyro update
 Useful variants: `kyro update --check` reports the status without changing anything,
 `kyro update --dry-run` previews the planned steps, and `kyro update --yes` skips the
 confirmation (for scripts). If only a projected runtime exists, migrate with `npm install -g kyro-ai`, open a new terminal, verify `kyro --version`, then run `kyro install --scope workspace --init-workspace --yes` from the project root. For a manual update of an initialized workspace, run `npm install -g kyro-ai` first and then `kyro sync --scope workspace --yes`. Existing scopes remain in place.
-With Kyro 5, install or sync also removes the old shared `project.json.scopes[]` cache after verifying every old entry against its scope's `sprint.json`. If the cache contains an unresolved entry, migration stops and explains what must be reconciled.
+Install or sync removes the old shared `project.json.scopes[]` cache without creating a backup. Missing or invalid `sprint.json` files produce warnings at the end instead of blocking the runtime refresh; affected scopes may not appear in `scope list` until their sprint files are repaired or restored. Existing scope files are not changed.
 
 See [CLI · invocation persistence](cli.md#cli-invocation-persistence-kyroinvocation) and
 [CLI · update](cli.md#update-kyro-update).

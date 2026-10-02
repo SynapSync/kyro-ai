@@ -51,11 +51,14 @@ function withWorkspace(prefix, callback) {
 function captureLogs(callback) {
   const logs = [];
   const originalLog = console.log;
+  const originalWarn = console.warn;
   try {
     console.log = (...args) => logs.push(args.join(' '));
+    console.warn = (...args) => logs.push(args.join(' '));
     callback();
   } finally {
     console.log = originalLog;
+    console.warn = originalWarn;
   }
   return `${logs.join('\n')}\n`;
 }
@@ -175,6 +178,7 @@ function assertLayeredInstall(cwd, label) {
   const gitignore = readFileSync(gitignorePath, 'utf-8');
   assert(gitignore.includes('local.json'), `${label}: gitignore must list local.json`);
   assert(gitignore.includes('kyro.json'), `${label}: gitignore must list kyro.json`);
+  assert(!gitignore.includes('legacy-migrations/'), `${label}: gitignore must not add a migration-backup rule`);
   assert(!/^project\.json\s*$/m.test(gitignore), `${label}: gitignore must not ignore project.json`);
   assert(!/^scopes\/?\s*$/m.test(gitignore), `${label}: gitignore must not ignore scopes/`);
   try {
@@ -240,6 +244,7 @@ withWorkspace('kyro-rehydrate-multi-', (cwd) => {
   const gitignoreAfter = readFileSync(join(kyroDir(cwd), '.gitignore'), 'utf-8');
   assert(gitignoreAfter.includes('# custom keep'), 'multi: re-install must not drop custom gitignore lines');
   assert(gitignoreAfter.includes('local.json'), 'multi: re-install keeps local.json ignore');
+  assert(!gitignoreAfter.includes('legacy-migrations/'), 'multi: re-install does not add a backup ignore');
 });
 
 // --- valid sprint with an unsafe managed ancestor never rehydrates ---
@@ -324,32 +329,36 @@ withWorkspace('kyro-rehydrate-preserve-', (cwd) => {
   assert(state.principles?.[0]?.id === 'p1', 'preserve: principles kept on shared layer');
   assert(state.scopes.some((s) => s.id === 'orphan' && s.title === 'Orphan On Disk'), 'preserve: orphan folder registered');
 
-  // An orphan in the old shared cache must not be silently discarded by sync.
+  // Sync removes the legacy cache without a backup and warns about unresolved entries.
   const projectPath = join(cwd, '.agents', 'kyro', 'project.json');
   const project = JSON.parse(readFileSync(projectPath, 'utf-8'));
-  project.scopes = [{ id: 'stale', title: 'Stale', status: 'active' }];
+  project.scopes = [
+    { id: 'stale', title: 'Stale', status: 'active', custom: 'keep this metadata' },
+    { id: 'damaged', title: 'Damaged', status: 'completed' },
+  ];
+  writeScope(cwd, 'damaged', { ...minimalSprint('damaged', 'Damaged'), debt: [{ id: 'D1', title: 'Old debt' }] });
   writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`, 'utf-8');
-  let refused = false;
-  try {
-    captureLogs(() => sync(cliOptions({ agents: [standard] })));
-  } catch (error) {
-    refused = error?.code === 'INVALID_INPUT' && String(error.message).includes('stale');
-  }
-  assert(refused, 'sync: refuses to discard an orphaned legacy scope');
-  assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'sync: refusal preserves old cache');
+  const original = readFileSync(projectPath, 'utf8');
+  const preview = captureLogs(() => sync(cliOptions({ agents: [standard], dryRun: true })));
+  assert(preview.includes('stale') && preview.includes('damaged'), 'sync preview: names unresolved legacy entries');
+  assert(readFileSync(projectPath, 'utf8') === original, 'sync preview: does not change project state');
+  assert(!existsSync(join(cwd, '.agents', 'kyro', 'legacy-migrations')), 'sync preview: does not create a backup');
   const { runDoctorChecks } = require(join(repo, 'dist/cli/commands/doctor.js'));
   const registryCheck = runDoctorChecks(false, false, false, false, null).find((check) => check.name === 'scope registry');
   assert(registryCheck?.status === 'fail' && registryCheck.detail.includes('stale'), 'doctor: names the orphaned legacy scope');
   const { classifyRegistry } = require(join(repo, 'dist/cli/project/reconcile.js'));
   assert(classifyRegistry('stale')[0]?.classification === 'registered-orphan', 'reconcile: retains orphan diagnosis');
-  project.scopes = [{ id: 'known', title: 'Known From Disk', status: 'planning' }];
-  writeFileSync(projectPath, `${JSON.stringify(project, null, 2)}\n`, 'utf-8');
-  captureLogs(() => sync(cliOptions({ agents: [standard] })));
+  const output = captureLogs(() => sync(cliOptions({ agents: [standard] })));
+  assert(output.includes('Kyro synced') && output.includes('stale') && output.includes('damaged'), 'sync: succeeds with final warnings');
   assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'sync: removes stale shared scopes[]');
+  assert(!existsSync(join(cwd, '.agents', 'kyro', 'legacy-migrations')), 'sync: does not create migration backups');
+  assert(existsSync(join(cwd, '.agents', 'kyro', 'scopes', 'damaged', 'sprint.json')), 'sync: does not delete damaged sprint');
   state = readEffectiveState(cwd);
   assert(state.scopes.map((s) => s.id).sort().join(',') === 'known,orphan', 'sync: rehydrates both folders');
   assert(state.activeScope === 'known', 'sync: keeps existing activeScope');
   assert(state.principles?.[0]?.id === 'p1', 'sync: principles remain on shared layer');
+  captureLogs(() => sync(cliOptions({ agents: [standard] })));
+  assert(!existsSync(join(cwd, '.agents', 'kyro', 'legacy-migrations')), 'sync: repeat does not create migration backups');
 });
 
 // --- no-init-workspace does not create kyro.json even with scopes on disk ---
