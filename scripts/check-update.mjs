@@ -449,16 +449,57 @@ if (process.platform !== 'win32') {
       PATH: `${fakeBin}${delimiter}${process.env.PATH ?? ''}`,
     };
     const cli = resolve(repo, 'dist/cli.js');
+    const originalProject = readFileSync(projectPath);
     for (const flag of ['--check', '--dry-run']) {
-      const blocked = spawnSync(process.execPath, [cli, 'update', flag], { cwd: root, env, encoding: 'utf8' });
-      assert(blocked.status !== 0 && blocked.stderr.includes('unresolved legacy entries legacy'),
-        `${flag} must report blocked migration: ${blocked.stderr}\n${blocked.stdout}`);
+      const preview = spawnSync(process.execPath, [cli, 'update', flag], { cwd: root, env, encoding: 'utf8' });
+      assert(preview.status === 0 && preview.stderr.includes('scope directory is absent'),
+        `${flag} must warn without blocking: ${preview.stderr}\n${preview.stdout}`);
       assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${flag} must not change project.json`);
+      assert(!existsSync(join(projectDir, 'legacy-migrations')), `${flag} must not write backup`);
     }
-    const blocked = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
-    assert(blocked.status !== 0 && blocked.stderr.includes('unresolved legacy entries legacy'),
-      `update must refuse to discard orphaned legacy scope: ${blocked.stderr}\n${blocked.stdout}`);
-    assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'refused update preserves shared scopes[]');
+    const updated = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
+    assert(updated.status === 0 && updated.stderr.includes('legacy') && updated.stdout.includes('Runtime refreshed'),
+      `update must refresh and warn: ${updated.stderr}\n${updated.stdout}`);
+    assert((updated.stderr.match(/WARNING:/g) ?? []).length === 1, 'update prints one final warning block');
+    assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'update removes shared scopes[]');
+    assert(!readFileSync(join(projectDir, '.gitignore'), 'utf8').includes('legacy-migrations/'), 'update does not add a backup ignore');
+    assert(!existsSync(join(projectDir, 'legacy-migrations')), 'update does not create migration backups');
+    for (const args of [['sync', '--dry-run'], ['sync'], ['install', '--init-workspace', '--dry-run'], ['install', '--init-workspace', '--yes']]) {
+      writeFileSync(projectPath, originalProject);
+      const action = spawnSync(process.execPath, [cli, ...args], { cwd: root, env, encoding: 'utf8' });
+      assert(action.status === 0 && action.stderr.includes('legacy'),
+        `${args.join(' ')} must warn without blocking: ${action.stderr}\n${action.stdout}`);
+      if (args.includes('--dry-run')) assert(readFileSync(projectPath).equals(originalProject), `${args.join(' ')} remains read-only`);
+      else assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${args.join(' ')} removes legacy cache`);
+      assert(!existsSync(join(projectDir, 'legacy-migrations')), `${args.join(' ')} creates no backup`);
+    }
+
+    writeFileSync(projectPath, JSON.stringify({ schemaVersion: 4, scopes: { malformed: true }, principles: [{ id: 'p1', rule: 'Keep this rule', severity: 'strong', rationale: 'quality' }] }));
+    const malformed = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
+    const cleaned = JSON.parse(readFileSync(projectPath, 'utf8'));
+    assert(malformed.status === 0 && malformed.stderr.includes('not an array'),
+      `update warns about malformed scopes without blocking: ${malformed.stderr}\n${malformed.stdout}`);
+    assert(!Object.hasOwn(cleaned, 'scopes') && cleaned.principles?.[0]?.rule === 'Keep this rule',
+      'update removes malformed scopes metadata and preserves supported project fields');
+    assert(!existsSync(join(projectDir, 'legacy-migrations')), 'malformed scopes do not create a backup');
+
+    const badDir = join(projectDir, 'scopes', 'damaged');
+    const foreignDir = join(projectDir, 'scopes', 'foreign');
+    const mismatchDir = join(projectDir, 'scopes', 'mismatch');
+    mkdirSync(badDir, { recursive: true });
+    mkdirSync(foreignDir, { recursive: true });
+    mkdirSync(mismatchDir, { recursive: true });
+    writeFileSync(join(badDir, 'sprint.json'), '{broken');
+    writeFileSync(join(foreignDir, 'README.txt'), 'unrelated data');
+    const demo = JSON.parse(readFileSync(join(repo, 'fixtures/evals/close-sprint-happy/state/.agents/kyro/scopes/demo/sprint.json'), 'utf8'));
+    writeFileSync(join(mismatchDir, 'sprint.json'), JSON.stringify({ ...demo, scope: 'other' }));
+    writeFileSync(projectPath, JSON.stringify({ schemaVersion: 4, scopes: ['damaged', 'foreign', 'mismatch'].map((id) => ({ id, title: id, status: 'planning' })) }));
+    const classified = spawnSync(process.execPath, [cli, 'update', '--check'], { cwd: root, env, encoding: 'utf8' });
+    assert(classified.status === 0 && classified.stderr.includes('sprint.json is invalid')
+      && classified.stderr.includes('directory has no Kyro artifacts')
+      && classified.stderr.includes('identity conflict'),
+    `legacy diagnostics distinguish damaged, foreign, and identity conflict: ${classified.stderr}`);
+    writeFileSync(projectPath, originalProject);
     const scopeDir = join(projectDir, 'scopes', 'legacy');
     mkdirSync(scopeDir, { recursive: true });
     writeFileSync(join(scopeDir, 'sprint.json'), `${JSON.stringify({
@@ -478,6 +519,26 @@ if (process.platform !== 'win32') {
       debt: [{ id: 'legacy-debt', title: 'Legacy debt', origin: 1, priority: 'medium', status: 'resolved', targetSprint: 1, resolvedSprint: 1, note: 'historical' }],
       handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: '', lastUpdated: '2026-09-22' },
     }, null, 2)}\n`);
+    const legacySprintBefore = readFileSync(join(scopeDir, 'sprint.json'));
+    writeFileSync(projectPath, JSON.stringify({ schemaVersion: 4, scopes: [
+      { id: 'legacy', title: 'Legacy', status: 'planning' },
+      { id: 'another-orphan', title: 'Another orphan', status: 'planning' },
+    ] }));
+    for (const args of [['sync'], ['install', '--init-workspace', '--yes']]) {
+      writeFileSync(projectPath, JSON.stringify({ schemaVersion: 4, scopes: [
+        { id: 'legacy', title: 'Legacy', status: 'planning' },
+        { id: 'another-orphan', title: 'Another orphan', status: 'planning' },
+      ] }));
+      writeFileSync(join(scopeDir, 'sprint.json'), legacySprintBefore);
+      const action = spawnSync(process.execPath, [cli, ...args], { cwd: root, env, encoding: 'utf8' });
+      assert(action.status === 0 && action.stderr.includes('another-orphan'),
+        `${args.join(' ')} must warn about the orphan: ${action.stderr}`);
+      assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${args.join(' ')} removes scopes[]`);
+      assert(readFileSync(join(scopeDir, 'sprint.json')).equals(legacySprintBefore),
+        `${args.join(' ')} leaves the existing sprint unchanged`);
+      assert(!existsSync(join(projectDir, 'legacy-migrations')), `${args.join(' ')} creates no backup`);
+    }
+    writeFileSync(projectPath, originalProject);
     const manifestDir = join(home, '.agents', 'kyro', 'current');
     mkdirSync(manifestDir, { recursive: true });
     writeFileSync(join(manifestDir, 'manifest.json'), JSON.stringify({
@@ -494,11 +555,19 @@ if (process.platform !== 'win32') {
     const result = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
     assert(result.status === 0, `update --yes failed: ${result.stderr}\n${result.stdout}`);
     assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'update --yes removes shared scopes[]');
-    const migratedSprint = JSON.parse(readFileSync(join(scopeDir, 'sprint.json'), 'utf8'));
-    assert(!Object.hasOwn(migratedSprint.debt[0], 'resolvedSprint'), 'safe legacy debt field is migrated automatically');
-    assert(existsSync(join(projectDir, 'legacy-migrations', 'legacy.sprint.json')), 'migration backup is preserved');
+    assert(readFileSync(join(scopeDir, 'sprint.json')).equals(legacySprintBefore), 'update leaves the legacy sprint unchanged');
+    assert(!existsSync(join(projectDir, 'legacy-migrations')), 'update creates no migration backup');
     const second = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
     assert(second.status === 0, `second update must remain idempotent: ${second.stderr}\n${second.stdout}`);
+    assert(!existsSync(join(projectDir, 'legacy-migrations')), 'repeated update creates no backup directory');
+    const previousBackupDir = join(projectDir, 'legacy-migrations');
+    mkdirSync(previousBackupDir);
+    writeFileSync(join(previousBackupDir, 'existing.txt'), 'from a previous release\n');
+    const interactive = { ...env, KYRO_TEST_ASSUME_TTY: '1' };
+    const existing = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env: interactive, encoding: 'utf8' });
+    assert(existing.status === 0 && existsSync(join(previousBackupDir, 'existing.txt'))
+      && !existing.stdout.includes('Delete .agents/kyro/legacy-migrations'),
+    `update leaves an old backup directory alone: ${existing.stderr}\n${existing.stdout}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -9,7 +9,7 @@ import { readPackageVersion } from '../help';
 import { classifyGlobalKyroOwnership, resolveKyroCommandPath, type GlobalKyroOwnership } from '../invocation';
 import { assertWorkspaceScope } from '../options';
 import {
-  assertPersistedLegacyScopeCachesMigratable,
+  legacyScopeCacheWarnings,
   readManifest,
   readMonolitoProjectState,
   readProjectState,
@@ -18,7 +18,6 @@ import {
 import { detectPackageRootMode } from '../package-root-mode';
 import type { CliOptions } from '../types';
 import { compareSemverLike } from './doctor';
-import { hasSafelyMigratableLegacySprintFiles } from '../migrations/legacy-sprints';
 
 /**
  * Friendly one-step updater (`kyro update`).
@@ -421,7 +420,10 @@ export function refreshFromCli(cliJs: string, hasWorkspace: boolean, verbose: bo
     ? ['sync', '--scope', 'workspace']
     : ['install', '--scope', 'workspace', '--no-init-workspace'];
   if (verbose) args.push('--verbose');
-  const child = spawnSync(process.execPath, [cliJs, ...args], { stdio: 'inherit' });
+  const child = spawnSync(process.execPath, [cliJs, ...args], {
+    stdio: 'inherit',
+    env: { ...process.env, KYRO_UPDATE_DEFER_SCOPE_WARNINGS: '1' },
+  });
   if (child.status !== 0 || child.error) {
     const detail = child.error ? String(child.error) : `exit code ${String(child.status)}`;
     throw new KyroCoreError(
@@ -468,14 +470,24 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     ownership,
   };
   const plan = buildUpdatePlan(facts);
-  if (facts.hasLegacyScopeCache && !hasSafelyMigratableLegacySprintFiles()) assertPersistedLegacyScopeCachesMigratable();
+  const legacyWarnings = facts.hasLegacyScopeCache
+    ? legacyScopeCacheWarnings()
+    : [];
+  const printWarnings = (): void => {
+    if (legacyWarnings.length === 0) return;
+    console.warn(`WARNING: ${legacyWarnings.length} legacy scope issue(s):`);
+    for (const warning of legacyWarnings) console.warn(`  - ${warning}`);
+    console.warn('Sync removes legacy scopes[] without creating a legacy-migrations backup. Existing scope files remain unchanged; review with kyro doctor --artifacts.');
+  };
   if (options.check) {
     printPlan(plan);
+    printWarnings();
     return;
   }
   if (options.dryRun) {
     console.log(`Kyro update ${current} (dry run; no changes made)`);
     printPlan(plan);
+    printWarnings();
     return;
   }
 
@@ -484,11 +496,13 @@ export async function runUpdate(options: CliOptions): Promise<void> {
   }
   if (plan.action === 'migrate-global' || plan.action === 'blocked-ownership' || plan.action === 'registry-unavailable' || plan.action === 'ahead-of-registry') {
     printPlan(plan);
+    printWarnings();
     return;
   }
 
   if (plan.action === 'up-to-date') {
     printPlan(plan);
+    printWarnings();
     return;
   }
 
@@ -514,6 +528,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     refreshFromCli(fresh.cliJs, facts.hasWorkspace, options.verbose);
     verifyUpdate(current, fresh);
     console.log(`Runtime refreshed from kyro ${current}.`);
+    printWarnings();
     return;
   }
 
@@ -542,6 +557,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     refreshFromCli(fresh!.cliJs, facts.hasWorkspace, options.verbose);
     verifyUpdate(plan.target, fresh);
     console.log(`Updated kyro ${current} → ${plan.target}.`);
+    printWarnings();
     return;
   }
 

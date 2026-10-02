@@ -114,7 +114,8 @@ export function reopenWork(id: string, expectedRevision: number, reason: string,
     if (current.revision !== expectedRevision) throw new KyroCoreError('STATE_DIVERGED', `Work ${id} revision ${current.revision} does not match expected ${expectedRevision}.`, 'Read Work status and retry from the current revision.');
     if (current.state !== 'closed' || !current.closure) throw new KyroCoreError('INVALID_INPUT', `Work ${id} is not closed and cannot be reopened.`, 'Only a closed, non-promoted Work can be reopened.');
     const now = new Date().toISOString();
-    const next: WorkFile = { ...current, state: 'active', revision: current.revision + 1, updatedAt: now, closure: null,
+    const reopenedState = current.tasks.length === 0 ? 'draft' : 'active';
+    const next: WorkFile = { ...current, state: reopenedState, revision: current.revision + 1, updatedAt: now, closure: null,
       activity: [...current.activity, { seq: current.activity.length + 1, at: now, event: 'work_reopened', taskId: null, by, reason, revision: current.revision + 1 }], handoff: { ...current.handoff } };
     next.handoff = deriveWorkHandoff(next);
     const issues = validateWorkFile(next, workJsonPath(id));

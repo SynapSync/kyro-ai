@@ -4,7 +4,7 @@ import { listRegistrableScopeDirectories } from '../artifacts/scopes';
 import { buildInstallPlan, buildRuntimeInstallPlan } from '../install-plan';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope, uniqueAgents } from '../options';
-import { readProjectState } from '../state';
+import { legacyScopeCacheWarnings, readProjectState } from '../state';
 import { formatWorkspaceInitPrompt } from '../core/scopes';
 import { KyroCoreError } from '../core/errors';
 import { isInteractiveTerminal } from '../core/tty';
@@ -15,7 +15,6 @@ import { runAdapterPreflight, summarizePlanTargets } from './preflight';
 import { analyzeDrift, buildPrunePlan, hasDrift, hasPrunableDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
 import { readPackageVersion } from '../help';
 import { withStateWriterLock, withStateWriterLockAsync } from '../pipeline/state-writer-lock';
-import { migrateLegacySprintFiles } from '../migrations/legacy-sprints';
 
 export function install(options: CliOptions): void | Promise<void> {
   requireFullPackageFor('install');
@@ -42,10 +41,7 @@ function runInstallPlan(
   packageVersion: string,
   shouldInitializeWorkspace: boolean,
 ): void {
-  if (shouldInitializeWorkspace && !options.dryRun) {
-    const migrations = migrateLegacySprintFiles();
-    if (migrations.length > 0) console.log(`Migrated legacy sprint metadata for ${migrations.map((migration) => migration.scope).join(', ')}; backups preserved under .agents/kyro/legacy-migrations/.`);
-  }
+  const warnings = shouldInitializeWorkspace ? legacyScopeCacheWarnings() : [];
   const plan = shouldInitializeWorkspace ? buildInstallPlan(agents, options.scope) : buildRuntimeInstallPlan(options.scope);
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
   if (!shouldInitializeWorkspace && options.dryRun) {
@@ -57,6 +53,7 @@ function runInstallPlan(
 
   if (options.dryRun) {
     console.log('Dry run complete. No files changed.');
+    printLegacyScopeWarnings(warnings, true);
     return;
   }
 
@@ -69,6 +66,7 @@ function runInstallPlan(
     console.log('Workspace: skipped');
   }
   console.log(`Runtime: ${KYRO_ROOT}/`);
+  printLegacyScopeWarnings(warnings);
 }
 
 export function sync(options: CliOptions): void {
@@ -83,10 +81,7 @@ export function sync(options: CliOptions): void {
   runAdapterPreflight('sync', unique);
 
   const currentVersion = readPackageVersion();
-  if (!options.dryRun) {
-    const migrations = migrateLegacySprintFiles();
-    if (migrations.length > 0) console.log(`Migrated legacy sprint metadata for ${migrations.map((migration) => migration.scope).join(', ')}; backups preserved under .agents/kyro/legacy-migrations/.`);
-  }
+  const warnings = legacyScopeCacheWarnings();
   const plan = buildInstallPlan(unique, SCOPE.WORKSPACE);
   const drift = analyzeDrift(currentVersion, managedFilesFromInstallPlan(plan));
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
@@ -111,10 +106,21 @@ export function sync(options: CliOptions): void {
 
   if (options.dryRun) {
     console.log('Dry run complete. No files changed.');
+    printLegacyScopeWarnings(warnings, true);
     return;
   }
   applyPlan(plan);
   console.log(`Kyro synced for: ${unique.join(', ')}`);
+  printLegacyScopeWarnings(warnings);
+}
+
+function printLegacyScopeWarnings(warnings: readonly string[], preview = false): void {
+  if (warnings.length === 0 || process.env.KYRO_UPDATE_DEFER_SCOPE_WARNINGS === '1') return;
+  console.warn(`WARNING: ${warnings.length} legacy scope issue(s) ${preview ? 'would remain after the runtime refresh' : 'remain after the runtime refresh'}:`);
+  for (const warning of warnings) console.warn(`  - ${warning}`);
+  console.warn(preview
+    ? 'No files changed. Sync will remove project.json.scopes[]; scope files will remain unchanged.'
+    : 'Legacy scopes[] was removed without creating a legacy-migrations backup. Scope files remain unchanged; inspect them with kyro doctor --artifacts.');
 }
 
 function shouldInstallWorkspace(options: CliOptions, hasWorkspaceState: boolean): boolean | Promise<boolean> {

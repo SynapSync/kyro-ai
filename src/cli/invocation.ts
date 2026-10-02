@@ -85,8 +85,7 @@ export function resolveKyroCommandPath(): string | null {
     let raw: string;
     if (process.platform === 'win32') {
       raw = execFileSync('where', ['kyro'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-      // `where` may list multiple matches; first wins.
-      raw = raw.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? '';
+      raw = selectWindowsKyroCommandPath(raw) ?? '';
     } else {
       raw = execFileSync('/bin/sh', ['-c', 'command -v kyro'], {
         encoding: 'utf8',
@@ -97,6 +96,18 @@ export function resolveKyroCommandPath(): string | null {
   } catch {
     return null;
   }
+}
+
+/** Keep PATH priority, but prefer npm's executable .cmd sibling over its extensionless sh shim. */
+export function selectWindowsKyroCommandPath(whereOutput: string): string | null {
+  const matches = whereOutput.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const first = matches[0];
+  if (!first) return null;
+  if (win32.basename(first).toLowerCase() !== 'kyro') return first;
+  const firstDirectory = win32.dirname(first).toLowerCase();
+  return matches.find((candidate) =>
+    win32.dirname(candidate).toLowerCase() === firstDirectory &&
+    win32.basename(candidate).toLowerCase() === 'kyro.cmd') ?? first;
 }
 
 export type GlobalKyroOwnership = 'npm-owned' | 'missing' | 'foreign' | 'ambiguous';

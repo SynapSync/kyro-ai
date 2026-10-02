@@ -408,7 +408,8 @@ function assertGenericArchiveContentIsNotOwnership() {
 
 /**
  * A legacy registry entry pointing at a foreign directory may be junk or the only remaining clue
- * to a damaged scope. Migration must stop before dropping that entry and must not touch the directory.
+ * to a damaged scope. Migration may retire the cache, but must retain the exact monolito and never
+ * touch the foreign directory.
  */
 function assertPreExistingContaminationIsProtected() {
   for (const mode of ['global', 'scoped']) {
@@ -420,11 +421,16 @@ function assertPreExistingContaminationIsProtected() {
       writeFileSync(join(foreign, 'README.md'), 'do not touch\n');
       writeFileSync(join(foreign, 'drafts/idea.md'), 'do not touch this either\n');
       registerScopes(sandbox, [{ id: 'notes-backup', title: 'notes-backup', status: 'planning' }]);
-      const migrated = spawnCli(['install', '--scope', 'workspace', '--init-workspace', '--yes'], sandbox);
-      assert(migrated.status !== 0 && `${migrated.stdout}${migrated.stderr}`.includes('notes-backup'),
-        `legacy migration must name unresolved entry: ${migrated.stdout}${migrated.stderr}`);
-      assert(!existsSync(join(sandbox, '.agents/kyro/project.json')), 'refused migration must not write shared state');
+      const monolitoBefore = readFileSync(join(sandbox, '.agents/kyro/kyro.json'));
       const before = hashTree(foreign);
+      const migrated = spawnCli(['install', '--scope', 'workspace', '--init-workspace', '--yes'], sandbox);
+      assert(migrated.status === 0 && `${migrated.stdout}${migrated.stderr}`.includes('notes-backup'),
+        `legacy migration must warn about unresolved entry: ${migrated.stdout}${migrated.stderr}`);
+      assert(existsSync(join(sandbox, '.agents/kyro/project.json')), 'migration writes shared state');
+      assert(!Object.hasOwn(readRegistry(sandbox), 'scopes'), 'migration removes the legacy cache');
+      assert(readFileSync(join(sandbox, '.agents/kyro/kyro.json.migrated')).equals(monolitoBefore),
+        'migration keeps byte-exact original monolito');
+      assert(hashTree(foreign) === before, 'migration does not touch foreign directory');
 
       // The digest must be structural, not file-only: an empty directory is part of what "preserved
       // byte for byte" has to mean, or removing one would go unnoticed by this very assertion.
@@ -439,16 +445,13 @@ function assertPreExistingContaminationIsProtected() {
         assert(prepare.status === 0, `global prepare should succeed: ${prepare.stderr}`);
         const plan = machineData(prepare.stdout);
         assert(!plan.targets.unregister.includes('notes-backup'), 'foreign directory is not a derived scope');
-        assert(plan.blockers.some((blocker) => blocker.code === 'legacy-registered-orphan'),
-          'legacy entry stays visible as a blocker');
       } else {
-        assert(prepare.status === 0 && machineData(prepare.stdout).blockers.some((blocker) => blocker.code === 'legacy-registered-orphan'),
-          `scoped prepare must name the unresolved legacy entry: ${prepare.stdout}${prepare.stderr}`);
+        assert(prepare.status !== 0, 'scoped prepare cannot target an entry removed from the live cache');
       }
       assert(hashTree(foreign) === before, `${mode}: inspection must preserve the foreign directory`);
       const listed = spawnCli(['scope', 'list'], sandbox);
-      assert(listed.status === 0 && listed.stdout.includes('notes-backup'),
-        `${mode}: refused migration keeps legacy entry visible for investigation`);
+      assert(listed.status === 0 && !listed.stdout.includes('notes-backup'),
+        `${mode}: invalid scope is not listed after the cache is retired`);
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
     }
@@ -493,6 +496,14 @@ function assertRegistryMatrixIsClassifiedByBothAxes() {
     assert(codeFor('reg-corrupt') === 'irreconcilable', `registered + corrupt sprint.json must report irreconcilable: ${prepare.stdout}`);
     assert(codeFor('reg-foreign') === 'legacy-registered-orphan' && codeFor('reg-absent') === 'legacy-registered-orphan',
       `registered + foreign and registered + absent must remain visible blockers: ${prepare.stdout}`);
+    const beforeSync = hashTree(sandbox);
+    const syncPreview = spawnCli(['sync', '--dry-run'], sandbox);
+    assert(syncPreview.status === 0 && syncPreview.stderr.includes('close checkpoint can recover it')
+      && syncPreview.stderr.includes('sprint.json is invalid')
+      && syncPreview.stderr.includes('directory has no Kyro artifacts')
+      && syncPreview.stderr.includes('scope directory is absent'),
+    `sync preview must distinguish recoverable, corrupt, foreign, and absent scopes: ${syncPreview.stderr}`);
+    assert(hashTree(sandbox) === beforeSync, 'sync preview must preserve all workspace files');
     assert(plan.targets.unregister.length === 0, 'legacy orphan cleanup is not automatic');
     const recoverableDiscard = spawnCli(['repair', 'integrity', 'prepare', '--kyro-scope', 'demo', '--reason', 'discard', '--json'], sandbox);
     assert(recoverableDiscard.status === 0, `recoverable prepare should diagnose: ${recoverableDiscard.stderr}`);

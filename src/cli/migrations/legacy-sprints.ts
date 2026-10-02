@@ -6,6 +6,8 @@ import { validateSprintFile } from '../artifacts/schema';
 import { LEGACY_MIGRATION_DEBT_KEYS } from '../artifacts/debt-contract';
 import { atomicReplace } from '../checkpoints/sprint-close';
 import { KyroCoreError } from '../core/errors';
+import { deriveScopeStatus } from '../core/status';
+import type { KyroScopeEntry, SprintFile } from '../types';
 import { assertSafeManagedPath, assertSafePathSegment, withStateWriterLock } from '../pipeline/state-writer-lock';
 
 const BACKUP_ROOT = `${KYRO_PROJECT_ROOT}/legacy-migrations`;
@@ -22,6 +24,7 @@ interface Candidate {
   original: string;
   migrated: string;
   backupPath: string;
+  entry: KyroScopeEntry;
 }
 
 function candidateFor(scope: string): Candidate | null {
@@ -52,12 +55,22 @@ function candidateFor(scope: string): Candidate | null {
   const migratedValue = { ...value, debt };
   const issues = validateSprintFile(migratedValue, path);
   if (issues.length > 0) throw new KyroCoreError('INVALID_INPUT', `${scope}/sprint.json cannot be migrated safely: ${issues.map((issue) => `${issue.field} ${issue.message}`).join('; ')}`, 'No files were changed. Repair the sprint shape and retry.');
+  const sprint = migratedValue as unknown as SprintFile;
+  if (sprint.scope !== scope) throw new KyroCoreError('INVALID_INPUT', `${scope}/sprint.json declares scope ${sprint.scope}.`, 'Resolve the scope identity conflict before migration. No files were changed.');
   return {
     scope,
     path,
     original,
     migrated: `${JSON.stringify(migratedValue, null, 2)}\n`,
     backupPath: `${BACKUP_ROOT}/${scope}.sprint.json`,
+    entry: {
+      id: scope,
+      title: sprint.title || scope,
+      status: deriveScopeStatus(sprint, Boolean(sprint.activeSprint)),
+      ...(sprint.completion ? { completion: sprint.completion } : {}),
+      ...(sprint.completionHistory ? { completionHistory: sprint.completionHistory } : {}),
+      ...(sprint.retirement ? { retirement: sprint.retirement } : {}),
+    },
   };
 }
 
@@ -72,6 +85,11 @@ function collectCandidates(): Candidate[] {
 
 export function hasSafelyMigratableLegacySprintFiles(): boolean {
   return collectCandidates().length > 0;
+}
+
+/** Read-only future registry entries for sprints whose legacy debt fields can migrate safely. */
+export function previewLegacySprintMigrationEntries(): Map<string, KyroScopeEntry> {
+  return new Map(collectCandidates().map((candidate) => [candidate.scope, candidate.entry]));
 }
 
 export function migrateLegacySprintFiles(): readonly LegacySprintMigration[] {
