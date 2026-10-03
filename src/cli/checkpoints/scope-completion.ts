@@ -14,12 +14,22 @@ import {
 } from './lifecycle-state';
 import type { KyroProjectState, KyroScopeEntry, ScopeCompletion, SprintFile } from '../types';
 import { atomicReplace, canonicalJson } from './sprint-close';
+import { sha256 } from '../core/digest';
+import { remediationStateDigest, debtCollectionDigest } from '../remediation/canonical-state';
+import { debtEvolution, planDebtRecovery } from '../remediation/debt';
+import { commitRemediationPlanUnlocked } from '../remediation/transaction';
+import { remediationRecordPath, type RemediationPlan } from '../remediation/plan';
+import type { ScopeRemediation } from '../remediation/protocol';
 
 export { SCOPE_COMPLETION_KIND, SCOPE_COMPLETION_SCHEMA_VERSION };
 
 export interface ScopeCompletionRequest {
   scope: string;
   summary: string | null;
+  acceptOpenDebt?: boolean;
+  reconcileDebt?: boolean;
+  reason?: string | null;
+  expectDigest?: string | null;
 }
 
 export type ScopeCompletionState = 'fresh' | 'resumable' | 'already-applied';
@@ -32,6 +42,9 @@ export interface ScopeCompletionPreparation {
   affectedFiles: string[];
   validations: string[];
   state: ScopeCompletionState;
+  planDigest: string;
+  reconciliation: RemediationPlan | null;
+  acceptedDebt: SprintFile['debt'];
 }
 
 export interface ScopeCompletionApplyResult {
@@ -46,7 +59,34 @@ export interface ScopeCompletionApplyResult {
  * this module — which owns the locked transaction — does not depend on `commands/artifact-doctor`,
  * preserving the existing one-directional `commands/` → `checkpoints/` layering.
  */
-export type ScopeCompletionHealthCheck = (scope: string) => void;
+export type ScopeCompletionHealthCheck = (scope: string, options?: { sprint?: SprintFile; acceptOpenDebt?: boolean; historicalOnly?: boolean }) => void;
+
+function completionPolicy(request: ScopeCompletionRequest): ScopeCompletion['policy'] {
+  if (!request.acceptOpenDebt && !request.reconcileDebt) {
+    if (request.reason != null) throw new KyroCoreError('INVALID_INPUT', '--reason requires --accept-open-debt or --reconcile-debt.');
+    return undefined;
+  }
+  const reason = request.reason?.trim();
+  if (!reason) throw new KyroCoreError('INVALID_INPUT', 'Debt acceptance/reconciliation requires a non-empty --reason.');
+  return { acceptOpenDebt: Boolean(request.acceptOpenDebt), reconcileDebt: Boolean(request.reconcileDebt), reason };
+}
+
+function prepareFreshCompletion(request: ScopeCompletionRequest, sprint: SprintFile, entry: KyroScopeEntry, assertHealthy: ScopeCompletionHealthCheck) {
+  const policy = completionPolicy(request);
+  if (sprint.activeSprint) assertHealthy(request.scope, { sprint, acceptOpenDebt: request.acceptOpenDebt });
+  const reconciliation = request.reconcileDebt ? planDebtRecovery(request.scope, sprint, policy!.reason) : null;
+  assertHealthy(request.scope, { sprint, acceptOpenDebt: request.acceptOpenDebt, historicalOnly: Boolean(reconciliation) });
+  const requestDigest = scopeCompletionRequestDigest(request.scope, normalizeCompletionSummary(request.summary), policy);
+  let head = sprint.remediations?.at(-1)?.commitment ?? null;
+  // An explanation transaction changes only the anchor; recover the exact reviewed input head on retry.
+  if (request.reconcileDebt && !reconciliation && sprint.remediations?.length) {
+    const anchor = sprint.remediations.at(-1)!;
+    const record = readJsonSafely(remediationRecordPath(request.scope, anchor.id)).value as ScopeRemediation | null;
+    if (record?.schemaVersion === 5 && record.provenance.reason === policy!.reason && record.issues.every((issue) => issue.code === 'UNRECORDED_DEBT_CHANGE') && record.result.stateSha256 === remediationStateDigest(sprint)) head = record.base.remediationHead;
+  }
+  const planDigest = sha256({ requestDigest, state: remediationStateDigest(sprint), entry: completionRegistryEntryDigest(entry), head, checkpoints: sprint.ledger.map((row) => [row.checkpoint, row.checkpointSha256]) });
+  return { reconciliation, planDigest, acceptedDebt: request.acceptOpenDebt ? sprint.debt.filter((item) => item.status === 'open' || item.status === 'in_progress') : [] };
+}
 
 function normalizeCompletionSummary(raw: string | null | undefined): string | null {
   if (raw == null) return null;
@@ -88,12 +128,13 @@ export function buildScopeCompletionPreparation(
   assertHealthy: ScopeCompletionHealthCheck,
 ): ScopeCompletionPreparation {
   const normalizedSummary = normalizeCompletionSummary(request.summary);
-  const requestDigest = scopeCompletionRequestDigest(request.scope, normalizedSummary);
+  const requestDigest = scopeCompletionRequestDigest(request.scope, normalizedSummary, completionPolicy(request));
   const sprint = readValidSprint(request.scope);
   const { entry } = readRegisteredProject(request.scope);
   assertNotRetired(request.scope, sprint, entry);
 
   let state: ScopeCompletionState = 'fresh';
+  let fresh: ReturnType<typeof prepareFreshCompletion> | null = null;
   if (sprint.completion !== undefined) {
     if (sprint.completion.requestDigest !== requestDigest) {
       throw new KyroCoreError('COMPLETION_CONFLICT', `Scope "${request.scope}" is already completed.`, 'Use kyro status to inspect the existing completion record.');
@@ -104,7 +145,7 @@ export function buildScopeCompletionPreparation(
     // order (sprint is always written before the registry); let the locked apply fail this closed.
     state = 'fresh';
   } else {
-    assertHealthy(request.scope);
+    fresh = prepareFreshCompletion(request, sprint, entry, assertHealthy);
   }
 
   return {
@@ -112,16 +153,19 @@ export function buildScopeCompletionPreparation(
     normalizedSummary,
     requestDigest,
     currentStatus: entry.status,
-    affectedFiles: hasLayeredProjectStateOnDisk()
+    affectedFiles: [...(fresh?.reconciliation ? [fresh.reconciliation.recordPath] : []), ...(hasLayeredProjectStateOnDisk()
       ? [sprintJsonPath(request.scope)]
-      : [sprintJsonPath(request.scope), '.agents/kyro/project.json', '.agents/kyro/local.json', '.agents/kyro/kyro.json', '.agents/kyro/kyro.json.migrated'],
+      : [sprintJsonPath(request.scope), '.agents/kyro/project.json', '.agents/kyro/local.json', '.agents/kyro/kyro.json', '.agents/kyro/kyro.json.migrated'])],
     validations: [
       'scope has a valid matching sprint.json and is not retired',
-      'no active sprint, open debt, pending review, or blocking findings (fresh completions only)',
+      'no active sprint, unaccepted open debt, pending review, or blocking findings (fresh completions only)',
       'apply is a single locked transaction bound to this request digest',
       'a matching prior attempt resumes instead of re-writing sprint.json',
     ],
     state,
+    planDigest: fresh?.planDigest ?? sprint.completion?.planDigest ?? requestDigest,
+    reconciliation: fresh?.reconciliation ?? null,
+    acceptedDebt: fresh?.acceptedDebt ?? sprint.completion?.debtAcceptance?.items ?? [],
   };
 }
 
@@ -131,15 +175,18 @@ export function applyScopeCompletion(
   assertHealthy: ScopeCompletionHealthCheck,
 ): ScopeCompletionApplyResult {
   const normalizedSummary = normalizeCompletionSummary(request.summary);
-  const requestDigest = scopeCompletionRequestDigest(request.scope, normalizedSummary);
+  const policy = completionPolicy(request);
+  const requestDigest = scopeCompletionRequestDigest(request.scope, normalizedSummary, policy);
+  if (request.reconcileDebt && !request.expectDigest) throw new KyroCoreError('INVALID_INPUT', 'Applying --reconcile-debt requires --expect-digest from a fresh preview.');
 
   return withStateWriterLock(() => {
-    const sprint = readValidSprint(request.scope);
+    let sprint = readValidSprint(request.scope);
     const { project, entry } = readRegisteredProject(request.scope);
     assertNotRetired(request.scope, sprint, entry);
 
     const sprintMatches = sprint.completion?.requestDigest === requestDigest;
     const entryMatches = entry.completion?.requestDigest === requestDigest;
+    if (sprintMatches && request.expectDigest && sprint.completion?.planDigest !== request.expectDigest) throw new KyroCoreError('STATE_DIVERGED', 'Completion plan digest differs from the approved request.');
 
     if (sprintMatches && entryMatches) {
       assertExactlyApplied(request.scope, sprint, entry, requestDigest);
@@ -172,7 +219,13 @@ export function applyScopeCompletion(
     }
 
     // Fresh scenario: re-run real preconditions now, under the lock, against state read this instant.
-    assertHealthy(request.scope);
+    const fresh = prepareFreshCompletion(request, sprint, entry, assertHealthy);
+    if (request.expectDigest && request.expectDigest !== fresh.planDigest) throw new KyroCoreError('STATE_DIVERGED', 'The closure plan changed after preview. Re-run --dry-run.');
+    if (fresh.reconciliation) {
+      commitRemediationPlanUnlocked(fresh.reconciliation);
+      if (process.env.KYRO_TEST_COMPLETE_FAIL_AFTER === 'reconciliation') throw new KyroCoreError('INTERNAL', 'Injected completion failure after reconciliation. Retry the identical approved command.');
+      sprint = readValidSprint(request.scope);
+    }
 
     const beforeEntryDigest = completionRegistryEntryDigest(entry);
     const completedAt = new Date().toISOString();
@@ -182,6 +235,10 @@ export function applyScopeCompletion(
       ...(normalizedSummary ? { summary: normalizedSummary } : {}),
       requestDigest,
       beforeEntryDigest,
+      beforeStateDigest: remediationStateDigest(sprint),
+      planDigest: fresh.planDigest,
+      ...(policy ? { policy } : {}),
+      ...(request.acceptOpenDebt ? { debtAcceptance: { reason: policy!.reason, items: structuredClone(fresh.acceptedDebt), debtCollectionSha256: debtCollectionDigest(sprint.debt) } } : {}),
     };
     const nextSprint: SprintFile = completedSprintState(sprint, completion);
     atomicReplace(sprintJsonPath(request.scope), `${JSON.stringify(nextSprint, null, 2)}\n`);
@@ -216,6 +273,10 @@ function assertExactlyApplied(scope: string, sprint: SprintFile, entry: KyroScop
   }
   if (canonicalJson(sprint.completion) !== canonicalJson(entry.completion)) {
     throw diverged('sprint and registry completion records diverge');
+  }
+  if (sprint.completion?.beforeStateDigest) {
+    const evolution = debtEvolution(scope, sprint);
+    if (evolution && (evolution.kind === 'broken' || !evolution.matchesLive)) throw diverged(evolution.kind === 'broken' ? evolution.detail : 'completed scope differs from its verified historical evolution');
   }
 }
 

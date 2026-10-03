@@ -486,6 +486,20 @@ function validateCompletionRecord(completion: unknown, path: string, field: stri
   requireIsoString(completion, 'completedAt', path, issues, `${field}.completedAt`);
   requireNonEmptyString(completion, 'by', path, issues, `${field}.by`);
   if ('summary' in completion) requireNonEmptyString(completion, 'summary', path, issues, `${field}.summary`);
+  if ('policy' in completion) {
+    const policy = completion.policy;
+    if (!isRecord(policy) || typeof policy.acceptOpenDebt !== 'boolean' || typeof policy.reconcileDebt !== 'boolean' || typeof policy.reason !== 'string' || !policy.reason.trim()) issues.push({ path, field: `${field}.policy`, message: 'must contain acceptOpenDebt, reconcileDebt and a non-empty reason' });
+  }
+  if ('debtAcceptance' in completion) {
+    const accepted = completion.debtAcceptance;
+    if (!isRecord(accepted) || typeof accepted.reason !== 'string' || !accepted.reason.trim() || !Array.isArray(accepted.items) || typeof accepted.debtCollectionSha256 !== 'string' || !SHA256_HEX_PATTERN.test(accepted.debtCollectionSha256)) {
+      issues.push({ path, field: `${field}.debtAcceptance`, message: 'must contain reason, canonical items and a debt collection digest' });
+    } else {
+      accepted.items.forEach((item, index) => validateDebtItem(item, path, `${field}.debtAcceptance.items[${index}]`, issues));
+    }
+    if (!isRecord(completion.policy) || completion.policy.acceptOpenDebt !== true) issues.push({ path, field: `${field}.debtAcceptance`, message: 'requires an acceptOpenDebt policy' });
+  } else if (isRecord(completion.policy) && completion.policy.acceptOpenDebt === true) issues.push({ path, field: `${field}.debtAcceptance`, message: 'is required when accepting open debt' });
+  if ('planDigest' in completion && (typeof completion.planDigest !== 'string' || !SHA256_HEX_PATTERN.test(completion.planDigest))) issues.push({ path, field: `${field}.planDigest`, message: 'must be a SHA-256 digest' });
   validatePairedDigests(completion, path, field, issues);
 }
 
@@ -494,6 +508,7 @@ function validateCompletionRecord(completion: unknown, path: string, field: stri
  * absent together on legacy records. One without the other is drift, not a legacy shape.
  */
 function validatePairedDigests(record: Record<string, unknown>, path: string, field: string, issues: ValidationIssue[]): void {
+  if ('beforeStateDigest' in record && (typeof record.beforeStateDigest !== 'string' || !SHA256_HEX_PATTERN.test(record.beforeStateDigest))) issues.push({ path, field: `${field}.beforeStateDigest`, message: 'must be a SHA-256 digest' });
   if ('requestDigest' in record && (typeof record.requestDigest !== 'string' || !SHA256_HEX_PATTERN.test(record.requestDigest))) {
     issues.push({ path, field: `${field}.requestDigest`, message: 'must be a lowercase SHA-256 digest' });
   }

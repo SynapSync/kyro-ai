@@ -73,7 +73,9 @@ export function commitRemediationPlanUnlocked(plan: RemediationPlan): Remediatio
     publishExclusive(plan.recordPath, `${JSON.stringify(plan.record, null, 2)}\n`, `remediation record ${plan.remediationId}`);
   }
   verifyPublishedRecord(plan);
+  if (process.env.KYRO_TEST_REMEDIATION_FAIL_AFTER === 'record') throw new KyroCoreError('INTERNAL', 'Injected remediation failure after record. Retry the identical command.');
   compareAndSwapSprint(plan);
+  if (process.env.KYRO_TEST_REMEDIATION_FAIL_AFTER === 'anchor') throw new KyroCoreError('INTERNAL', 'Injected remediation failure after anchor.');
   verifyApplied(plan);
 
   return {

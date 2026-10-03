@@ -14,6 +14,7 @@ import {
 } from './lifecycle-state';
 import type { KyroProjectState, KyroScopeEntry, ScopeCompletion, ScopeReopenRecord, SprintFile } from '../types';
 import { atomicReplace, canonicalJson } from './sprint-close';
+import { remediationStateDigest } from '../remediation/canonical-state';
 
 export { SCOPE_REOPEN_KIND, SCOPE_REOPEN_SCHEMA_VERSION };
 
@@ -201,6 +202,7 @@ export function applyScopeReopen(request: ScopeReopenRequest): ScopeReopenApplyR
       completion: supersededCompletion,
       requestDigest,
       beforeEntryDigest,
+      beforeStateDigest: remediationStateDigest(sprint),
     };
     const nextSprint = reopenedSprintState(sprint, record);
     atomicReplace(sprintJsonPath(request.scope), `${JSON.stringify(nextSprint, null, 2)}\n`);

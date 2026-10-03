@@ -81,6 +81,7 @@ interface BriefStatusReport {
   status: string;
   objective: string;
   retirement: ScopeRetirement | null;
+  completion: SprintFile['completion'] | null;
   activeSprint: ActiveSprintStatusSummary | null;
   nextAction: string;
   nextTask: TaskReference | null;
@@ -252,6 +253,7 @@ function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusR
     status: deriveScopeStatus(sprint, Boolean(activeSprint)),
     objective: sprint.objective,
     retirement: sprint.retirement ?? null,
+    completion: sprint.completion ?? null,
     activeSprint: activeSprint ? {
       n: activeSprint.n,
       slug: activeSprint.slug,
@@ -413,6 +415,7 @@ function printBriefStatus(report: BriefStatusReport): void {
     console.log('Note: sprint progress is "planned" (no task started yet); nextAction "execute_task" is the routing handoff — not a conflict.');
   }
   console.log(`Open debt: ${report.openDebtCount}`);
+  if (report.completion?.debtAcceptance) console.log(`Accepted pending debt at completion: ${report.completion.debtAcceptance.items.map((item) => item.id).join(', ') || 'none'} — ${report.completion.debtAcceptance.reason}`);
   console.log(`Pending review: ${report.pendingReviewCount}`);
   if (report.execution.readyTaskIds.length) console.log(`Ready tasks: ${report.execution.readyTaskIds.join(', ')}`);
   if (report.execution.blockedTasks.length) console.log(`Blocked tasks: ${report.execution.blockedTasks.map((item) => `${item.taskId}${item.blockedByTaskIds.length ? ` ← ${item.blockedByTaskIds.join(', ')}` : ''}`).join(' | ')}`);

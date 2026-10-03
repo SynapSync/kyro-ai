@@ -64,6 +64,13 @@ export interface ScopeCompletion {
    * the registry once it verifies the registry hasn't drifted since sprint.json was completed.
    */
   beforeEntryDigest?: string;
+  /** Business-state binding for composed remediation/lifecycle replay. */
+  beforeStateDigest?: string;
+  /** Request options for extended completion; absent preserves the historical request digest. */
+  policy?: { acceptOpenDebt: boolean; reconcileDebt: boolean; reason: string };
+  debtAcceptance?: { reason: string; items: Debt[]; debtCollectionSha256: string };
+  /** Digest of the reviewed closure plan, preserved for interruption recovery. */
+  planDigest?: string;
 }
 
 /**
@@ -90,6 +97,7 @@ export interface ScopeReopenRecord {
    * the registry once it verifies the registry has not drifted since sprint.json was reopened.
    */
   beforeEntryDigest?: string;
+  beforeStateDigest?: string;
 }
 
 /** Built-in, machine-checkable predicates a principle can bind to (enforced by `kyro analyze`). */

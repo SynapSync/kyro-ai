@@ -108,6 +108,8 @@ hosts may not expose an equivalent hook, so correctness never depends on it.
 
 User intent to complete/close a finished scope is `{{KYRO_CLI}} scope complete` (Forge overlay), not a `nextAction` and not retirement. `done` means already terminal.
 
+For explicit debt acceptance/recovery, follow `commands/forge.md`: `scope complete --accept-open-debt` / `--reconcile-debt`, with `--reason`; reconciliation requires preview and `--expect-digest`. Never infer acceptance or create an administrative sprint. Completed scopes require reopen before debt changes; other integrity failures block.
+
 | nextAction | Load |
 |------------|------|
 | `init` (no sprint.json) | `modes/INIT.md` + one `helpers/analysis/{workType}.md` |

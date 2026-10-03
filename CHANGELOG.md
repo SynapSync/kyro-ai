@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-10-03
+
+### Fixed
+
+- Post-sprint debt changes are recorded as replayable v5 transitions, allowing scope completion without an administrative sprint. Completed scopes require reopening before changing debt.
+
+### Added
+
+- `scope complete --accept-open-debt --reason` records an explicit acceptance without changing pending debt. `--reconcile-debt` recovers authorized debt-only divergence using a reviewed `--expect-digest`, preserving historical artifacts and resuming interrupted writes.
+
 ## [6.0.2] - 2026-10-02
 
 ### Fixed

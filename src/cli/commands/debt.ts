@@ -7,6 +7,13 @@ import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import type { Debt, OperationPlan, SprintFile } from '../types';
+import { applyDebtChange, nextDebtId, type DebtChangeAction } from '../core/debt-transition';
+import { sha256 } from '../core/digest';
+import { withStateWriterLock } from '../pipeline/state-writer-lock';
+import { readPackageVersion } from '../help';
+import { debtEvolution, debtManifest, debtOperation } from '../remediation/debt';
+import { planRemediation } from '../remediation/plan';
+import { commitRemediationPlanUnlocked } from '../remediation/transaction';
 
 const DEBT_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const;
 type DebtPriority = (typeof DEBT_PRIORITIES)[number];
@@ -320,6 +327,8 @@ function readAndValidateSprint(scope: string): SprintFile {
   }
   const sprint = asSprintFile(read.value);
   if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" does not match the v4 schema.`, `Run kyro doctor --artifacts --kyro-scope ${scope}.`);
+  if (sprint.completion || sprint.status === 'completed') throw new KyroCoreError('SCOPE_COMPLETED', 'Reopen the scope before changing debt.', `Run kyro scope reopen --kyro-scope ${scope} --reason "<why further work is needed>" --yes.`);
+  if (sprint.retirement || sprint.status === 'retired') throw new KyroCoreError('SCOPE_RETIRED', 'Retired scopes cannot change debt.');
   return sprint;
 }
 
@@ -338,43 +347,49 @@ function applyDebtMutation(
   dryRun: boolean,
   successMessage: string,
 ): void {
-  // Deep-clone-then-mutate mirrors record-evidence/review: the plan carries the whole file (sprint.json
-  // has one artifact, not per-field patches), but only debt[] differs from the source.
-  const nextSprint: SprintFile = { ...(JSON.parse(JSON.stringify(sprint)) as SprintFile), debt: nextDebt };
-  const plan: OperationPlan[] = [{ action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(nextSprint, null, 2)}\n` }];
-  printPlan(`Debt ${op} for scope ${scope}`, plan);
+  return withStateWriterLock(() => {
+    const current = readAndValidateSprint(scope);
+    if (sha256(current) !== sha256(sprint)) throw new KyroCoreError('STATE_DIVERGED', 'Debt changed while the command was being prepared. Retry against fresh state.');
+    const after = nextDebt.find((item) => item.id === traceArgs.id)!;
+    const shared = applyDebtChange(sprint, op as DebtChangeAction, after);
+    if (sha256(shared) !== sha256(nextDebt)) throw new KyroCoreError('INVALID_INPUT', 'Debt mutation does not match the shared transition contract.');
+    const reason = after.note.trim() || `Debt ${op}: ${after.id}`;
+    const evolution = !sprint.activeSprint ? debtEvolution(scope, sprint, true) : null;
+    if (evolution && (evolution.kind === 'broken' || !evolution.matchesLive)) throw new KyroCoreError('DIVERGED', evolution.kind === 'broken' ? evolution.detail : 'Unrecorded post-close evolution remains.', `Preview kyro scope complete --kyro-scope ${scope} --reconcile-debt --reason "<reason>" --dry-run.`);
+    if (evolution) {
+      const remediation = planRemediation({ scope, manifest: debtManifest(scope, sprint, debtOperation(sprint, op as DebtChangeAction, after, reason)), now: new Date().toISOString(), kyroVersion: readPackageVersion() });
+      printPlan(`Debt ${op} for scope ${scope}`, [{ action: 'write', path: remediation.recordPath }, { action: 'write', path: remediation.sprintPath }]);
+      if (dryRun) { console.log('Dry run complete. No files changed.'); return; }
+      commitRemediationPlanUnlocked(remediation);
+      emitToolCommandRun(scope, 'cli', 'debt', { op, ...traceArgs });
+      console.log(successMessage);
+      return;
+    }
+    // Before a close checkpoint, only the CLI-owned live debt collection changes.
+    const nextSprint: SprintFile = { ...(JSON.parse(JSON.stringify(sprint)) as SprintFile), debt: nextDebt };
+    const plan: OperationPlan[] = [{ action: 'write', path: sprintJsonPath(scope), content: `${JSON.stringify(nextSprint, null, 2)}\n` }];
+    printPlan(`Debt ${op} for scope ${scope}`, plan);
 
-  if (dryRun) {
-    console.log('Dry run complete. No files changed.');
-    return;
-  }
+    if (dryRun) {
+      console.log('Dry run complete. No files changed.');
+      return;
+    }
 
-  emitToolCommandRun(scope, 'cli', 'debt', { op, ...traceArgs });
-  applyPlan(plan);
+    emitToolCommandRun(scope, 'cli', 'debt', { op, ...traceArgs });
+    applyPlan(plan);
 
-  const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `debt ${op} wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `debt ${op} wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
-  }
-  console.log(successMessage);
+    const verify = readJsonSafely(sprintJsonPath(scope));
+    if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `debt ${op} wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
+    const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
+    if (issues.length > 0) {
+      const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
+      throw new KyroCoreError('INVALID_SPRINT_SHAPE', `debt ${op} wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
+    }
+    console.log(successMessage);
+  });
 }
 
 // --- helpers ---
-
-function nextDebtId(debt: Debt[]): string {
-  let max = 0;
-  for (const item of debt) {
-    const match = /^debt-(\d+)$/.exec(item.id);
-    if (match) {
-      const n = Number.parseInt(match[1], 10);
-      if (n > max) max = n;
-    }
-  }
-  return `debt-${max + 1}`;
-}
 
 function maxLedgerSprintNumber(sprint: SprintFile): number | null {
   if (sprint.ledger.length === 0) return null;

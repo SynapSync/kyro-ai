@@ -426,6 +426,10 @@ interface ScopeCompleteArgs {
   yes: boolean;
   dryRun: boolean;
   help: boolean;
+  acceptOpenDebt: boolean;
+  reconcileDebt: boolean;
+  reason: string | null;
+  expectDigest: string | null;
 }
 
 /**
@@ -439,7 +443,7 @@ function runScopeComplete(args: ScopeCompleteArgs): void {
   if (args.dryRun && args.yes) {
     throw new KyroCoreError('INVALID_INPUT', '--dry-run and --yes are mutually exclusive.', 'Use --dry-run to preview, or --yes to confirm the write — not both.');
   }
-  const request: ScopeCompletionRequest = { scope: args.scope, summary: args.summary };
+  const request: ScopeCompletionRequest = { scope: args.scope, summary: args.summary, acceptOpenDebt: args.acceptOpenDebt, reconcileDebt: args.reconcileDebt, reason: args.reason, expectDigest: args.expectDigest };
   const preparation = buildScopeCompletionPreparation(request, assertScopeHealthyForCompletion);
   printCompletionPlan(preparation);
   if (args.dryRun) {
@@ -466,21 +470,28 @@ function printCompletionPlan(preparation: ScopeCompletionPreparation): void {
   console.log('Validations:');
   for (const validation of preparation.validations) console.log(`- ${validation}`);
   console.log(`Request digest: ${preparation.requestDigest}`);
+  console.log(`Plan digest: ${preparation.planDigest}`);
+  if (preparation.request.acceptOpenDebt) console.log(`Accepted pending debt: ${preparation.acceptedDebt.map((item) => `${item.id} (${item.status}, ${item.priority})`).join(', ') || 'none'}; reason: ${preparation.request.reason}`);
+  if (preparation.reconciliation) {
+    console.log(`Debt reconciliation: ${preparation.reconciliation.remediationId}`);
+    for (const operation of preparation.reconciliation.record.operations) console.log(`- ${JSON.stringify(operation)}`);
+    console.log(`Apply this reviewed plan with --expect-digest ${preparation.planDigest} --yes.`);
+  }
   console.log('\nCompletion is a confirmed statement that the scope work is done. It does NOT retire the scope and never rewrites archive/.');
   if (preparation.state === 'already-applied') console.log('State: already applied; an identical apply is a safe no-op.');
   else if (preparation.state === 'resumable') console.log('State: partially applied; an identical apply will resume and finish the registry update.');
 }
 
-function assertScopeHealthyForCompletion(scope: string): void {
+function assertScopeHealthyForCompletion(scope: string, options?: { sprint?: SprintFile; acceptOpenDebt?: boolean; historicalOnly?: boolean }): void {
   const read = readJsonSafely(sprintJsonPath(scope));
   if (read.error || !read.exists) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error ?? 'missing'}).`, 'Fix invalid JSON or restore from an archive snapshot.');
-  const sprint = asSprintFile(read.value);
+  const sprint = options?.sprint ?? asSprintFile(read.value);
   if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" does not match the v4 schema.`, 'Run kyro doctor --artifacts --kyro-scope ${scope}.');
   const active = sprint.activeSprint;
   if (active) {
     throw new KyroCoreError('NOT_READY_TO_COMPLETE', `Cannot complete scope "${scope}": sprint ${active.n} (${active.slug}) is active.`, 'Close the active sprint first, or defer completion until no sprint is in progress.');
   }
-  if (sprint.debt.some((d) => d.status === 'open' || d.status === 'in_progress')) {
+  if (!options?.acceptOpenDebt && sprint.debt.some((d) => d.status === 'open' || d.status === 'in_progress')) {
     throw new KyroCoreError('NOT_READY_TO_COMPLETE', `Cannot complete scope "${scope}": open debt remains.`, 'Resolve or explicitly defer all debt before completing the scope.');
   }
   // Review debt: any done task without a pass verdict (read-only projection, same as status).
@@ -495,7 +506,7 @@ function assertScopeHealthyForCompletion(scope: string): void {
     const detail = blocking.map((finding) => finding.detail).join('; ');
     throw new KyroCoreError('BLOCKING_FINDINGS', `Cannot complete scope "${scope}": ${blocking.length} blocking analyze finding(s) remain — ${detail}`, 'Run kyro analyze, resolve CRITICAL/HIGH findings, then complete the scope.');
   }
-  const unhealthy = inspectSprintCloseCheckpoints(scope).filter((check) => check.status !== 'pass');
+  const unhealthy = inspectSprintCloseCheckpoints(scope, options?.historicalOnly).filter((check) => check.status !== 'pass');
   if (unhealthy.length > 0) {
     const detail = unhealthy.map((check) => `${check.name}: ${check.detail}`).join('; ');
     throw new KyroCoreError('DIVERGED', `Cannot complete scope "${scope}": artifact validation failed — ${detail}`, unhealthy[0]?.remedy ?? 'Run kyro doctor --artifacts for the scope and reconcile the divergence before completing.');
@@ -514,6 +525,10 @@ function parseCompleteArgs(args: string[]): ScopeCompleteArgs {
   let yes = false;
   let dryRun = false;
   let help = false;
+  let acceptOpenDebt = false;
+  let reconcileDebt = false;
+  let reason: string | null = null;
+  let expectDigest: string | null = null;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--help' || arg === '-h') help = true;
@@ -521,18 +536,26 @@ function parseCompleteArgs(args: string[]): ScopeCompleteArgs {
     else if (arg === '--dry-run') dryRun = true;
     else if (arg === '--kyro-scope') scope = requiredValue(args, ++index, arg);
     else if (arg === '--summary') summary = requiredValue(args, ++index, arg);
+    else if (arg === '--accept-open-debt') acceptOpenDebt = true;
+    else if (arg === '--reconcile-debt') reconcileDebt = true;
+    else if (arg === '--reason') reason = requiredValue(args, ++index, arg);
+    else if (arg === '--expect-digest') expectDigest = requiredValue(args, ++index, arg);
     else throw new KyroCoreError('INVALID_INPUT', `Unknown scope complete option: ${arg}`, 'Run kyro scope complete --help.');
   }
   if (!help && !scope) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes].');
-  return { scope, summary, yes, dryRun, help };
+  if (expectDigest && !/^[a-f0-9]{64}$/.test(expectDigest)) throw new KyroCoreError('INVALID_INPUT', '--expect-digest must be a SHA-256 digest.');
+  return { scope, summary, yes, dryRun, help, acceptOpenDebt, reconcileDebt, reason, expectDigest };
 }
 
 function printScopeCompleteHelp(): void {
   console.log(`Usage:
-  kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes]
+  kyro scope complete --kyro-scope <scope> [--summary <text>] [--accept-open-debt] [--reconcile-debt] [--reason <text>] [--expect-digest <sha256>] [--dry-run | --yes]
 
 Records explicit scope completion as a lifecycle fact distinct from retirement. Refuses active
 sprints, open debt, pending review, blocking findings, and artifact divergence without writing.
+--accept-open-debt explicitly accepts pending debt without changing it. --reconcile-debt records
+authorized debt-only divergence. Either requires --reason; applying reconciliation also requires
+--expect-digest from the --dry-run preview. Neither bypasses active work or historical integrity.
 Completion never creates a retirement checkpoint and never rewrites archive/.`);
 }
 
@@ -591,6 +614,7 @@ function printReopenPlan(preparation: ScopeReopenPreparation): void {
 function printLifecycleHistory(sprint: SprintFile): void {
   if (sprint.completion) {
     console.log(`Completed at: ${sprint.completion.completedAt}${sprint.completion.summary ? ` — ${sprint.completion.summary}` : ''}`);
+    if (sprint.completion.debtAcceptance) console.log(`Accepted pending debt at completion: ${JSON.stringify(sprint.completion.debtAcceptance)}`);
   }
   for (const record of sprint.completionHistory ?? []) {
     console.log(`Reopened at: ${record.reopenedAt} (completed ${record.completion.completedAt}) — ${record.reason}`);
