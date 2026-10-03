@@ -14,7 +14,8 @@ import { canonicalJson, sha256 } from '../checkpoints/sprint-close';
 import { rebuildCanonicalCheckpointFromDisk } from '../checkpoints/canonicalize';
 import { EFFECTIVE_CHECKPOINT_STATUS, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
 import { observedValueDigest } from '../remediation/canonical-state';
-import { resolveRemediationReplayState } from '../remediation/plan';
+import { isSupersededByActiveSprint, resolveRemediationReplayState, resolveScopeEvolution, usesBoundEvolution } from '../remediation/plan';
+import { remediationStateDigest } from '../remediation/canonical-state';
 import {
   classifyRegistry,
   REGISTRY_CLASS,
@@ -365,6 +366,18 @@ export function prepareIntegrityPlan(options: {
     const physicalAfter = physicalRead.exists && !physicalRead.error
       ? (physicalRead.value as { intendedAfterClose?: SprintFile }).intendedAfterClose
       : null;
+    if (usesBoundEvolution(scope, live)) {
+      const baseEntry = resolved.checkpoint?.projectScopeAfter ?? rebuilt?.projection.projectScopeAfter;
+      if (!baseEntry) continue;
+      const evolution = resolveScopeEvolution(scope, physicalAfter ?? after, baseEntry, live);
+      if (evolution.kind === 'verified' && (evolution.matchesLive || isSupersededByActiveSprint(scope, live as unknown as Record<string, unknown>))) continue;
+      const changedFields = evolution.kind === 'verified' ? [...new Set([...Object.keys(evolution.state), ...Object.keys(live)])].filter((key) => !['remediations', 'checkpointSha256'].includes(key) && canonicalJson((evolution.state as unknown as Record<string, unknown>)[key]) !== canonicalJson((live as unknown as Record<string, unknown>)[key])) : [];
+      const detail = evolution.kind === 'broken' ? evolution.detail : `unexplained post-close evolution in ${changedFields.join(', ') || 'scope registry'}`;
+      const remedy = changedFields.length === 1 && changedFields[0] === 'debt' ? '; preview scope complete --reconcile-debt --reason "<authorized decision>" --dry-run' : '';
+      const blocker: IntegrityFinding = { class: 'blocker', code: 'diverged', summary: `${scope}: ${detail}${remedy}` };
+      blockers.push(blocker); findings.push(blocker);
+      continue;
+    }
     // Lifecycle records are not authority by themselves. Completion/reopen is structurally coherent
     // only when one verifier reproduces both durable layers from the same checkpoint after-image.
     if (hasLifecycleEvidence(live)) {
@@ -403,6 +416,21 @@ export function prepareIntegrityPlan(options: {
     }
     const baseline = replay.state as unknown as SprintFile;
     const liveOps = planLiveEvolution(scope, live, baseline, { includeReanchor: Boolean(resolved.checkpoint) });
+    const explained = structuredClone(baseline);
+    for (const operation of liveOps) {
+      if (operation.kind === 'convention.append') explained.conventions.push(operation.after);
+      if (operation.kind === 'adr.append') (explained.adrs ??= []).push(operation.after);
+      if (operation.kind === 'ledger.checkpoint.reanchor') {
+        const row = explained.ledger.find((entry) => entry.n === operation.sprintN && entry.slug === operation.sprintSlug);
+        if (row) row.checkpointSha256 = operation.afterSha256;
+      }
+    }
+    if (!hasLifecycleEvidence(live) && !live.activeSprint && remediationStateDigest(explained) !== remediationStateDigest(live)) {
+      const keys = [...new Set([...Object.keys(explained), ...Object.keys(live)])].filter((key) => !['remediations', 'certifications'].includes(key) && canonicalJson((explained as unknown as Record<string, unknown>)[key]) !== canonicalJson((live as unknown as Record<string, unknown>)[key]));
+      const blocker: IntegrityFinding = { class: 'blocker', code: 'diverged', summary: `${scope}: unexplained post-close fields: ${keys.join(', ')}.${keys.length === 1 && keys[0] === 'debt' ? ` Preview kyro scope complete --kyro-scope ${scope} --reconcile-debt --reason "<owner decision>" --dry-run.` : ' Reconcile these fields explicitly; debt acceptance cannot authorize them.'}` };
+      blockers.push(blocker); findings.push(blocker);
+      continue;
+    }
     for (const op of liveOps) operations.push(op);
     if (liveOps.length > 0) {
       targets.live.push({

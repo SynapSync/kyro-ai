@@ -659,6 +659,25 @@ See [adr-adaptive-sprint-lifecycle.md](plans/adr-adaptive-sprint-lifecycle.md) a
 
 Unknown ids fail with `DEBT_NOT_FOUND`. Run `kyro status debt` to inspect the result.
 
+After a sprint closes, debt commands record replayable `debt.change` operations in immutable remediation records (protocol v5). Completed scopes are frozen: run `scope reopen` before changing their debt. These transitions preserve existing checkpoints, snapshots and narratives.
+
+### Complete a scope with accepted debt or reconcile an older debt change
+
+Ordinary `scope complete` still refuses open/in-progress debt. `--accept-open-debt --reason "<owner decision>"` permits completion at any debt priority without changing the debt statuses. The completion records the actor, date, reason and the accepted pending items. `status` and `scope inspect` expose that decision; it is not a QA certification.
+
+For a debt-only divergence left by an older CLI, preview and apply the recovery through the same closure command:
+
+```bash
+kyro scope complete --kyro-scope <scope> --reconcile-debt \
+  --reason "Confirm the observed debt decisions." --dry-run
+kyro scope complete --kyro-scope <scope> --reconcile-debt \
+  --reason "Confirm the observed debt decisions." --expect-digest <plan-digest> --yes
+```
+
+Add `--accept-open-debt` to both commands when accepting debt that remains open or in progress. Both flags require a concrete reason. `--expect-digest` binds apply to the reviewed plan and is required when applying reconciliation. A stale plan fails without completing; rerun the preview. Identical retries resume an interrupted reconciliation/completion without duplicating records.
+
+Reconciliation accepts only debt evolution: it cannot delete/reorder debt, change existing identity/title/origin, bypass an active sprint or other blocking findings, or ignore altered historical files. It records the owner's present confirmation, not an invented history of prior actors. It creates no administrative sprint. Neither `install`, `sync` nor Doctor performs this recovery automatically.
+
 ## Tool-owned emergent-task append (`kyro add-emergent`)
 
 `kyro add-emergent --title <t> --description <d> --acceptance <a> [--acceptance <a> ...] [--file <p> ...] [--context <c>] [--depends-on <id> ...] [--kyro-scope <scope>] [--dry-run]` appends a task to `activeSprint.emergentTasks[]` deterministically, so the agent never hand-edits `sprint.json` for required work discovered mid-sprint. `--title`, `--description`, and at least one `--acceptance` are required. The new task gets a fresh, never-reused `E<N>` id, `status: pending`, `evidence: null`, `verdict: null`; the handoff returns to `execute_task` and selects the next executable task. `kyro record-evidence` and `kyro review` then operate on it exactly like a phase task. Each `--depends-on` must reference an existing task id (phase or emergent) already in the sprint, or the command refuses with `TASK_NOT_FOUND`; with no active sprint it refuses with `NO_ACTIVE_SPRINT`. Nothing is written on refusal.
@@ -841,7 +860,8 @@ that leaves an immutable record of itself.
 | **5.1.0** | retains protocol v3 remediation | Preserves `debt.canonicalize` and the 5.0.1 compatibility migration; neither rewrites scopes during install or Doctor. |
 | **6.0.0** | retains protocol v3 remediation | Preserves `debt.canonicalize` and the 5.0.1 compatibility migration while moving Claude Code to CLI-managed skills; neither rewrites scopes during install or Doctor. |
 | **6.0.1** | retains protocol v3 remediation | Preserves explicit `debt.canonicalize` repair and adds guided diagnostics for legacy scope migration. |
-| **6.0.2 release candidate** | retains protocol v3 remediation | Removes legacy `project.json.scopes[]` with final warnings; install, sync, and update no longer run the automatic `resolvedSprint` compatibility migration or write `legacy-migrations/` backups. |
+| **6.0.2** | retains protocol v3 remediation | Removes legacy `project.json.scopes[]` with final warnings; install, sync, and update no longer run the automatic `resolvedSprint` compatibility migration or write `legacy-migrations/` backups. |
+| **6.1.0** | adds protocol v5 `debt.change` | Records post-close debt transitions, supports digest-bound debt reconciliation and explicit pending-debt acceptance at scope completion. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

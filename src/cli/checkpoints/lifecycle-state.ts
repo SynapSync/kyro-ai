@@ -1,6 +1,7 @@
 import { deriveScopeStatus } from '../core/status';
 import { canonicalJson, sha256 } from './sprint-close';
 import type { KyroScopeEntry, ScopeCompletion, ScopeReopenRecord, SprintFile } from '../types';
+import { remediationStateDigest, debtCollectionDigest } from '../remediation/canonical-state';
 
 /**
  * The exact after-states that `kyro scope complete` and `kyro scope reopen` write.
@@ -23,13 +24,14 @@ export const SCOPE_REOPEN_SCHEMA_VERSION = 1 as const;
  * same derivation the writers use. A digest recomputed by a second implementation would only prove
  * that two copies of the formula agree.
  */
-export function scopeCompletionRequestDigest(scope: string, normalizedSummary: string | null): string {
+export function scopeCompletionRequestDigest(scope: string, normalizedSummary: string | null, policy?: ScopeCompletion['policy']): string {
   return sha256({
     kind: SCOPE_COMPLETION_KIND,
     schemaVersion: SCOPE_COMPLETION_SCHEMA_VERSION,
     part: 'request',
     scope,
     summary: normalizedSummary,
+    ...(policy ? { policy } : {}),
   });
 }
 
@@ -301,6 +303,12 @@ const LIFECYCLE_TRANSITIONS: Record<LifecycleEvent['kind'], LifecycleTransition>
   complete(state, event) {
     if (event.kind !== 'complete') return SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION;
     if (state.sprint.completion !== undefined) return SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION;
+    if (event.completion.beforeStateDigest && event.completion.beforeStateDigest !== remediationStateDigest(state.sprint)) return SCOPE_LIFECYCLE_VERIFICATION_REASON.SPRINT_AFTER_MISMATCH;
+    if (event.completion.policy?.acceptOpenDebt) {
+      const accepted = event.completion.debtAcceptance;
+      const open = state.sprint.debt.filter((item) => item.status === 'open' || item.status === 'in_progress');
+      if (!accepted || accepted.reason !== event.completion.policy.reason || accepted.debtCollectionSha256 !== debtCollectionDigest(state.sprint.debt) || canonicalJson(accepted.items) !== canonicalJson(open)) return SCOPE_LIFECYCLE_VERIFICATION_REASON.COMPLETION_BINDING_MISMATCH;
+    } else if (event.completion.debtAcceptance) return SCOPE_LIFECYCLE_VERIFICATION_REASON.COMPLETION_BINDING_MISMATCH;
     if (!hasValidCompletionBinding(state.scope, event.completion)) return SCOPE_LIFECYCLE_VERIFICATION_REASON.COMPLETION_BINDING_MISMATCH;
     if (completionRegistryEntryDigest(state.entry) !== event.completion.beforeEntryDigest) return SCOPE_LIFECYCLE_VERIFICATION_REASON.ENTRY_BEFORE_BINDING_MISMATCH;
     state.sprint = completedSprintState(state.sprint, event.completion);
@@ -311,6 +319,7 @@ const LIFECYCLE_TRANSITIONS: Record<LifecycleEvent['kind'], LifecycleTransition>
   reopen(state, event) {
     if (event.kind !== 'reopen') return SCOPE_LIFECYCLE_VERIFICATION_REASON.ILLEGAL_TRANSITION;
     if (!hasValidReopenBinding(state.scope, event.record)) return SCOPE_LIFECYCLE_VERIFICATION_REASON.REOPEN_BINDING_MISMATCH;
+    if (event.record.beforeStateDigest && event.record.beforeStateDigest !== remediationStateDigest(state.sprint)) return SCOPE_LIFECYCLE_VERIFICATION_REASON.SPRINT_AFTER_MISMATCH;
     if (
       state.sprint.completion === undefined
       || state.entry.completion === undefined
@@ -349,7 +358,7 @@ function exactPrefixSuffix(sealed: ScopeReopenRecord[], live: ScopeReopenRecord[
 function hasValidCompletionBinding(scope: string, completion: ScopeCompletion): boolean {
   if (!completion.requestDigest || !completion.beforeEntryDigest) return false;
   const summary = completion.summary ?? null;
-  return completion.requestDigest === scopeCompletionRequestDigest(scope, summary);
+  return completion.requestDigest === scopeCompletionRequestDigest(scope, summary, completion.policy);
 }
 
 /** A reopen binding covers the scope, reason, and exact superseded completion. */

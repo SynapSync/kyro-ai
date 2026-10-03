@@ -24,6 +24,8 @@ Continue Kyro work without loading the whole workflow upfront.
   2. Confirm completion (reopenable) — not another sprint, not marking it obsolete.
   3. After yes, run the same command with `--yes`. Stop.
   4. Do not load plan-sprint. Forge never retires.
+  - Explicit pending-debt acceptance: add `--accept-open-debt --reason "<decision>"`; never infer acceptance or change debt statuses.
+  - Unrecorded debt-only drift: preview `--reconcile-debt --reason "<confirmation>" --dry-run`; apply approved options with `--expect-digest <plan-digest> --yes`. Combine acceptance only when authorized. Never create an administrative sprint or rewrite history; other drift blocks.
 - **Obsolete / superseded / discarded** (irreversible): STOP. That is the operator-only `kyro-scope-retire` router.
 - Otherwise route on `nextAction` below.
 

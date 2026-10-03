@@ -33,7 +33,7 @@ import {
   surveyScopeCheckpoints,
 } from '../checkpoints/discovery';
 import { findCanonicalizationForBytes } from '../checkpoints/canonicalize';
-import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase } from '../remediation/plan';
+import { businessStateDigest, deriveScopeVerificationState, inspectRemediationChain, resolveRemediationRebase, resolveScopeEvolution, usesBoundEvolution } from '../remediation/plan';
 import {
   SCOPE_LIFECYCLE_VERIFICATION_STATUS,
   verifyScopeLifecycleEvolution,
@@ -352,7 +352,7 @@ function scopeVerificationChecks(scope: string): CheckResult[] {
   return [fail(name, message, 'Do not overwrite live state. Reconcile the scope explicitly against the checkpoint after-image and the remediation chain.')];
 }
 
-export function inspectSprintCloseCheckpoints(scope: string): CheckResult[] {
+export function inspectSprintCloseCheckpoints(scope: string, historicalOnly = false): CheckResult[] {
   const survey = surveyScopeCheckpoints(scope);
   const unsafe = managedPathFailures(scope, survey);
   if (survey.container.status === CHECKPOINT_DISCOVERY_STATUS.ABSENT && survey.files.length === 0) {
@@ -382,7 +382,7 @@ export function inspectSprintCloseCheckpoints(scope: string): CheckResult[] {
     const path = `${archiveDir(scope)}/${file}`;
     const checkpoint = valid.find((candidate) => candidate.path === path)?.checkpoint;
     const supersededByActiveSprint = activeN !== null && checkpoint !== undefined && activeN > checkpoint.identity.sprintN;
-    return inspectCheckpoint(scope, path, path === latestPath && !supersededByActiveSprint && !retiredApplied);
+    return inspectCheckpoint(scope, path, !historicalOnly && path === latestPath && !supersededByActiveSprint && !retiredApplied);
   })];
 }
 
@@ -470,6 +470,14 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
   const project = readProjectState() ?? asProjectState(readJsonSafely(KYRO_STATE_PATH).value);
   const projectEntry = project?.scopes.find((entry) => entry.id === scope);
   const projectDigest = projectEntry ? sha256(projectEntry) : null;
+
+  if (projectEntry && usesBoundEvolution(scope, sprintRead.value as SprintFile)) {
+    const evolution = resolveScopeEvolution(scope, (canonicalized ? asRecord(read.value)?.intendedAfterClose : checkpoint.intendedAfterClose) as SprintFile, checkpoint.projectScopeAfter, sprintRead.value as SprintFile, projectEntry);
+    if (evolution.kind === 'verified' && evolution.matchesLive && snapshotState === 'ok' && narrativeState === 'ok') {
+      return checkpointResult(scope, path, canonicalized ? SPRINT_CLOSE_TRANSACTION_STATUS.CANONICALIZED : SPRINT_CLOSE_TRANSACTION_STATUS.APPLIED, withHistoricalNote('sprint=after (replayed debt/remediation and lifecycle; actor identity unverified), scope=after, snapshot=ok, narrative=ok'));
+    }
+    return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.DIVERGED, evolution.kind === 'broken' ? evolution.detail : `unexplained live evolution; snapshot=${snapshotState}, narrative=${narrativeState}`);
+  }
 
   let sprintPosition = digestPosition(sprintDigest, checkpoint.digests.beforeClose, checkpoint.digests.intendedAfterClose);
   if (sprintPosition === 'other' && canonicalized) {
