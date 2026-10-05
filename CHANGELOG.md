@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.1.1] - 2026-10-04
+
+### Fixed
+
+- Work validation rejects `completed` closures without planned tasks, including when reading existing artifacts. Empty drafts closed as `stopped` remain valid and retain their brief and closure history.
+- Draft Work context packs include a revision-bound `--outcome stopped --dry-run` closure recipe; anomalous Work continues to expose only its status recipe.
+
 ## [6.1.0] - 2026-10-03
 
 ### Fixed
