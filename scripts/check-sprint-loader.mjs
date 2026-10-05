@@ -18,11 +18,15 @@ const missing = [...exemptions.keys()].filter((file) => !found.has(file));
 const extra = [...found].filter((file) => file !== 'src/cli/artifacts/load-sprint.ts' && !exemptions.has(file));
 const unexpected = sprintErrors.filter((line) => !exemptions.has(line.split(':', 1)[0]) && line.split(':', 1)[0] !== 'src/cli/artifacts/load-sprint.ts');
 
-if (missing.length || extra.length || unexpected.length) {
+// Post-write re-parse of sprint.json belongs to verifyWrittenSprint; no exemptions.
+const postWrite = scanLines('wrote sprint\\.json but|Post-write sprint\\.json', 'src/cli').filter((line) => line.split(':', 1)[0] !== 'src/cli/artifacts/load-sprint.ts');
+
+if (missing.length || extra.length || unexpected.length || postWrite.length) {
   if (missing.length) console.error(`Exempt files no longer match (remove the exemption):\n${missing.map((file) => `  ${file}`).join('\n')}`);
   if (extra.length) console.error(`Unexpected files with live sprint loader errors:\n${extra.map((file) => `  ${file}`).join('\n')}`);
   if (unexpected.length) console.error(`Unexpected live sprint loader errors:\n${unexpected.join('\n')}`);
+  if (postWrite.length) console.error(`Hand-written post-write sprint.json re-parse (use verifyWrittenSprint):\n${postWrite.join('\n')}`);
   process.exit(1);
 }
 
-console.log(`Sprint loader guard passed (${sprintErrors.length} exempt lines in ${exemptions.size} files).`);
+console.log(`Sprint loader guard passed (${sprintErrors.length} exempt lines in ${exemptions.size} files; no hand-written post-write re-parse).`);

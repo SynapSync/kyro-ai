@@ -1,8 +1,6 @@
 import { applyPlan, printPlan } from '../fs';
-import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { loadScopeSprint } from '../artifacts/load-sprint';
-import { validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
@@ -130,15 +128,7 @@ function loadValidSprint(scope: string): SprintFile {
 }
 
 function revalidateWritten(scope: string): void {
-  const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) {
-    throw new KyroCoreError('INVALID_JSON', `adr add wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  }
-  const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `adr add wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
-  }
+  verifyWrittenSprint(scope, 'adr add');
 }
 
 function parseAdrAddArgs(args: string[]): AdrAddArgs {

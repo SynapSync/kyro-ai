@@ -3,6 +3,7 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateLocalProjectStateShape, validateSharedProjectStateShape, validateSprintFile } from '../artifacts/schema';
+import { verifyWrittenSprint } from '../artifacts/load-sprint';
 import { LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveScopeAuthorFromGit } from '../core/actor';
 import { KyroCoreError } from '../core/errors';
@@ -316,13 +317,7 @@ function runPlanInitMode(raw: unknown, scope: string, args: PlanArgs, state: Kyr
   emitToolCommandRun(input.scope, 'cli', 'plan', { mode: 'init' });
   applyPlan(plan);
 
-  const verify = readJsonSafely(sprintJsonPath(input.scope));
-  if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `plan wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  const issues = validateSprintFile(verify.value, `${input.scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `plan wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
-  }
+  verifyWrittenSprint(input.scope, 'plan');
 
   registerScopeInProjectState(input.scope);
 
@@ -343,13 +338,7 @@ function runPlanSprintMode(raw: unknown, scope: string, currentSprint: SprintFil
   emitToolCommandRun(scope, 'cli', 'plan', { mode: 'sprint' });
   applyPlan(plan);
 
-  const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `plan wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `plan wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
-  }
+  verifyWrittenSprint(scope, 'plan');
 
   const active = sprint.activeSprint!;
   const phaseCount = active.phases.length;

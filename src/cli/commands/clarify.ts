@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { applyPlan, printPlan } from '../fs';
-import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { loadScopeSprint } from '../artifacts/load-sprint';
+import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { validateSprintFile } from '../artifacts/schema';
 import { countClarificationMarkers } from '../core/analysis';
 import { KyroCoreError } from '../core/errors';
@@ -251,13 +250,7 @@ function parseClarifyArgs(rawArgs: string[]): ClarifyArgs {
 }
 
 function revalidateWritten(scope: string): void {
-  const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `clarify wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `clarify wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
-  }
+  verifyWrittenSprint(scope, 'clarify');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

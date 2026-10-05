@@ -55,3 +55,16 @@ export function loadScopeSprint(scope: string, options: LoadScopeSprintOptions =
   }
   return sprint;
 }
+
+/** Re-reads sprint.json after a write; a missing or invalid file is corruption, never an unknown scope. */
+export function verifyWrittenSprint(scope: string, label: string, options: { remedy?: string } = {}): SprintFile {
+  const remedy = options.remedy ?? 'Restore from an archive snapshot.';
+  const read = readJsonSafely(sprintJsonPath(scope));
+  if (read.error || !read.exists) throw new KyroCoreError('INVALID_JSON', `${label} wrote sprint.json but re-parse failed (${read.error ?? 'missing'}).`, remedy);
+  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
+  if (issues.length > 0) {
+    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
+    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `${label} wrote sprint.json but it failed validation — ${detail}.`, remedy);
+  }
+  return read.value as SprintFile;
+}

@@ -1,8 +1,6 @@
 import { applyPlan, printPlan } from '../fs';
-import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { loadScopeSprint } from '../artifacts/load-sprint';
-import { validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { deriveActiveSprintStatus, nextExecutableTaskId } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
@@ -44,13 +42,7 @@ export function runAddEmergentCommand(rawArgs: string[]): void {
   emitToolCommandRun(scope, 'cli', 'add-emergent', { id: task.id });
   applyPlan(plan);
 
-  const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `add-emergent wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `add-emergent wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
-  }
+  verifyWrittenSprint(scope, 'add-emergent');
   console.log(`Emergent task ${task.id} added to sprint ${sprint.activeSprint!.n}: "${task.title}" (status pending).`);
 }
 

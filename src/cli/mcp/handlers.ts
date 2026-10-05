@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { applyPlan } from '../fs';
 import { runDoctorChecks } from '../commands/doctor';
 import { inspectScope } from '../commands/artifact-doctor';
@@ -13,9 +12,7 @@ import { planCertification } from '../remediation/certification-plan';
 import { applyCertificationTransaction } from '../remediation/certification-transaction';
 import { readPackageVersion } from '../help';
 import { executeReview, parseFinding, parseVerdict, parseWaiver, type ReviewArgs } from '../commands/review';
-import { readJsonSafely } from '../artifacts/json';
-import { sprintJsonPath } from '../artifacts/paths';
-import { validateSprintFile } from '../artifacts/schema';
+import { verifyWrittenSprint } from '../artifacts/load-sprint';
 import { runAnalysis } from '../core/analysis';
 import { KyroCoreError, toErrorEnvelope } from '../core/errors';
 import { evaluateGuard } from '../core/policy';
@@ -119,7 +116,7 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
   emitGateApproved(scope, 'close_sprint');
   emitToolCommandRun(scope, 'mcp', 'close_sprint', { outcome: transaction.checkpoint.close.outcome });
   const applied = applySprintCloseTransaction(transaction);
-  assertValidSprint(scope, snapshotPath);
+  verifyWrittenSprint(scope, 'close_sprint', { remedy: `Snapshot preserves the sprint at ${snapshotPath}.` });
   emitTraceEvent({
     v: 1,
     ts: new Date().toISOString(),
@@ -146,7 +143,7 @@ function repairScopeTool(args: Record<string, unknown>): unknown {
   emitGateApproved(scope, 'repair_scope');
   emitToolCommandRun(scope, 'mcp', 'repair_scope');
   applyPlan(plan);
-  assertValidSprint(scope);
+  verifyWrittenSprint(scope, 'repair_scope');
   return { phase: 'applied', scope, plan };
 }
 
@@ -271,14 +268,6 @@ function confirmationRequiredResult(scope: string, plan: OperationPlan[], messag
 
 function planResult(scope: string, plan: OperationPlan[], extra: Record<string, unknown> = {}): unknown {
   return { phase: 'plan', scope, plan, requiresConfirm: true, ...extra };
-}
-
-function assertValidSprint(scope: string, snapshotPath?: string): void {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (read.error || !read.exists) throw new KyroCoreError('INVALID_JSON', `Post-write sprint.json validation failed (${read.error ?? 'missing'}).`, snapshotPath ? `Snapshot preserves the sprint at ${snapshotPath}.` : undefined);
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Post-write sprint.json validation failed — ${issues.map((i) => `${i.field} ${i.message}`).join('; ')}`, snapshotPath ? `Snapshot preserves the sprint at ${snapshotPath}.` : undefined);
-  if (snapshotPath && !existsSync(snapshotPath)) void snapshotPath;
 }
 
 function ok(data: unknown, text: string): ToolResult {

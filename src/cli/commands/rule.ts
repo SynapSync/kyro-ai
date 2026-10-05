@@ -1,7 +1,7 @@
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSharedProjectState, asSprintFile, validateSharedProjectStateShape, validateSprintFile } from '../artifacts/schema';
-import { loadScopeSprint } from '../artifacts/load-sprint';
+import { asSharedProjectState, validateSharedProjectStateShape, validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { PROJECT_STATE_PATH } from '../constants';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
@@ -246,14 +246,7 @@ function loadSharedProject(required: boolean): KyroSharedProjectState | null {
 }
 
 function revalidateWritten(scope: string, global: boolean): void {
-  const sprintRead = readJsonSafely(sprintJsonPath(scope));
-  if (sprintRead.error || !sprintRead.exists) {
-    throw new KyroCoreError('INVALID_JSON', `rule add wrote sprint.json but re-parse failed (${sprintRead.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  }
-  const sprintIssues = validateSprintFile(sprintRead.value, `${scope}/sprint.json`);
-  if (sprintIssues.length > 0) {
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `rule add wrote sprint.json but validation failed: ${formatIssues(sprintIssues)}`, 'Restore from an archive snapshot.');
-  }
+  verifyWrittenSprint(scope, 'rule add');
   if (!global) return;
   const projectRead = readJsonSafely(PROJECT_STATE_PATH);
   if (projectRead.error || !projectRead.exists) {

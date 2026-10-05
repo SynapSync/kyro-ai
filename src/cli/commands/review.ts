@@ -1,8 +1,6 @@
 import { applyPlan, printPlan } from '../fs';
-import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, validateSprintFile } from '../artifacts/schema';
-import { loadScopeSprint } from '../artifacts/load-sprint';
+import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { collectCheckerFindings, countClarificationMarkers, normalizeCriterion } from '../core/analysis';
 import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId, taskExecutionInfo } from '../core/status';
 import { KyroCoreError } from '../core/errors';
@@ -250,12 +248,7 @@ function reviewResult(
 }
 
 function assertReviewWrite(scope: string): void {
-  const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `Review wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
-  if (issues.length === 0) return;
-  const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-  throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Review wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
+  verifyWrittenSprint(scope, 'review');
 }
 
 function buildReviewRequestDigest(
