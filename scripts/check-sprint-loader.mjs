@@ -6,9 +6,6 @@ const exemptions = new Map([
   ['src/cli/commands/plan.ts', 'init mode tolerates a missing sprint.json; roadmap maps missing/invalid JSON to INVALID_SPRINT_SHAPE'],
   ['src/cli/commands/close-sprint.ts', 'a missing sprint.json falls back to checkpoint recovery'],
   ['src/cli/commands/repair.ts', 'normalizes the raw value before validating it'],
-  ['src/cli/commands/scope.ts', 'completion health check reports a missing sprint.json as INVALID_JSON'],
-  ['src/cli/checkpoints/scope-completion.ts', 'reports a missing sprint.json as INVALID_JSON'],
-  ['src/cli/checkpoints/scope-reopen.ts', 'reports a missing sprint.json as INVALID_JSON'],
   ['src/cli/remediation/canonicalize-surface.ts', 'needs the raw value of legacy-shaped state'],
 ]); // do not add entries without a reason the loader cannot cover
 

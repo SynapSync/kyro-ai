@@ -27,6 +27,12 @@ All notable changes to this project are documented here. The format is based on
   task definition changes, invalidated approvals, revalidation reasons and retained evidence. Additive;
   the digest and invalidation semantics are unchanged.
 
+### Fixed
+
+- `scope complete` (preview, apply and its health check) and `scope reopen` report a missing
+  `sprint.json` as `SCOPE_NOT_FOUND` instead of `INVALID_JSON`; invalid JSON and shape drift keep
+  their codes.
+
 ## [6.1.1] - 2026-10-04
 
 ### Fixed

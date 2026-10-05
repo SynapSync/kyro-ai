@@ -1,5 +1,6 @@
 import { KYRO_PROJECT_ROOT } from '../constants';
 import { readJsonSafely } from '../artifacts/json';
+import { loadScopeSprint } from '../artifacts/load-sprint';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
 import { formatScopeAuthor } from '../core/actor';
@@ -483,10 +484,8 @@ function printCompletionPlan(preparation: ScopeCompletionPreparation): void {
 }
 
 function assertScopeHealthyForCompletion(scope: string, options?: { sprint?: SprintFile; acceptOpenDebt?: boolean; historicalOnly?: boolean }): void {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (read.error || !read.exists) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error ?? 'missing'}).`, 'Fix invalid JSON or restore from an archive snapshot.');
-  const sprint = options?.sprint ?? asSprintFile(read.value);
-  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" does not match the v4 schema.`, 'Run kyro doctor --artifacts --kyro-scope ${scope}.');
+  const onDisk = loadScopeSprint(scope, { action: 'complete' });
+  const sprint = options?.sprint ?? onDisk;
   const active = sprint.activeSprint;
   if (active) {
     throw new KyroCoreError('NOT_READY_TO_COMPLETE', `Cannot complete scope "${scope}": sprint ${active.n} (${active.slug}) is active.`, 'Close the active sprint first, or defer completion until no sprint is in progress.');
