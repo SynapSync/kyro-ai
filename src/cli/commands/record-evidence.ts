@@ -1,7 +1,6 @@
 import { applyPlan, printPlan } from '../fs';
-import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { deriveActiveSprintStatus, deriveLiveWorkHandoff, derivePhaseStatus, taskExecutionInfo } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { countClarificationMarkers } from '../core/analysis';
@@ -72,29 +71,15 @@ export function runRecordEvidenceCommand(rawArgs: string[]): void {
   });
   applyPlan(plan);
 
-  const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) throw new KyroCoreError('INVALID_JSON', `record-evidence wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, 'Restore from an archive snapshot.');
-  const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `record-evidence wrote sprint.json but it failed validation — ${detail}.`, 'Restore from an archive snapshot.');
-  }
+  verifyWrittenSprint(scope, 'record-evidence');
   const located = locateTask(sprint, args.taskId);
   const recordedStatus = located?.task.status ?? args.status;
   console.log(`Evidence recorded for task ${args.taskId} (${args.dispositionKind ? `disposition ${args.dispositionKind}` : recordedStatus}). Next action: ${sprint.handoff.nextAction}.`);
 }
 
 export function buildRecordEvidencePlan(scope: string, args: RecordEvidenceArgs): { sprint: SprintFile; plan: OperationPlan[] } {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Create the scope with /kyro:forge (INIT) or choose another scope.');
-  if (read.error) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error}).`, 'Fix invalid JSON or restore from an archive snapshot.');
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot record evidence for ${scope}: sprint.json has shape drift — ${detail}.`, 'Fix sprint.json shape first.');
-  }
-  const sprint = asSprintFile(read.value);
-  if (!sprint || !sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint.`);
+  const sprint = loadScopeSprint(scope, { strict: true, action: 'record evidence for' });
+  if (!sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint.`);
   const located = locateTask(sprint, args.taskId);
   if (!located) throw new KyroCoreError('TASK_NOT_FOUND', `Task not found: ${args.taskId}`, 'Run kyro context-pack --json to inspect the active sprint tasks.');
   const markers = countClarificationMarkers(sprint);

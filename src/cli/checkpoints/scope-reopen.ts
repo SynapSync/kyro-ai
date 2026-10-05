@@ -1,6 +1,5 @@
-import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
 import { KyroCoreError } from '../core/errors';
 import { hasLayeredProjectStateOnDisk, readProjectState, updateProjectStateLayersUnlocked } from '../state';
 import { withStateWriterLock } from '../pipeline/state-writer-lock';
@@ -51,13 +50,7 @@ function normalizeReason(raw: string): string {
 }
 
 function readValidSprint(scope: string): SprintFile {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (read.error || !read.exists) {
-    throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error ?? 'missing'}).`, 'Fix invalid JSON or restore from an archive snapshot.');
-  }
-  const sprint = asSprintFile(read.value);
-  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" does not match the v4 schema.`, `Run kyro doctor --artifacts --kyro-scope ${scope}.`);
-  return sprint;
+  return loadScopeSprint(scope, { action: 'reopen', remedy: { SCOPE_NOT_FOUND: 'Restore its live sprint.json before reopening; do not edit archive history.' } });
 }
 
 function readRegisteredProject(scope: string): { project: KyroProjectState; entry: KyroScopeEntry } {

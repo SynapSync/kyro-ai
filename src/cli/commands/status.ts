@@ -1,6 +1,5 @@
-import { readJsonSafely } from '../artifacts/json';
-import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
+import { asTaskVerdict } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
 import { formatScopeAuthor } from '../core/actor';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { unregisteredScopeFolders } from '../core/scopes';
@@ -229,12 +228,7 @@ function invalidInput(message: string, remedy: string): KyroCoreError {
 }
 
 function readSprint(scope: string): SprintFile {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope '${scope}' has no sprint.json.`, 'Run /kyro:forge (INIT) to create it.');
-  if (read.error) throw new KyroCoreError('INVALID_JSON', `sprint.json for '${scope}' is invalid JSON: ${read.error}`, 'Fix invalid JSON or restore from an archive snapshot.');
-  const sprint = asSprintFile(read.value);
-  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for '${scope}' does not match the v4 schema.`, `Run kyro doctor --artifacts --kyro-scope ${scope}.`);
-  return sprint;
+  return loadScopeSprint(scope);
 }
 
 function buildBriefStatusReport(scope: string, sprint: SprintFile): BriefStatusReport {

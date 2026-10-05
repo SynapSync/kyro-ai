@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { computeMaterialDigest, validateWorkFile } from '../dist/cli/work/schema.js';
+import { asWorkFile, computeMaterialDigest, validateWorkFile } from '../dist/cli/work/schema.js';
 
 const at = '2026-09-26T00:00:00.000Z';
 const digest = (value) => createHash('sha256').update(value).digest('hex');
@@ -134,6 +134,15 @@ const draftWorkClosed = { ...base, activity: [...base.activity, { seq: 2, at, ev
 rejects('empty draft cannot claim work was closed without reopen history', draftWorkClosed, 'activity');
 const stoppedEmptyDraft = { ...base, state: 'closed', revision: 2, updatedAt: at, handoff: { nextAction: 'done', nextTaskId: null, blockedReason: null }, closure: { outcome: 'stopped', reason: 'Discarded before planning.', by: 'cli', closedAt: at, briefDigest: base.brief.digest, finalRevision: 2 }, activity: [...base.activity, { seq: 2, at, event: 'work_closed', taskId: null, by: 'cli', reason: 'Discarded before planning.', revision: 2 }] };
 assert.deepEqual(validateWorkFile(stoppedEmptyDraft), [], 'an empty draft may be explicitly stopped and closed');
+assert.deepEqual(asWorkFile(stoppedEmptyDraft), stoppedEmptyDraft, 'a stopped empty draft remains readable');
+const completedEmptyDraft = { ...stoppedEmptyDraft, closure: { ...stoppedEmptyDraft.closure, outcome: 'completed' } };
+rejects('taskless closure cannot claim completion', completedEmptyDraft, 'closure.outcome');
+assert.equal(asWorkFile(completedEmptyDraft), null, 'a taskless completed closure must not become a WorkFile');
+const resumedDraft = { ...stoppedEmptyDraft, state: 'draft', revision: 3, closure: null, handoff: base.handoff,
+  activity: [...stoppedEmptyDraft.activity, { seq: 3, at, event: 'work_reopened', taskId: null, by: 'cli', reason: 'Resume planning.', revision: 3 }],
+};
+assert.deepEqual(validateWorkFile(resumedDraft), [], 'reopened taskless Work is a draft with closure history');
+rejects('taskless Work cannot reopen active', { ...resumedDraft, state: 'active' }, 'state');
 const missingEvidenceEvent = active([taskFor({ status: 'awaiting_review', evidence: evidenceFor() })]);
 missingEvidenceEvent.activity = missingEvidenceEvent.activity.filter((item) => item.event !== 'evidence_recorded').map((item, index) => ({ ...item, seq: index + 1 }));
 rejects('evidence requires matching activity event', missingEvidenceEvent, 'tasks.W1.evidence');

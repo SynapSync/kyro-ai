@@ -92,7 +92,7 @@ When delegating to an implementer or checker delegate, the orchestrator builds t
 kyro context-pack --kyro-scope <scope> --task <id> --json
 ```
 
-The pack includes task identity, `files_to_touch`, acceptance criteria, conventions, and routing fields. JSON also includes `delegationEnabled` from `local.json` `execution.delegationEnabled` (`false` when unset). When `true`, execute/review modes load `delegates/implementer.md` or `delegates/checker.md`.
+The pack includes task identity, `files_to_touch`, acceptance criteria, conventions, and routing fields. Spec requirements are narrowed to those traced by the task's `scenario_refs`; the rest are named in `omittedRequirementIds` so the delegate can request the scope pack if it needs them. A task with no resolved scenarios keeps the full requirement list. JSON also includes `delegationEnabled` from `local.json` `execution.delegationEnabled` (`false` when unset). When `true`, execute/review modes load `delegates/implementer.md` or `delegates/checker.md`.
 
 **Implementer status contract** (returned to orchestrator):
 

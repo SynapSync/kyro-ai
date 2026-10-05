@@ -1,9 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
+import { archiveDir, sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import { readJsonSafely } from '../artifacts/json';
 import { surveyScopeCheckpoints } from '../checkpoints/discovery';
-import { effectiveCommitment, resolveEffectiveCheckpoint } from '../checkpoints/effective';
+import { effectiveCommitment } from '../checkpoints/effective';
+import { readClosedSprint } from '../checkpoints/history';
 import { atomicReplace } from '../checkpoints/sprint-close';
 import { assertSafeManagedPath, assertSafePathSegment, withStateWriterLock } from '../pipeline/state-writer-lock';
 import { readProjectState } from '../state';
@@ -37,8 +38,16 @@ export interface ActivePlanPreview {
   changes: ActivePlanChange[];
   affectedTaskIds: string[];
   invalidatedTaskIds: string[];
+  changedRequirementIds: string[];
+  changedScenarioIds: string[];
+  /** Why each affected task must be revalidated; one row per affectedTaskIds entry. */
+  taskImpact: ActivePlanTaskImpact[];
+  /** Affected tasks whose recorded evidence stays as reference material, not renewed approval. */
+  retainedEvidenceTaskIds: string[];
   projected: SprintFile;
 }
+/** edited: definition changed or cancelled; scenario: consumes a changed scenario; dependency: depends on an affected task. */
+export interface ActivePlanTaskImpact { taskId: string; cause: 'edited' | 'scenario' | 'dependency'; via: string[] }
 
 /** Closed input surface: task field updates and full requirement/scenario definitions, never JSON paths. */
 export function parseActivePlanInput(raw: unknown): ActivePlanInput {
@@ -133,6 +142,16 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   const affected = new Set<string>();
   const changedScenarios = new Set<string>();
   const changedRequirements = new Set<string>();
+  // First cause recorded wins (edited, then scenario, then dependency); same-cause marks extend `via`.
+  const impact = new Map<string, { cause: ActivePlanTaskImpact['cause']; via: Set<string> }>();
+  const mark = (id: string, cause: ActivePlanTaskImpact['cause'], via: string): boolean => {
+    const known = affected.has(id);
+    affected.add(id);
+    const row = impact.get(id);
+    if (!row) impact.set(id, { cause, via: new Set([via]) });
+    else if (row.cause === cause) row.via.add(via);
+    return !known;
+  };
   const change = (target: string, field: string, before: unknown, after: unknown): boolean => {
     if (canonicalJson(before) === canonicalJson(after)) return false;
     changes.push({ target, field, before: before ?? null, after: after ?? null });
@@ -148,14 +167,14 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
       const disposition = { kind: 'cancelled' as const, reason: update.reason, by: 'plan --update-active', recordedAt: new Date().toISOString() };
       if (change(task.id, 'disposition', task.disposition, disposition)) {
         task.disposition = disposition;
-        affected.add(task.id);
+        mark(task.id, 'edited', 'disposition');
       }
       continue;
     }
     for (const field of TASK_FIELDS) {
       if (field in update && change(task.id, field, task[field], update[field])) {
         Object.assign(task, { [field]: update[field] });
-        affected.add(task.id);
+        mark(task.id, 'edited', field);
       }
     }
   }
@@ -205,7 +224,7 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   }
   // Consumers in both graphs: removing a reference cannot hide the previous impact.
   const bothTasks = [...allTasks(active), ...tasks];
-  for (const task of bothTasks) if ((task.scenario_refs ?? []).some((ref) => changedScenarios.has(ref))) affected.add(task.id);
+  for (const task of bothTasks) for (const ref of task.scenario_refs ?? []) if (changedScenarios.has(ref)) mark(task.id, 'scenario', ref);
   const consumers = new Map<string, Set<string>>();
   for (const task of bothTasks) for (const dep of task.depends_on ?? []) {
     if (!consumers.has(dep)) consumers.set(dep, new Set());
@@ -213,7 +232,7 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   }
   const queue = [...affected];
   for (let i = 0; i < queue.length; i += 1) for (const id of consumers.get(queue[i]) ?? []) {
-    if (!affected.has(id)) { affected.add(id); queue.push(id); }
+    if (mark(id, 'dependency', queue[i])) queue.push(id);
   }
   const invalidatedTaskIds: string[] = [];
   for (const task of tasks.filter((item) => affected.has(item.id))) {
@@ -252,7 +271,11 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   }
   return { scope, sprint: input.sprint, reason: input.reason,
     digest: sha256({ kind: 'active-plan-update', state: current, input, entry, principles: project?.principles ?? [], policy: loadPolicy().policy, history: history.digests }),
-    changes, affectedTaskIds: [...affected].sort(), invalidatedTaskIds: invalidatedTaskIds.sort(), projected: next };
+    changes, affectedTaskIds: [...affected].sort(), invalidatedTaskIds: invalidatedTaskIds.sort(),
+    changedRequirementIds: [...changedRequirements].sort(), changedScenarioIds: [...changedScenarios].sort(),
+    taskImpact: [...impact].map(([taskId, row]) => ({ taskId, cause: row.cause, via: [...row.via].sort() })).sort((a, b) => a.taskId.localeCompare(b.taskId)),
+    retainedEvidenceTaskIds: tasks.filter((task) => affected.has(task.id) && !task.disposition && task.evidence).map((task) => task.id).sort(),
+    projected: next };
 }
 
 /** Single-file transaction: contract changes and invalidation commit together, never via the ordinary multi-write plan. */
@@ -287,19 +310,25 @@ function inspectHistory(scope: string, sprint: SprintFile): { scenarios: Set<str
   for (const entry of sprint.ledger) {
     let closed: ActiveSprint | null = null;
     let spec = sprint.spec;
-    if (entry.checkpoint) {
-      if (!entry.checkpoint.startsWith('archive/') || entry.checkpoint.includes('..') || entry.checkpoint.includes('\\')) invalid('unsafe historical checkpoint path');
-      const resolved = resolveEffectiveCheckpoint(scope, entry);
-      if (!resolved.checkpoint || !['valid', 'canonicalized'].includes(resolved.status)
-        || (entry.checkpointSha256 && entry.checkpointSha256 !== effectiveCommitment(resolved))) {
-        throw new KyroCoreError('CHECKPOINT_CONFLICT', `Cannot verify historical checkpoint for sprint ${entry.n}: ${resolved.detail}`);
+    const history = readClosedSprint(scope, sprint, entry);
+    if ('failure' in history) {
+      if (history.failure === 'unsafe-path') {
+        if (history.error) throw history.error;
+        invalid(history.detail);
       }
-      closed = resolved.checkpoint.beforeClose.activeSprint;
-      spec = resolved.checkpoint.beforeClose.spec;
+      if (history.failure === 'unverified') throw new KyroCoreError('CHECKPOINT_CONFLICT', history.detail);
+      if (history.failure === 'unreadable' || history.failure === 'malformed') throw new KyroCoreError('CHECKPOINT_CORRUPT', history.detail);
+      unknown = true;
+      digests.push({ entry: entry.n, consumers: 'unknown' });
+    } else if (history.source === 'checkpoint') {
+      const resolved = history.resolved;
+      const checkpoint = resolved.checkpoint!;
+      closed = checkpoint.beforeClose.activeSprint;
+      spec = history.spec;
       digests.push({ entry: entry.n, raw: resolved.originalSha256, commitment: effectiveCommitment(resolved) });
       for (const [artifact, expected] of [
-        [resolved.checkpoint.paths.legacySnapshot, resolved.checkpoint.digests.legacySnapshot],
-        [resolved.checkpoint.paths.narrative, resolved.checkpoint.digests.narrative],
+        [checkpoint.paths.legacySnapshot, checkpoint.digests.legacySnapshot],
+        [checkpoint.paths.narrative, checkpoint.digests.narrative],
       ]) {
         if (!artifact.startsWith(`${archiveDir(scope)}/`) || artifact.includes('..') || artifact.includes('\\')) invalid('unsafe historical artifact path');
         let actual: string;
@@ -308,17 +337,12 @@ function inspectHistory(scope: string, sprint: SprintFile): { scenarios: Set<str
         if (actual !== expected) throw new KyroCoreError('CHECKPOINT_CONFLICT', `Historical artifact ${artifact} differs from its checkpoint.`);
         digests.push({ artifact, digest: actual });
       }
-    } else if (entry.snapshot) {
-      if (!entry.snapshot.startsWith('archive/') || entry.snapshot.includes('..') || entry.snapshot.includes('\\')) invalid('unsafe historical snapshot path');
-      const path = assertSafeManagedPath(`${scopeRoot(scope)}/${entry.snapshot}`);
-      let raw: unknown;
-      try { raw = JSON.parse(readFileSync(path, 'utf8')); } catch { throw new KyroCoreError('CHECKPOINT_CORRUPT', `Historical snapshot ${entry.snapshot} is unreadable.`); }
-      if (!raw || validateSprintFile({ ...sprint, activeSprint: raw }, path).length) throw new KyroCoreError('CHECKPOINT_CORRUPT', `Historical snapshot ${entry.snapshot} is malformed.`);
-      closed = raw as ActiveSprint;
-      digests.push({ entry: entry.n, snapshot: sha256(raw) });
+    } else if (history.source === 'snapshot') {
+      closed = history.active;
+      digests.push({ entry: entry.n, snapshot: sha256(history.raw) });
       // A legacy snapshot does not retain the requirement mapping as it existed at close.
       unknown = true;
-    } else { unknown = true; digests.push({ entry: entry.n, consumers: 'unknown' }); }
+    }
     if (!closed) { unknown = true; continue; }
     if (closed.n !== entry.n || closed.slug !== entry.slug) throw new KyroCoreError('CHECKPOINT_CONFLICT', 'Historical sprint identity does not match its ledger.');
     for (const task of allTasks(closed)) for (const ref of task.scenario_refs ?? []) {

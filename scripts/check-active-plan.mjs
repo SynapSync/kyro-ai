@@ -78,6 +78,13 @@ try {
     for (const id of ['T1.1', 'T1.2', 'T1.3', 'T1.4']) finish(r, id);
     const before = read(r), untouched = task(r, 'T1.3'); const file = input(r), p = preview(r, file);
     assert.deepEqual(p.affectedTaskIds, ['T1.1', 'T1.2', 'T1.4']); assert.deepEqual(p.invalidatedTaskIds, ['T1.1', 'T1.2', 'T1.4']);
+    assert.deepEqual(p.taskImpact, [
+      { taskId: 'T1.1', cause: 'edited', via: ['context'] },
+      { taskId: 'T1.2', cause: 'dependency', via: ['T1.1'] },
+      { taskId: 'T1.4', cause: 'dependency', via: ['T1.2'] },
+    ]);
+    assert.deepEqual(p.retainedEvidenceTaskIds, ['T1.1', 'T1.2', 'T1.4']);
+    assert.deepEqual(p.changedRequirementIds, []); assert.deepEqual(p.changedScenarioIds, []);
     apply(r, file, p.digest); assert.equal(task(r).status, 'pending'); assert.equal(task(r).verdict, null);
     assert.deepEqual(task(r).evidence, before.activeSprint.phases[0].tasks[0].evidence); assert.deepEqual(task(r, 'T1.3'), untouched);
     const close = run(r, ['close-sprint', '--kyro-scope', scope, '--dry-run']); assert.equal(close.status, 1);
@@ -104,7 +111,17 @@ try {
   check('shared active requirement/scenario consumers invalidate; new definitions supported', () => {
     const r = sandbox(); for (const id of ['T1.1', 'T1.2', 'T1.3']) finish(r, id);
     const file = input(r, { tasks: [], requirements: [{ id: 'R1', statement: 'Revised requirement' }] });
-    const p = preview(r, file); assert.deepEqual(p.affectedTaskIds, ['T1.1', 'T1.2']); apply(r, file, p.digest);
+    const p = preview(r, file); assert.deepEqual(p.affectedTaskIds, ['T1.1', 'T1.2']);
+    assert.deepEqual(p.changedRequirementIds, ['R1']); assert.deepEqual(p.changedScenarioIds, ['S1', 'S2']);
+    // T1.2 also depends on T1.1, but consuming a changed scenario is the more specific cause.
+    assert.deepEqual(p.taskImpact, [{ taskId: 'T1.1', cause: 'scenario', via: ['S1'] }, { taskId: 'T1.2', cause: 'scenario', via: ['S2'] }]);
+    const report = ok(r, [...base(file), '--dry-run']).stdout;
+    for (const line of ['Behavior changes:', 'R1 requirement: "First behavior" → "Revised requirement"', 'Approvals invalidated (verdict cleared): T1.1, T1.2',
+      'Revalidate:', 'T1.1 — scenario changed (S1)', 'Evidence kept for reference only (not renewed approval): T1.1, T1.2', `Digest: ${p.digest}`]) {
+      assert(report.includes(line), `impact report missing "${line}":\n${report}`);
+    }
+    assert(!report.includes('Task definition changes:'), `requirement-only update has no task definition section:\n${report}`);
+    apply(r, file, p.digest);
     const addition = input(r, { tasks: [{ id: 'T1.1', scenario_refs: ['S4'] }], requirements: [{ id: 'R3', statement: 'New active requirement' }], scenarios: [{ id: 'S4', requirement: 'R3', given: 'input', when: 'action', then: 'new result' }] });
     apply(r, addition, preview(r, addition).digest); assert.equal(read(r).spec.requirements.length, 3);
   });

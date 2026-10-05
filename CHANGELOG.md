@@ -6,6 +6,46 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.2.0] - 2026-10-05
+
+### Added
+
+- `kyro analyze --matrix [--kyro-scope <s>] [--json]`: a read-only scenario verification matrix
+  (`none` / `linked` / `evidence` / `verdict recorded` / `unknown` per spec scenario) derived from
+  `sprint.json` and closed-sprint history, with declared maker/checker actors and a same-actor flag.
+  It writes nothing, runs no gate and exits 0; unreadable history is reported as `unknown`. No schema,
+  migration or persisted-field change; plain `kyro analyze` is unchanged.
+
+### Changed
+
+- Task context packs (`context-pack --task`) include only the spec requirements traced by the task's
+  resolved scenarios instead of every scope requirement, and list the rest in the new additive
+  `omittedRequirementIds` field (text output names them too). Scope packs and tasks without resolved
+  scenarios keep the full list. On this repo's archived tasks the cut averages ~490 estimated tokens
+  per task pack.
+- `plan --update-active` previews now explain impact: new `changedRequirementIds`,
+  `changedScenarioIds`, `retainedEvidenceTaskIds` and `taskImpact[]` (why each affected task must be
+  revalidated: `edited`, `scenario` or `dependency`). Text output is grouped into behavior changes,
+  task definition changes, invalidated approvals, revalidation reasons and retained evidence. Additive;
+  the digest and invalidation semantics are unchanged.
+- Error messages for an unreadable live `sprint.json` are now uniform across commands and MCP tools:
+  a missing, invalid-JSON or drifted file reads `Cannot <action> "<scope>": …` (or `sprint.json for
+  "<scope>" …`) with one canonical remedy per code, and post-write re-validation failures read
+  `<command> wrote sprint.json but …`. Error codes and exit statuses are unchanged.
+
+### Fixed
+
+- `scope complete` (preview, apply and its health check) and `scope reopen` report a missing
+  `sprint.json` as `SCOPE_NOT_FOUND` instead of `INVALID_JSON`; invalid JSON and shape drift keep
+  their codes.
+
+## [6.1.1] - 2026-10-04
+
+### Fixed
+
+- Work validation rejects `completed` closures without planned tasks, including when reading existing artifacts. Empty drafts closed as `stopped` remain valid and retain their brief and closure history.
+- Draft Work context packs include a revision-bound `--outcome stopped --dry-run` closure recipe; anomalous Work continues to expose only its status recipe.
+
 ## [6.1.0] - 2026-10-03
 
 ### Fixed

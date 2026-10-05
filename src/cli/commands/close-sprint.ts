@@ -21,6 +21,7 @@ import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { projectScopeWritePath } from '../checkpoints/sprint-close';
 import { surveyScopeCheckpoints } from '../checkpoints/discovery';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { verifyWrittenSprint } from '../artifacts/load-sprint';
 import {
   applySprintCloseTransaction,
   buildSprintCloseCheckpoint,
@@ -111,15 +112,7 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
   emitGateApproved(scope, 'close_sprint');
   applySprintCloseTransaction(fresh.transaction);
 
-  const verify = readJsonSafely(sprintJsonPath(scope));
-  if (verify.error || !verify.exists) {
-    throw new KyroCoreError('INVALID_JSON', `Close wrote sprint.json but re-parse failed (${verify.error ?? 'missing'}).`, `The snapshot at ${fresh.snapshotPath} preserves the sprint.`);
-  }
-  const issues = validateSprintFile(verify.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((i) => `${i.field} ${i.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Close wrote sprint.json but it failed validation — ${detail}.`, `The snapshot at ${fresh.snapshotPath} preserves the sprint.`);
-  }
+  const written = verifyWrittenSprint(scope, 'close-sprint', { remedy: `The snapshot at ${fresh.snapshotPath} preserves the sprint.` });
   emitTraceEvent({
     v: 1,
     ts: new Date().toISOString(),
@@ -130,7 +123,7 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
     outcome: normalizeTraceCloseOutcome(fresh.transaction.checkpoint.close.outcome),
   });
   console.log(`\nSprint ${identity.sprintN} closed. activeSprint cleared; ledger entry, snapshot, and checkpoint recorded.`);
-  const handoff = (verify.value as SprintFile).handoff;
+  const handoff = written.handoff;
   console.log(`Next action: ${handoff.nextAction}.`);
   if (handoff.nextAction === 'plan_sprint') {
     console.log('');

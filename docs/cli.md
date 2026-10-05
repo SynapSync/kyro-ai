@@ -813,6 +813,13 @@ kyro plan --update-active --from active-update.json --kyro-scope auth-refactor -
 - Preview writes nothing and returns `digest`, `changes`, `affectedTaskIds`, `invalidatedTaskIds` and
   `requiresConfirmation`. It shows before/after values, including removed criteria and derived
   routing changes. `handoff.lastUpdated` is stamped at apply time, not during preview.
+- The preview also reports impact for the reviewer: `changedRequirementIds`, `changedScenarioIds`,
+  `retainedEvidenceTaskIds` (affected tasks whose evidence stays as reference, not renewed approval) and
+  `taskImpact[]` with one `{taskId, cause, via}` per affected task. `cause` is `edited` (definition
+  changed or cancelled; `via` = fields), `scenario` (consumes a changed scenario; `via` = scenario ids) or
+  `dependency` (depends on an affected task; `via` = prerequisite ids); the first matching cause in that
+  order wins. Text output groups behavior changes, task definition changes, invalidated approvals,
+  revalidation reasons and retained evidence. These fields are not part of the digest.
 - `--yes` confirms the reviewed update; it does not prove human identity or authorize execution of
   the tasks' operational/destructive steps. A stale digest requires a fresh preview and approval.
 - Task updates accept `title`, `description`, `context`, `acceptance_criteria`, `files_to_touch`,
@@ -841,7 +848,33 @@ execution/evidence/review; no plan update or emergent task is needed solely beca
 
 ## Spec traceability
 
-`kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces requirements for scope packs and resolved scenarios for task packs. See [spec-traceability.md](spec-traceability.md).
+`kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces all requirements for scope packs. Task packs carry the task's resolved scenarios and only the requirements those scenarios trace to; the rest are listed in `omittedRequirementIds` (a task without resolved scenarios keeps the full list). See [spec-traceability.md](spec-traceability.md).
+
+### Scenario verification matrix
+
+`kyro analyze --matrix [--kyro-scope <scope>] [--json]` shows, per `spec.scenarios[]` entry, how much
+stored backing it has. It reads only `sprint.json` and closed-sprint history (ledger checkpoints, or
+legacy snapshots); it writes nothing (no state, no trace), runs no gate, and exits 0 whatever it finds.
+Plain `kyro analyze` is unchanged.
+
+Each task whose `scenario_refs` include the scenario gets the highest level it has stored, and the
+scenario takes the best counted task level:
+
+| Level | Meaning |
+| --- | --- |
+| `none` | No counted task references the scenario |
+| `linked` | A task references it |
+| `evidence` | The task has recorded evidence (also: a failing or stale pass verdict, with a note) |
+| `verdict recorded` (`verdict` in JSON) | A pass verdict is on file; for the active sprint it is not stale |
+| `unknown` | No known backing and some closed-sprint history could not be read or verified |
+
+Disposed tasks are listed but not counted. Each task shows its sprint, `evidence.by`, `verdict.by` and
+`⚠ same declared actor` when both are equal. Unreadable history never fails the command: the affected
+sprint is reported with a reason, scenarios with no other backing become `unknown`, and known levels
+are marked as a lower bound. A scope without `spec` prints a "no spec traceability" message. There is
+no QA column: QA is not recorded per scenario.
+
+Verdict recorded ≠ independent review: maker/checker identity is self-declared and not verified by Kyro.
 
 ## Legacy debt remediation and recertification (`kyro remediate`, `kyro recertify`)
 
@@ -862,6 +895,8 @@ that leaves an immutable record of itself.
 | **6.0.1** | retains protocol v3 remediation | Preserves explicit `debt.canonicalize` repair and adds guided diagnostics for legacy scope migration. |
 | **6.0.2** | retains protocol v3 remediation | Removes legacy `project.json.scopes[]` with final warnings; install, sync, and update no longer run the automatic `resolvedSprint` compatibility migration or write `legacy-migrations/` backups. |
 | **6.1.0** | adds protocol v5 `debt.change` | Records post-close debt transitions, supports digest-bound debt reconciliation and explicit pending-debt acceptance at scope completion. |
+| **6.1.1** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; rejects taskless `completed` Work closures and provides revision-bound draft closure previews. |
+| **6.2.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds the read-only `analyze --matrix` scenario verification matrix and reports a missing `sprint.json` on scope complete/reopen as `SCOPE_NOT_FOUND`. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

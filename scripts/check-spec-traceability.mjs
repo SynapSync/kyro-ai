@@ -127,6 +127,62 @@ function assertContextPackAndDoctor() {
   }
 }
 
+function packData(root, args) {
+  const result = run(['context-pack', '--kyro-scope', 'demo', ...args, '--json'], root);
+  assert(result.status === 0, `context-pack ${args.join(' ')} should pass: ${result.stdout}${result.stderr}`);
+  return JSON.parse(result.stdout).data;
+}
+
+function assertTaskPackRequirementSelection() {
+  const twoRequirements = (sprint, refs) => {
+    addSpec(sprint, {
+      requirements: [
+        { id: 'R1', statement: 'Demo requirement.', priority: 'must' },
+        { id: 'R2', statement: 'Unrelated requirement with a long statement the task does not need.', priority: 'should' },
+      ],
+      scenarios: [
+        { id: 'S1', requirement: 'R1', given: 'a demo scope', when: 'the task runs', then: 'the demo works' },
+        { id: 'S2', requirement: 'R2', given: 'another scope', when: 'other work runs', then: 'it works too' },
+      ],
+    });
+    sprint.activeSprint.phases[0].tasks[0].scenario_refs = refs;
+  };
+  const ids = (requirements) => requirements.map((requirement) => requirement.id).join(',');
+
+  const traced = withSprint((sprint) => twoRequirements(sprint, ['S1']), 'route-review-task');
+  try {
+    const scope = packData(traced.root, []);
+    assert(ids(scope.specRequirements) === 'R1,R2' && scope.omittedRequirementIds.length === 0, `scope pack keeps every requirement: ${JSON.stringify(scope.specRequirements)}`);
+    const task = packData(traced.root, ['--task', 'T1.1']);
+    assert(ids(task.specRequirements) === 'R1', `task pack should keep only traced requirements: ${JSON.stringify(task.specRequirements)}`);
+    assert(task.omittedRequirementIds.join(',') === 'R2', `task pack should name omitted requirements: ${JSON.stringify(task.omittedRequirementIds)}`);
+    const text = run(['context-pack', '--kyro-scope', 'demo', '--task', 'T1.1'], traced.root);
+    assert(text.status === 0 && text.stdout.includes('Requirements omitted (not linked to this task): R2'), `text pack should disclose omitted requirements: ${text.stdout}${text.stderr}`);
+  } finally {
+    traced.cleanup();
+  }
+
+  const untraced = withSprint((sprint) => twoRequirements(sprint, []), 'route-review-task');
+  try {
+    const task = packData(untraced.root, ['--task', 'T1.1']);
+    assert(ids(task.specRequirements) === 'R1,R2' && task.omittedRequirementIds.length === 0, `untraced task keeps the full requirement list: ${JSON.stringify(task)}`);
+  } finally {
+    untraced.cleanup();
+  }
+
+  // Same task, same spec: the only difference is the trace, so the estimate must shrink with it.
+  const tracedTask = withSprint((sprint) => twoRequirements(sprint, ['S1']), 'route-review-task');
+  const untracedTask = withSprint((sprint) => twoRequirements(sprint, []), 'route-review-task');
+  try {
+    const filtered = packData(tracedTask.root, ['--task', 'T1.1']);
+    const full = packData(untracedTask.root, ['--task', 'T1.1']);
+    assert(filtered.estimatedTokens < full.estimatedTokens, `filtered task pack should be smaller: ${filtered.estimatedTokens} vs ${full.estimatedTokens}`);
+  } finally {
+    tracedTask.cleanup();
+    untracedTask.cleanup();
+  }
+}
+
 function assertSingleDecisionSite() {
   const lines = scanLines('missing requirement|has no scenario coverage|has no task coverage|shipped without a scenario reference|scenario_refs .*does not exist', 'src/cli', { cwd: repo });
   const offenders = lines.filter((line) => !line.startsWith('src/cli/core/analysis.ts:'));
@@ -176,6 +232,7 @@ function main() {
   });
   assertHistoricalScenarioCoverageSilencesMedium();
   assertContextPackAndDoctor();
+  assertTaskPackRequirementSelection();
   console.log('check:spec-traceability — spec graph invariants passed');
 }
 

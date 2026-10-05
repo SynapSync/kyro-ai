@@ -33,6 +33,7 @@ export function runWorkCommand(args: string[]): void {
       '  kyro work status --work <slug> [--task Wn] [--json]',
       '  kyro work context-pack --work <slug> [--task Wn] [--json]',
     ].join('\n'));
+    console.log('Draft Work can close only with --outcome stopped, without planning artificial tasks. Reopening a taskless Work returns it to draft; closure history is preserved.');
     console.log('Evidence and review require --by with a specific actor. Validation results are maker-reported; a pass requires a different checker and does not certify automatic test execution or Forge QA.');
     console.log('Brief amendments require lossless UTF-8. An interrupted amendment blocks other Work mutations; retry with the original source, actor, reason, and expected revision. External brief edits never authorize recovery.');
     console.log('Promotion transfers only unfinished tasks as pending Forge tasks with no carried approval; a Work pass never becomes Forge QA. An interrupted promotion blocks other Work mutations; status shows the exact retry command. Status and doctor verify the reciprocal link before reporting a promoted Work as healthy. Until the installed runtime gains work, run these commands from the workspace build (node dist/cli.js).');
@@ -490,7 +491,10 @@ function status(args: string[], context: boolean): void {
   } : null;
   const workTasks = work.tasks.map((item) => ({ id: item.id, status: item.status, dependsOn: item.dependsOn, eligible: canStart(item), blocker: item.blocker, disposition: item.disposition }));
   const recipes = [`kyro work status --work ${id} --json`];
-  if (!anomaly && work.state === 'draft') recipes.push(`kyro work plan --work ${id} --from <proposal.json> --expect-revision ${work.revision}`);
+  if (!anomaly && work.state === 'draft') {
+    recipes.push(`kyro work plan --work ${id} --from <proposal.json> --expect-revision ${work.revision}`);
+    recipes.push(`kyro work close --work ${id} --outcome stopped --reason "<reason>" --by <actor> --expect-revision ${work.revision} --dry-run`);
+  }
   if (!anomaly && work.state === 'closed') recipes.push(`kyro work reopen --work ${id} --reason "<reason>" --by <actor> --expect-revision ${work.revision} --dry-run`);
   if (!anomaly && work.state === 'active') recipes.push(`kyro work close --work ${id} --outcome <completed-or-stopped> --reason "<reason>" --by <actor> --expect-revision ${work.revision} --dry-run`);
   if (!anomaly && work.state === 'active' && taskReadModel) {

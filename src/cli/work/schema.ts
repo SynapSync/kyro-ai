@@ -153,6 +153,9 @@ function semantic(work: Record<string, unknown>, tasks: Record<string, unknown>[
       // follow) the current revision timestamp instead of matching it.
       if (promotionValue && closedAt > updatedAt) issue(path, 'closure.closedAt', 'must not follow updatedAt once promoted', issues);
     }
+    if (closureValue.outcome === 'completed' && tasks.length === 0) {
+      issue(path, 'closure.outcome', 'completed requires at least one planned task; use stopped for an unstarted Work', issues);
+    }
     if (closureValue.outcome === 'completed' && tasks.some((item) => !isTerminal(item))) {
       issue(path, 'closure.outcome', 'completed requires every task to be verified or explicitly disposed', issues);
     }

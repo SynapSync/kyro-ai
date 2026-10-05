@@ -21,26 +21,89 @@ try {
   const forge = ['.agents/kyro/project.json', '.agents/kyro/local.json', '.agents/kyro/scopes/existing/sprint.json'];
   const forgeBefore = forge.map((entry) => readFileSync(join(root, entry)));
 
-  // An explicitly stopped empty draft is a valid terminal discard; no fake task plan is needed.
-  ok(['create', '--id', 'empty-draft', '--from', 'brief.md']);
-  const emptyBefore = readFileSync(path('empty-draft'));
-  const emptyPreview = ok(close('empty-draft', 'stopped', 1, ['--dry-run']));
-  assert.equal(emptyPreview.state, 'closed');
-  assert.deepEqual(emptyPreview.summary.unresolved, []);
-  assert.deepEqual(readFileSync(path('empty-draft')), emptyBefore);
-  const emptyClosed = ok(close('empty-draft', 'stopped', 1));
-  assert.equal(emptyClosed.closure.outcome, 'stopped');
-  assert.equal(emptyClosed.revision, 2);
-  const emptyOpened = ok(reopen('empty-draft', 2));
-  assert.equal(emptyOpened.state, 'draft');
-  assert.equal(emptyOpened.revision, 3);
-  bad(/only be stopped/i, close('empty-draft', 'completed', 3, ['--dry-run']));
-
   write('plan.json', JSON.stringify({ tasks: [
     { id: 'W1', title: 'First', description: 'First task.', context: '', filesToTouch: [], acceptanceCriteria: ['First is complete.'], dependsOn: [] },
     { id: 'W2', title: 'Second', description: 'Second task.', context: '', filesToTouch: [], acceptanceCriteria: ['Second is complete.'], dependsOn: [] },
   ] }));
   const setup = (id) => { ok(['create', '--id', id, '--from', 'brief.md']); ok(['plan', '--work', id, '--from', 'plan.json', '--expect-revision', '1']); };
+
+  // A draft can be discarded honestly, without a fake task graph.
+  ok(['create', '--id', 'empty-draft', '--from', 'brief.md']);
+  const draftEntries = [path('empty-draft'), join(root, '.agents/kyro/work/empty-draft/brief.md'), ...forge.map((entry) => join(root, entry))];
+  const draftFiles = draftEntries.map((entry) => readFileSync(entry));
+  const assertDraftUnchanged = () => assert.deepEqual(draftEntries.map((entry) => readFileSync(entry)), draftFiles, 'draft previews and refusals must preserve Work, brief, and Forge bytes');
+  const draftPack = ok(['context-pack', '--work', 'empty-draft']);
+  assert(draftPack.recipes.includes('kyro work close --work empty-draft --outcome stopped --reason "<reason>" --by <actor> --expect-revision 1 --dry-run'), 'draft context must expose a revision-bound closure preview');
+  assertDraftUnchanged();
+  bad(/require --yes/i, close('empty-draft', 'stopped', 1, []));
+  assertDraftUnchanged();
+  bad(/only be stopped/i, close('empty-draft', 'completed', 1, ['--dry-run']));
+  assertDraftUnchanged();
+  bad(/only be stopped/i, close('empty-draft', 'completed', 1));
+  assertDraftUnchanged();
+  bad(/revision .* does not match expected/i, close('empty-draft', 'stopped', 2));
+  assertDraftUnchanged();
+  const emptyPreview = ok(close('empty-draft', 'stopped', 1, ['--dry-run']));
+  assert.equal(emptyPreview.state, 'closed');
+  assert.equal(emptyPreview.revision, 2);
+  assert.equal(emptyPreview.closure.outcome, 'stopped');
+  assert(Object.values(emptyPreview.summary).every((ids) => ids.length === 0));
+  assertDraftUnchanged();
+  bad(/Injected Work close failure/i, close('empty-draft', 'stopped', 1), { KYRO_WORK_INJECT_FAILURE: 'close-before-write' });
+  assertDraftUnchanged();
+  const emptyClosed = ok(close('empty-draft', 'stopped', 1));
+  assert.equal(emptyClosed.closure.outcome, 'stopped');
+  assert.equal(emptyClosed.revision, 2);
+  assert.equal(emptyClosed.handoff.nextAction, 'done');
+  assert.equal(ok(['status', '--work', 'empty-draft']).closure.outcome, 'stopped');
+  const emptyClosedBytes = readFileSync(path('empty-draft'));
+  assert.equal(JSON.parse(emptyClosedBytes).tasks.length, 0);
+  assert.deepEqual(readFileSync(draftEntries[1]), draftFiles[1]);
+  bad(/cannot be closed/i, close('empty-draft', 'stopped', 2));
+  assert.deepEqual(readFileSync(path('empty-draft')), emptyClosedBytes);
+  const emptyReopenPreview = ok(reopen('empty-draft', 2, ['--dry-run']));
+  assert.equal(emptyReopenPreview.state, 'draft');
+  assert.equal(emptyReopenPreview.handoff.nextAction, 'plan_tasks');
+  assert.deepEqual(readFileSync(path('empty-draft')), emptyClosedBytes);
+  assert.equal(existsSync(join(root, emptyReopenPreview.closureHistoryPath)), false);
+  bad(/Injected Work reopen failure/i, reopen('empty-draft', 2), { KYRO_WORK_INJECT_FAILURE: 'reopen-after-history' });
+  assert.deepEqual(readFileSync(path('empty-draft')), emptyClosedBytes);
+  const firstHistoryPath = join(root, emptyReopenPreview.closureHistoryPath);
+  const firstHistoryBytes = readFileSync(firstHistoryPath);
+  const emptyOpened = ok(reopen('empty-draft', 2));
+  assert.equal(emptyOpened.state, 'draft');
+  assert.equal(emptyOpened.revision, 3);
+  assert.equal(emptyOpened.handoff.nextAction, 'plan_tasks');
+  assert.deepEqual(JSON.parse(readFileSync(firstHistoryPath)).closure, emptyClosed.closure);
+  assert.deepEqual(readFileSync(firstHistoryPath), firstHistoryBytes, 'recovery must reuse the immutable closure record');
+  bad(/only be stopped/i, close('empty-draft', 'completed', 3, ['--dry-run']));
+  const reopenedPack = ok(['context-pack', '--work', 'empty-draft']);
+  assert(reopenedPack.recipes.includes('kyro work close --work empty-draft --outcome stopped --reason "<reason>" --by <actor> --expect-revision 3 --dry-run'));
+  assert(!reopenedPack.recipes.includes(draftPack.recipes.find((recipe) => recipe.includes('--outcome stopped'))), 'reopened recipes must not retain the stale revision');
+
+  // Repeated discard/reopen keeps distinct history and still permits planning.
+  const emptyClosedAgain = ok(close('empty-draft', 'stopped', 3));
+  const emptyOpenedAgain = ok(reopen('empty-draft', 4));
+  assert.equal(emptyOpenedAgain.state, 'draft');
+  assert.equal(emptyOpenedAgain.revision, 5);
+  assert.notEqual(emptyOpenedAgain.closureHistoryPath, emptyOpened.closureHistoryPath);
+  assert.deepEqual(JSON.parse(readFileSync(join(root, emptyOpenedAgain.closureHistoryPath))).closure, emptyClosedAgain.closure);
+  assert.deepEqual(readFileSync(firstHistoryPath), firstHistoryBytes);
+  ok(['plan', '--work', 'empty-draft', '--from', 'plan.json', '--expect-revision', '5']);
+  assert.equal(JSON.parse(readFileSync(path('empty-draft'))).state, 'active');
+  assert.deepEqual(readFileSync(draftEntries[1]), draftFiles[1]);
+  for (const [index, entry] of forge.entries()) assert.deepEqual(readFileSync(join(root, entry)), forgeBefore[index]);
+
+  // A changed brief blocks recommendations rather than offering a mutation.
+  ok(['create', '--id', 'draft-anomaly', '--from', 'brief.md']);
+  write('.agents/kyro/work/draft-anomaly/brief.md', '# Changed outside CLI\n\nNot authoritative.\n');
+  const anomalyEntries = [path('draft-anomaly'), join(root, '.agents/kyro/work/draft-anomaly/brief.md'), ...forge.map((entry) => join(root, entry))];
+  const anomalyFiles = anomalyEntries.map((entry) => readFileSync(entry));
+  const anomalyPack = ok(['context-pack', '--work', 'draft-anomaly']);
+  assert.equal(anomalyPack.nextAction, 'resolve_blocker');
+  assert(anomalyPack.anomalies.length > 0);
+  assert.deepEqual(anomalyPack.recipes, ['kyro work status --work draft-anomaly --json']);
+  assert.deepEqual(anomalyEntries.map((entry) => readFileSync(entry)), anomalyFiles);
   setup('partial');
   const before = readFileSync(path('partial'));
   bad(/require --yes/i, close('partial', 'stopped', 2, []));
@@ -139,6 +202,10 @@ try {
   assert.equal(promoted.state, 'promoted');
   const promotedEntries = [path('promoted-reopen'), join(root, '.agents/kyro/scopes/reopen-target/sprint.json'), join(root, '.agents/kyro/scopes/reopen-target/promotion-source.json')];
   const promotedFiles = promotedEntries.map((entry) => readFileSync(entry));
+  bad(/cannot be closed/i, close('promoted-reopen', 'stopped', 3, ['--dry-run']));
+  assert.deepEqual(promotedEntries.map((entry) => readFileSync(entry)), promotedFiles, 'refused close preview must preserve promoted Work and Forge bytes');
+  bad(/cannot be closed/i, close('promoted-reopen', 'stopped', 3));
+  assert.deepEqual(promotedEntries.map((entry) => readFileSync(entry)), promotedFiles, 'refused close must preserve promoted Work and Forge bytes');
   bad(/not closed and cannot be reopened/i, reopen('promoted-reopen', 3, ['--dry-run']));
   bad(/not closed and cannot be reopened/i, reopen('promoted-reopen', 3));
   assert.deepEqual(promotedEntries.map((entry) => readFileSync(entry)), promotedFiles, 'reopening a promoted Work must change neither Work nor Forge bytes');
