@@ -1,6 +1,7 @@
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSharedProjectState, asSprintFile, validateSharedProjectStateShape, validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
 import { PROJECT_STATE_PATH } from '../constants';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
@@ -219,20 +220,10 @@ function parseLocalRuleArgs(kind: LocalRuleMutation, rawArgs: string[]): LocalRu
 }
 
 function loadValidSprint(scope: string): SprintFile {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) {
-    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Create the scope with kyro plan --from (init).');
-  }
-  if (read.error) {
-    throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error}).`, 'Restore from an archive snapshot.');
-  }
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot add rule for ${scope}: ${formatIssues(issues)}`, 'Fix sprint.json shape first (kyro doctor --artifacts).');
-  }
-  const sprint = asSprintFile(read.value);
-  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" is not a valid v4 file.`, 'Run kyro doctor --artifacts.');
-  return sprint;
+  return loadScopeSprint(scope, {
+    strict: true,
+    action: 'add rule for',
+  });
 }
 
 function loadSharedProject(required: boolean): KyroSharedProjectState | null {

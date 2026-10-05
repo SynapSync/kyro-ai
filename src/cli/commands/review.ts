@@ -2,6 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
 import { collectCheckerFindings, countClarificationMarkers, normalizeCriterion } from '../core/analysis';
 import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId, taskExecutionInfo } from '../core/status';
 import { KyroCoreError } from '../core/errors';
@@ -132,15 +133,10 @@ export function executeReview(scope: string, args: ReviewArgs, options: ReviewEx
 }
 
 export function buildReviewPlan(scope: string, args: ReviewArgs): ReviewPreparation {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Create the scope with /kyro:forge (INIT) or choose another scope.');
-  if (read.error) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error}).`, 'Fix invalid JSON or restore from an archive snapshot.');
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot review ${scope}: sprint.json has shape drift — ${detail}.`, 'Fix sprint.json shape before reviewing.');
-  }
-  const sprint = asSprintFile(read.value);
+  const sprint = loadScopeSprint(scope, {
+    strict: true,
+    action: 'review',
+  });
   if (!sprint || !sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint to review.`);
   const located = locateTask(sprint, args.taskId);
   if (!located) throw new KyroCoreError('TASK_NOT_FOUND', `Task not found: ${args.taskId}`, 'Run kyro context-pack --json to inspect the active sprint tasks.');

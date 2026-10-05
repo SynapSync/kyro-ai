@@ -2,7 +2,8 @@ import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
 import { DEBT_CLASSIFICATION, assessRawDebt } from '../artifacts/debt-contract';
-import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
+import { validateSprintFile } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
@@ -313,20 +314,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readAndValidateSprint(scope: string): SprintFile {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Create the scope with /kyro:forge (INIT) or choose another scope.');
-  if (read.error) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error}).`, 'Fix invalid JSON or restore from an archive snapshot.');
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError(
-      'INVALID_SPRINT_SHAPE',
-      `Cannot mutate debt for ${scope}: sprint.json has shape drift — ${detail}.${describeDebtDrift(read.value)}`,
-      'Fix sprint.json shape first. The compatibility reading above is a diagnostic, not an authorization to write legacy debt back.',
-    );
-  }
-  const sprint = asSprintFile(read.value);
-  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" does not match the v4 schema.`, `Run kyro doctor --artifacts --kyro-scope ${scope}.`);
+  const sprint = loadScopeSprint(scope, {
+    strict: true,
+    action: 'mutate debt for',
+    remedy: { INVALID_SPRINT_SHAPE: 'Fix sprint.json shape first. The compatibility reading above is a diagnostic, not an authorization to write legacy debt back.' },
+    shapeDetail: describeDebtDrift,
+  });
   if (sprint.completion || sprint.status === 'completed') throw new KyroCoreError('SCOPE_COMPLETED', 'Reopen the scope before changing debt.', `Run kyro scope reopen --kyro-scope ${scope} --reason "<why further work is needed>" --yes.`);
   if (sprint.retirement || sprint.status === 'retired') throw new KyroCoreError('SCOPE_RETIRED', 'Retired scopes cannot change debt.');
   return sprint;

@@ -3,6 +3,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { relative } from 'node:path';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { readJsonSafely } from '../artifacts/json';
+import { loadScopeSprint } from '../artifacts/load-sprint';
 import { validateProjectStateShape, validateSprintFile } from '../artifacts/schema';
 import { resolveManagedPath } from '../fs';
 import { KyroCoreError } from '../core/errors';
@@ -469,12 +470,12 @@ function readValidSprint(scope: string): SprintFile {
   if (!existsSync(resolveManagedPath(root))) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}`, 'Run kyro scope list to see available scopes.');
   const sprintPath = sprintJsonPath(scope);
   assertSafeManagedPath(sprintPath);
-  const read = readJsonSafely(sprintPath);
-  if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Restore its live state before retirement.');
-  if (read.error) throw new KyroCoreError('INVALID_JSON', `Cannot retire "${scope}": sprint.json is invalid (${read.error}).`, 'Restore from an intact checkpoint; do not edit archive history.');
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot retire "${scope}": ${issues.map(formatIssue).join('; ')}.`, 'Run kyro doctor --artifacts and repair only through supported tool-owned operations.');
-  return clone(read.value as SprintFile);
+  const sprint = loadScopeSprint(scope, {
+    strict: true,
+    action: 'retire',
+    remedy: { SCOPE_NOT_FOUND: 'Restore its live state before retirement.', INVALID_JSON: 'Restore from an intact checkpoint; do not edit archive history.', INVALID_SPRINT_SHAPE: 'Run kyro doctor --artifacts and repair only through supported tool-owned operations.' },
+  });
+  return clone(sprint);
 }
 
 function readRegisteredProject(scope: string): KyroProjectState {

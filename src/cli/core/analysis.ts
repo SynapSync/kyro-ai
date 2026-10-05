@@ -1,6 +1,7 @@
 import { readJsonSafely } from '../artifacts/json';
-import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, asTaskEvidence, asTaskVerdict, taskEvidenceIssues } from '../artifacts/schema';
+import { scopeRoot } from '../artifacts/paths';
+import { asTaskEvidence, asTaskVerdict, taskEvidenceIssues } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
 import { resolveManagedPath } from '../fs';
 import { readProjectState } from '../state';
 import type {
@@ -34,11 +35,7 @@ export interface AnalysisResult {
 /** Resolves the scope and loads its live sprint.json, failing with analyze's errors. Shared by analyze and analyze --matrix. */
 export function loadSprintForAnalysis(requestedScope: string | null): { scope: string; sprint: SprintFile } {
   const scope = resolveScope(requestedScope);
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json. Run /kyro:forge (INIT).`, 'Create the scope with /kyro:forge (INIT) or choose another scope.');
-  if (read.error) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error}).`, 'Fix invalid JSON or restore from an archive snapshot.');
-  const sprint = asSprintFile(read.value);
-  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" is not a valid v4 file.`, 'Run kyro doctor --artifacts for shape details.');
+  const sprint = loadScopeSprint(scope);
   return { scope, sprint };
 }
 

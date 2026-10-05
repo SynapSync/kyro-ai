@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
-import { readJsonSafely } from '../artifacts/json';
-import { scopeRoot, sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, asTaskVerdict } from '../artifacts/schema';
+import { scopeRoot } from '../artifacts/paths';
+import { asTaskVerdict } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
 import { resolveRoute } from '../routing';
 import { resolveManagedPath } from '../fs';
 import { listScopeNames } from '../artifacts/scopes';
@@ -46,17 +46,7 @@ export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'js
 
 export function buildContextPack(scope: string, taskOption: string | null = null, verbosity: PackVerbosity = 'detailed'): ContextPackOutput {
   const warnings: string[] = [];
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) {
-    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope '${scope}' has no sprint.json.`, 'Run /kyro:forge (INIT) to create it.');
-  }
-  if (read.error) {
-    throw new KyroCoreError('INVALID_JSON', `sprint.json for '${scope}' is invalid JSON: ${read.error}`, 'Fix invalid JSON or restore from an archive snapshot.');
-  }
-  const sprint = asSprintFile(read.value);
-  if (!sprint) {
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for '${scope}' does not match the v4 schema.`, `Run kyro doctor --artifacts --kyro-scope ${scope}.`);
-  }
+  const sprint = loadScopeSprint(scope);
 
   const packMode: ContextPackMode = resolvePackMode(taskOption, sprint, warnings);
   const task = packMode === 'task' ? resolveTask(sprint, taskOption, warnings) : null;
