@@ -862,6 +862,7 @@ that leaves an immutable record of itself.
 | **6.0.1** | retains protocol v3 remediation | Preserves explicit `debt.canonicalize` repair and adds guided diagnostics for legacy scope migration. |
 | **6.0.2** | retains protocol v3 remediation | Removes legacy `project.json.scopes[]` with final warnings; install, sync, and update no longer run the automatic `resolvedSprint` compatibility migration or write `legacy-migrations/` backups. |
 | **6.1.0** | adds protocol v5 `debt.change` | Records post-close debt transitions, supports digest-bound debt reconciliation and explicit pending-debt acceptance at scope completion. |
+| **6.1.1** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; rejects taskless `completed` Work closures and provides revision-bound draft closure previews. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

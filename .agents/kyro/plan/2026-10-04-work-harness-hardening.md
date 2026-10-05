@@ -127,3 +127,14 @@ Validación local del candidato 6.1.1: build, sincronización de versiones, cont
 `npm pack --dry-run --json` produjo el candidato `kyro-ai-6.1.1.tgz` con 1019 entradas, 9830551 bytes empaquetados y 21522958 bytes sin comprimir. Se comprobó que no incluye `.claude-plugin/`, `providers/claude/`, `hooks/` ni `.agents/`. No se publicó el paquete.
 
 Logs locales del candidato: `/var/folders/39/zhd12r1d3c1__mcsbv89gc6r0000gn/T/kyro-6-1-1-release-5buflr9q/`. La aprobación del release queda pendiente de los gates del PR en Ubuntu y Windows; los resultados locales parciales no sustituyen esa validación completa.
+
+
+### Primera validación remota del release
+
+PR de release: https://github.com/SynapSync/kyro-ai/pull/149, `develop` hacia `main`. El commit inicial del candidato fue `743b5dbc706775e0ddf13493f16edfa7349a428c`.
+
+El run https://github.com/SynapSync/kyro-ai/actions/runs/37260957295 aprobó los tres jobs de Windows (Node 18, 20 y 22). Ubuntu falló en `check:remediation-release-docs`: exigía mencionar la versión candidata 6.1.1 en `README.md` y `docs/cli.md`. Este fue un defecto de preparación del release, distinto de los fallos anteriores del entorno macOS.
+
+Se corrige la referencia al candidato actual en README y se añade una fila 6.1.1 en la matriz de CLI, preservando la fila histórica 6.1.0 y sus capacidades originales. Se valida el contrato de documentación antes de subir la corrección al mismo PR; la validación completa remota deberá repetirse sobre el nuevo commit.
+
+Validación local de la corrección de documentación: `check:remediation-release-docs` aprobó sus 86 aserciones, `check:links` aprobó los 91 archivos comprobados y `git diff --check` terminó correctamente.
