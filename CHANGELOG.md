@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `kyro analyze --matrix [--kyro-scope <s>] [--json]`: a read-only scenario verification matrix
+  (`none` / `linked` / `evidence` / `verdict recorded` / `unknown` per spec scenario) derived from
+  `sprint.json` and closed-sprint history, with declared maker/checker actors and a same-actor flag.
+  It writes nothing, runs no gate and exits 0; unreadable history is reported as `unknown`. No schema,
+  migration or persisted-field change; plain `kyro analyze` is unchanged.
+
 ### Changed
 
 - Task context packs (`context-pack --task`) include only the spec requirements traced by the task's

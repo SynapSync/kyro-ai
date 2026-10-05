@@ -27,6 +27,7 @@ export function parseOptions(args: string[]): CliOptions {
   let evalList = false;
   let keepSandbox = false;
   let check = false;
+  let matrix = false;
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -69,6 +70,8 @@ export function parseOptions(args: string[]): CliOptions {
       keepSandbox = true;
     } else if (arg === '--check') {
       check = true;
+    } else if (arg === '--matrix') {
+      matrix = true;
     } else if (arg === '--case') {
       const value = args[i + 1];
       if (!value) throw invalidInput('--case requires a value', 'Use --case <id> or --case=<id>.');
@@ -149,6 +152,7 @@ export function parseOptions(args: string[]): CliOptions {
     evalList,
     keepSandbox,
     check,
+    matrix,
   };
 }
 

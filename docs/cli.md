@@ -850,6 +850,32 @@ execution/evidence/review; no plan update or emergent task is needed solely beca
 
 `kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces all requirements for scope packs. Task packs carry the task's resolved scenarios and only the requirements those scenarios trace to; the rest are listed in `omittedRequirementIds` (a task without resolved scenarios keeps the full list). See [spec-traceability.md](spec-traceability.md).
 
+### Scenario verification matrix
+
+`kyro analyze --matrix [--kyro-scope <scope>] [--json]` shows, per `spec.scenarios[]` entry, how much
+stored backing it has. It reads only `sprint.json` and closed-sprint history (ledger checkpoints, or
+legacy snapshots); it writes nothing (no state, no trace), runs no gate, and exits 0 whatever it finds.
+Plain `kyro analyze` is unchanged.
+
+Each task whose `scenario_refs` include the scenario gets the highest level it has stored, and the
+scenario takes the best counted task level:
+
+| Level | Meaning |
+| --- | --- |
+| `none` | No counted task references the scenario |
+| `linked` | A task references it |
+| `evidence` | The task has recorded evidence (also: a failing or stale pass verdict, with a note) |
+| `verdict recorded` (`verdict` in JSON) | A pass verdict is on file; for the active sprint it is not stale |
+| `unknown` | No known backing and some closed-sprint history could not be read or verified |
+
+Disposed tasks are listed but not counted. Each task shows its sprint, `evidence.by`, `verdict.by` and
+`⚠ same declared actor` when both are equal. Unreadable history never fails the command: the affected
+sprint is reported with a reason, scenarios with no other backing become `unknown`, and known levels
+are marked as a lower bound. A scope without `spec` prints a "no spec traceability" message. There is
+no QA column: QA is not recorded per scenario.
+
+Verdict recorded ≠ independent review: maker/checker identity is self-declared and not verified by Kyro.
+
 ## Legacy debt remediation and recertification (`kyro remediate`, `kyro recertify`)
 
 A closed scope's history is immutable. Checkpoints, snapshots, narratives and ledger commitments are

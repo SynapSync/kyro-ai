@@ -797,6 +797,8 @@ export interface CliOptions {
   evalList: boolean;
   keepSandbox: boolean;
   check: boolean;
+  /** analyze only: print the read-only scenario verification matrix instead of findings. */
+  matrix: boolean;
 }
 
 export type ContextPackMode = 'scope' | 'task';

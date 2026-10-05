@@ -123,7 +123,7 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'status') {
     console.log('Usage: kyro status [brief|full|debt] [--kyro-scope <scope>] [--json]');
   } else if (command === 'analyze') {
-    console.log('Usage: kyro analyze [--kyro-scope <scope>] [--json]');
+    console.log('Usage: kyro analyze [--matrix] [--kyro-scope <scope>] [--json]');
   } else if (command === 'record-evidence') {
     console.log('Usage: kyro record-evidence <task> [--kyro-scope <scope>] --summary <text> --validation <text> [--validation <text> ...] [--file <path> ...] [--notes <text>] [--by <actor>] [--status done|blocked] [--disposition deferred|blocked|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]] [--dry-run]');
   } else if (command === 'plan') {
