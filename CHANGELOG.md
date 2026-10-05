@@ -26,6 +26,10 @@ All notable changes to this project are documented here. The format is based on
   revalidated: `edited`, `scenario` or `dependency`). Text output is grouped into behavior changes,
   task definition changes, invalidated approvals, revalidation reasons and retained evidence. Additive;
   the digest and invalidation semantics are unchanged.
+- Error messages for an unreadable live `sprint.json` are now uniform across commands and MCP tools:
+  a missing, invalid-JSON or drifted file reads `Cannot <action> "<scope>": …` (or `sprint.json for
+  "<scope>" …`) with one canonical remedy per code, and post-write re-validation failures read
+  `<command> wrote sprint.json but …`. Error codes and exit statuses are unchanged.
 
 ### Fixed
 
