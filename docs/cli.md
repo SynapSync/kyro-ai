@@ -841,7 +841,7 @@ execution/evidence/review; no plan update or emergent task is needed solely beca
 
 ## Spec traceability
 
-`kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces requirements for scope packs and resolved scenarios for task packs. See [spec-traceability.md](spec-traceability.md).
+`kyro analyze` validates the optional `sprint.json.spec` graph: requirements, scenarios, task `scenario_refs`, open questions, and coverage gaps. `context-pack` surfaces all requirements for scope packs. Task packs carry the task's resolved scenarios and only the requirements those scenarios trace to; the rest are listed in `omittedRequirementIds` (a task without resolved scenarios keeps the full list). See [spec-traceability.md](spec-traceability.md).
 
 ## Legacy debt remediation and recertification (`kyro remediate`, `kyro recertify`)
 

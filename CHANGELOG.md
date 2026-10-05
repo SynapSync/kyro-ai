@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- Task context packs (`context-pack --task`) include only the spec requirements traced by the task's
+  resolved scenarios instead of every scope requirement, and list the rest in the new additive
+  `omittedRequirementIds` field (text output names them too). Scope packs and tasks without resolved
+  scenarios keep the full list. On this repo's archived tasks the cut averages ~490 estimated tokens
+  per task pack.
+
 ## [6.1.1] - 2026-10-04
 
 ### Fixed

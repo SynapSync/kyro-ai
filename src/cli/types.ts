@@ -1007,6 +1007,8 @@ export interface ContextPackOutput {
   taskContext: string | null;
   taskAcceptanceCriteria: string[];
   specRequirements: SpecRequirement[];
+  /** Scope requirements not traced by the task's scenarios (task packs only); the scope pack lists them. */
+  omittedRequirementIds: string[];
   specNonGoals: string[];
   specOpenQuestions: string[];
   taskScenarios: SpecScenario[];

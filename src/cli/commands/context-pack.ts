@@ -24,6 +24,7 @@ import type {
   ContextPackOutput,
   NextTaskReview,
   PackVerbosity,
+  SpecRequirement,
   SpecScenario,
   SprintFile,
   Task,
@@ -78,6 +79,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const conventions = selectConventions(sprint, projectState?.conventions ?? [], packMode, task, concise);
   const adrs = selectAdrs(sprint, concise);
   const taskScenarios = resolveTaskScenarios(sprint, task);
+  const selectedRequirements = selectSpecRequirements(sprint, taskScenarios);
   const { reviewPending, nextTaskReview } = resolveReviewDebt(sprint, task);
   const executionInfo = taskExecutionInfo(sprint);
   const selectedTaskExecution = task ? executionInfo.find((info) => info.taskId === task.id) ?? null : null;
@@ -120,7 +122,8 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     taskFiles: task?.files_to_touch ?? [],
     taskContext: concise ? null : (task?.context ?? null),
     taskAcceptanceCriteria: task?.acceptance_criteria ?? [],
-    specRequirements: sprint.spec?.requirements ?? [],
+    specRequirements: selectedRequirements.requirements,
+    omittedRequirementIds: selectedRequirements.omittedIds,
     specNonGoals: sprint.spec?.nonGoals ?? [],
     specOpenQuestions: sprint.spec?.openQuestions ?? [],
     taskScenarios,
@@ -371,6 +374,20 @@ function resolveTaskScenarios(sprint: SprintFile, task: Task | null): SpecScenar
   return (task.scenario_refs ?? []).map((id) => scenarioById.get(id)).filter((scenario): scenario is SpecScenario => Boolean(scenario));
 }
 
+/**
+ * Task packs carry only the requirements their resolved scenarios trace to; the rest are named in
+ * omittedIds so the cut stays discoverable. Scope packs and untraced tasks keep the full list.
+ */
+function selectSpecRequirements(sprint: SprintFile, taskScenarios: SpecScenario[]): { requirements: SpecRequirement[]; omittedIds: string[] } {
+  const all = sprint.spec?.requirements ?? [];
+  if (!taskScenarios.length) return { requirements: all, omittedIds: [] };
+  const linked = new Set(taskScenarios.map((scenario) => scenario.requirement));
+  return {
+    requirements: all.filter((requirement) => linked.has(requirement.id)),
+    omittedIds: all.filter((requirement) => !linked.has(requirement.id)).map((requirement) => requirement.id),
+  };
+}
+
 function scopeExists(scope: string): boolean {
   if (listScopeNames().includes(scope)) return true;
   return existsSync(resolveManagedPath(scopeRoot(scope)));
@@ -400,6 +417,7 @@ function printContextPackText(pack: ContextPackOutput): void {
   console.log(`Delegation: ${pack.delegationEnabled ? 'enabled' : 'disabled'}`);
   if (pack.activeSprintSlug) console.log(`Active sprint: ${pack.activeSprintSlug} — ${pack.activeSprintObjective ?? ''}`);
   if (pack.specRequirements.length) console.log(`Requirements: ${pack.specRequirements.map((r) => `${r.id}: ${r.statement}`).join(' | ')}`);
+  if (pack.omittedRequirementIds.length) console.log(`Requirements omitted (not linked to this task): ${pack.omittedRequirementIds.join(', ')} — run without --task for the full spec`);
   if (pack.specNonGoals.length) console.log(`Non-goals: ${pack.specNonGoals.join(' | ')}`);
   if (pack.specOpenQuestions.length) console.log(`Open questions: ${pack.specOpenQuestions.join(' | ')}`);
   console.log(`Open debt: ${pack.openDebtCount}`);

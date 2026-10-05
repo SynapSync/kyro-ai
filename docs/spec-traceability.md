@@ -72,5 +72,5 @@ The tool owns validation and these graph mutations; agents must not whole-file r
 ## Runtime surfaces
 
 - `kyro analyze` emits spec findings and `close-sprint` blocks on HIGH findings through the existing close gate.
-- `kyro context-pack --json` includes scope-level requirements/non-goals/open questions and task-level resolved scenarios.
+- `kyro context-pack --json` includes scope-level requirements/non-goals/open questions and task-level resolved scenarios. Task packs narrow `specRequirements` to the requirements traced by the task's scenarios and name the rest in `omittedRequirementIds`; untraced tasks keep every requirement.
 - `kyro doctor --adapters` reports the honest enforcement tiers: structural checks are enforced or surfaced; semantic validation remains advisory.
