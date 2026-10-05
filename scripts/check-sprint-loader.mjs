@@ -1,34 +1,31 @@
 #!/usr/bin/env node
 import { scanLines } from './lib/scan.mjs';
 
-const allowlist = new Set([
-  'src/cli/commands/add-emergent.ts',
-  'src/cli/commands/record-evidence.ts',
-  'src/cli/commands/clarify.ts',
-  'src/cli/commands/adr.ts',
-  'src/cli/commands/plan.ts',
-  'src/cli/commands/close-sprint.ts',
-  'src/cli/commands/repair.ts',
-  'src/cli/checkpoints/scope-completion.ts',
-  'src/cli/checkpoints/scope-reopen.ts',
-  'src/cli/commands/scope.ts',
-  'src/cli/remediation/canonicalize-surface.ts',
-]); // pending migration in step 2 — do not add new entries
+// Live sprint.json readers that cannot use loadScopeSprint without changing behavior or error codes.
+const exemptions = new Map([
+  ['src/cli/commands/plan.ts', 'init mode tolerates a missing sprint.json; roadmap maps missing/invalid JSON to INVALID_SPRINT_SHAPE'],
+  ['src/cli/commands/close-sprint.ts', 'a missing sprint.json falls back to checkpoint recovery'],
+  ['src/cli/commands/repair.ts', 'normalizes the raw value before validating it'],
+  ['src/cli/commands/scope.ts', 'completion health check reports a missing sprint.json as INVALID_JSON'],
+  ['src/cli/checkpoints/scope-completion.ts', 'reports a missing sprint.json as INVALID_JSON'],
+  ['src/cli/checkpoints/scope-reopen.ts', 'reports a missing sprint.json as INVALID_JSON'],
+  ['src/cli/remediation/canonicalize-surface.ts', 'needs the raw value of legacy-shaped state'],
+]); // do not add entries without a reason the loader cannot cover
 
 const matches = scanLines("KyroCoreError\\(['\"](?:SCOPE_NOT_FOUND|INVALID_JSON)['\"]", 'src/cli');
 const sprintErrors = matches.filter((line) =>
   /KyroCoreError\(['"]SCOPE_NOT_FOUND['"].*has no sprint\.json|KyroCoreError\(['"]INVALID_JSON['"].*sprint\.json (?:for|is invalid)/.test(line),
 );
 const found = new Set(sprintErrors.map((line) => line.split(':', 1)[0]));
-const missing = [...allowlist].filter((file) => !found.has(file));
-const extra = [...found].filter((file) => file !== 'src/cli/artifacts/load-sprint.ts' && !allowlist.has(file));
-const unexpected = sprintErrors.filter((line) => !allowlist.has(line.split(':', 1)[0]) && line.split(':', 1)[0] !== 'src/cli/artifacts/load-sprint.ts');
+const missing = [...exemptions.keys()].filter((file) => !found.has(file));
+const extra = [...found].filter((file) => file !== 'src/cli/artifacts/load-sprint.ts' && !exemptions.has(file));
+const unexpected = sprintErrors.filter((line) => !exemptions.has(line.split(':', 1)[0]) && line.split(':', 1)[0] !== 'src/cli/artifacts/load-sprint.ts');
 
 if (missing.length || extra.length || unexpected.length) {
-  if (missing.length) console.error(`Allowlisted files no longer match (remove from allowlist):\n${missing.map((file) => `  ${file}`).join('\n')}`);
+  if (missing.length) console.error(`Exempt files no longer match (remove the exemption):\n${missing.map((file) => `  ${file}`).join('\n')}`);
   if (extra.length) console.error(`Unexpected files with live sprint loader errors:\n${extra.map((file) => `  ${file}`).join('\n')}`);
   if (unexpected.length) console.error(`Unexpected live sprint loader errors:\n${unexpected.join('\n')}`);
   process.exit(1);
 }
 
-console.log(`Sprint loader guard passed (${sprintErrors.length} known legacy lines in ${allowlist.size} allowlisted files).`);
+console.log(`Sprint loader guard passed (${sprintErrors.length} exempt lines in ${exemptions.size} files).`);

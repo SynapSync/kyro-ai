@@ -1,7 +1,8 @@
 import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
+import { validateSprintFile } from '../artifacts/schema';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
@@ -125,23 +126,7 @@ function todayIsoDate(): string {
 }
 
 function loadValidSprint(scope: string): SprintFile {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) {
-    throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Create the scope with kyro plan --from (init).');
-  }
-  if (read.error) {
-    throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error}).`, 'Restore from an archive snapshot.');
-  }
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot add ADR for ${scope}: ${detail}`, 'Fix sprint.json shape first (kyro doctor --artifacts).');
-  }
-  const sprint = asSprintFile(read.value);
-  if (!sprint) {
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" is not a valid v4 file.`, 'Run kyro doctor --artifacts.');
-  }
-  return sprint;
+  return loadScopeSprint(scope, { strict: true, action: 'add ADR for' });
 }
 
 function revalidateWritten(scope: string): void {

@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
+import { validateSprintFile } from '../artifacts/schema';
 import { countClarificationMarkers } from '../core/analysis';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
@@ -185,17 +186,7 @@ function firstTaskId(sprint: SprintFile): string | null {
 }
 
 function loadValidSprint(scope: string): SprintFile {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Create the scope with kyro plan --from <file>.');
-  if (read.error) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error}).`, 'Restore from an archive snapshot.');
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot clarify ${scope}: ${detail}`, 'Fix sprint.json shape before applying clarifications.');
-  }
-  const sprint = asSprintFile(read.value);
-  if (!sprint) throw new KyroCoreError('INVALID_SPRINT_SHAPE', `sprint.json for "${scope}" is not a valid v4 file.`, 'Run kyro doctor --artifacts.');
-  return sprint;
+  return loadScopeSprint(scope, { strict: true, action: 'clarify' });
 }
 
 function parseClarificationFile(path: string): ClarificationFileInput {

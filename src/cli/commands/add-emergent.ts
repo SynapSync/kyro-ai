@@ -1,7 +1,8 @@
 import { applyPlan, printPlan } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { sprintJsonPath } from '../artifacts/paths';
-import { asSprintFile, validateSprintFile } from '../artifacts/schema';
+import { loadScopeSprint } from '../artifacts/load-sprint';
+import { validateSprintFile } from '../artifacts/schema';
 import { deriveActiveSprintStatus, nextExecutableTaskId } from '../core/status';
 import { KyroCoreError } from '../core/errors';
 import { resolveScope } from '../core/scope-resolution';
@@ -54,16 +55,8 @@ export function runAddEmergentCommand(rawArgs: string[]): void {
 }
 
 export function buildAddEmergentPlan(scope: string, args: AddEmergentArgs): { sprint: SprintFile; plan: OperationPlan[] } {
-  const read = readJsonSafely(sprintJsonPath(scope));
-  if (!read.exists) throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope "${scope}" has no sprint.json.`, 'Create the scope with /kyro:forge (INIT) or choose another scope.');
-  if (read.error) throw new KyroCoreError('INVALID_JSON', `sprint.json for "${scope}" is invalid JSON (${read.error}).`, 'Fix invalid JSON or restore from an archive snapshot.');
-  const issues = validateSprintFile(read.value, `${scope}/sprint.json`);
-  if (issues.length > 0) {
-    const detail = issues.map((issue) => `${issue.field} ${issue.message}`).join('; ');
-    throw new KyroCoreError('INVALID_SPRINT_SHAPE', `Cannot add emergent task for ${scope}: sprint.json has shape drift — ${detail}.`, 'Fix sprint.json shape first.');
-  }
-  const sprint = asSprintFile(read.value);
-  if (!sprint || !sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint.`, 'Emergent tasks attach to the active sprint — plan a sprint first (kyro plan --from ...).');
+  const sprint = loadScopeSprint(scope, { strict: true, action: 'add emergent task for' });
+  if (!sprint.activeSprint) throw new KyroCoreError('NO_ACTIVE_SPRINT', `Scope "${scope}" has no active sprint.`, 'Emergent tasks attach to the active sprint — plan a sprint first (kyro plan --from ...).');
 
   const allIds = collectAllTaskIds(sprint.activeSprint);
   for (const dep of args.dependsOn) {
