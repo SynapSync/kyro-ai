@@ -14,6 +14,7 @@ import { readProjectState, updateProjectStateLayers } from '../state';
 import type { ActiveSprint, KyroProjectState, NextAction, OperationPlan, Phase, Roadmap, ScopeAuthor, Spec, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
 import type { ValidationIssue } from '../artifacts/schema';
 import { applyActivePlan, parseActivePlanInput, prepareActivePlan } from '../core/active-plan';
+import type { ActivePlanChange, ActivePlanPreview } from '../core/active-plan';
 import { canonicalJson, sha256 } from '../core/digest';
 import { atomicReplace } from '../checkpoints/sprint-close';
 import { assertSafePathSegment, withStateWriterLock } from '../pipeline/state-writer-lock';
@@ -162,10 +163,47 @@ function runActiveUpdate(raw: unknown, scope: string, args: PlanArgs): void {
   setCliMachineResult(phase, { ...details, outcome: phase, mode: 'update-active',
     requiresConfirmation: args.dryRun && preview.changes.length > 0,
     affectedFiles: phase === 'applied' ? [sprintJsonPath(scope)] : [], nextAction: projected.handoff.nextAction });
-  console.log(`Active Sprint ${preview.sprint.n} update (${phase}): ${preview.changes.length} change(s).`);
-  for (const change of preview.changes) console.log(`${change.target}.${change.field}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`);
-  console.log(`Revalidate tasks: ${preview.affectedTaskIds.join(', ') || 'none'}. Digest: ${preview.digest}`);
+  printActivePlanImpact(preview, phase);
   if (args.dryRun) console.log('Dry run complete. No files changed.');
+}
+
+/** Reviewer-facing impact report: behavior first, then lost approvals and what must be revalidated. */
+function printActivePlanImpact(preview: ActivePlanPreview, phase: string): void {
+  const contract = new Set([...preview.changedRequirementIds, ...preview.changedScenarioIds]);
+  const invalidated = new Set(preview.invalidatedTaskIds);
+  const isDerived = (change: ActivePlanChange): boolean => change.target === 'activeSprint' || change.target === 'handoff'
+    || change.target.startsWith('phase:') || (invalidated.has(change.target) && (change.field === 'verdict' || change.field === 'status'));
+  const behavior = preview.changes.filter((change) => contract.has(change.target) && (change.field === 'requirement' || change.field === 'scenario'));
+  const derived = preview.changes.filter(isDerived);
+  const definitions = preview.changes.filter((change) => !behavior.includes(change) && !derived.includes(change));
+  const section = (title: string, lines: string[]): void => {
+    if (!lines.length) return;
+    console.log(title);
+    for (const line of lines) console.log(`  ${line}`);
+  };
+  console.log(`Active Sprint ${preview.sprint.n} update (${phase}): ${preview.changes.length} change(s). Reason: ${preview.reason}`);
+  section('Behavior changes:', behavior.map((change) => {
+    const label = `${change.target} ${change.field}`;
+    if (change.before === null) return `${label} added: ${describeContract(change.after)}`;
+    if (change.after === null) return `${label} removed: ${describeContract(change.before)}`;
+    return `${label}: ${describeContract(change.before)} → ${describeContract(change.after)}`;
+  }));
+  section('Task definition changes:', definitions.map((change) => `${change.target}.${change.field}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`));
+  if (preview.invalidatedTaskIds.length) console.log(`Approvals invalidated (verdict cleared): ${preview.invalidatedTaskIds.join(', ')}`);
+  section('Revalidate:', preview.taskImpact.map(({ taskId, cause, via }) => `${taskId} — ${
+    cause === 'edited' ? `definition edited (${via.join(', ')})` : cause === 'scenario' ? `scenario changed (${via.join(', ')})` : `depends on ${via.join(', ')}`}`));
+  if (!preview.taskImpact.length) console.log('Revalidate: none');
+  if (preview.retainedEvidenceTaskIds.length) console.log(`Evidence kept for reference only (not renewed approval): ${preview.retainedEvidenceTaskIds.join(', ')}`);
+  if (derived.length) console.log(`Derived state: ${derived.length} phase/sprint/handoff/task-status update(s)`);
+  console.log(`Digest: ${preview.digest}`);
+}
+
+function describeContract(value: unknown): string {
+  if (!value || typeof value !== 'object') return JSON.stringify(value);
+  const row = value as Record<string, unknown>;
+  if (typeof row.statement === 'string') return JSON.stringify(row.statement);
+  if (typeof row.given === 'string') return `Given ${row.given}; When ${row.when}; Then ${row.then}`;
+  return JSON.stringify(value);
 }
 
 /**

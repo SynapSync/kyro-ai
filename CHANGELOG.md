@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format is based on
   `omittedRequirementIds` field (text output names them too). Scope packs and tasks without resolved
   scenarios keep the full list. On this repo's archived tasks the cut averages ~490 estimated tokens
   per task pack.
+- `plan --update-active` previews now explain impact: new `changedRequirementIds`,
+  `changedScenarioIds`, `retainedEvidenceTaskIds` and `taskImpact[]` (why each affected task must be
+  revalidated: `edited`, `scenario` or `dependency`). Text output is grouped into behavior changes,
+  task definition changes, invalidated approvals, revalidation reasons and retained evidence. Additive;
+  the digest and invalidation semantics are unchanged.
 
 ## [6.1.1] - 2026-10-04
 

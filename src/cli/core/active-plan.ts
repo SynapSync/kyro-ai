@@ -37,8 +37,16 @@ export interface ActivePlanPreview {
   changes: ActivePlanChange[];
   affectedTaskIds: string[];
   invalidatedTaskIds: string[];
+  changedRequirementIds: string[];
+  changedScenarioIds: string[];
+  /** Why each affected task must be revalidated; one row per affectedTaskIds entry. */
+  taskImpact: ActivePlanTaskImpact[];
+  /** Affected tasks whose recorded evidence stays as reference material, not renewed approval. */
+  retainedEvidenceTaskIds: string[];
   projected: SprintFile;
 }
+/** edited: definition changed or cancelled; scenario: consumes a changed scenario; dependency: depends on an affected task. */
+export interface ActivePlanTaskImpact { taskId: string; cause: 'edited' | 'scenario' | 'dependency'; via: string[] }
 
 /** Closed input surface: task field updates and full requirement/scenario definitions, never JSON paths. */
 export function parseActivePlanInput(raw: unknown): ActivePlanInput {
@@ -133,6 +141,16 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   const affected = new Set<string>();
   const changedScenarios = new Set<string>();
   const changedRequirements = new Set<string>();
+  // First cause recorded wins (edited, then scenario, then dependency); same-cause marks extend `via`.
+  const impact = new Map<string, { cause: ActivePlanTaskImpact['cause']; via: Set<string> }>();
+  const mark = (id: string, cause: ActivePlanTaskImpact['cause'], via: string): boolean => {
+    const known = affected.has(id);
+    affected.add(id);
+    const row = impact.get(id);
+    if (!row) impact.set(id, { cause, via: new Set([via]) });
+    else if (row.cause === cause) row.via.add(via);
+    return !known;
+  };
   const change = (target: string, field: string, before: unknown, after: unknown): boolean => {
     if (canonicalJson(before) === canonicalJson(after)) return false;
     changes.push({ target, field, before: before ?? null, after: after ?? null });
@@ -148,14 +166,14 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
       const disposition = { kind: 'cancelled' as const, reason: update.reason, by: 'plan --update-active', recordedAt: new Date().toISOString() };
       if (change(task.id, 'disposition', task.disposition, disposition)) {
         task.disposition = disposition;
-        affected.add(task.id);
+        mark(task.id, 'edited', 'disposition');
       }
       continue;
     }
     for (const field of TASK_FIELDS) {
       if (field in update && change(task.id, field, task[field], update[field])) {
         Object.assign(task, { [field]: update[field] });
-        affected.add(task.id);
+        mark(task.id, 'edited', field);
       }
     }
   }
@@ -205,7 +223,7 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   }
   // Consumers in both graphs: removing a reference cannot hide the previous impact.
   const bothTasks = [...allTasks(active), ...tasks];
-  for (const task of bothTasks) if ((task.scenario_refs ?? []).some((ref) => changedScenarios.has(ref))) affected.add(task.id);
+  for (const task of bothTasks) for (const ref of task.scenario_refs ?? []) if (changedScenarios.has(ref)) mark(task.id, 'scenario', ref);
   const consumers = new Map<string, Set<string>>();
   for (const task of bothTasks) for (const dep of task.depends_on ?? []) {
     if (!consumers.has(dep)) consumers.set(dep, new Set());
@@ -213,7 +231,7 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   }
   const queue = [...affected];
   for (let i = 0; i < queue.length; i += 1) for (const id of consumers.get(queue[i]) ?? []) {
-    if (!affected.has(id)) { affected.add(id); queue.push(id); }
+    if (mark(id, 'dependency', queue[i])) queue.push(id);
   }
   const invalidatedTaskIds: string[] = [];
   for (const task of tasks.filter((item) => affected.has(item.id))) {
@@ -252,7 +270,11 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
   }
   return { scope, sprint: input.sprint, reason: input.reason,
     digest: sha256({ kind: 'active-plan-update', state: current, input, entry, principles: project?.principles ?? [], policy: loadPolicy().policy, history: history.digests }),
-    changes, affectedTaskIds: [...affected].sort(), invalidatedTaskIds: invalidatedTaskIds.sort(), projected: next };
+    changes, affectedTaskIds: [...affected].sort(), invalidatedTaskIds: invalidatedTaskIds.sort(),
+    changedRequirementIds: [...changedRequirements].sort(), changedScenarioIds: [...changedScenarios].sort(),
+    taskImpact: [...impact].map(([taskId, row]) => ({ taskId, cause: row.cause, via: [...row.via].sort() })).sort((a, b) => a.taskId.localeCompare(b.taskId)),
+    retainedEvidenceTaskIds: tasks.filter((task) => affected.has(task.id) && !task.disposition && task.evidence).map((task) => task.id).sort(),
+    projected: next };
 }
 
 /** Single-file transaction: contract changes and invalidation commit together, never via the ordinary multi-write plan. */

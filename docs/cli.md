@@ -813,6 +813,13 @@ kyro plan --update-active --from active-update.json --kyro-scope auth-refactor -
 - Preview writes nothing and returns `digest`, `changes`, `affectedTaskIds`, `invalidatedTaskIds` and
   `requiresConfirmation`. It shows before/after values, including removed criteria and derived
   routing changes. `handoff.lastUpdated` is stamped at apply time, not during preview.
+- The preview also reports impact for the reviewer: `changedRequirementIds`, `changedScenarioIds`,
+  `retainedEvidenceTaskIds` (affected tasks whose evidence stays as reference, not renewed approval) and
+  `taskImpact[]` with one `{taskId, cause, via}` per affected task. `cause` is `edited` (definition
+  changed or cancelled; `via` = fields), `scenario` (consumes a changed scenario; `via` = scenario ids) or
+  `dependency` (depends on an affected task; `via` = prerequisite ids); the first matching cause in that
+  order wins. Text output groups behavior changes, task definition changes, invalidated approvals,
+  revalidation reasons and retained evidence. These fields are not part of the digest.
 - `--yes` confirms the reviewed update; it does not prove human identity or authorize execution of
   the tasks' operational/destructive steps. A stale digest requires a fresh preview and approval.
 - Task updates accept `title`, `description`, `context`, `acceptance_criteria`, `files_to_touch`,
