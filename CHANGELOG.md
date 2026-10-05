@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.2.0] - 2026-10-05
+
 ### Added
 
 - `kyro analyze --matrix [--kyro-scope <s>] [--json]`: a read-only scenario verification matrix
