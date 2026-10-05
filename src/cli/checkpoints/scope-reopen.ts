@@ -50,7 +50,7 @@ function normalizeReason(raw: string): string {
 }
 
 function readValidSprint(scope: string): SprintFile {
-  return loadScopeSprint(scope, { action: 'reopen' });
+  return loadScopeSprint(scope, { action: 'reopen', remedy: { SCOPE_NOT_FOUND: 'Restore its live sprint.json before reopening; do not edit archive history.' } });
 }
 
 function readRegisteredProject(scope: string): { project: KyroProjectState; entry: KyroScopeEntry } {
