@@ -133,15 +133,19 @@ export function legacyClaudePluginDetected(): boolean {
 
 /** Called by the operation executor immediately before a Claude skill write. */
 export function assertSafeClaudeSkillWrite(managedPath: string, allowExisting: boolean): void {
-  const file = managedFiles().find((file) => file === managedPath || file.slice(0, -'/SKILL.md'.length) === managedPath);
+  assertSafeLinkedSkillWrite(managedPath, allowExisting, CLAUDE_SKILLS_ROOT, 'Claude');
+}
+
+/** Shared ownership guard for links to canonical command skills. */
+export function assertSafeLinkedSkillWrite(managedPath: string, allowExisting: boolean, root: string, nameOfAdapter: string): void {
+  const file = buildCommandSkillManagedFilesForRoot(root).find((file) => file === managedPath || file.slice(0, -'/SKILL.md'.length) === managedPath);
   if (!file) {
-    throw new KyroCoreError('INVALID_INPUT', `Not a Claude skill projection: ${managedPath}.`, 'Use a Kyro-owned Claude skill path.');
+    throw new KyroCoreError('INVALID_INPUT', `Not a ${nameOfAdapter} skill projection: ${managedPath}.`, `Use a Kyro-owned ${nameOfAdapter} skill path.`);
   }
-  const home = homedir();
-  for (const ancestor of [resolve(home, '.claude'), resolve(home, '.claude/skills')]) {
+  for (const ancestor of [resolveManagedPath(root.slice(0, -'/skills'.length)), resolveManagedPath(root)]) {
     const stat = lstatIfPresent(ancestor);
     if (stat && !stat.isDirectory()) {
-      throw new KyroCoreError('INVALID_INPUT', `Unsafe Claude skill directory: ${ancestor}.`, 'Replace the symlink or non-directory with a real directory; Kyro will not follow it.');
+      throw new KyroCoreError('INVALID_INPUT', `Unsafe ${nameOfAdapter} skill directory: ${ancestor}.`, 'Replace the symlink or non-directory with a real directory; Kyro will not follow it.');
     }
   }
   const target = resolveManagedPath(file);
@@ -155,36 +159,36 @@ export function assertSafeClaudeSkillWrite(managedPath: string, allowExisting: b
         throw new Error('non-canonical target');
       }
     } catch {
-      throw new KyroCoreError('INVALID_INPUT', `Unsafe Claude skill directory: ${skillDir} -> ${readlinkSync(skillDir)}; expected ${canonical}.`, 'Move the foreign or dangling link aside; Kyro accepts only the canonical directory of the same skill name.');
+      throw new KyroCoreError('INVALID_INPUT', `Unsafe ${nameOfAdapter} skill directory: ${skillDir} -> ${readlinkSync(skillDir)}; expected ${canonical}.`, 'Move the foreign or dangling link aside; Kyro accepts only the canonical directory of the same skill name.');
     }
     const stat = lstatIfPresent(target);
     if (stat && !stat.isFile()) {
-      throw new KyroCoreError('INVALID_INPUT', `Unsafe Claude skill target: ${target}.`, 'Move the symlink or non-file aside; Kyro will not overwrite it.');
+      throw new KyroCoreError('INVALID_INPUT', `Unsafe ${nameOfAdapter} skill target: ${target}.`, 'Move the symlink or non-file aside; Kyro will not overwrite it.');
     }
     return;
   }
   if (directoryStat && !directoryStat.isDirectory()) {
-    throw new KyroCoreError('INVALID_INPUT', `Unsafe Claude skill directory: ${skillDir}.`, 'Move the foreign file aside before installing the Claude adapter.');
+    throw new KyroCoreError('INVALID_INPUT', `Unsafe ${nameOfAdapter} skill directory: ${skillDir}.`, `Move the foreign file aside before installing the ${nameOfAdapter} adapter.`);
   }
   if (directoryStat) {
     if (!allowExisting) {
-      throw new KyroCoreError('INVALID_INPUT', `Foreign Claude skill target: ${managedPath}.`, 'Move the existing directory aside; the previous Kyro manifest did not own it.');
+      throw new KyroCoreError('INVALID_INPUT', `Foreign ${nameOfAdapter} skill target: ${managedPath}.`, 'Move the existing directory aside; the previous Kyro manifest did not own it.');
     }
     if (readdirSync(skillDir).some((entry) => entry !== 'SKILL.md')) {
-      throw new KyroCoreError('INVALID_INPUT', `Foreign Claude skill target: ${skillDir}.`, 'Move the directory aside; it contains files not owned by the Kyro skill projection.');
+      throw new KyroCoreError('INVALID_INPUT', `Foreign ${nameOfAdapter} skill target: ${skillDir}.`, 'Move the directory aside; it contains files not owned by the Kyro skill projection.');
     }
   }
   const stat = lstatIfPresent(target);
   if (!stat) return;
   if (!allowExisting) {
-    throw new KyroCoreError('INVALID_INPUT', `Foreign Claude skill target: ${managedPath}.`, 'Move the existing file aside; the previous Kyro manifest did not own it.');
+    throw new KyroCoreError('INVALID_INPUT', `Foreign ${nameOfAdapter} skill target: ${managedPath}.`, 'Move the existing file aside; the previous Kyro manifest did not own it.');
   }
   if (!stat.isFile()) {
-    throw new KyroCoreError('INVALID_INPUT', `Unsafe Claude skill target: ${managedPath}.`, 'Move the symlink or non-file aside; Kyro will not overwrite it.');
+    throw new KyroCoreError('INVALID_INPUT', `Unsafe ${nameOfAdapter} skill target: ${managedPath}.`, 'Move the symlink or non-file aside; Kyro will not overwrite it.');
   }
   const body = readFileSync(target, 'utf8');
   if (!name || !body.includes(`name: ${name}\n`) || !parseSkillRuntimeVersion(body)) {
-    throw new KyroCoreError('INVALID_INPUT', `Foreign Claude skill target: ${managedPath}.`, 'Move the foreign file aside before installing the Claude adapter.');
+    throw new KyroCoreError('INVALID_INPUT', `Foreign ${nameOfAdapter} skill target: ${managedPath}.`, `Move the foreign file aside before installing the ${nameOfAdapter} adapter.`);
   }
 }
 

@@ -25,7 +25,7 @@ import type { OperationPlan, OperationProjectionResult } from '../types';
 import { PipelineOrchestrator } from './orchestrator';
 import type { PipelineResult, StagePlan, Step } from './types';
 import { assertStateWriterLeaseHealthy, withStateWriterLock } from './state-writer-lock';
-import { assertSafeClaudeSkillWrite } from '../adapters/claude';
+import { assertSafeClaudeSkillWrite, assertSafeLinkedSkillWrite } from '../adapters/claude';
 
 interface OperationExecutionContext {
   packageRoot: string;
@@ -98,6 +98,7 @@ class OperationStep implements Step {
   run(): void {
     assertStateWriterLeaseHealthy();
     const target = this.context.resolveManagedPath(this.operation.path);
+    if (this.operation.guard === 'opencode-skill') assertSafeLinkedSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true, '~/.config/opencode/skills', 'OpenCode');
     if (this.operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
     if (this.operation.action !== 'mkdir' && this.operation.action !== 'rmdir-if-empty') {
       assertNotRetiredSprintOverwrite(target);
@@ -149,6 +150,7 @@ class OperationStep implements Step {
 }
 
 function applyDirectoryLink(operation: OperationPlan, target: string, context: OperationExecutionContext): OperationProjectionResult {
+  if (operation.guard === 'opencode-skill') assertSafeLinkedSkillWrite(operation.path, operation.allowExistingManagedSkill === true, '~/.config/opencode/skills', 'OpenCode');
   if (operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
   if (!operation.source) throw new Error(`Link operation missing source for ${operation.path}`);
   const source = context.resolveManagedPath(operation.source);
@@ -159,7 +161,7 @@ function applyDirectoryLink(operation: OperationPlan, target: string, context: O
   mkdirSync(dirname(target), { recursive: true });
   assertStateWriterLeaseHealthy();
   rmSync(target, { recursive: true, force: true });
-  if (process.env.KYRO_LINK_MODE !== 'copy') {
+  if (process.env.KYRO_LINK_MODE !== 'copy' && operation.projection !== 'copy') {
     try {
       assertStateWriterLeaseHealthy();
       symlinkSync(source, target, 'dir');
@@ -184,6 +186,7 @@ function isLinkUnsupported(error: unknown): boolean {
 }
 
 function applyOperation(operation: OperationPlan, target: string, context: OperationExecutionContext): void {
+  if (operation.guard === 'opencode-skill') assertSafeLinkedSkillWrite(operation.path, operation.allowExistingManagedSkill === true, '~/.config/opencode/skills', 'OpenCode');
   if (operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
   if (operation.action === 'mkdir') {
     assertStateWriterLeaseHealthy();

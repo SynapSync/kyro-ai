@@ -11,7 +11,7 @@ const fs = require('node:fs');
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const root = fs.mkdtempSync(join(tmpdir(), 'kyro-adapter-links-'));
 const savedCwd = process.cwd();
-const savedEnv = Object.fromEntries(['HOME', 'USERPROFILE', 'KYRO_LINK_MODE'].map((key) => [key, process.env[key]]));
+const savedEnv = Object.fromEntries(['HOME', 'USERPROFILE', 'npm_config_cache', 'KYRO_LINK_MODE'].map((key) => [key, process.env[key]]));
 const realSymlink = fs.symlinkSync;
 const realCopy = fs.cpSync;
 
@@ -36,6 +36,7 @@ try {
   process.chdir(root);
   process.env.HOME = join(root, 'home');
   process.env.USERPROFILE = process.env.HOME;
+  process.env.npm_config_cache = join(root, 'npm-cache');
   delete process.env.KYRO_LINK_MODE;
   fs.mkdirSync(process.env.HOME);
   const { applyOperationPlan } = require(join(repo, 'dist/cli/pipeline/operation-steps.js'));

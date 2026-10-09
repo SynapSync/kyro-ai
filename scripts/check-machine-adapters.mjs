@@ -12,9 +12,12 @@ const repo = fileURLToPath(new URL('..', import.meta.url));
 const require = createRequire(import.meta.url);
 const root = fs.mkdtempSync(join(tmpdir(), 'kyro-machine-adapters-'));
 const home = join(root, 'home');
-const original = { cwd: process.cwd(), HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+const original = { cwd: process.cwd(), HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, npm_config_cache: process.env.npm_config_cache, PATH: process.env.PATH };
 process.env.HOME = home;
 process.env.USERPROFILE = home;
+process.env.npm_config_cache = join(root, 'npm-cache');
+process.env.PATH = join(root, 'bin');
+fs.mkdirSync(process.env.PATH);
 const timestamp = '2001-01-01T00:00:00.000Z';
 const registryPath = join(home, '.agents/kyro/adapters.json');
 const lockPath = join(home, '.agents/kyro/.adapters.lock');
@@ -81,7 +84,8 @@ try {
   run(a, ['sync']);
   run(b, ['sync']);
   assert.deepEqual(json(registryPath).adapters.map((adapter) => adapter.agent), ['codex', 'standard']);
-  assert(json(registryPath).adapters.every((adapter) => adapter.integrations === true));
+  assert.equal(json(registryPath).adapters.find((adapter) => adapter.agent === 'codex').integrations, true);
+  assert.equal(json(registryPath).adapters.find((adapter) => adapter.agent === 'standard').integrations, false, 'canonical standard was auto-added before legacy workspace B and keeps its machine choice');
   assert.equal(json(registryPath).schemaVersion, 1);
   assert(!registryPath.includes('/current/'));
   const manifestPath = join(home, '.agents/kyro/current/manifest.json');
@@ -95,6 +99,7 @@ try {
   }));
   console.log('PASS legacy union / integrations / manifest: two workspaces and runtime-only install converge');
   for (const cwd of [a, b]) assert(!Object.hasOwn(json(join(cwd, '.agents/kyro/local.json')), 'installedAdapters'));
+  fs.writeFileSync(join(process.env.PATH, 'codex'), '#!/bin/sh\nexit 0\n');
   run(a, ['install', '--init-workspace', '--agent', 'codex']);
   assert(!Object.hasOwn(json(join(a, '.agents/kyro/local.json')), 'installedAdapters'));
   ({ machine, state } = load(a));
@@ -106,6 +111,7 @@ try {
   assert.deepEqual(load(mono).state.readLegacyInstalledAdapters().map((adapter) => adapter.agent), ['claude']);
   console.log('PASS local overlay: install/sync omit installedAdapters; layered and monolito legacy remain readable');
 
+  fs.writeFileSync(join(process.env.PATH, 'claude'), '#!/bin/sh\nexit 0\n');
   const before = tree(home);
   run(a, ['sync', '--dry-run']);
   run(a, ['install', '--init-workspace', '--agent', 'claude', '--dry-run']);
@@ -303,6 +309,6 @@ try {
   console.log('Machine adapter registry checks passed (W1 criteria 1-7).');
 } finally {
   process.chdir(original.cwd);
-  for (const key of ['HOME', 'USERPROFILE']) if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key];
+  for (const key of ['HOME', 'USERPROFILE', 'npm_config_cache', 'PATH']) if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key];
   fs.rmSync(root, { recursive: true, force: true });
 }

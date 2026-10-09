@@ -1,15 +1,16 @@
+import { printReconciliation, reconcileAdapters } from '../adapters/reconcile';
 import { withMachineAdapterRegistryLock } from '../adapters/machine-registry';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { listRegistrableScopeDirectories } from '../artifacts/scopes';
 import { buildInstallPlan, buildRuntimeInstallPlan } from '../install-plan';
 import { applyPlan, printPlan } from '../fs';
-import { assertWorkspaceScope, uniqueAgents } from '../options';
+import { assertWorkspaceScope } from '../options';
 import { legacyScopeCacheWarnings, readProjectState } from '../state';
 import { formatWorkspaceInitPrompt } from '../core/scopes';
 import { KyroCoreError } from '../core/errors';
 import { isInteractiveTerminal } from '../core/tty';
-import { AGENT, KYRO_ROOT, LOCAL_STATE_PATH, PROJECT_STATE_PATH, SCOPE } from '../constants';
+import { KYRO_ROOT, LOCAL_STATE_PATH, PROJECT_STATE_PATH, SCOPE } from '../constants';
 import { requireFullPackageFor } from '../package-root-mode';
 import type { Agent, CliOptions, OperationProjectionResult } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
@@ -20,8 +21,7 @@ import { withStateWriterLock, withStateWriterLockAsync } from '../pipeline/state
 export function install(options: CliOptions): void | Promise<void> {
   requireFullPackageFor('install');
   assertWorkspaceScope(options.scope);
-  const agents = options.agents.length > 0 ? options.agents : [AGENT.STANDARD];
-  runAdapterPreflight('install', agents);
+  const agents = options.agents;
 
   const packageVersion = readPackageVersion();
   const existingState = readProjectState();
@@ -47,8 +47,9 @@ function runInstallPlan(
 }
 
 function runInstallPlanUnlocked(options: CliOptions, agents: Agent[], packageVersion: string, shouldInitializeWorkspace: boolean): void {
+  runAdapterPreflight('install', reconcileAdapters(agents, options.integrations).desired);
   const warnings = shouldInitializeWorkspace ? legacyScopeCacheWarnings() : [];
-  const plan = shouldInitializeWorkspace ? buildInstallPlan(agents, options.scope) : buildRuntimeInstallPlan(options.scope);
+  const plan = shouldInitializeWorkspace ? buildInstallPlan(agents, options.scope, new Map(), options.integrations) : buildRuntimeInstallPlan(options.scope, agents, options.integrations);
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
   if (!shouldInitializeWorkspace && options.dryRun) {
     console.log('Workspace: skipped');
@@ -59,11 +60,14 @@ function runInstallPlanUnlocked(options: CliOptions, agents: Agent[], packageVer
 
   if (options.dryRun) {
     console.log('Dry run complete. No files changed.');
+    printReconciliation(plan);
     printLegacyScopeWarnings(warnings, true);
     return;
   }
 
-  printProjections(applyPlan(plan));
+  const projections = applyPlan(plan);
+  printProjections(projections);
+  printReconciliation(plan, projections);
   console.log('Kyro has been installed.');
   console.log(`Version: ${packageVersion}`);
   if (shouldInitializeWorkspace) {
@@ -87,13 +91,13 @@ function syncUnlocked(options: CliOptions): void {
   if (!state) {
     throw new KyroCoreError('INVALID_INPUT', 'Kyro is not installed in this workspace.', 'Run kyro install --init-workspace.');
   }
-  const agents = options.agents.length > 0 ? options.agents : (state.installedAdapters ?? []).map((adapter) => adapter.agent);
-  const unique = uniqueAgents(agents);
+  const agents = options.agents;
+  const unique = reconcileAdapters(agents, options.integrations).desired;
   runAdapterPreflight('sync', unique);
 
   const currentVersion = readPackageVersion();
   const warnings = legacyScopeCacheWarnings();
-  const plan = buildInstallPlan(unique, SCOPE.WORKSPACE);
+  const plan = buildInstallPlan(agents, SCOPE.WORKSPACE, new Map(), options.integrations);
   const drift = analyzeDrift(currentVersion, managedFilesFromInstallPlan(plan));
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
   if (options.dryRun || options.trace || options.verbose) {
@@ -117,10 +121,13 @@ function syncUnlocked(options: CliOptions): void {
 
   if (options.dryRun) {
     console.log('Dry run complete. No files changed.');
+    printReconciliation(plan);
     printLegacyScopeWarnings(warnings, true);
     return;
   }
-  printProjections(applyPlan(plan));
+  const projections = applyPlan(plan);
+  printProjections(projections);
+  printReconciliation(plan, projections);
   console.log(`Kyro synced for: ${unique.join(', ')}`);
   printLegacyScopeWarnings(warnings);
 }

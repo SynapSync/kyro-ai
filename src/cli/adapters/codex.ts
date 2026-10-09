@@ -37,8 +37,9 @@ export const codexAdapter: AdapterDefinition = {
   mcpStrategy() {
     return 'toml-file';
   },
-  buildProjection(plan) {
+  buildProjection(plan, options) {
     addCommandSkillProjection(plan);
+    if (!options?.integrations || !options.includeWorkspace) return;
     plan.push({
       action: 'upsert-block',
       path: AGENTS_PATH,
@@ -91,10 +92,10 @@ export const codexAdapter: AdapterDefinition = {
     }
     const commandCheck = checkCommandProjection('Codex adapter');
     if (commandCheck.status !== 'pass') return commandCheck;
-    if (!hasManagedBlock(AGENTS_PATH, KYRO_AGENTS_BLOCK)) {
+    if (manifest.managedBlocks.includes(`${AGENTS_PATH}#${KYRO_AGENTS_BLOCK}`) && !hasManagedBlock(AGENTS_PATH, KYRO_AGENTS_BLOCK)) {
       return { status: 'fail', name: 'Codex adapter', detail: `missing Kyro block in ${AGENTS_PATH}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
     }
-    return { status: 'pass', name: 'Codex adapter', detail: 'projected Kyro command skills and root AGENTS.md block present' };
+    return { status: 'pass', name: 'Codex adapter', detail: 'projected Kyro command skills and enabled integrations present' };
   },
 };
 

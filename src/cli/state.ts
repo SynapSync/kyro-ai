@@ -1,5 +1,4 @@
 import { readMachineAdapterRegistry } from './adapters/machine-registry';
-import { getAdapterDefinition } from './adapters/registry';
 import { existsSync, lstatSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
@@ -262,6 +261,9 @@ export function readLegacyInstalledAdapters(): KyroInstalledAdapter[] {
 }
 
 function withMachineAdapters(state: KyroProjectState): KyroProjectState {
+  // Resolve definitions after module initialization: registry -> adapters -> fs -> state
+  // would otherwise capture a partially initialized adapter during direct API loading.
+  const { getAdapterDefinition } = require('./adapters/registry') as typeof import('./adapters/registry');
   const machine = readMachineAdapterRegistry();
   const entries = new Map(state.installedAdapters.map((adapter) => [adapter.agent, adapter]));
   for (const adapter of machine.adapters) {

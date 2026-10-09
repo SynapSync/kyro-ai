@@ -25,9 +25,14 @@ function withWorkspace(prefix, callback) {
   const cwd = createWorkspace(prefix);
   const previousCwd = process.cwd();
   const previousHome = process.env.HOME;
+  const previousEnv = Object.fromEntries(['USERPROFILE', 'npm_config_cache', 'PATH'].map((key) => [key, process.env[key]]));
   try {
     process.chdir(cwd);
     process.env.HOME = join(cwd, '.home');
+    process.env.USERPROFILE = process.env.HOME;
+    process.env.npm_config_cache = join(cwd, 'npm-cache');
+    process.env.PATH = join(cwd, 'bin');
+    mkdirSync(process.env.PATH);
     clearDistCache();
     return callback(cwd);
   } finally {
@@ -37,6 +42,7 @@ function withWorkspace(prefix, callback) {
     } else {
       process.env.HOME = previousHome;
     }
+    for (const [key, value] of Object.entries(previousEnv)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
     clearDistCache();
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -55,8 +61,12 @@ function captureLogs(callback) {
 }
 
 function cliOptions(overrides = {}) {
+  // Explicit selections model installed harnesses, independent of the developer's PATH.
+  for (const agent of overrides.agents ?? []) writeFileSync(join(process.env.PATH, agent), '#!/bin/sh\nexit 0\n');
   return {
     agents: [],
+    // Existing config-overlay fixtures explicitly opt in; defaults are covered by check:reconcile.
+    integrations: true,
     scope: 'workspace',
     dryRun: false,
     yes: true,
@@ -145,10 +155,10 @@ assert(combinedPlan.includes('- upsert-block AGENTS.md # agents-md'), 'combined:
 assert(standardPlan.includes('- standard: status=implemented;'), 'standard: missing preflight status');
 assert(openCodePlan.includes('- opencode: status=implemented;'), 'opencode: missing preflight status');
 assert(codexPlan.includes('- codex: status=implemented;'), 'codex: missing preflight status');
-assert(openCodePlan.includes('- write ~/.config/opencode/skills/kyro-forge/SKILL.md'), 'opencode: missing native forge skill projection');
+assert(openCodePlan.includes('- link ~/.config/opencode/skills/kyro-forge <= ~/.agents/skills/kyro-forge'), 'opencode: missing native forge skill projection');
 assert(openCodePlan.includes('- write ~/.config/opencode/commands/kyro/forge.md'), 'opencode: missing native forge command projection');
 assert(openCodePlan.includes('- merge-json ~/.config/opencode/opencode.json'), 'opencode: missing native settings overlay');
-assert(!openCodePlan.includes('- write ~/.agents/skills/kyro-forge/SKILL.md'), 'opencode: should not use standard global command skill projection');
+assert(openCodePlan.includes('- write ~/.agents/skills/kyro-forge/SKILL.md'), 'opencode: canonical skills are always projected before native links');
 assert(countIncludes(combinedPlan, '- write ~/.agents/skills/kyro-forge/SKILL.md') === 1, 'combined: forge skill should be projected once');
 assert(countIncludes(combinedPlan, '- write ~/.agents/skills/kyro-work/SKILL.md') === 1, 'combined: Work skill should be projected once');
 assert(openCodePlan.includes('- write ~/.config/opencode/commands/kyro/work.md'), 'opencode: missing Work command projection');
@@ -481,7 +491,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!Object.hasOwn(sharedBeforeUpgrade, 'kyroInvocation'), 'install: shared state should not include kyroInvocation');
   assert(!Object.hasOwn(localBeforeUpgrade, 'kyroInvocation'), 'install: local state should not include kyroInvocation');
   const staleCodexInstalledAt = '2000-01-01T00:00:00.000Z';
-  const staleStandardInstalledAt = '2001-01-01T00:00:00.000Z';
+  const staleStandardInstalledAt = JSON.parse(readFileSync(join(home, '.agents/kyro/adapters.json'), 'utf8')).adapters.find((entry) => entry.agent === 'standard').updatedAt;
   const principles = [
     {
       id: 'preserve-principles',
@@ -635,10 +645,17 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
     assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode uninstall: should preserve native command ${command} without purge`);
   }
 
-  assert(!existsSync(join(home, '.agents', 'skills', 'kyro-forge', 'SKILL.md')), 'opencode install: should not install standard global skill projection');
+  assert(existsSync(join(home, '.agents', 'skills', 'kyro-forge', 'SKILL.md')), 'opencode install: canonical skills must back the native links');
 
   captureLogs(() => install(cliOptions({ agents: [opencode], initWorkspace: true })));
   const purgeDryRunOutput = captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true, dryRun: true })));
+  const { getAdapterDefinition } = require(join(repo, 'dist/cli/adapters/registry.js'));
+  assert(getAdapterDefinition(opencode).buildManagedFiles().every((path) => path.startsWith('~/.config/opencode/skills/') || path.startsWith('~/.config/opencode/commands/kyro/')), 'opencode purge: managed files must contain only OpenCode-owned paths');
+  const registryBeforePurge = readFileSync(join(home, '.agents', 'kyro', 'adapters.json'));
+  assert(JSON.parse(registryBeforePurge).adapters.some((adapter) => adapter.agent === 'standard' && adapter.state === 'enabled'), 'opencode purge: Standard must be registered');
+  const canonicalSkills = EXPECTED_COMMAND_SKILLS.map((command) => join(home, '.agents', 'skills', `kyro-${command}`, 'SKILL.md'));
+  const canonicalBeforePurge = canonicalSkills.map((path) => readFileSync(path));
+  assert(!purgeDryRunOutput.split('\n').some((line) => /^- (remove|rmdir-if-empty) ~\/\.agents\/skills(?:\/|$)/.test(line)), 'opencode purge dry-run: must not remove canonical skills or their directories');
   assert(purgeDryRunOutput.includes('purgeAdapterAssets=yes'), 'opencode purge dry-run: summary should report purge enabled');
   assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/skills/kyro-forge/SKILL.md'), 'opencode purge dry-run: plan should include native skill removal');
   assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/commands/kyro/forge.md'), 'opencode purge dry-run: plan should include native command removal');
@@ -665,10 +682,14 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   }
   assert(!existsSync(join(home, '.config', 'opencode', 'commands', 'kyro')), 'opencode purge: empty command namespace still present');
   assert(existsSync(join(home, '.config', 'opencode')), 'opencode purge: shared OpenCode config directory should remain');
+  assert(existsSync(join(home, '.agents', 'skills', 'kyro-work', 'SKILL.md')), 'opencode purge: canonical Work skill must remain discoverable');
+  canonicalSkills.forEach((path, index) => assert(readFileSync(path).equals(canonicalBeforePurge[index]), `opencode purge: canonical skill changed: ${path}`));
+  assert(readFileSync(join(home, '.agents', 'kyro', 'adapters.json')).equals(registryBeforePurge), 'opencode purge: machine registrations must remain unchanged');
 
   const priorExitCode = process.exitCode;
   const doctorAfterPurgeOutput = captureLogs(() => doctor(cliOptions({ adapters: true })));
   assert(doctorAfterPurgeOutput.includes('[PASS] global runtime'), 'opencode purge doctor: global runtime should remain valid after purging adapter assets');
+  assert(doctorAfterPurgeOutput.includes('[PASS] Standard .agents adapter:'), 'opencode purge doctor: Standard must remain healthy');
   const purgeDoctorFailures = doctorAfterPurgeOutput.split('\n').filter((line) => line.startsWith('[FAIL]'));
   // W1 keeps the machine registration after a workspace purge. W4 owns machine uninstall;
   // doctor must expose the missing registered projection rather than forget the machine entry.

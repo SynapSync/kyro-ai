@@ -19,14 +19,18 @@ function withWorkspace(prefix, callback) {
   const cwd = mkdtempSync(join(tmpdir(), prefix));
   const previousCwd = process.cwd();
   const previousHome = process.env.HOME;
+  const previousEnv = Object.fromEntries(['USERPROFILE', 'npm_config_cache'].map((key) => [key, process.env[key]]));
   try {
     process.chdir(cwd);
     process.env.HOME = join(cwd, '.home');
+    process.env.USERPROFILE = process.env.HOME;
+    process.env.npm_config_cache = join(cwd, 'npm-cache');
     return callback(cwd);
   } finally {
     process.chdir(previousCwd);
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
+    for (const [key, value] of Object.entries(previousEnv)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
     rmSync(cwd, { recursive: true, force: true });
   }
 }

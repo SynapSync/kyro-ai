@@ -50,7 +50,7 @@ export interface AdapterDefinition {
   detect(context: DetectionContext): DetectionResult;
   systemPromptStrategy(): SystemPromptStrategy;
   mcpStrategy(): MCPStrategy;
-  buildProjection(plan: OperationPlan[]): void;
+  buildProjection(plan: OperationPlan[], options?: { integrations: boolean; includeWorkspace: boolean }): void;
   buildRemoval(plan: OperationPlan[]): void;
   buildMcpProjection(plan: OperationPlan[]): void;
   buildMcpRemoval(plan: OperationPlan[]): void;

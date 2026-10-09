@@ -1,4 +1,4 @@
-import { KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
+import { AGENT_SKILLS_ROOT, KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { getInstalledAdapterDefinitions } from '../adapters/registry';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope } from '../options';
@@ -28,6 +28,9 @@ export function uninstall(options: CliOptions): void {
     if (adapter.capabilities().includes('mcp')) adapter.buildMcpRemoval(plan);
     if (options.purgeAdapterAssets) {
       for (const file of adapter.buildManagedFiles()) {
+        // Canonical skills are machine-owned and shared by every adapter.
+        // Only an explicit machine uninstall may remove them, never a workspace purge.
+        if (file === AGENT_SKILLS_ROOT || file.startsWith(`${AGENT_SKILLS_ROOT}/`)) continue;
         plan.push({ action: 'remove', path: file });
         purgeDirectories.add(parentPath(file));
       }

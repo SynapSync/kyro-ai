@@ -15,7 +15,7 @@ function assert(condition, message) {
 }
 
 function run(args, cwd, env = {}) {
-  return spawnSync(process.execPath, [cli, ...args], { cwd, env: { ...process.env, HOME: join(cwd, '.home'), ...env }, encoding: 'utf-8' });
+  return spawnSync(process.execPath, [cli, ...args], { cwd, env: { ...process.env, HOME: join(cwd, '.home'), USERPROFILE: join(cwd, '.home'), npm_config_cache: join(cwd, 'npm-cache'), ...env }, encoding: 'utf-8' });
 }
 
 function sandbox(caseName = 'close-sprint-happy') {
@@ -36,7 +36,7 @@ function writePolicy(root, policy) {
 }
 
 async function withServer(cwd, fn) {
-  const child = spawn(process.execPath, [cli, 'mcp', 'serve'], { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, HOME: join(cwd, '.home') } });
+  const child = spawn(process.execPath, [cli, 'mcp', 'serve'], { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, HOME: join(cwd, '.home'), USERPROFILE: join(cwd, '.home'), npm_config_cache: join(cwd, 'npm-cache') } });
   const rl = createInterface({ input: child.stdout, crlfDelay: Infinity });
   const queue = [];
   const waiters = [];
@@ -128,7 +128,9 @@ function assertMcpProjection() {
     // `isKyroOnPath()` is deterministically false, making the projected MCP command stable across
     // machines (a dev box with a global `kyro` would otherwise emit `command = "node"` vs "kyro").
     const noKyroPath = join(root, '.home');
-    const install = run(['install', '--agent', 'codex', '--scope', 'workspace', '--init-workspace', '--yes'], root, { PATH: noKyroPath });
+    // Model an installed Codex harness while keeping the Kyro invocation off PATH.
+    mkdirSync(join(root, '.home/.codex'));
+    const install = run(['install', '--agent', 'codex', '--integrations', '--scope', 'workspace', '--init-workspace', '--yes'], root, { PATH: noKyroPath });
     assert(install.status === 0, `codex install should pass: ${install.stderr || install.stdout}`);
     const configPath = join(root, '.home/.codex/config.toml');
     const first = readFileSync(configPath, 'utf-8');
@@ -139,7 +141,7 @@ function assertMcpProjection() {
     // spawns the command without a shell, so a literal `~` would not expand and cli.js would not resolve.
     const expectedCli = join(root, '.home', '.agents/kyro/current/dist/cli.js');
     assert(first.includes(`args = [${JSON.stringify(expectedCli)},"mcp","serve"]`), `codex MCP block should register the ~-expanded runtime cli.js mcp serve invocation (expected ${expectedCli})`);
-    const reinstall = run(['install', '--agent', 'codex', '--scope', 'workspace', '--yes'], root, { PATH: noKyroPath });
+    const reinstall = run(['install', '--agent', 'codex', '--integrations', '--scope', 'workspace', '--yes'], root, { PATH: noKyroPath });
     assert(reinstall.status === 0, 'codex reinstall should pass');
     const second = readFileSync(configPath, 'utf-8');
     assert(second.split('# kyro-ai:mcp-server-kyro:start').length - 1 === 1, 'codex MCP projection should be idempotent');

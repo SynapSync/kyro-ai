@@ -12,6 +12,7 @@ export function parseOptions(args: string[]): CliOptions {
   let tokens = false;
   let artifacts = false;
   let adapters = false;
+  let integrations = false;
   let trace = false;
   let kyroScope: string | null = null;
   let task: string | null = null;
@@ -43,6 +44,8 @@ export function parseOptions(args: string[]): CliOptions {
       artifacts = true;
     } else if (arg === '--adapters') {
       adapters = true;
+    } else if (arg === '--integrations') {
+      integrations = true;
     } else if (arg === '--trace') {
       trace = true;
     } else if (arg === '--json') {
@@ -137,6 +140,7 @@ export function parseOptions(args: string[]): CliOptions {
     tokens,
     artifacts,
     adapters,
+    integrations,
     trace,
     kyroScope,
     task,

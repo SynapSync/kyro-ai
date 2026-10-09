@@ -1,9 +1,10 @@
-import { AGENT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
+import { AGENT, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
 import type { AdapterDefinition } from './registry-types';
-import { addCommandSkillProjectionToRoot, buildCommandSkillManagedFilesForRoot, getCommandDescription } from './command-skills';
-import { managedPathExists } from '../fs';
+import { addCommandSkillProjection, buildCommandSkillManagedFilesForRoot, getCommandDescription } from './command-skills';
+import { addLinkDirectoryPlan, managedPathExists } from '../fs';
 import { detectFromPaths } from './detection';
 import type { CheckResult, KyroCommandName, OperationPlan } from '../types';
+import { readManifest } from '../state';
 import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 
 const OPENCODE_SKILLS_ROOT = '~/.config/opencode/skills';
@@ -63,8 +64,17 @@ export const openCodeAdapter: AdapterDefinition = {
   },
 };
 
-function addOpenCodeProjection(plan: OperationPlan[]): void {
-  addCommandSkillProjectionToRoot(plan, OPENCODE_SKILLS_ROOT);
+function addOpenCodeProjection(plan: OperationPlan[], options?: { integrations: boolean; includeWorkspace: boolean }): void {
+  addCommandSkillProjection(plan);
+  const previous = readManifest();
+  for (const file of buildCommandSkillManagedFilesForRoot(OPENCODE_SKILLS_ROOT)) {
+    const path = file.slice(0, -'/SKILL.md'.length);
+    addLinkDirectoryPlan(plan, `${AGENT_SKILLS_ROOT}/${path.split('/').at(-1)}`, path);
+    const operation = plan.find((operation) => operation.path === path)!;
+    operation.guard = 'opencode-skill';
+    operation.allowExistingManagedSkill = previous?.adapters.some((adapter) => adapter.agent === AGENT.OPENCODE)
+      && (previous.managedFiles.includes(file) || previous.managedFiles.includes(path));
+  }
   for (const command of COMMAND_NAMES) {
     plan.push({
       action: 'write',
@@ -72,6 +82,7 @@ function addOpenCodeProjection(plan: OperationPlan[]): void {
       content: buildOpenCodeCommand(command),
     });
   }
+  if (!options?.integrations) return;
   plan.push({
     action: 'merge-json',
     path: OPENCODE_SETTINGS_PATH,
@@ -84,7 +95,9 @@ function removeOpenCodeProjection(plan: OperationPlan[]): void {
 }
 
 function buildOpenCodeManagedFiles(): string[] {
+  // Own only native links and commands; their canonical targets belong to the machine.
   return [
+    ...buildCommandSkillManagedFilesForRoot(OPENCODE_SKILLS_ROOT).map((file) => file.slice(0, -'/SKILL.md'.length)),
     ...buildCommandSkillManagedFilesForRoot(OPENCODE_SKILLS_ROOT),
     ...COMMAND_NAMES.map((command) => `${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`),
   ];

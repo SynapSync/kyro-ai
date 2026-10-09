@@ -415,11 +415,13 @@ function throwInstallFailed(detail: string, stderr: string): never {
  * Refresh the current workspace (or runtime-only when there is none) from a CLI entrypoint,
  * with inherited stdio so progress is visible. Propagates the child exit code.
  */
-export function refreshFromCli(cliJs: string, hasWorkspace: boolean, verbose: boolean): void {
+export function refreshFromCli(cliJs: string, hasWorkspace: boolean, verbose: boolean, options?: Pick<CliOptions, 'agents' | 'integrations'>): void {
   const args = hasWorkspace
     ? ['sync', '--scope', 'workspace']
     : ['install', '--scope', 'workspace', '--no-init-workspace'];
   if (verbose) args.push('--verbose');
+  if (options?.agents.length) args.push('--agent', options.agents.join(','));
+  if (options?.integrations) args.push('--integrations');
   const child = spawnSync(process.execPath, [cliJs, ...args], {
     stdio: 'inherit',
     env: { ...process.env, KYRO_UPDATE_DEFER_SCOPE_WARNINGS: '1' },
@@ -500,13 +502,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     return;
   }
 
-  if (plan.action === 'up-to-date') {
-    printPlan(plan);
-    printWarnings();
-    return;
-  }
-
-  if (plan.action === 'refresh-stale-runtime' || plan.action === 'refresh-workspace') {
+  if (plan.action === 'refresh-stale-runtime' || plan.action === 'refresh-workspace' || plan.action === 'up-to-date') {
     printPlan(plan);
     if (!options.yes) {
       if (!isInteractiveTerminal()) {
@@ -525,7 +521,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     if (!fresh || fresh.version !== current) {
       throw new KyroCoreError('INTERNAL', 'The npm global package is incomplete or differs from the expected version.', `Reinstall with npm install -g kyro-ai@${current}.`);
     }
-    refreshFromCli(fresh.cliJs, facts.hasWorkspace, options.verbose);
+    refreshFromCli(fresh.cliJs, facts.hasWorkspace, options.verbose, options);
     verifyUpdate(current, fresh);
     console.log(`Runtime refreshed from kyro ${current}.`);
     printWarnings();
@@ -554,7 +550,7 @@ export async function runUpdate(options: CliOptions): Promise<void> {
     }
     const fresh = readFreshGlobalPackage();
     if (!fresh || fresh.version !== plan.target) verifyUpdate(plan.target, fresh);
-    refreshFromCli(fresh!.cliJs, facts.hasWorkspace, options.verbose);
+    refreshFromCli(fresh!.cliJs, facts.hasWorkspace, options.verbose, options);
     verifyUpdate(plan.target, fresh);
     console.log(`Updated kyro ${current} → ${plan.target}.`);
     printWarnings();

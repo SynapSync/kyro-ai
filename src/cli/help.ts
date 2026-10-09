@@ -48,6 +48,7 @@ Options:
   --adapters                   Include adapter inventory for doctor
   --trace                      Include trace summary for doctor
   --json                       Print machine-readable output where supported
+  --integrations               Opt in to config blocks for selected/detected adapters
   --verbose                    Show detailed install/sync operation plans
   --verbosity <level>          Output depth for context-pack: concise or detailed (default)
   --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
@@ -109,7 +110,7 @@ export function printCommandHelp(command: string): void {
     return;
   }
   if (command === 'install') {
-    console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--init-workspace|--no-init-workspace] [--dry-run] [--yes]');
+    console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--init-workspace|--no-init-workspace] [--integrations] [--dry-run] [--yes]');
   } else if (command === 'detect') {
     console.log('Usage: kyro detect [--agent standard|opencode|codex|claude|cursor] [--json]');
   } else if (command === 'doctor') {
@@ -161,9 +162,9 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'scope') {
     console.log('Usage: kyro scope list | inspect <scope> | set-active <scope> | complete --kyro-scope <scope> [--summary <text>] [--yes] | reopen --kyro-scope <scope> --reason <reason> [--yes] | retire --kyro-scope <scope> --reason <reason> [--digest <sha256> --yes]');
   } else if (command === 'sync') {
-    console.log('Usage: kyro sync [--agent standard|opencode|codex] [--prune] [--dry-run]');
+    console.log('Usage: kyro sync [--agent standard|opencode|codex] [--integrations] [--prune] [--dry-run]');
   } else if (command === 'update') {
-    console.log('Usage: kyro update [--check] [--dry-run] [--yes] [--verbose]');
+    console.log('Usage: kyro update [--agent <agent>] [--integrations] [--check] [--dry-run] [--yes] [--verbose]');
     console.log('Checks the registry for the latest kyro-ai release, updates the global package when behind, and refreshes the runtime + current workspace from the fresh package. Prompts before changing anything unless --yes.');
   } else if (command === 'uninstall') {
     console.log('Usage: kyro uninstall [--purge-adapter-assets] [--dry-run] [--yes]');

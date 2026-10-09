@@ -789,6 +789,8 @@ export interface KyroManifest {
 
 export interface CliOptions {
   agents: Agent[];
+  /** Allow config integrations for explicitly selected adapters, or all desired adapters. */
+  integrations?: boolean;
   scope: InstallScope;
   dryRun: boolean;
   yes: boolean;
@@ -837,13 +839,15 @@ export interface OperationPlan {
   path: string;
   /** `link` sources are managed directory paths, resolved like `path` (not package-relative). */
   source?: string;
+  /** An adapter's persisted copy preference; KYRO_LINK_MODE=copy also forces fallback. */
+  projection?: 'link' | 'copy';
   content?: string;
   blockName?: string;
   jsonPath?: string;
   /** Literal token -> value replacements applied to `copy` operations at apply time (e.g. `{{KYRO_CLI}}`). */
   substitutions?: Record<string, string>;
   /** A host-owned write guard enforced immediately before publication. */
-  guard?: 'claude-skill';
+  guard?: 'claude-skill' | 'opencode-skill';
   /** Existing Claude skills may be replaced only when the previous manifest owned them. */
   allowExistingManagedSkill?: boolean;
 }
