@@ -1,5 +1,10 @@
 import {
   chmodSync,
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  ftruncateSync,
+  openSync,
   copyFileSync,
   cpSync,
   existsSync,
@@ -25,7 +30,8 @@ import type { OperationPlan, OperationProjectionResult } from '../types';
 import { PipelineOrchestrator } from './orchestrator';
 import type { PipelineResult, StagePlan, Step } from './types';
 import { assertStateWriterLeaseHealthy, withStateWriterLock } from './state-writer-lock';
-import { assertSafeClaudeSkillWrite, assertSafeLinkedSkillWrite } from '../adapters/claude';
+import { assertSafeClaudeSkillWrite } from '../adapters/claude';
+import { assertSafeOpenCodeCommandWrite, assertSafeOpenCodeSkillWrite } from '../adapters/opencode';
 
 interface OperationExecutionContext {
   packageRoot: string;
@@ -98,7 +104,8 @@ class OperationStep implements Step {
   run(): void {
     assertStateWriterLeaseHealthy();
     const target = this.context.resolveManagedPath(this.operation.path);
-    if (this.operation.guard === 'opencode-skill') assertSafeLinkedSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true, '~/.config/opencode/skills', 'OpenCode');
+    if (this.operation.guard === 'opencode-skill') assertSafeOpenCodeSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
+    if (this.operation.guard === 'opencode-command') assertSafeOpenCodeCommandWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
     if (this.operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
     if (this.operation.action !== 'mkdir' && this.operation.action !== 'rmdir-if-empty') {
       assertNotRetiredSprintOverwrite(target);
@@ -150,7 +157,8 @@ class OperationStep implements Step {
 }
 
 function applyDirectoryLink(operation: OperationPlan, target: string, context: OperationExecutionContext): OperationProjectionResult {
-  if (operation.guard === 'opencode-skill') assertSafeLinkedSkillWrite(operation.path, operation.allowExistingManagedSkill === true, '~/.config/opencode/skills', 'OpenCode');
+  if (operation.guard === 'opencode-skill') assertSafeOpenCodeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
+  if (operation.guard === 'opencode-command') assertSafeOpenCodeCommandWrite(operation.path, operation.allowExistingManagedSkill === true);
   if (operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
   if (!operation.source) throw new Error(`Link operation missing source for ${operation.path}`);
   const source = context.resolveManagedPath(operation.source);
@@ -186,7 +194,8 @@ function isLinkUnsupported(error: unknown): boolean {
 }
 
 function applyOperation(operation: OperationPlan, target: string, context: OperationExecutionContext): void {
-  if (operation.guard === 'opencode-skill') assertSafeLinkedSkillWrite(operation.path, operation.allowExistingManagedSkill === true, '~/.config/opencode/skills', 'OpenCode');
+  if (operation.guard === 'opencode-skill') assertSafeOpenCodeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
+  if (operation.guard === 'opencode-command') assertSafeOpenCodeCommandWrite(operation.path, operation.allowExistingManagedSkill === true);
   if (operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
   if (operation.action === 'mkdir') {
     assertStateWriterLeaseHealthy();
@@ -195,7 +204,8 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
     assertStateWriterLeaseHealthy();
     mkdirSync(dirname(target), { recursive: true });
     assertStateWriterLeaseHealthy();
-    writeFileSync(target, operation.content ?? '', 'utf-8');
+    if (operation.guard === 'opencode-command') writeOpenCodeCommand(operation, target);
+    else writeFileSync(target, operation.content ?? '', 'utf-8');
   } else if (operation.action === 'copy') {
     if (!operation.source) throw new Error(`Copy operation missing source for ${operation.path}`);
     assertStateWriterLeaseHealthy();
@@ -248,6 +258,28 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
       writeFileSync(target, removeJsonPathContent(existing, operation.jsonPath), 'utf-8');
     }
   }
+}
+
+/** Open without truncation or symlink traversal, then verify before writing. */
+function writeOpenCodeCommand(operation: OperationPlan, target: string): void {
+  assertSafeOpenCodeCommandWrite(operation.path, operation.allowExistingManagedSkill === true);
+  let previous: ReturnType<typeof lstatSync> | null = null;
+  try { previous = lstatSync(target); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  const flags = fsConstants.O_WRONLY | (fsConstants.O_NOFOLLOW ?? 0)
+    | (previous ? 0 : fsConstants.O_CREAT | fsConstants.O_EXCL);
+  const fd = openSync(target, flags, 0o666);
+  try {
+    const opened = fstatSync(fd);
+    const current = lstatSync(target);
+    if (!opened.isFile() || !current.isFile() || opened.ino !== current.ino || opened.dev !== current.dev
+      || (previous && (opened.ino !== previous.ino || opened.dev !== previous.dev))) {
+      throw new Error(`Unsafe OpenCode command target changed before write: ${target}.`);
+    }
+    assertStateWriterLeaseHealthy();
+    ftruncateSync(fd);
+    writeFileSync(fd, operation.content ?? '', 'utf8');
+  } finally { closeSync(fd); }
 }
 
 /**

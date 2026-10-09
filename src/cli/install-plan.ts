@@ -167,8 +167,6 @@ function buildInstallPlanForMode(
     const integrations = integrationAgents.includes(adapter.agent);
     adapter.buildProjection(projection, { integrations, includeWorkspace: options.includeWorkspace });
     if (integrations && adapter.capabilities().includes('mcp')) adapter.buildMcpProjection(projection);
-    const mode = machineRegistry.adapters.find((entry) => entry.agent === adapter.agent)?.projection;
-    if (mode) for (const operation of projection) if (operation.action === 'link') operation.projection = mode;
     projections.set(adapter.agent, projection);
     for (const operation of projection) {
       if (!plan.some((existing) => existing.path === operation.path && existing.action === operation.action)) plan.push(operation);

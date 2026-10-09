@@ -17,6 +17,7 @@ export function applyPlan(plan: OperationPlan[]): OperationProjectionResult[] {
   // Keep workspace -> machine lock ordering for direct API callers as well as CLI callers.
   withStateWriterLock(() => applyMachineAdapterPlan(plan, () => {
     projections = applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath });
+    return projections;
   }));
   return projections;
 }

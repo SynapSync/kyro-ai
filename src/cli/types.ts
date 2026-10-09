@@ -839,7 +839,7 @@ export interface OperationPlan {
   path: string;
   /** `link` sources are managed directory paths, resolved like `path` (not package-relative). */
   source?: string;
-  /** An adapter's persisted copy preference; KYRO_LINK_MODE=copy also forces fallback. */
+  /** A plan's copy preference; KYRO_LINK_MODE=copy also forces fallback. */
   projection?: 'link' | 'copy';
   content?: string;
   blockName?: string;
@@ -847,8 +847,8 @@ export interface OperationPlan {
   /** Literal token -> value replacements applied to `copy` operations at apply time (e.g. `{{KYRO_CLI}}`). */
   substitutions?: Record<string, string>;
   /** A host-owned write guard enforced immediately before publication. */
-  guard?: 'claude-skill' | 'opencode-skill';
-  /** Existing Claude skills may be replaced only when the previous manifest owned them. */
+  guard?: 'claude-skill' | 'opencode-skill' | 'opencode-command';
+  /** Existing adapter paths may be replaced only when the previous manifest owned them. */
   allowExistingManagedSkill?: boolean;
 }
 

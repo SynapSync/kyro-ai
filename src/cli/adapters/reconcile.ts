@@ -86,6 +86,12 @@ export function recordReconciliation(plan: OperationPlan[], reconciliation: Adap
 }
 
 function textForOperation(operation: OperationPlan): string {
+  // Unsafe native command paths belong to the publication guard. Do not
+  // traverse their symlinks or let an EISDIR read hide the named refusal.
+  if (operation.guard === 'opencode-command') {
+    try { if (!lstatSync(resolveManagedPath(operation.path)).isFile()) return ''; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  }
   return operation.action === 'link' ? '' : textAt(operation.path);
 }
 

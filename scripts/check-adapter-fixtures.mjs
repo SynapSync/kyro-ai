@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -289,6 +289,57 @@ withWorkspace('kyro-claude-adapter-', (cwd) => {
   for (const [index, file] of [settings, userSkill, legacyPlugin].entries()) {
     assert(readFileSync(file).equals(preserved[index]), `claude: purge touched unrelated file: ${file}`);
   }
+});
+
+// Adapted from the auditor's opencode-probe.cjs; never use the real HOME.
+withWorkspace('kyro-foreign-opencode-command-link-', (cwd) => {
+  const { parseOptions } = require(join(repo, 'dist/cli/options.js'));
+  const { install } = require(join(repo, 'dist/cli/commands/install.js'));
+  const home = process.env.HOME;
+  const foreign = join(cwd, 'user-notes.md');
+  const target = join(home, '.config/opencode/commands/kyro/work.md');
+  mkdirSync(resolve(target, '..'), { recursive: true });
+  writeFileSync(foreign, 'PRIVATE USER CONTENT\n');
+  symlinkSync(foreign, target);
+  const before = readFileSync(foreign);
+  let error = null;
+  const output = captureLogs(() => {
+    try { install(parseOptions(['--no-init-workspace'])); }
+    catch (caught) { error = caught; }
+  });
+  assert(error && String(error).includes(target), 'foreign OpenCode link: install must fail with the offending path');
+  assert(!output.includes('Kyro has been installed.'), 'foreign OpenCode link: failed install must not report success');
+  assert(readFileSync(foreign).equals(before), 'foreign OpenCode link: foreign bytes changed');
+  assert(lstatSync(target).isSymbolicLink(), 'foreign OpenCode link: symlink must survive');
+  for (const path of ['.agents/kyro/adapters.json', '.agents/kyro/current/manifest.json', '.agents/skills/kyro-work/SKILL.md', '.config/opencode/commands/kyro/forge.md']) {
+    assert(!existsSync(join(home, path)), `foreign OpenCode link: rollback left ${path}`);
+  }
+  console.log('PASS F1 foreign-opencode-command-link: install fails with path, original bytes and symlink preserved, no success report; registry/runtime/earlier commands rolled back');
+
+  // The same ownership rule protects regular foreign files and directories.
+  rmSync(target);
+  for (const directory of [false, true]) {
+    if (directory) mkdirSync(target);
+    else writeFileSync(target, before);
+    error = null;
+    captureLogs(() => { try { install(parseOptions(['--no-init-workspace'])); } catch (caught) { error = caught; } });
+    assert(error && String(error).includes(target), 'foreign OpenCode command: collision must fail with path');
+    assert(directory ? lstatSync(target).isDirectory() : readFileSync(target).equals(before), 'foreign OpenCode command: collision changed');
+    rmSync(target, { recursive: true });
+  }
+  captureLogs(() => install(parseOptions(['--no-init-workspace'])));
+  const managedBefore = readFileSync(target);
+  rmSync(target);
+  symlinkSync(foreign, target);
+  error = null;
+  captureLogs(() => { try { install(parseOptions(['--no-init-workspace'])); } catch (caught) { error = caught; } });
+  assert(error && String(error).includes(target), 'manifest-owned OpenCode path: symlink still must be refused');
+  assert(lstatSync(target).isSymbolicLink() && readFileSync(foreign).equals(before), 'manifest-owned OpenCode path: foreign link changed');
+  rmSync(target);
+  writeFileSync(target, managedBefore);
+  captureLogs(() => install(parseOptions(['--no-init-workspace'])));
+  assert(readFileSync(target).equals(managedBefore), 'manifest-owned OpenCode file: repeat install changed native command bytes');
+  console.log('PASS F1 OpenCode command ownership: foreign files/directories and owned-path symlinks refused; owned regular commands refresh successfully');
 });
 
 withWorkspace('kyro-claude-symlink-root-', (cwd) => {

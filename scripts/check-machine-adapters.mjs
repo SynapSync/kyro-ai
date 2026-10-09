@@ -40,8 +40,8 @@ function load(cwd) {
     state: require(join(repo, 'dist/cli/state.js')),
   };
 }
-function run(cwd, args, success = true) {
-  const result = spawnSync(process.execPath, [cli, ...args], { cwd, env: process.env, encoding: 'utf8' });
+function run(cwd, args, success = true, env = {}) {
+  const result = spawnSync(process.execPath, [cli, ...args], { cwd, env: { ...process.env, ...env }, encoding: 'utf8' });
   if (success) assert.equal(result.status, 0, `${args.join(' ')}: ${result.stdout}\n${result.stderr}`);
   else assert.notEqual(result.status, 0, `unexpected success: ${args.join(' ')}`);
   return result;
@@ -178,6 +178,59 @@ try {
   });
   console.log('PASS R2 stale lock: exited local pid reclaimed; sync succeeds and new lock records pid/hostname');
 
+  const reclaimPath = `${lockPath}.reclaim`;
+  writeJson(lockPath, { pid: deadPid, hostname: hostname(), token: 'dead-owner' });
+  writeJson(reclaimPath, { pid: deadPid, hostname: hostname(), token: 'dead-reclaimer' });
+  run(a, ['sync']);
+  assert(!fs.existsSync(lockPath) && !fs.existsSync(reclaimPath));
+  console.log('PASS F2 stale-reclaim-sentinel: dead sentinel and dead lock reclaimed; sync succeeds and both locks cleaned');
+
+  // Adapted from the auditor's stale-reclaim-interleaving probe. Replace the
+  // lock during its final read; the returned bytes still belong to the dead owner.
+  const originalRead = fs.readFileSync;
+  const originalNow = Date.now;
+  for (const racedPath of [lockPath, reclaimPath]) {
+    writeJson(lockPath, { pid: deadPid, hostname: hostname(), token: 'dead-owner' });
+    if (racedPath === reclaimPath) writeJson(reclaimPath, { pid: deadPid, hostname: hostname(), token: 'dead-reclaimer' });
+    let reads = 0, interleaved = false, ticks = 0;
+    const liveRaw = JSON.stringify({ pid: process.pid, hostname: hostname(), token: 'live-B' });
+    try {
+      fs.readFileSync = function (path, ...args) {
+        const value = originalRead(path, ...args);
+        if (path === racedPath && ++reads === 2) {
+          if (racedPath === lockPath) assert(fs.existsSync(reclaimPath), 'final lock check must hold reclaim sentinel');
+          fs.unlinkSync(racedPath);
+          fs.writeFileSync(racedPath, liveRaw);
+          interleaved = true;
+        }
+        return value;
+      };
+      Date.now = () => originalNow() + (ticks++ === 0 ? 0 : 10_001);
+      assert.throws(() => machine.withMachineAdapterRegistryLock(() => assert.fail('live owner replaced')), /MACHINE_ADAPTER_REGISTRY_LOCKED/);
+      assert(interleaved, 'auditor interleaving was not exercised');
+      assert.equal(originalRead(racedPath, 'utf8'), liveRaw, 'live owner must survive final-read replacement');
+      if (racedPath === reclaimPath) assert.equal(JSON.parse(originalRead(lockPath, 'utf8')).token, 'dead-owner', 'failed sentinel acquisition must not touch machine lock');
+    } finally {
+      fs.readFileSync = originalRead;
+      Date.now = originalNow;
+      for (const path of [lockPath, reclaimPath]) if (fs.existsSync(path)) fs.unlinkSync(path);
+    }
+  }
+  console.log('PASS F2 stale-reclaim-interleaving: live lock and live sentinel replacements survive; writer times out without entering callback');
+
+  // A live reclaimer serializes other reclaimers and publishers.
+  writeJson(lockPath, { pid: deadPid, hostname: hostname(), token: 'dead-owner' });
+  writeJson(reclaimPath, { pid: process.pid, hostname: hostname(), token: 'live-reclaimer' });
+  const heldLock = fs.readFileSync(lockPath), heldSentinel = fs.readFileSync(reclaimPath);
+  let ticks = 0;
+  try {
+    Date.now = () => originalNow() + (ticks++ === 0 ? 0 : 10_001);
+    assert.throws(() => machine.withMachineAdapterRegistryLock(() => assert.fail('reclaim sentinel bypassed')), /MACHINE_ADAPTER_REGISTRY_LOCKED/);
+    assert.deepEqual(fs.readFileSync(lockPath), heldLock);
+    assert.deepEqual(fs.readFileSync(reclaimPath), heldSentinel);
+  } finally { Date.now = originalNow; fs.unlinkSync(lockPath); fs.unlinkSync(reclaimPath); }
+  console.log('PASS F2 exclusive-reclaim-sentinel: live sentinel blocks reclamation/publication and preserves both files');
+
   for (const owner of [
     { pid: process.pid, hostname: hostname(), token: 'live-owner' },
     { pid: deadPid, hostname: `${hostname()}-foreign`, token: 'foreign-owner' },
@@ -306,6 +359,15 @@ try {
   assert.deepEqual(json(manifestPath).adapters.map((adapter) => adapter.agent), ['claude', 'opencode', 'standard']);
   assert(!fs.existsSync(lockPath));
   console.log('PASS concurrency: simultaneous workspace syncs preserve union and final manifest under one machine lock');
+  const projectionWorkspace = workspace('effective-projection');
+  run(projectionWorkspace, ['install', '--init-workspace'], true, { KYRO_LINK_MODE: 'copy' });
+  const claudeSkill = join(home, '.claude/skills/kyro-work');
+  assert(fs.lstatSync(claudeSkill).isDirectory());
+  assert.equal(json(registryPath).adapters.find((adapter) => adapter.agent === 'claude').projection, 'copy');
+  run(projectionWorkspace, ['sync']);
+  assert(fs.lstatSync(claudeSkill).isSymbolicLink());
+  assert.equal(json(registryPath).adapters.find((adapter) => adapter.agent === 'claude').projection, 'link');
+  console.log('PASS F3 effective-projection: forced-copy install persists claude=copy; later linked sync persists claude=link');
   console.log('Machine adapter registry checks passed (W1 criteria 1-7).');
 } finally {
   process.chdir(original.cwd);

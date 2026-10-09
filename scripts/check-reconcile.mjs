@@ -120,12 +120,20 @@ try {
   assert(fs.lstatSync(join(copy.home, '.claude/skills/kyro-work')).isDirectory());
   const copyRegistryPath = join(copy.home, '.agents/kyro/adapters.json');
   const copyRegistry = json(copyRegistryPath);
-  copyRegistry.adapters.find((entry) => entry.agent === 'claude').projection = 'copy';
-  put(copyRegistryPath, JSON.stringify(copyRegistry));
+  assert.equal(copyRegistry.adapters.find((entry) => entry.agent === 'claude').projection, 'copy');
+  assert.equal(copyRegistry.adapters.find((entry) => entry.agent === 'opencode').projection, 'copy');
   const mixed = run(copy, ['update', '--yes']);
-  assert(mixed.includes('Adapter claude: unchanged; projection=copy'));
-  assert.match(mixed, /Adapter opencode: refreshed; projection=(link|copy)/);
-  assert(fs.lstatSync(join(copy.home, '.claude/skills/kyro-work')).isDirectory());
+  const effectiveMode = fs.lstatSync(join(copy.home, '.claude/skills/kyro-work')).isSymbolicLink() ? 'link' : 'copy';
+  if (process.platform === 'win32') {
+    // Windows runners may lack symlink privileges, so copy fallback remains valid.
+    assert.match(mixed, /Adapter claude: refreshed; projection=(link|copy)/);
+    assert.match(mixed, /Adapter opencode: refreshed; projection=(link|copy)/);
+  } else {
+    assert(mixed.split('\n').includes('Adapter claude: refreshed; projection=link'));
+    assert(mixed.split('\n').includes('Adapter opencode: refreshed; projection=link'));
+    assert.equal(effectiveMode, 'link');
+  }
+  assert.equal(json(copyRegistryPath).adapters.find((entry) => entry.agent === 'claude').projection, effectiveMode);
   console.log('PASS C3/C7 outside-workspace update refreshes all 24 stale skills; copy modes reported; repeat update unchanged');
 
   const configs = fixture('configs', ['claude', 'codex', 'opencode']);
@@ -136,6 +144,12 @@ try {
   run(runtimeConfigs, ['install', '--no-init-workspace']); unchangedRuntimeConfigs();
   run(runtimeConfigs, ['update', '--yes']); unchangedRuntimeConfigs();
   console.log('PASS C5 install, sync, update preserve exact config bytes with integrations off (workspace and runtime-only)');
+
+  // These disposable scenarios are complete. Release their copies before
+  // building more homes so validation also fits a quota-limited /tmp.
+  for (const completed of [absent, addedSync, addedUpdate, copy, configs, runtimeConfigs]) {
+    fs.rmSync(completed.cwd, { recursive: true, force: true });
+  }
 
   const optin = fixture('optin', ['codex', 'opencode']);
   configBytes(optin);
