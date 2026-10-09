@@ -832,9 +832,10 @@ export interface BudgetClassDefinition {
 export type BudgetManifest = Record<BudgetClassId, BudgetClassDefinition>;
 
 export interface OperationPlan {
-  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'merge-json' | 'remove-json-key';
+  action: 'write' | 'copy' | 'link' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'merge-json' | 'remove-json-key';
   commentStyle?: 'html' | 'hash';
   path: string;
+  /** `link` sources are managed directory paths, resolved like `path` (not package-relative). */
   source?: string;
   content?: string;
   blockName?: string;
@@ -845,6 +846,12 @@ export interface OperationPlan {
   guard?: 'claude-skill';
   /** Existing Claude skills may be replaced only when the previous manifest owned them. */
   allowExistingManagedSkill?: boolean;
+}
+
+export interface OperationProjectionResult {
+  path: string;
+  source: string;
+  projection: 'link' | 'copy';
 }
 
 

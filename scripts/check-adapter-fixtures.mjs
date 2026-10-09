@@ -137,8 +137,8 @@ assertStandardCommandSkills(combinedPlan, 'combined');
 assert(!standardPlan.includes('- upsert-block AGENTS.md # agents-md'), 'standard: should not manage AGENTS.md block');
 assert(!openCodePlan.includes('- upsert-block AGENTS.md # agents-md'), 'opencode: should not manage AGENTS.md block');
 assert(codexPlan.includes('- upsert-block AGENTS.md # agents-md'), 'codex: should manage AGENTS.md block');
-assert(claudePlan.includes('- write ~/.claude/skills/kyro-forge/SKILL.md'), 'claude: missing native forge skill');
-assert(claudePlan.includes('- write ~/.claude/skills/kyro-work/SKILL.md'), 'claude: missing native Work skill');
+assert(claudePlan.includes('- link ~/.claude/skills/kyro-forge <= ~/.agents/skills/kyro-forge'), 'claude: missing native forge skill link');
+assert(claudePlan.includes('- link ~/.claude/skills/kyro-work <= ~/.agents/skills/kyro-work'), 'claude: missing native Work skill link');
 assert(!claudePlan.includes('providers/claude/commands'), 'claude: must not project plugin wrappers');
 assert(combinedPlan.includes('- upsert-block AGENTS.md # agents-md'), 'combined: should manage AGENTS.md block once');
 
@@ -259,7 +259,10 @@ withWorkspace('kyro-claude-adapter-', (cwd) => {
   writeFileSync(workSkill, readFileSync(workSkill, 'utf8').replace(`runtimeVersion: "${manifest.packageVersion}"`, 'runtimeVersion: "0.0.0"'));
   assert(adapter.doctor(manifest).status === 'fail', 'claude: stale skill must fail doctor');
   captureLogs(() => sync(cliOptions({ agents: [claude] })));
-  rmSync(workSkill);
+  // A directory projection follows the canonical skill. Create the foreign
+  // leaf in an owned copy so this fixture never edits the canonical source.
+  rmSync(resolve(workSkill, '..'), { recursive: true });
+  mkdirSync(resolve(workSkill, '..'), { recursive: true });
   symlinkSync(userSkill, workSkill);
   refused = false;
   try {

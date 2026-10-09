@@ -10,11 +10,22 @@ import { hasManagedBlockContent } from './injectors/managed-block';
 import { applyMachineAdapterPlan } from './adapters/machine-registry';
 import { applyOperationPlan } from './pipeline/operation-steps';
 import { withStateWriterLock } from './pipeline/state-writer-lock';
-import type { OperationPlan } from './types';
+import type { OperationPlan, OperationProjectionResult } from './types';
 
-export function applyPlan(plan: OperationPlan[]): void {
+export function applyPlan(plan: OperationPlan[]): OperationProjectionResult[] {
+  let projections: OperationProjectionResult[] = [];
   // Keep workspace -> machine lock ordering for direct API callers as well as CLI callers.
-  withStateWriterLock(() => applyMachineAdapterPlan(plan, () => applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath })));
+  withStateWriterLock(() => applyMachineAdapterPlan(plan, () => {
+    projections = applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath });
+  }));
+  for (const result of projections) {
+    console.log(`- ${result.path}: projection=${result.projection} <= ${result.source}`);
+  }
+  return projections;
+}
+
+export function addLinkDirectoryPlan(plan: OperationPlan[], source: string, path: string): void {
+  if (!plan.some((operation) => operation.path === path)) plan.push({ action: 'link', source, path });
 }
 
 export function printPlan(title: string, plan: OperationPlan[]): void {

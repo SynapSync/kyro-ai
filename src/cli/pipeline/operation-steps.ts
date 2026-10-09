@@ -11,16 +11,17 @@ import {
   readdirSync,
   rmdirSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { removeManagedBlock, upsertManagedBlock } from '../injectors/managed-block';
 import { mergeJsonObjectContent, removeJsonPathContent } from '../injectors/json-merge';
 import { describeWriteFailure } from '../core/errors';
 import { assertNotRetiredSprintOverwrite } from '../core/retirement-guard';
-import type { OperationPlan } from '../types';
+import type { OperationPlan, OperationProjectionResult } from '../types';
 import { PipelineOrchestrator } from './orchestrator';
 import type { PipelineResult, StagePlan, Step } from './types';
 import { assertStateWriterLeaseHealthy, withStateWriterLock } from './state-writer-lock';
@@ -35,17 +36,19 @@ type TargetSnapshot =
   | { kind: 'missing' }
   | { kind: 'file'; content: Buffer; mode: number }
   | { kind: 'directory'; backupPath: string }
-  | { kind: 'symlink'; link: string };
+  | { kind: 'symlink'; link: string; type?: 'dir' };
 
-export function applyOperationPlan(plan: OperationPlan[], context: OperationExecutionContext): void {
-  withStateWriterLock(() => {
+export function applyOperationPlan(plan: OperationPlan[], context: OperationExecutionContext): OperationProjectionResult[] {
+  return withStateWriterLock(() => {
     for (const operation of plan) {
       if (operation.action !== 'mkdir' && operation.action !== 'rmdir-if-empty') {
         assertNotRetiredSprintOverwrite(context.resolveManagedPath(operation.path));
       }
     }
-    const result = new PipelineOrchestrator('stop-on-error').execute(operationPlanToStagePlan(plan, context));
+    const stagePlan = operationPlanToStagePlan(plan, context);
+    const result = new PipelineOrchestrator('stop-on-error').execute(stagePlan);
     if (result.error) throw formatPipelineError(result);
+    return stagePlan.apply.flatMap((step) => step instanceof OperationStep && step.projection ? [step.projection] : []);
   });
 }
 
@@ -68,11 +71,20 @@ class SnapshotCreateError extends Error {
   }
 }
 
+class LinkRollbackError extends Error {
+  constructor(target: string, applyError: unknown, rollbackError: unknown) {
+    super(`Link apply failed and rollback failed for ${target}: ${String(applyError)}; restore: ${String(rollbackError)}`);
+    this.name = 'LinkRollbackError';
+  }
+}
+
 class OperationStep implements Step {
   readonly id: string;
   readonly description: string;
   private snapshot: TargetSnapshot | null = null;
   private backupRoots: string[] = [];
+  private retainBackups = false;
+  projection: OperationProjectionResult | undefined;
 
   constructor(
     index: number,
@@ -93,7 +105,23 @@ class OperationStep implements Step {
     this.snapshot = snapshotIfNeeded(this.operation, target);
     this.registerDirectoryBackup(this.snapshot);
     assertStateWriterLeaseHealthy();
-    applyOperation(this.operation, target, this.context);
+    if (this.operation.action === 'link') {
+      // The orchestrator rolls back successful steps only. A failed link/copy
+      // publication must restore its own snapshot before propagating failure.
+      try {
+        this.projection = applyDirectoryLink(this.operation, target, this.context);
+      } catch (error) {
+        try {
+          if (this.snapshot) restoreTarget(target, this.snapshot);
+        } catch (rollbackError) {
+          this.retainBackups = true;
+          throw new LinkRollbackError(target, error, rollbackError);
+        }
+        throw error;
+      }
+    } else {
+      applyOperation(this.operation, target, this.context);
+    }
   }
 
   rollback(): void {
@@ -103,6 +131,7 @@ class OperationStep implements Step {
   }
 
   confirm(): void {
+    if (this.retainBackups) return;
     for (const root of this.backupRoots) {
       try {
         assertStateWriterLeaseHealthy();
@@ -117,6 +146,41 @@ class OperationStep implements Step {
   private registerDirectoryBackup(snapshot: TargetSnapshot | null): void {
     if (snapshot?.kind === 'directory') this.backupRoots.push(dirname(snapshot.backupPath));
   }
+}
+
+function applyDirectoryLink(operation: OperationPlan, target: string, context: OperationExecutionContext): OperationProjectionResult {
+  if (operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
+  if (!operation.source) throw new Error(`Link operation missing source for ${operation.path}`);
+  const source = context.resolveManagedPath(operation.source);
+  if (isWithin(source, target) || isWithin(target, source) || !lstatSync(source).isDirectory()) {
+    throw new Error(`Link source must be a disjoint real directory for ${operation.path}: ${source}`);
+  }
+  assertStateWriterLeaseHealthy();
+  mkdirSync(dirname(target), { recursive: true });
+  assertStateWriterLeaseHealthy();
+  rmSync(target, { recursive: true, force: true });
+  if (process.env.KYRO_LINK_MODE !== 'copy') {
+    try {
+      assertStateWriterLeaseHealthy();
+      symlinkSync(source, target, 'dir');
+      return { path: operation.path, source: operation.source, projection: 'link' };
+    } catch (error: unknown) {
+      if (!isLinkUnsupported(error)) throw error;
+    }
+  }
+  assertStateWriterLeaseHealthy();
+  cpSync(source, target, { recursive: true, verbatimSymlinks: true });
+  return { path: operation.path, source: operation.source, projection: 'copy' };
+}
+
+function isWithin(parent: string, child: string): boolean {
+  const path = relative(parent, child);
+  return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
+}
+
+function isLinkUnsupported(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error
+    && ['EPERM', 'EACCES', 'ENOSYS', 'ENOTSUP', 'EOPNOTSUPP'].includes(String(error.code));
 }
 
 function applyOperation(operation: OperationPlan, target: string, context: OperationExecutionContext): void {
@@ -218,15 +282,20 @@ function operationNeedsSnapshot(operation: OperationPlan, target: string): boole
 
 function snapshotIfNeeded(operation: OperationPlan, target: string): TargetSnapshot | null {
   if (!operationNeedsSnapshot(operation, target)) return null;
-  return snapshotTarget(target);
+  return snapshotTarget(target, operation.action === 'link');
 }
 
-function snapshotTarget(target: string): TargetSnapshot {
-  if (!existsSync(target)) return { kind: 'missing' };
-
-  const stat = lstatSync(target);
+function snapshotTarget(target: string, directoryLink = false): TargetSnapshot {
+  let stat: ReturnType<typeof lstatSync>;
+  try {
+    stat = lstatSync(target);
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return { kind: 'missing' };
+    throw error;
+  }
   if (stat.isSymbolicLink()) {
-    return { kind: 'symlink', link: readlinkSync(target) };
+    try { directoryLink ||= statSync(target).isDirectory(); } catch { /* preserve dangling link text */ }
+    return { kind: 'symlink', link: readlinkSync(target), ...(directoryLink ? { type: 'dir' as const } : {}) };
   }
   if (stat.isDirectory()) {
     return snapshotDirectory(target);
@@ -272,11 +341,12 @@ function restoreTarget(target: string, snapshot: TargetSnapshot): void {
     // so a later rollback failure still has diagnostic evidence.
   } else if (snapshot.kind === 'symlink') {
     assertStateWriterLeaseHealthy();
-    symlinkSync(snapshot.link, target);
+    symlinkSync(snapshot.link, target, snapshot.type);
   }
 }
 
 function formatPipelineError(result: PipelineResult): Error {
+  if (result.error instanceof LinkRollbackError) return result.error;
   const snapshotError = result.error instanceof SnapshotCreateError ? result.error : null;
   const writeFailure = describeWriteFailure(snapshotError?.cause ?? result.error);
   if (writeFailure) return writeFailure;
