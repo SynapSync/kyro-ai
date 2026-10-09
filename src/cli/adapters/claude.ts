@@ -151,7 +151,7 @@ export function assertSafeClaudeSkillWrite(managedPath: string, allowExisting: b
   if (directoryStat?.isSymbolicLink()) {
     const canonical = resolveManagedPath(`${AGENT_SKILLS_ROOT}/${name}`);
     try {
-      if (!lstatSync(canonical).isDirectory() || realpathSync(canonical) !== canonical || realpathSync(skillDir) !== canonical) {
+      if (!lstatSync(canonical).isDirectory() || realpathSync(skillDir) !== realpathSync(canonical)) {
         throw new Error('non-canonical target');
       }
     } catch {

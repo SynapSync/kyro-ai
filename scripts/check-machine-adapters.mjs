@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -155,6 +155,115 @@ try {
   assert(!fs.existsSync(lockPath));
   assert(!fs.readdirSync(dirname(registryPath)).some((name) => name.includes('.tmp-')));
   console.log('PASS atomic writes / lock: validated sibling temp is renamed under lock; failed rename preserves bytes and cleans up');
+
+  const exited = spawnSync(process.execPath, ['-e', ''], { env: process.env });
+  assert.equal(exited.status, 0);
+  const deadPid = exited.pid;
+  assert(Number.isSafeInteger(deadPid) && deadPid > 0);
+  assert.throws(() => process.kill(deadPid, 0), (error) => error.code === 'ESRCH');
+  writeJson(lockPath, { pid: deadPid, hostname: hostname(), token: 'dead-owner' });
+  run(a, ['sync']);
+  assert(!fs.existsSync(lockPath));
+  machine.withMachineAdapterRegistryLock(() => {
+    const owner = json(lockPath);
+    assert.equal(owner.pid, process.pid);
+    assert.equal(owner.hostname, hostname());
+    assert.equal(typeof owner.token, 'string');
+  });
+  console.log('PASS R2 stale lock: exited local pid reclaimed; sync succeeds and new lock records pid/hostname');
+
+  for (const owner of [
+    { pid: process.pid, hostname: hostname(), token: 'live-owner' },
+    { pid: deadPid, hostname: `${hostname()}-foreign`, token: 'foreign-owner' },
+  ]) {
+    writeJson(lockPath, owner);
+    const bytes = fs.readFileSync(lockPath);
+    const started = Date.now();
+    const result = run(a, ['sync'], false);
+    assert.match(result.stdout + result.stderr, /MACHINE_ADAPTER_REGISTRY_LOCKED/);
+    assert(Date.now() - started >= 10_000, 'live/foreign lock must retain the ten-second timeout');
+    assert.deepEqual(fs.readFileSync(lockPath), bytes);
+    fs.unlinkSync(lockPath);
+  }
+  console.log('PASS R2 protected owners: live pid and foreign hostname retain lock bytes and fail locked after 10 s');
+
+  // Accelerate only these additional rejection probes, keeping the CLI timeout tests real.
+  const now = Date.now;
+  const kill = process.kill;
+  try {
+    for (const pid of [0, -1, 1.5, '123', null, Number.MAX_SAFE_INTEGER + 1]) {
+      writeJson(lockPath, { pid, hostname: hostname() });
+      const bytes = fs.readFileSync(lockPath);
+      let ticks = 0;
+      let probes = 0;
+      Date.now = () => now() + (ticks++ === 0 ? 0 : 10_001);
+      process.kill = () => { probes++; throw new Error('invalid pid must never be probed'); };
+      assert.throws(() => machine.withMachineAdapterRegistryLock(() => assert.fail('invalid owner reclaimed')), /MACHINE_ADAPTER_REGISTRY_LOCKED/);
+      assert.equal(probes, 0);
+      assert.deepEqual(fs.readFileSync(lockPath), bytes);
+      fs.unlinkSync(lockPath);
+    }
+    writeJson(lockPath, { pid: process.pid, hostname: hostname() });
+    const bytes = fs.readFileSync(lockPath);
+    let ticks = 0;
+    let probes = 0;
+    Date.now = () => now() + (ticks++ === 0 ? 0 : 10_001);
+    process.kill = () => { probes++; throw Object.assign(new Error('injected EPERM'), { code: 'EPERM' }); };
+    assert.throws(() => machine.withMachineAdapterRegistryLock(() => assert.fail('EPERM owner reclaimed')), /MACHINE_ADAPTER_REGISTRY_LOCKED/);
+    assert.equal(probes, 1);
+    assert.deepEqual(fs.readFileSync(lockPath), bytes);
+    fs.unlinkSync(lockPath);
+  } finally { Date.now = now; process.kill = kill; }
+  console.log('PASS R2 invalid pid / EPERM: untrusted pid never probed; permission-denied owner never reclaimed');
+
+  fs.writeFileSync(registryPath, atomicBefore);
+  // Successful restore preserves exact bytes and rethrows the original object.
+  const rollbackBefore = fs.readFileSync(registryPath, 'utf8');
+  const applyError = new Error('injected original apply failure');
+  const rollbackPlan = [];
+  machine.registerMachineAdapterPlan(rollbackPlan, { schemaVersion: 1, adapters: [] });
+  assert.throws(() => machine.applyMachineAdapterPlan(rollbackPlan, () => { throw applyError; }), (error) => error === applyError);
+  assert.equal(fs.readFileSync(registryPath, 'utf8'), rollbackBefore);
+  const restorePlan = [];
+  machine.registerMachineAdapterPlan(restorePlan, { schemaVersion: 1, adapters: [] });
+  let replacements = 0;
+  try {
+    fs.renameSync = (source, target) => {
+      if (target === registryPath && ++replacements === 2) throw new Error('injected registry restore failure');
+      return rename(source, target);
+    };
+    assert.throws(() => machine.applyMachineAdapterPlan(restorePlan, () => { throw applyError; }), (error) => {
+      assert.match(String(error), /injected original apply failure/);
+      assert.match(String(error), /restore: Error: injected registry restore failure/);
+      assert.equal(error.cause, applyError);
+      return true;
+    });
+    assert.equal(replacements, 2);
+    assert.deepEqual(json(registryPath), { schemaVersion: 1, adapters: [] });
+    assert(!fs.existsSync(lockPath));
+  } finally { fs.renameSync = rename; fs.writeFileSync(registryPath, rollbackBefore); }
+
+  // The absent-registry rollback uses unlink rather than atomic replacement.
+  fs.unlinkSync(registryPath);
+  const absentRestorePlan = [];
+  machine.registerMachineAdapterPlan(absentRestorePlan, { schemaVersion: 1, adapters: [] });
+  assert.throws(() => machine.applyMachineAdapterPlan(absentRestorePlan, () => { throw applyError; }), (error) => error === applyError);
+  assert(!fs.existsSync(registryPath));
+  const absentPlan = [];
+  machine.registerMachineAdapterPlan(absentPlan, { schemaVersion: 1, adapters: [] });
+  const unlink = fs.unlinkSync;
+  try {
+    fs.unlinkSync = (path) => { if (path === registryPath) throw new Error('injected registry unlink failure'); return unlink(path); };
+    assert.throws(() => machine.applyMachineAdapterPlan(absentPlan, () => { throw applyError; }), (error) => {
+      assert.match(String(error), /injected original apply failure/);
+      assert.match(String(error), /restore: Error: injected registry unlink failure/);
+      assert.equal(error.cause, applyError);
+      return true;
+    });
+    assert.deepEqual(json(registryPath), { schemaVersion: 1, adapters: [] });
+    assert(!fs.existsSync(lockPath));
+  } finally { fs.unlinkSync = unlink; fs.writeFileSync(registryPath, rollbackBefore); }
+  console.log('PASS R3 registry rollback: successful restore preserves bytes/original error; rename and unlink restore failures name both errors with original cause');
 
   const planBuilder = require(join(repo, 'dist/cli/install-plan.js'));
   const { applyPlan } = require(join(repo, 'dist/cli/fs.js'));

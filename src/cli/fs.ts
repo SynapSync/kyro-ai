@@ -18,9 +18,6 @@ export function applyPlan(plan: OperationPlan[]): OperationProjectionResult[] {
   withStateWriterLock(() => applyMachineAdapterPlan(plan, () => {
     projections = applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath });
   }));
-  for (const result of projections) {
-    console.log(`- ${result.path}: projection=${result.projection} <= ${result.source}`);
-  }
   return projections;
 }
 

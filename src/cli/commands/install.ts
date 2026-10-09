@@ -11,7 +11,7 @@ import { KyroCoreError } from '../core/errors';
 import { isInteractiveTerminal } from '../core/tty';
 import { AGENT, KYRO_ROOT, LOCAL_STATE_PATH, PROJECT_STATE_PATH, SCOPE } from '../constants';
 import { requireFullPackageFor } from '../package-root-mode';
-import type { Agent, CliOptions } from '../types';
+import type { Agent, CliOptions, OperationProjectionResult } from '../types';
 import { runAdapterPreflight, summarizePlanTargets } from './preflight';
 import { analyzeDrift, buildPrunePlan, hasDrift, hasPrunableDrift, managedFilesFromInstallPlan, printDriftReport, printPrunePlan } from '../drift';
 import { readPackageVersion } from '../help';
@@ -63,7 +63,7 @@ function runInstallPlanUnlocked(options: CliOptions, agents: Agent[], packageVer
     return;
   }
 
-  applyPlan(plan);
+  printProjections(applyPlan(plan));
   console.log('Kyro has been installed.');
   console.log(`Version: ${packageVersion}`);
   if (shouldInitializeWorkspace) {
@@ -120,9 +120,15 @@ function syncUnlocked(options: CliOptions): void {
     printLegacyScopeWarnings(warnings, true);
     return;
   }
-  applyPlan(plan);
+  printProjections(applyPlan(plan));
   console.log(`Kyro synced for: ${unique.join(', ')}`);
   printLegacyScopeWarnings(warnings);
+}
+
+function printProjections(projections: OperationProjectionResult[]): void {
+  for (const result of projections) {
+    console.log(`- ${result.path}: projection=${result.projection} <= ${result.source}`);
+  }
 }
 
 function printLegacyScopeWarnings(warnings: readonly string[], preview = false): void {

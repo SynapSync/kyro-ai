@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,11 +18,18 @@ const realCopy = fs.cpSync;
 function capture(callback) {
   const logs = [];
   const original = console.log;
+  const originalWrite = process.stdout.write;
   try {
     console.log = (...args) => logs.push(args.join(' '));
+    process.stdout.write = (chunk, ...args) => {
+      logs.push(String(chunk));
+      const callback = args.find((arg) => typeof arg === 'function');
+      if (callback) callback();
+      return true;
+    };
     const result = callback();
     return { result, output: logs.join('\n') };
-  } finally { console.log = original; }
+  } finally { console.log = original; process.stdout.write = originalWrite; }
 }
 
 try {
@@ -81,7 +89,7 @@ try {
     const fresh = capture(() => applyPlan([link()]));
     assertLink();
     assert.equal(fresh.result[0].projection, 'link');
-    assert(fresh.output.includes('projection=link'));
+    assert.equal(fresh.output, '', 'applyPlan must return link projections without writing stdout');
     assertSafeClaudeSkillWrite(path, false);
     assertSafeClaudeSkillWrite(`${path}/SKILL.md`, false);
     reset();
@@ -147,7 +155,7 @@ try {
   const forced = capture(() => applyPlan([link()]));
   assertCopy();
   assert.equal(forced.result[0].projection, 'copy');
-  assert(forced.output.includes('projection=copy'));
+  assert.equal(forced.output, '', 'applyPlan must return forced-copy projections without writing stdout');
   reset();
   assert.throws(() => applyOperationPlan([link(), tail], context));
   assert(!fs.existsSync(target));
@@ -162,7 +170,7 @@ try {
     assertCopy();
     assert.equal(attempts, 1);
     assert.equal(fallback.result[0].projection, 'copy');
-    assert(fallback.output.includes('projection=copy'));
+    assert.equal(fallback.output, '', 'applyPlan must return fallback projections without writing stdout');
     reset();
   }
   fs.symlinkSync = realSymlink;
@@ -267,7 +275,36 @@ try {
     assert(!fs.existsSync(target));
     assert.deepEqual(fs.readFileSync(join(canonical, 'SKILL.md')), canonicalBefore);
     console.log('PASS C6: file-level legacy purge unlinks directory before canonical traversal');
+
+    // Re-sync must accept Kyro's own projection through a symlinked HOME.
+    const realHome = process.env.HOME;
+    const linkedHome = join(root, 'linked-home');
+    realSymlink(realHome, linkedHome, 'dir');
+    const cwd = join(root, 'linked-home-workspace');
+    fs.mkdirSync(cwd);
+    process.env.HOME = linkedHome;
+    process.env.USERPROFILE = linkedHome;
+    try {
+      for (const args of [['install', '--init-workspace', '--agent', 'claude'], ['sync']]) {
+        const result = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), ...args], { cwd, env: process.env, encoding: 'utf8' });
+        assert.equal(result.status, 0, `${args.join(' ')}: ${result.stdout}\n${result.stderr}`);
+        assert.equal(fs.realpathSync(resolveManagedPath(path)), fs.realpathSync(resolveManagedPath(source)));
+        assert(result.stdout.split('\n').includes(`- ${path}: projection=link <= ${source}`), `${args[0]} must retain the projection line: ${result.stdout}`);
+      }
+      reset();
+      realSymlink(join(root, 'foreign-dir'), resolveManagedPath(path), 'dir');
+      const foreignLink = fs.readlinkSync(resolveManagedPath(path));
+      const result = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'sync'], { cwd, env: process.env, encoding: 'utf8' });
+      assert.notEqual(result.status, 0);
+      assert((result.stdout + result.stderr).includes(resolveManagedPath(path)), 'refusal must name the offending path');
+      assert.equal(fs.readlinkSync(resolveManagedPath(path)), foreignLink);
+      console.log('PASS R1/R4 symlink HOME / CLI stdout: install and re-sync accept canonical links and print projection lines; foreign link refused with path');
+    } finally {
+      process.env.HOME = realHome;
+      process.env.USERPROFILE = realHome;
+    }
   }
+  console.log('PASS R4 applyPlan stdout: link, forced-copy and fallback return projections with no stdout writes');
   console.log('RESULT: PASS adapter link contract (isolated HOME and USERPROFILE)');
 } finally {
   fs.symlinkSync = realSymlink;

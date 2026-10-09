@@ -1,6 +1,6 @@
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { AGENT, MACHINE_ADAPTER_LOCK_PATH, MACHINE_ADAPTER_REGISTRY_PATH } from '../constants';
 import { KyroCoreError } from '../core/errors';
@@ -68,13 +68,14 @@ export function withMachineAdapterRegistryLock<T>(work: () => T): T {
   readMachineAdapterRegistry();
   const path = pathFor(MACHINE_ADAPTER_LOCK_PATH);
   mkdirSync(dirname(path), { recursive: true });
-  const token = JSON.stringify({ pid: process.pid, token: randomUUID() });
+  const token = JSON.stringify({ pid: process.pid, hostname: hostname(), token: randomUUID() });
   const deadline = Date.now() + 10_000;
   while (true) {
     let fd: number;
     try { fd = openSync(path, 'wx', 0o600); }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      if (reclaimDeadMachineLock(path)) continue;
       if (Date.now() >= deadline) throw new KyroCoreError('WRITE_NOT_PERMITTED', `MACHINE_ADAPTER_REGISTRY_LOCKED: ${MACHINE_ADAPTER_LOCK_PATH}.`, 'Wait for the other Kyro process. If its owner has exited, back up and remove the stale .adapters.lock before retrying.');
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
       continue;
@@ -89,6 +90,24 @@ export function withMachineAdapterRegistryLock<T>(work: () => T): T {
     try { assertLock(); unlinkSync(path); }
     finally { lockToken = null; lockDepth = 0; }
   }
+}
+
+function reclaimDeadMachineLock(path: string): boolean {
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile()) return false;
+    const raw = readFileSync(path, 'utf8');
+    const owner: unknown = JSON.parse(raw);
+    if (!record(owner) || owner.hostname !== hostname() || typeof owner.pid !== 'number'
+      || !Number.isSafeInteger(owner.pid) || owner.pid <= 0) return false;
+    try { process.kill(owner.pid, 0); return false; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') return false; }
+    // A competing reclaimer may already have replaced the dead owner's lock.
+    const current = lstatSync(path);
+    if (!current.isFile() || current.dev !== stat.dev || current.ino !== stat.ino || readFileSync(path, 'utf8') !== raw) return false;
+    unlinkSync(path);
+    return true;
+  } catch { return false; }
 }
 
 function assertLock(): void {
@@ -139,6 +158,13 @@ export function mergeMachineAdapters(registry: MachineAdapterRegistry, legacy: K
 interface RegistryPlan { before: string | null; registry: MachineAdapterRegistry }
 const registryPlans = new WeakMap<OperationPlan[], RegistryPlan>();
 
+class MachineAdapterRollbackError extends Error {
+  constructor(applyError: unknown, rollbackError: unknown) {
+    super(`Machine adapter apply failed and rollback failed for ${MACHINE_ADAPTER_REGISTRY_PATH}: ${String(applyError)}; restore: ${String(rollbackError)}`, { cause: applyError });
+    this.name = 'MachineAdapterRollbackError';
+  }
+}
+
 /** Keep previews pure; persistence belongs to applyPlan, under the same machine lock. */
 export function registerMachineAdapterPlan(plan: OperationPlan[], registry: MachineAdapterRegistry): void {
   registryPlans.set(plan, { before: registryRaw(), registry });
@@ -152,8 +178,10 @@ export function applyMachineAdapterPlan(plan: OperationPlan[], apply: () => void
     writeMachineAdapterRegistry(update.registry);
     try { apply(); }
     catch (error) {
-      if (update.before === null) { assertLock(); unlinkSync(pathFor(MACHINE_ADAPTER_REGISTRY_PATH)); }
-      else atomicReplace(update.before);
+      try {
+        if (update.before === null) { assertLock(); unlinkSync(pathFor(MACHINE_ADAPTER_REGISTRY_PATH)); }
+        else atomicReplace(update.before);
+      } catch (rollbackError) { throw new MachineAdapterRollbackError(error, rollbackError); }
       throw error;
     }
   });
