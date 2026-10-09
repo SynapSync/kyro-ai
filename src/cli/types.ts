@@ -24,6 +24,19 @@ export interface KyroInstalledAdapter {
   skillsPath?: string;
 }
 
+export interface MachineAdapterEntry {
+  agent: Agent;
+  state: 'enabled' | 'disabled';
+  projection: 'link' | 'copy' | null;
+  integrations: boolean;
+  updatedAt: string;
+}
+
+export interface MachineAdapterRegistry {
+  schemaVersion: 1;
+  adapters: MachineAdapterEntry[];
+}
+
 /** Effective scope view derived from its sprint.json. */
 export interface KyroScopeEntry {
   id: string;
@@ -148,7 +161,7 @@ export interface ExecutionPreferences {
  * | team               | **shared only**               | TeamPolicy (minPackageVersion, …) |
  * | scopes             | derived from sprint.json      | Valid matching per-scope files define effective entries |
  * | activeScope        | **local only**                | Never on shared (git thrash) |
- * | installedAdapters  | **local only**                | Per-machine adapter install records |
+ * | installedAdapters  | **machine registry**          | Local records are legacy read-only |
  * | execution          | **local only**                | Personal delegation opt-in (L1); default off |
  * | runtimePath        | effective default / local     | Informational; not a git conflict surface |
  * | kyroInvocation     | **neither** (global only)     | `~/.agents/kyro/current/manifest.json` |
@@ -175,7 +188,8 @@ export interface KyroSharedProjectState {
 export interface KyroLocalProjectState {
   schemaVersion: 4;
   activeScope: string | null;
-  installedAdapters: KyroInstalledAdapter[];
+  /** Legacy read-only input; new install/sync writes omit this field. */
+  installedAdapters?: KyroInstalledAdapter[];
   /** Optional informational runtime path; defaults to global current when absent. */
   runtimePath?: string;
   /** Optional personal execution preferences (delegation opt-in). */

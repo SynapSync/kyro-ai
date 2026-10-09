@@ -14,6 +14,7 @@ import {
   PROJECT_STATE_PATH,
   WORKFLOW_NAME,
 } from './constants';
+import { mergeMachineAdapters, readMachineAdapterRegistry, registerMachineAdapterPlan } from './adapters/machine-registry';
 import { getAdapterDefinition, getInstalledAdapterDefinitions } from './adapters/registry';
 import { addCopyDirectoryPlan, addCopyFilePlan, listRelativeFiles, resolveManagedPath } from './fs';
 import { readPackageVersion } from './help';
@@ -23,6 +24,7 @@ import {
   hasMonolitoProjectStateOnDisk,
   KYRO_STATE_MIGRATED_PATH,
   readProjectState,
+  readLegacyInstalledAdapters,
   sanitizeLocalForWrite,
   collectUnnormalizableState,
   sanitizeSharedForWrite,
@@ -66,8 +68,13 @@ function buildInstallPlanForMode(
   // SoT is the global runtime manifest only — never project kyro.json (avoids multi-workspace drift).
   const kyroInvocation = resolveKyroInvocation().raw;
   const state = options.includeWorkspace ? mergeProjectState(agents, scope, now) : null;
-  const manifestAgents = state?.installedAdapters.map((adapter) => adapter.agent) ?? [];
-  const adapters = state?.installedAdapters ?? [];
+  const machineRegistry = mergeMachineAdapters(readMachineAdapterRegistry(), readLegacyInstalledAdapters(), agents, now);
+  const manifestAgents = machineRegistry.adapters.filter((adapter) => adapter.state === 'enabled').map((adapter) => adapter.agent);
+  const adapters = machineRegistry.adapters.filter((adapter) => adapter.state === 'enabled')
+    .map((adapter) => getAdapterDefinition(adapter.agent).buildInstalledAdapter(scope, adapter.updatedAt));
+  // Only registered/selected adapters participate here; harness detection is owned by W3.
+  const projectionAgents = (state?.installedAdapters ?? []).map((adapter) => adapter.agent)
+    .filter((agent) => manifestAgents.includes(agent));
   const managedFiles = buildManagedFiles(manifestAgents, runtimeRoot);
   const managedBlocks = buildManagedBlocks(manifestAgents);
   const manifest: KyroManifest = {
@@ -93,6 +100,7 @@ function buildInstallPlanForMode(
 
   if (state) {
     const { shared, local } = splitMonolitoToLayers(state);
+    delete local.installedAdapters;
     // Never let content vanish under a success message. Aliases from hand-authored state are mapped
     // by the clone helpers; whatever still has no recoverable text is named here so the user can
     // restore it, instead of finding a hollow `{ id }` entry later.
@@ -154,12 +162,13 @@ function buildInstallPlanForMode(
   plan.push({ action: 'remove', path: KYRO_LEGACY_VERSIONS_ROOT });
 
   if (state) {
-    for (const adapter of getInstalledAdapterDefinitions(manifestAgents)) {
+    for (const adapter of getInstalledAdapterDefinitions(projectionAgents)) {
       adapter.buildProjection(plan);
       if (adapter.capabilities().includes('mcp')) adapter.buildMcpProjection(plan);
     }
   }
 
+  registerMachineAdapterPlan(plan, machineRegistry);
   return plan;
 }
 

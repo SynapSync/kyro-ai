@@ -230,8 +230,8 @@ export function validateLocalProjectStateShape(value: unknown, path: string): Va
   if (!isRecord(value)) return [{ path, field: '<root>', message: 'must be an object' }];
   requireLiteral(value, 'schemaVersion', 4, path, issues);
   requireNullableString(value, 'activeScope', path, issues);
-  if (!Array.isArray(value.installedAdapters)) {
-    issues.push({ path, field: 'installedAdapters', message: 'must be an array' });
+  if ('installedAdapters' in value && !Array.isArray(value.installedAdapters)) {
+    issues.push({ path, field: 'installedAdapters', message: 'must be an array when present (legacy)' });
   }
   if ('runtimePath' in value && value.runtimePath !== undefined && typeof value.runtimePath !== 'string') {
     issues.push({ path, field: 'runtimePath', message: 'must be a string when present' });

@@ -7,11 +7,14 @@ import { homedir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { PACKAGE_ROOT, WORKSPACE_ROOT } from './constants';
 import { hasManagedBlockContent } from './injectors/managed-block';
+import { applyMachineAdapterPlan } from './adapters/machine-registry';
 import { applyOperationPlan } from './pipeline/operation-steps';
+import { withStateWriterLock } from './pipeline/state-writer-lock';
 import type { OperationPlan } from './types';
 
 export function applyPlan(plan: OperationPlan[]): void {
-  applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath });
+  // Keep workspace -> machine lock ordering for direct API callers as well as CLI callers.
+  withStateWriterLock(() => applyMachineAdapterPlan(plan, () => applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath })));
 }
 
 export function printPlan(title: string, plan: OperationPlan[]): void {

@@ -502,7 +502,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   localBeforeUpgrade.kyroInvocation = 'kyro';
   localBeforeUpgrade.runtimeVersion = '0.0.0-legacy';
   localBeforeUpgrade.installedAdapters = [
-    { ...localBeforeUpgrade.installedAdapters[0], installedAt: staleCodexInstalledAt },
+    { agent: codex, scope: 'workspace', corePath: '~/.agents/kyro/current', installedAt: staleCodexInstalledAt },
     {
       agent: 'standard',
       scope: 'workspace',
@@ -523,13 +523,18 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!Object.hasOwn(sharedAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from shared');
   assert(!Object.hasOwn(localAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed from local');
   assert(!Object.hasOwn(localAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from local');
-  const syncedCodex = localAfterSync.installedAdapters.find((adapter) => adapter.agent === 'codex');
-  const syncedStandard = localAfterSync.installedAdapters.find((adapter) => adapter.agent === 'standard');
-  assert(syncedCodex.installedAt !== staleCodexInstalledAt, 'sync: selected adapter installedAt was not refreshed');
-  assert(syncedStandard.installedAt === staleStandardInstalledAt, 'sync: unselected adapter installedAt should be preserved');
+  // Adapter installation metadata moved to the machine registry; local overlays omit it.
+  assert(!Object.hasOwn(localAfterSync, 'installedAdapters'), 'sync: local installedAdapters must be omitted');
+  const machineRegistryPath = join(home, '.agents', 'kyro', 'adapters.json');
+  const registryAfterSync = JSON.parse(readFileSync(machineRegistryPath, 'utf-8'));
+  const syncedCodex = registryAfterSync.adapters.find((adapter) => adapter.agent === 'codex');
+  const syncedStandard = registryAfterSync.adapters.find((adapter) => adapter.agent === 'standard');
+  assert(syncedCodex.updatedAt !== staleCodexInstalledAt, 'sync: selected adapter installedAt was not refreshed');
+  assert(syncedStandard.updatedAt === staleStandardInstalledAt, 'sync: unselected adapter installedAt should be preserved');
 
   const staleReinstallInstalledAt = '2002-01-01T00:00:00.000Z';
-  syncedCodex.installedAt = staleReinstallInstalledAt;
+  syncedCodex.updatedAt = staleReinstallInstalledAt;
+  writeFileSync(machineRegistryPath, `${JSON.stringify(registryAfterSync, null, 2)}\n`, 'utf-8');
   localAfterSync.runtimeVersion = '0.0.0-legacy';
   localAfterSync.kyroInvocation = 'kyro';
   sharedAfterSync.runtimeVersion = '0.0.0-legacy';
@@ -539,8 +544,10 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
   const sharedAfterReinstall = JSON.parse(readFileSync(sharedPath, 'utf-8'));
   const localAfterReinstall = JSON.parse(readFileSync(localPath, 'utf-8'));
-  const reinstalledCodex = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
-  const reinstalledStandard = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
+  assert(!Object.hasOwn(localAfterReinstall, 'installedAdapters'), 'reinstall: local installedAdapters must be omitted');
+  const registryAfterReinstall = JSON.parse(readFileSync(machineRegistryPath, 'utf-8'));
+  const reinstalledCodex = registryAfterReinstall.adapters.find((adapter) => adapter.agent === 'codex');
+  const reinstalledStandard = registryAfterReinstall.adapters.find((adapter) => adapter.agent === 'standard');
   assert(JSON.stringify(sharedAfterReinstall.principles) === JSON.stringify(principles), 'reinstall: principles were not preserved');
   assert(!Object.hasOwn(sharedAfterReinstall, 'scopes'), 'reinstall: shared scopes[] must remain absent');
   assert(localAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
@@ -548,8 +555,8 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!Object.hasOwn(sharedAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from shared');
   assert(!Object.hasOwn(localAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed from local');
   assert(!Object.hasOwn(localAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from local');
-  assert(reinstalledCodex.installedAt !== staleReinstallInstalledAt, 'reinstall: selected adapter installedAt was not refreshed');
-  assert(reinstalledStandard.installedAt === staleStandardInstalledAt, 'reinstall: unselected adapter installedAt should be preserved');
+  assert(reinstalledCodex.updatedAt !== staleReinstallInstalledAt, 'reinstall: selected adapter installedAt was not refreshed');
+  assert(reinstalledStandard.updatedAt === staleStandardInstalledAt, 'reinstall: unselected adapter installedAt should be preserved');
   assert(!existsSync(monoPath), 'reinstall: must not recreate live monolito kyro.json');
 
   captureLogs(() => uninstall(cliOptions()));
@@ -660,7 +667,10 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   const doctorAfterPurgeOutput = captureLogs(() => doctor(cliOptions({ adapters: true })));
   assert(doctorAfterPurgeOutput.includes('[PASS] global runtime'), 'opencode purge doctor: global runtime should remain valid after purging adapter assets');
   const purgeDoctorFailures = doctorAfterPurgeOutput.split('\n').filter((line) => line.startsWith('[FAIL]'));
-  assert(purgeDoctorFailures.every((line) => line.startsWith('[FAIL] CLI capabilities:') && line.includes('work')), `opencode purge doctor: unexpected failure after purging adapter assets\n${doctorAfterPurgeOutput}`);
+  // W1 keeps the machine registration after a workspace purge. W4 owns machine uninstall;
+  // doctor must expose the missing registered projection rather than forget the machine entry.
+  assert(purgeDoctorFailures.some((line) => line.startsWith('[FAIL] OpenCode adapter:')), 'opencode purge doctor: missing registered machine projection must fail');
+  assert(purgeDoctorFailures.every((line) => line.startsWith('[FAIL] OpenCode adapter:') || (line.startsWith('[FAIL] CLI capabilities:') && line.includes('work'))), `opencode purge doctor: unexpected failure after purging adapter assets\n${doctorAfterPurgeOutput}`);
   process.exitCode = priorExitCode;
 });
 

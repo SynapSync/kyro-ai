@@ -1,3 +1,4 @@
+import { withMachineAdapterRegistryLock } from '../adapters/machine-registry';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { listRegistrableScopeDirectories } from '../artifacts/scopes';
@@ -41,6 +42,11 @@ function runInstallPlan(
   packageVersion: string,
   shouldInitializeWorkspace: boolean,
 ): void {
+  if (!options.dryRun) return withMachineAdapterRegistryLock(() => runInstallPlanUnlocked(options, agents, packageVersion, shouldInitializeWorkspace));
+  runInstallPlanUnlocked(options, agents, packageVersion, shouldInitializeWorkspace);
+}
+
+function runInstallPlanUnlocked(options: CliOptions, agents: Agent[], packageVersion: string, shouldInitializeWorkspace: boolean): void {
   const warnings = shouldInitializeWorkspace ? legacyScopeCacheWarnings() : [];
   const plan = shouldInitializeWorkspace ? buildInstallPlan(agents, options.scope) : buildRuntimeInstallPlan(options.scope);
   console.log(`Plan summary: ${summarizePlanTargets(plan)}`);
@@ -70,6 +76,11 @@ function runInstallPlan(
 }
 
 export function sync(options: CliOptions): void {
+  if (options.dryRun) return syncUnlocked(options);
+  withStateWriterLock(() => withMachineAdapterRegistryLock(() => syncUnlocked(options)));
+}
+
+function syncUnlocked(options: CliOptions): void {
   requireFullPackageFor('sync');
   assertWorkspaceScope(options.scope);
   const state = readProjectState();

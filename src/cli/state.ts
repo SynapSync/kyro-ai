@@ -1,3 +1,5 @@
+import { readMachineAdapterRegistry } from './adapters/machine-registry';
+import { getAdapterDefinition } from './adapters/registry';
 import { existsSync, lstatSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
@@ -15,6 +17,7 @@ import { scopeEntriesFromDisk, scopeEntryFromDisk } from './core/scope-entries';
 import { classifyScopeDirectory, readScopeSprint, SCOPE_DIR_CLASS } from './artifacts/scopes';
 import { assertSafeManagedPath, assertStateWriterLeaseHealthy, withStateWriterLock } from './pipeline/state-writer-lock';
 import type {
+  Agent,
   KyroLocalProjectState,
   KyroManifest,
   KyroProjectState,
@@ -243,11 +246,29 @@ export function readProjectState(): KyroProjectState | null {
   const sharedRaw = readSharedProjectState();
   const localRaw = readLocalProjectState();
   if (sharedRaw !== null || localRaw !== null) {
-    return mergeProjectLayers(sharedRaw, localRaw);
+    return withMachineAdapters(mergeProjectLayers(sharedRaw, localRaw));
   }
   const monolito = readMonolitoProjectState();
-  if (monolito) return effectiveFromMonolito(monolito);
+  if (monolito) return withMachineAdapters(effectiveFromMonolito(monolito));
   return null;
+}
+
+/** Read only persisted legacy entries, never the machine-derived effective facade. */
+export function readLegacyInstalledAdapters(): KyroInstalledAdapter[] {
+  const local = readLocalProjectState();
+  if (local !== null || readSharedProjectState() !== null) return Array.isArray(local?.installedAdapters) ? local.installedAdapters : [];
+  const monolito = readMonolitoProjectState();
+  return Array.isArray(monolito?.installedAdapters) ? monolito.installedAdapters : [];
+}
+
+function withMachineAdapters(state: KyroProjectState): KyroProjectState {
+  const machine = readMachineAdapterRegistry();
+  const entries = new Map(state.installedAdapters.map((adapter) => [adapter.agent, adapter]));
+  for (const adapter of machine.adapters) {
+    if (adapter.state === 'disabled') entries.delete(adapter.agent);
+    else entries.set(adapter.agent, getAdapterDefinition(adapter.agent).buildInstalledAdapter('workspace', adapter.updatedAt));
+  }
+  return { ...state, installedAdapters: [...entries.values()].sort((a, b) => a.agent.localeCompare(b.agent)) };
 }
 
 export function readManifest(): KyroManifest | null {
@@ -274,7 +295,7 @@ export function mergeProjectLayers(
     scopes: scopeEntriesFromDisk(),
     activeScope: local.activeScope,
     runtimePath: local.runtimePath ?? KYRO_ROOT,
-    installedAdapters: local.installedAdapters,
+    installedAdapters: local.installedAdapters ?? [],
   };
   if (shared.principles !== undefined) effective.principles = shared.principles;
   if (shared.conventions !== undefined) effective.conventions = shared.conventions;
@@ -548,10 +569,16 @@ export function sanitizeLocalForWrite(local: KyroLocalProjectState): KyroLocalPr
   delete cleaned.artifactRoot;
   delete cleaned.kyroInvocation;
   delete cleaned.runtimeVersion;
+  const legacyAdapters = (cleaned.installedAdapters as KyroInstalledAdapter[] | undefined) ?? [];
+  const registeredAgents = legacyAdapters.length > 0
+    ? new Set(readMachineAdapterRegistry().adapters.map((entry) => entry.agent)) : new Set<Agent>();
+  const unmigratedAdapters = legacyAdapters.filter((adapter) => !registeredAgents.has(adapter.agent));
   const result: KyroLocalProjectState = {
     schemaVersion: 4,
     activeScope: (cleaned.activeScope as string | null) ?? null,
-    installedAdapters: (cleaned.installedAdapters as KyroInstalledAdapter[]) ?? [],
+    // Preserve unmigrated legacy input for unrelated workspace writers. Once the registry
+    // owns an entry (including a disabled one), it must never be re-persisted locally.
+    ...(unmigratedAdapters.length > 0 ? { installedAdapters: unmigratedAdapters } : {}),
   };
   if (typeof cleaned.runtimePath === 'string' && cleaned.runtimePath) {
     result.runtimePath = cleaned.runtimePath;
