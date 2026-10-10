@@ -166,6 +166,7 @@ export function parseAgent(value: string): Agent {
   if (normalized === 'opencode') return AGENT.OPENCODE;
   if (normalized === 'claude' || normalized === 'claude-code') return AGENT.CLAUDE;
   if (normalized === 'codex') return AGENT.CODEX;
+  if (normalized === 'pi') return AGENT.PI;
   if (normalized === 'cursor') return AGENT.CURSOR;
   throw invalidInput(
     `Unsupported agent: ${value}.`,

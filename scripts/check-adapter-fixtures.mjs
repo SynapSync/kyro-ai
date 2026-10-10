@@ -446,7 +446,7 @@ withWorkspace('kyro-adapter-contract-', (cwd) => {
   mkdirSync(join(homeDir, '.claude'), { recursive: true });
   mkdirSync(join(homeDir, '.cursor'), { recursive: true });
 
-  assert(ADAPTERS.length === 5, `adapter contract: expected 5 adapters, got ${ADAPTERS.length}`);
+  assert(ADAPTERS.length === 6, `adapter contract: expected 6 adapters, got ${ADAPTERS.length}`);
   for (const adapter of ADAPTERS) {
     assert(typeof adapter.capabilities === 'function', `${adapter.agent}: missing capabilities()`);
     assert(typeof adapter.paths === 'function', `${adapter.agent}: missing paths()`);

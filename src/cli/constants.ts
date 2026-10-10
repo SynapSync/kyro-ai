@@ -5,6 +5,7 @@ export const AGENT = {
   OPENCODE: 'opencode',
   CLAUDE: 'claude',
   CODEX: 'codex',
+  PI: 'pi',
   CURSOR: 'cursor',
 } as const;
 

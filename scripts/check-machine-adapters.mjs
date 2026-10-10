@@ -1,4 +1,4 @@
-/** W1 machine registry contract. Every API and CLI invocation uses a disposable HOME. */
+/** W1 machine registry and W5 Pi contracts. Every invocation uses a disposable HOME. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawn, spawnSync } from 'node:child_process';
@@ -369,6 +369,122 @@ try {
   assert.equal(json(registryPath).adapters.find((adapter) => adapter.agent === 'claude').projection, 'link');
   console.log('PASS F3 effective-projection: forced-copy install persists claude=copy; later linked sync persists claude=link');
   console.log('Machine adapter registry checks passed (W1 criteria 1-7).');
+
+  // W5 uses a separate HOME/PATH so Pi detection cannot alter W1's registry assertions.
+  const piHome = join(root, 'pi-home');
+  const piBin = join(root, 'pi-bin');
+  const piCwd = join(root, 'pi-runtime-only');
+  fs.mkdirSync(piBin);
+  fs.mkdirSync(piCwd);
+  process.env.HOME = process.env.USERPROFILE = piHome;
+  process.env.PATH = piBin;
+  load(piCwd);
+  const { piAdapter } = require(join(repo, 'dist/cli/adapters/pi.js'));
+  const { getInstallableAdapters, getAdapterDefinition } = require(join(repo, 'dist/cli/adapters/registry.js'));
+  const { parseAgent, assertInstallableAgents } = require(join(repo, 'dist/cli/options.js'));
+  const { AGENT } = require(join(repo, 'dist/cli/constants.js'));
+  assert.equal(AGENT.PI, 'pi');
+  assert.equal(parseAgent(' PI '), 'pi');
+  assertInstallableAgents(['pi']);
+  assert.equal(getAdapterDefinition('pi'), piAdapter);
+  assert(getInstallableAdapters().includes(piAdapter));
+  assert.equal(piAdapter.status, 'implemented');
+  const detectPi = () => piAdapter.detect({ homeDir: piHome, envPath: piBin });
+  assert.equal(detectPi().installed, false);
+  fs.mkdirSync(join(piHome, '.pi'), { recursive: true });
+  assert.equal(detectPi().installed, false, '.pi alone must not count as .pi/agent');
+  fs.writeFileSync(join(piHome, '.pi/agent'), 'foreign file');
+  assert.equal(detectPi().installed, false, '.pi/agent must be a directory');
+  fs.unlinkSync(join(piHome, '.pi/agent'));
+  fs.mkdirSync(join(piHome, '.pi/agent'));
+  assert.equal(detectPi().installed, true);
+  assert.equal(detectPi().configFound, true);
+  assert.equal(detectPi().binaryPath, null);
+  fs.rmSync(join(piHome, '.pi'), { recursive: true });
+  const piBinary = join(piBin, process.platform === 'win32' ? 'pi.cmd' : 'pi');
+  fs.writeFileSync(piBinary, process.platform === 'win32' ? '@exit /b 0\r\n' : '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  assert.equal(detectPi().installed, true);
+  assert.equal(detectPi().binaryPath, piBinary);
+  assert.equal(detectPi().configFound, false);
+  console.log('PASS W5 detection / registry / parseAgent: Pi implemented; binary or .pi/agent directory accepted; absent/file/root-only rejected');
+
+  const piBefore = tree(piHome);
+  run(piCwd, ['install', '--no-init-workspace', '--agent', 'pi', '--dry-run']);
+  assert.equal(tree(piHome), piBefore);
+  const piInstall = run(piCwd, ['install', '--no-init-workspace']);
+  assert.match(piInstall.stdout, /Adapter pi: added; projection=none/);
+  assert(!fs.existsSync(join(piHome, '.pi')), 'binary detection must not create a Pi config directory');
+  const piRegistry = json(join(piHome, '.agents/kyro/adapters.json'));
+  assert.deepEqual(piRegistry.adapters.map((adapter) => adapter.agent), ['pi', 'standard']);
+  assert.equal(piRegistry.adapters.find((adapter) => adapter.agent === 'pi').projection, null);
+  const piManifest = json(join(piHome, '.agents/kyro/current/manifest.json'));
+  assert.equal(piManifest.adapters.find((adapter) => adapter.agent === 'pi').skillsPath, '~/.agents/skills');
+  writeJson(join(piHome, '.pi/agent/settings.json'), { enableSkillCommands: false, skills: ['user-owned'] });
+  const piConfigBefore = tree(join(piHome, '.pi'));
+  run(piCwd, ['install', '--no-init-workspace', '--agent', 'pi', '--integrations']);
+  assert.equal(tree(join(piHome, '.pi')), piConfigBefore);
+  const noWritesBefore = tree(piHome);
+  const piOperations = [{ action: 'write', path: 'sentinel', content: 'untouched' }];
+  const unchangedOperations = structuredClone(piOperations);
+  piAdapter.buildProjection(piOperations, { integrations: true, includeWorkspace: true });
+  piAdapter.buildRemoval(piOperations);
+  piAdapter.buildMcpProjection(piOperations);
+  piAdapter.buildMcpRemoval(piOperations);
+  assert.deepEqual(piOperations, unchangedOperations);
+  assert.deepEqual(piAdapter.buildManagedFiles(), []);
+  assert.deepEqual(piAdapter.buildManagedBlocks(), []);
+  assert.equal(piAdapter.systemPromptStrategy(), 'none');
+  assert.equal(piAdapter.mcpStrategy(), 'none');
+  assert.equal(tree(piHome), noWritesBefore);
+  console.log('PASS W5 canonical-only / no projection: install discovers Pi natively; no .pi creation; config preserved even with integrations; all adapter operations are no-ops');
+
+  const assertPiNote = (check) => {
+    assert.match(check.detail, /\/skill:kyro-work/);
+    assert.match(check.detail, /enableSkillCommands/);
+    assert.match(check.detail, /manually entered skill commands still work/);
+  };
+  const healthyPi = piAdapter.doctor(piManifest);
+  assert.equal(healthyPi.status, 'pass');
+  assertPiNote(healthyPi);
+  assert.equal(piAdapter.doctor({ ...piManifest, adapters: [] }).status, 'pass', 'canonical health must not depend on workspace adapter membership');
+  for (const manifest of [null, { ...piManifest, packageVersion: '' }]) {
+    const check = piAdapter.doctor(manifest);
+    assert.equal(check.status, 'fail');
+    assert(check.remedy);
+    assertPiNote(check);
+  }
+  const { buildCommandSkillManagedFiles } = require(join(repo, 'dist/cli/adapters/command-skills.js'));
+  for (const managed of buildCommandSkillManagedFiles()) {
+    const path = managed.replace('~', piHome);
+    const body = fs.readFileSync(path, 'utf8');
+    for (const fault of ['missing', 'stale', 'unpinned', 'unreadable']) {
+      try {
+        if (fault === 'missing' || fault === 'unreadable') fs.unlinkSync(path);
+        if (fault === 'unreadable') fs.mkdirSync(path);
+        if (fault === 'stale') fs.writeFileSync(path, body.replace(/runtimeVersion: "[^"\n]+"/, 'runtimeVersion: "0.0.0-w5-stale"'));
+        if (fault === 'unpinned') fs.writeFileSync(path, body.replace(/^.*runtimeVersion:.*\n/m, ''));
+        const check = piAdapter.doctor(piManifest);
+        assert.equal(check.status, 'fail', `${managed}: ${fault}`);
+        assert(check.detail.includes(managed), `${managed}: failed check must name the skill`);
+        assert.match(check.remedy, /kyro sync/);
+        assertPiNote(check);
+      } finally {
+        if (fault === 'unreadable') fs.rmdirSync(path);
+        fs.writeFileSync(path, body);
+      }
+    }
+  }
+  assert.equal(piAdapter.doctor(piManifest).status, 'pass');
+  assert.equal(tree(piHome), noWritesBefore, 'doctor and fault probes must restore the original HOME bytes');
+  console.log('PASS W5 doctor health: every canonical command and full skill checked; current passes; missing/stale/unpinned/unreadable or unknown runtime fails with remedy');
+
+  const piWorkspace = join(root, 'pi-workspace');
+  fs.mkdirSync(piWorkspace);
+  run(piWorkspace, ['install', '--init-workspace', '--agent', 'pi']);
+  const piDoctor = run(piWorkspace, ['doctor']);
+  assert.match(piDoctor.stdout, /\[PASS\] Pi adapter:.*\/skill:kyro-work.*enableSkillCommands/);
+  console.log('PASS W5 doctor invocation / setting: CLI reports /skill:kyro-work and enableSkillCommands; manual invocation remains available');
+  console.log('Pi adapter checks passed (W5 criteria 1-4).');
 } finally {
   process.chdir(original.cwd);
   for (const key of ['HOME', 'USERPROFILE', 'npm_config_cache', 'PATH']) if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key];
