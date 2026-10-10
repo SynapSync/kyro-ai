@@ -37,5 +37,19 @@ export function checkDirectorRegressions() {
       assert.equal(fs.lstatSync(target).isSymbolicLink(), kind === 'symlink');
     }
     console.log('PASS canonical-skill-ownership');
+    for (const ancestor of ['.agents/kyro', '.agents']) {
+      const f = fixture(`registry-ancestor-${ancestor.replaceAll('/', '-')}`);
+      const external = join(f.cwd, 'foreign-directory'); fs.mkdirSync(external);
+      const bytes = Buffer.from([255, 0, 65, 13, 10]); put(join(external, 'user.bin'), bytes);
+      const target = join(f.home, ancestor); fs.mkdirSync(dirname(target), { recursive: true });
+      fs.symlinkSync(external, target, 'dir');
+      const result = cli(f, ['install', '--no-init-workspace']);
+      assert.notEqual(result.status, 0, 'registry-parent-symlink: install must fail closed');
+      assert((result.stdout + result.stderr).includes(target), 'registry-parent-symlink: error must identify the ancestor');
+      assert.deepEqual(fs.readdirSync(external), ['user.bin'], 'registry-parent-symlink: wrote outside machine root');
+      assert.deepEqual(fs.readFileSync(join(external, 'user.bin')), bytes);
+      assert.equal(fs.readlinkSync(target), external);
+    }
+    console.log('PASS registry-parent-symlink');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }

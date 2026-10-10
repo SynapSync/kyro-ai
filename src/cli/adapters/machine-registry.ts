@@ -34,7 +34,20 @@ function invalidRegistry(detail: string): KyroCoreError {
   return new KyroCoreError('INVALID_PROJECT_STATE', `MACHINE_ADAPTER_REGISTRY_INVALID: ${MACHINE_ADAPTER_REGISTRY_PATH}: ${detail}.`, remedy);
 }
 
+/** HOME itself may be linked, but machine-owned ancestors must be real directories. */
+function assertMachineRegistryParents(): void {
+  for (const managedPath of ['~/.agents', '~/.agents/kyro']) {
+    const path = pathFor(managedPath);
+    try {
+      if (!lstatSync(path).isDirectory()) throw invalidRegistry(`unsafe ancestor ${path}: must be a real directory (symlinks are refused)`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+}
+
 function registryRaw(): string | null {
+  assertMachineRegistryParents();
   const path = pathFor(MACHINE_ADAPTER_REGISTRY_PATH);
   try {
     if (!lstatSync(path).isFile()) throw invalidRegistry('must be a regular file (symlinks are refused)');
@@ -68,6 +81,7 @@ export function withMachineAdapterRegistryLock<T>(work: () => T): T {
   readMachineAdapterRegistry();
   const path = pathFor(MACHINE_ADAPTER_LOCK_PATH);
   mkdirSync(dirname(path), { recursive: true });
+  assertMachineRegistryParents();
   const token = JSON.stringify({ pid: process.pid, hostname: hostname(), token: randomUUID() });
   const deadline = Date.now() + 10_000;
   while (true) {
@@ -178,6 +192,7 @@ function reclaimDeadMachineLock(path: string): boolean {
 }
 
 function assertLock(): void {
+  assertMachineRegistryParents();
   const path = pathFor(MACHINE_ADAPTER_LOCK_PATH);
   if (!lockToken || !existsSync(path) || !lstatSync(path).isFile() || readFileSync(path, 'utf8') !== lockToken) {
     throw new KyroCoreError('WRITE_NOT_PERMITTED', 'MACHINE_ADAPTER_REGISTRY_LOCK_LOST: refusing to write.', 'Inspect .adapters.lock and retry after the other writer has finished.');
