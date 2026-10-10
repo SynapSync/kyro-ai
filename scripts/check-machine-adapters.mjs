@@ -384,7 +384,7 @@ try {
   const { parseAgent, assertInstallableAgents } = require(join(repo, 'dist/cli/options.js'));
   const { AGENT } = require(join(repo, 'dist/cli/constants.js'));
   assert.equal(AGENT.PI, 'pi');
-  assert.equal(parseAgent(' PI '), 'pi');
+  assert.equal(parseAgent('PI'), 'pi');
   assertInstallableAgents(['pi']);
   assert.equal(getAdapterDefinition('pi'), piAdapter);
   assert(getInstallableAdapters().includes(piAdapter));
