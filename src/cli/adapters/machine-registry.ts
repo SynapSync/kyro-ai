@@ -1,4 +1,4 @@
-import { closeSync, existsSync, fstatSync, fsyncSync, constants as fsConstants, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync, type Stats } from 'node:fs';
+import { closeSync, existsSync, fstatSync, fsyncSync, constants as fsConstants, lstatSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync, type Stats } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir, hostname } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -96,7 +96,9 @@ export function withMachineAdapterRegistryLock<T>(work: () => T): T {
           fd = -1;
         }
         if (fd !== -1) {
-          try { writeFileSync(fd, token); fsyncSync(fd); } finally { closeSync(fd); }
+          try { writeFileSync(fd, token); fsyncSync(fd); }
+          catch (error) { removeCreatedLock(path, fd); throw error; }
+          finally { closeSync(fd); }
           break;
         }
       } finally { release(); }
@@ -124,6 +126,13 @@ function deadLockIdentity(path: string): DeadLockIdentity | null {
     const stat = fstatSync(fd);
     if (!stat.isFile()) return null;
     const raw = readFileSync(path, 'utf8');
+    // Main-lock initialization is protected by the reclaim sentinel. New
+    // sentinels are published with complete tokens, so zero-byte files are dead.
+    if (raw.length === 0) {
+      const identity = { stat, raw, fd };
+      fd = undefined;
+      return identity;
+    }
     const owner: unknown = JSON.parse(raw);
     if (!record(owner) || owner.hostname !== hostname() || typeof owner.pid !== 'number'
       || !Number.isSafeInteger(owner.pid) || owner.pid <= 0) return null;
@@ -148,12 +157,37 @@ function sameLockIdentity(path: string, identity: LockIdentity): boolean {
   } catch { return false; }
 }
 
-/** Serialize both reclamation and publication; a writer cannot publish in the unlink window. */
+/** Remove only the inode we created, keeping it pinned until unlink. */
+function removeCreatedLock(path: string, fd: number): void {
+  const created = fstatSync(fd);
+  let current: Stats;
+  try { current = lstatSync(path); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error; }
+  if (current.isFile() && current.dev === created.dev && current.ino === created.ino) unlinkSync(path);
+}
+
+/** Serialize reclamation and publication without exposing an uninitialized token. */
 function acquireReclaimSentinel(lockPath: string): (() => void) | null {
   const path = `${lockPath}.reclaim`;
-  let fd: number;
-  try { fd = openSync(path, 'wx', 0o600); }
-  catch (error) {
+  const temp = `${path}.init-${process.pid}-${randomUUID()}`;
+  const fd = openSync(temp, 'wx', 0o600);
+  const raw = JSON.stringify({ pid: process.pid, hostname: hostname(), token: randomUUID() });
+  let identity: LockIdentity;
+  let published = false;
+  try {
+    writeFileSync(fd, raw);
+    fsyncSync(fd);
+    identity = { stat: fstatSync(fd), raw };
+    // Exclusive hard-link publication exposes a complete token atomically.
+    // No live reclaimer ever owns a publicly visible zero-byte sentinel.
+    linkSync(temp, path);
+    published = true;
+    unlinkSync(temp);
+  } catch (error) {
+    try {
+      if (published) removeCreatedLock(path, fd);
+      removeCreatedLock(temp, fd);
+    } finally { closeSync(fd); }
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
     // A crashed reclaimer must not permanently prevent future machine writes.
     const dead = deadLockIdentity(path);
@@ -166,13 +200,6 @@ function acquireReclaimSentinel(lockPath: string): (() => void) | null {
     }
     return null;
   }
-  const raw = JSON.stringify({ pid: process.pid, hostname: hostname(), token: randomUUID() });
-  let identity: LockIdentity;
-  try {
-    writeFileSync(fd, raw);
-    fsyncSync(fd);
-    identity = { stat: fstatSync(fd), raw };
-  } catch (error) { closeSync(fd); throw error; }
   return () => {
     try { if (sameLockIdentity(path, identity)) unlinkSync(path); }
     finally { closeSync(fd); }

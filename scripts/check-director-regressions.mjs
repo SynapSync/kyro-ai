@@ -120,5 +120,36 @@ export function checkDirectorRegressions() {
       `);
     }
     console.log('PASS native-write-rollback');
+    const locks = fixture('lock-initialization');
+    probe(locks, `
+      const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
+      const machine = require(${JSON.stringify(join(repo, 'dist/cli/adapters/machine-registry.js'))});
+      const lock = path.join(process.env.HOME, '.agents/kyro/.adapters.lock');
+      const open = fs.openSync, write = fs.writeFileSync, sync = fs.fsyncSync;
+      for (const failedPath of [lock + '.reclaim', lock]) {
+        for (const failure of ['write', 'fsync']) {
+          let failedFd, injected = false;
+          fs.openSync = (p, ...args) => { const fd = open(p, ...args); if (p === failedPath || (typeof p === 'string' && p.startsWith(failedPath + '.init-'))) failedFd = fd; return fd; };
+          fs.writeFileSync = (p, ...args) => { if (failure === 'write' && p === failedFd) { injected = true; throw new Error('injected lock initialization EIO'); } return write(p, ...args); };
+          fs.fsyncSync = (p) => { if (failure === 'fsync' && p === failedFd) { injected = true; throw new Error('injected lock initialization EIO'); } return sync(p); };
+          try { assert.throws(() => machine.withMachineAdapterRegistryLock(() => assert.fail('callback entered')), /injected lock initialization EIO/); }
+          finally { fs.openSync = open; fs.writeFileSync = write; fs.fsyncSync = sync; }
+          assert(injected, 'lock-initialization-recovery: injection not exercised');
+          assert(!fs.existsSync(failedPath), 'lock-initialization-recovery: abandoned token');
+          assert.deepEqual(fs.readdirSync(path.dirname(lock)), [], 'lock-initialization-recovery: temporary token remains');
+          let entered = false;
+          machine.withMachineAdapterRegistryLock(() => { entered = true; assert(fs.readFileSync(lock).length > 0); });
+          assert(entered, 'lock-initialization-recovery: later run blocked');
+        }
+      }
+      for (const empty of [lock, lock + '.reclaim']) {
+        fs.writeFileSync(empty, '');
+        let entered = false;
+        machine.withMachineAdapterRegistryLock(() => { entered = true; });
+        assert(entered, 'lock-initialization-recovery: empty lock not reclaimed');
+        assert.deepEqual(fs.readdirSync(path.dirname(lock)), []);
+      }
+    `);
+    console.log('PASS lock-initialization-recovery');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }
