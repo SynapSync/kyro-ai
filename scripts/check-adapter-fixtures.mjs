@@ -941,4 +941,14 @@ withWorkspace('kyro-adapter-detect-', () => {
   assert(payload.adapters[0].mcpStrategy === 'toml-file', 'detect --json: missing codex MCP strategy');
 });
 
+// A managed block replaced in place must keep the bytes that follow its end marker, and a second
+// upsert must be a byte-identical no-op. Losing one newline per run eroded user content over time.
+{
+  const { upsertManagedBlock } = require(join(repo, 'dist/cli/injectors/managed-block.js'));
+  const before = 'intro\n\n<!-- kyro-ai:agents-md:start -->\nOLD\n<!-- kyro-ai:agents-md:end -->\n\n\n<claude-mem-context>\nX\n</claude-mem-context>\n';
+  const once = upsertManagedBlock(before, 'agents-md', 'NEW');
+  assert(once.includes('<!-- kyro-ai:agents-md:end -->\n\n\n<claude-mem-context>\nX\n'), 'managed block replace: bytes after the end marker must be preserved');
+  assert(upsertManagedBlock(once, 'agents-md', 'NEW') === once, 'managed block replace: a second upsert must be a byte-identical no-op');
+}
+
 console.log('Adapter fixtures passed');
