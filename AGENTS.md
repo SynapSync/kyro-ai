@@ -125,10 +125,10 @@ When bumping version or changing the description:
 <!-- kyro-ai:agents-md:start -->
 ## Kyro AI
 
-Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-qa`, `kyro-idea`, `kyro-scope-retire`.
+Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-idea`, `kyro-qa`, `kyro-scope-retire`, `kyro-work`. Choose Work only when explicitly invoked; Forge routing is unchanged. Complete a finished scope through `kyro-forge` (`scope complete`). `kyro-scope-retire` is only for obsolete, superseded, or discarded scopes.
 
 Runtime: `~/.agents/kyro/current/`
-Project state: `.agents/kyro/project.json` + `local.json`
+Project state: `.agents/kyro/project.json` + `local.json` (legacy `kyro.json` dual-read)
 Artifacts: `.agents/kyro/scopes/{scope}/`
 Skills: `~/.agents/skills/kyro-*`
 
