@@ -19,6 +19,7 @@ import {
   statSync,
   symlinkSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -94,6 +95,13 @@ class LinkRollbackError extends Error {
   constructor(target: string, applyError: unknown, rollbackError: unknown) {
     super(`Link apply failed and rollback failed for ${target}: ${String(applyError)}; restore: ${String(rollbackError)}`);
     this.name = 'LinkRollbackError';
+  }
+}
+
+class WriteRollbackError extends Error {
+  constructor(target: string, applyError: unknown, rollbackError: unknown) {
+    super(`Write apply failed and rollback failed for ${target}: ${String(applyError)}; restore: ${String(rollbackError)}`);
+    this.name = 'WriteRollbackError';
   }
 }
 
@@ -284,6 +292,7 @@ function writeOpenCodeCommand(operation: OperationPlan, target: string): void {
   const flags = fsConstants.O_WRONLY | (fsConstants.O_NOFOLLOW ?? 0)
     | (previous ? 0 : fsConstants.O_CREAT | fsConstants.O_EXCL);
   const fd = openSync(target, flags, 0o666);
+  let fdOpen = true;
   try {
     const opened = fstatSync(fd);
     const current = lstatSync(target);
@@ -291,10 +300,37 @@ function writeOpenCodeCommand(operation: OperationPlan, target: string): void {
       || (previous && (opened.ino !== previous.ino || opened.dev !== previous.dev))) {
       throw new Error(`Unsafe OpenCode command target changed before write: ${target}.`);
     }
+    const original = previous ? readFileSync(target) : null;
     assertStateWriterLeaseHealthy();
-    ftruncateSync(fd);
-    writeFileSync(fd, operation.content ?? '', 'utf8');
-  } finally { closeSync(fd); }
+    try {
+      ftruncateSync(fd);
+      writeFileSync(fd, operation.content ?? '', 'utf8');
+    } catch (error) {
+      // A failed step is not rolled back by the orchestrator. Restore through
+      // the pinned descriptor, with explicit offsets after a partial write.
+      try {
+        assertStateWriterLeaseHealthy();
+        if (original !== null) {
+          let offset = 0;
+          while (offset < original.length) {
+            const written = writeSync(fd, original, offset, original.length - offset, offset);
+            if (!written) throw new Error(`Unable to restore bytes for ${target}.`);
+            offset += written;
+          }
+          ftruncateSync(fd, original.length);
+        } else {
+          closeSync(fd);
+          fdOpen = false;
+          const current = lstatSync(target);
+          if (!current.isFile() || current.ino !== opened.ino || current.dev !== opened.dev) {
+            throw new Error(`Unsafe command target changed before rollback: ${target}.`);
+          }
+          rmSync(target);
+        }
+      } catch (rollbackError) { throw new WriteRollbackError(target, error, rollbackError); }
+      throw error;
+    }
+  } finally { if (fdOpen) closeSync(fd); }
 }
 
 /**
@@ -396,7 +432,7 @@ function restoreTarget(target: string, snapshot: TargetSnapshot): void {
 }
 
 function formatPipelineError(result: PipelineResult): Error {
-  if (result.error instanceof LinkRollbackError) return result.error;
+  if (result.error instanceof LinkRollbackError || result.error instanceof WriteRollbackError) return result.error;
   const snapshotError = result.error instanceof SnapshotCreateError ? result.error : null;
   const writeFailure = describeWriteFailure(snapshotError?.cause ?? result.error);
   if (writeFailure) return writeFailure;

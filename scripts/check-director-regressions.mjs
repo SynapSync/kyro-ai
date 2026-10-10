@@ -91,5 +91,34 @@ export function checkDirectorRegressions() {
       `);
     }
     console.log('PASS registry-publish-rollback');
+    for (const existed of [true, false]) {
+      const f = fixture(`native-write-${existed}`);
+      probe(f, `
+        const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
+        const { applyPlan } = require(${JSON.stringify(join(repo, 'dist/cli/fs.js'))});
+        const target = path.join(process.env.HOME, '.config/opencode/commands/kyro/work.md');
+        const before = Buffer.from([255, 0, 13, 10, 65, 66, 67]);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        if (${existed}) { fs.writeFileSync(target, before); fs.chmodSync(target, 0o640); }
+        const mode = ${existed} ? fs.statSync(target).mode : null;
+        const open = fs.openSync, write = fs.writeFileSync; let commandFd, injected = false;
+        fs.openSync = (p, ...args) => { const fd = open(p, ...args); if (p === target && typeof args[0] === 'number') commandFd = fd; return fd; };
+        fs.writeFileSync = (p, ...args) => {
+          if (p === commandFd && !injected) {
+            assert.equal(fs.fstatSync(p).size, 0, 'native-write-rollback: truncation not exercised');
+            injected = true; write(p, 'PARTIAL COMMAND'); throw new Error('injected command write EIO');
+          }
+          return write(p, ...args);
+        };
+        try { assert.throws(() => applyPlan([{ action: 'write', path: '~/.config/opencode/commands/kyro/work.md', content: 'REPLACEMENT', guard: 'opencode-command', allowExistingManagedSkill: ${existed} }]), /injected command write EIO/); }
+        finally { fs.openSync = open; fs.writeFileSync = write; }
+        assert(injected, 'native-write-rollback: write failure not exercised');
+        if (${existed}) {
+          assert.deepEqual(fs.readFileSync(target), before, 'native-write-rollback: original bytes lost');
+          assert.equal(fs.statSync(target).mode, mode);
+        } else assert(!fs.existsSync(target), 'native-write-rollback: failed new file remains');
+      `);
+    }
+    console.log('PASS native-write-rollback');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }
