@@ -51,5 +51,45 @@ export function checkDirectorRegressions() {
       assert.equal(fs.readlinkSync(target), external);
     }
     console.log('PASS registry-parent-symlink');
+    for (const existed of [false, true]) {
+      const f = fixture(`registry-publish-${existed}`);
+      probe(f, `
+        const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
+        const machine = require(${JSON.stringify(join(repo, 'dist/cli/adapters/machine-registry.js'))});
+        const { applyPlan } = require(${JSON.stringify(join(repo, 'dist/cli/fs.js'))});
+        const registry = path.join(process.env.HOME, '.agents/kyro/adapters.json');
+        const before = '{"adapters": [], "schemaVersion": 1}\\n';
+        fs.mkdirSync(path.dirname(registry), { recursive: true });
+        if (${existed}) fs.writeFileSync(registry, before);
+        const source = path.join(process.env.HOME, '.agents/skills/kyro-work');
+        fs.mkdirSync(source, { recursive: true }); fs.writeFileSync(path.join(source, 'SKILL.md'), 'NEW PROJECTION');
+        const target = path.join(process.env.HOME, '.claude/skills/kyro-work');
+        const old = Buffer.from([255, 0, 13, 10, 66]);
+        if (${existed}) { fs.mkdirSync(target, { recursive: true }); fs.writeFileSync(path.join(target, 'SKILL.md'), old); }
+        const extra = path.join(process.env.HOME, 'published-file');
+        const plan = [{ action: 'link', source: '~/.agents/skills/kyro-work', path: '~/.claude/skills/kyro-work' }, { action: 'write', path: extra, content: 'NEW FILE' }];
+        machine.registerMachineAdapterPlan(plan, { schemaVersion: 1, adapters: [{ agent: 'claude', state: 'enabled', projection: null, integrations: false, updatedAt: '2026-10-09T00:00:00.000Z' }] });
+        const rename = fs.renameSync; let writes = 0, injected = false;
+        fs.renameSync = (from, to) => {
+          if (to === registry && ++writes === 2) {
+            assert.equal(fs.readFileSync(path.join(target, 'SKILL.md'), 'utf8'), 'NEW PROJECTION');
+            assert.equal(fs.readFileSync(extra, 'utf8'), 'NEW FILE');
+            injected = true; throw new Error('injected final registry EIO');
+          }
+          return rename(from, to);
+        };
+        try { assert.throws(() => applyPlan(plan), /injected final registry EIO/); } finally { fs.renameSync = rename; }
+        assert(injected, 'registry-publish-rollback: final publication not exercised');
+        if (${existed}) {
+          assert.equal(fs.readFileSync(registry, 'utf8'), before, 'registry-publish-rollback: registry bytes changed');
+          assert.deepEqual(fs.readFileSync(path.join(target, 'SKILL.md')), old, 'registry-publish-rollback: old projection bytes changed');
+        } else {
+          assert(!fs.existsSync(registry));
+          assert(!fs.existsSync(target), 'registry-publish-rollback: orphan projection');
+        }
+        assert(!fs.existsSync(extra), 'registry-publish-rollback: orphan file');
+      `);
+    }
+    console.log('PASS registry-publish-rollback');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }

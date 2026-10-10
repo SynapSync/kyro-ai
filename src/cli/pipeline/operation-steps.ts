@@ -45,7 +45,7 @@ type TargetSnapshot =
   | { kind: 'directory'; backupPath: string }
   | { kind: 'symlink'; link: string; type?: 'dir' };
 
-export function applyOperationPlan(plan: OperationPlan[], context: OperationExecutionContext): OperationProjectionResult[] {
+export function applyOperationPlan(plan: OperationPlan[], context: OperationExecutionContext, publish?: (results: OperationProjectionResult[]) => void): OperationProjectionResult[] {
   return withStateWriterLock(() => {
     // Check native ownership before canonical publication, including legacy migrations.
     for (const operation of plan) {
@@ -60,6 +60,11 @@ export function applyOperationPlan(plan: OperationPlan[], context: OperationExec
       }
     }
     const stagePlan = operationPlanToStagePlan(plan, context);
+    if (publish) stagePlan.apply.push({
+      id: 'publish-machine-adapter-registry',
+      description: 'Publish machine adapter projection modes',
+      run: () => publish(stagePlan.apply.flatMap((step) => step instanceof OperationStep && step.projection ? [step.projection] : [])),
+    });
     const result = new PipelineOrchestrator('stop-on-error').execute(stagePlan);
     if (result.error) throw formatPipelineError(result);
     return stagePlan.apply.flatMap((step) => step instanceof OperationStep && step.projection ? [step.projection] : []);

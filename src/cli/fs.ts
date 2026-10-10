@@ -15,8 +15,8 @@ import type { OperationPlan, OperationProjectionResult } from './types';
 export function applyPlan(plan: OperationPlan[]): OperationProjectionResult[] {
   let projections: OperationProjectionResult[] = [];
   // Keep workspace -> machine lock ordering for direct API callers as well as CLI callers.
-  withStateWriterLock(() => applyMachineAdapterPlan(plan, () => {
-    projections = applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath });
+  withStateWriterLock(() => applyMachineAdapterPlan(plan, (publish) => {
+    projections = applyOperationPlan(plan, { packageRoot: PACKAGE_ROOT, resolveManagedPath }, publish);
     return projections;
   }));
   return projections;

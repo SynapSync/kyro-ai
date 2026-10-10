@@ -252,15 +252,16 @@ export function registerMachineAdapterPlan(plan: OperationPlan[], registry: Mach
   registryPlans.set(plan, { before: registryRaw(), registry });
 }
 
-export function applyMachineAdapterPlan(plan: OperationPlan[], apply: () => OperationProjectionResult[] | void): void {
+export function applyMachineAdapterPlan(plan: OperationPlan[], apply: (publish: (results: OperationProjectionResult[]) => void) => void): void {
   const update = registryPlans.get(plan);
-  if (!update) { apply(); return; }
+  if (!update) { apply(() => {}); return; }
   withMachineAdapterRegistryLock(() => {
     if (registryRaw() !== update.before) throw new KyroCoreError('STATE_DIVERGED', 'Machine adapter registry changed since this plan was built.', 'Rebuild the install/sync plan and retry.');
     writeMachineAdapterRegistry(update.registry);
     try {
-      const results = apply();
-      if (results?.length) {
+      // Publish inside the projection transaction, before its snapshots are disposed.
+      apply((results) => {
+        if (!results.length) return;
         const registry: MachineAdapterRegistry = { schemaVersion: 1, adapters: update.registry.adapters.map((entry) => ({ ...entry })) };
         for (const entry of registry.adapters) {
           const root = entry.agent === AGENT.CLAUDE ? '~/.claude/skills/' : entry.agent === AGENT.OPENCODE ? '~/.config/opencode/skills/' : null;
@@ -269,7 +270,7 @@ export function applyMachineAdapterPlan(plan: OperationPlan[], apply: () => Oper
           if (applied.length) entry.projection = applied.some((result) => result.projection === 'copy') ? 'copy' : 'link';
         }
         writeMachineAdapterRegistry(registry);
-      }
+      });
     }
     catch (error) {
       try {
