@@ -90,12 +90,25 @@ function writeDurableFile(path: string, content: string | Buffer): void {
   try { fsyncSync(descriptor); } finally { closeSync(descriptor); }
 }
 
+/** Snapshot before builders run: callbacks may mutate the input author in place. */
+function authorPreimage(work: WorkFile): string {
+  const present = Object.prototype.hasOwnProperty.call(work, 'author');
+  const value = work.author && Object.fromEntries(Object.entries(work.author).sort(([a], [b]) => a.localeCompare(b)));
+  return JSON.stringify({ present, ...(present ? { value } : {}) });
+}
+
+function assertAuthorPreserved(preimage: string, next: WorkFile): void {
+  if (authorPreimage(next) !== preimage) throw new KyroCoreError('INVALID_INPUT', 'A Work transition must preserve its creation-time author, including absence.', 'Keep stored creator metadata unchanged; action actors belong in by.');
+}
+
 export function updateWork(id: string, expectedRevision: number, build: (current: WorkFile) => WorkFile, dryRun = false): WorkFile {
   return withStateWriterLock(() => {
     assertNoPendingPromotion(id);
     const current = readWork(id); assertBriefIntegrity(current);
     if (current.revision !== expectedRevision) throw new KyroCoreError('STATE_DIVERGED', `Work ${id} revision ${current.revision} does not match expected ${expectedRevision}.`, 'Read Work status and retry from the current revision.');
+    const authorBefore = authorPreimage(current);
     const next = build(current);
+    assertAuthorPreserved(authorBefore, next);
     if (next.id !== id || next.revision !== current.revision + 1) throw new KyroCoreError('INVALID_INPUT', 'A Work update must preserve its ID and increase revision exactly once.', 'Use a single CLI-owned transition.');
     const issues = validateWorkFile(next, workJsonPath(id)); if (issues.length) throw new KyroCoreError('INVALID_INPUT', `Refusing invalid Work at ${issues[0].field}: ${issues[0].message}.`, 'Correct the transition and retry.');
     if (!dryRun) atomicReplace(workJsonPath(id), `${JSON.stringify(next, null, 2)}\n`);
@@ -113,6 +126,7 @@ export function reopenWork(id: string, expectedRevision: number, reason: string,
     const current = readWork(id); assertBriefIntegrity(current);
     if (current.revision !== expectedRevision) throw new KyroCoreError('STATE_DIVERGED', `Work ${id} revision ${current.revision} does not match expected ${expectedRevision}.`, 'Read Work status and retry from the current revision.');
     if (current.state !== 'closed' || !current.closure) throw new KyroCoreError('INVALID_INPUT', `Work ${id} is not closed and cannot be reopened.`, 'Only a closed, non-promoted Work can be reopened.');
+    const authorBefore = authorPreimage(current);
     const now = new Date().toISOString();
     const reopenedState = current.tasks.length === 0 ? 'draft' : 'active';
     const next: WorkFile = { ...current, state: reopenedState, revision: current.revision + 1, updatedAt: now, closure: null,
@@ -120,6 +134,7 @@ export function reopenWork(id: string, expectedRevision: number, reason: string,
     next.handoff = deriveWorkHandoff(next);
     const issues = validateWorkFile(next, workJsonPath(id));
     if (issues.length) throw new KyroCoreError('INVALID_INPUT', `Refusing invalid reopened Work at ${issues[0].field}: ${issues[0].message}.`, 'Restore a valid closed Work before retrying.');
+    assertAuthorPreserved(authorBefore, next);
     const historyPath = workClosureHistoryPath(id, current.revision);
     if (dryRun) return { work: next, historyPath };
     const record: ClosureHistoryRecord = { schemaVersion: 1, kind: 'work-closure-history', workId: id, closedRevision: current.revision, closure: current.closure };
@@ -287,6 +302,7 @@ export function promoteWork(
     const workBytes = readFileSync(assertSafeManagedPath(workPath));
     const current = readWork(id);
     const requestDigest = promotionRequestDigest(id, { toScope: input.toScope, actor: input.actor, expectedRevision });
+    const authorBefore = authorPreimage(current);
     if (pending && (pending.expectedRevision !== expectedRevision || pending.toScope !== input.toScope || pending.actor !== input.actor || pending.requestDigest !== requestDigest)) {
       throw new KyroCoreError('STATE_DIVERGED', `Work ${id} pending promotion does not match this retry.`, 'Retry with the original target scope, actor, and expected revision.');
     }
@@ -355,6 +371,7 @@ export function promoteWork(
         handoff: { ...current.handoff },
       };
       built.handoff = deriveWorkHandoff(built);
+      assertAuthorPreserved(authorBefore, built);
       const nextIssues = validateWorkFile(built, workJsonPath(id));
       if (nextIssues.length) throw new KyroCoreError('INVALID_INPUT', `Refusing invalid promoted Work at ${nextIssues[0].field}: ${nextIssues[0].message}.`, 'Correct the Work before retrying.');
       next = built;
@@ -646,6 +663,7 @@ export function amendWorkBrief(
     const workBytes = readFileSync(assertSafeManagedPath(workPath));
     const current = readWork(id);
     const newDigest = byteDigest(input.briefBytes);
+    const authorBefore = authorPreimage(current);
     if (pending && (pending.expectedRevision !== expectedRevision || pending.newBriefDigest !== newDigest || pending.by !== input.by || pending.reason !== input.reason))
       throw new KyroCoreError('STATE_DIVERGED', `Work ${id} pending amendment does not match this retry.`, 'Retry with the original source, actor, reason, and expected revision.');
     if (!pending && current.revision !== expectedRevision) throw new KyroCoreError('STATE_DIVERGED', `Work ${id} revision ${current.revision} does not match expected ${expectedRevision}.`, 'Read Work status and retry from the current revision.');
@@ -692,6 +710,7 @@ export function amendWorkBrief(
     next.handoff = deriveWorkHandoff(next);
     const issues = validateWorkFile(next, workJsonPath(id));
     if (issues.length) throw new KyroCoreError('INVALID_INPUT', `Refusing invalid Work at ${issues[0].field}: ${issues[0].message}.`, 'Correct the brief input and retry.');
+    assertAuthorPreserved(authorBefore, next);
     if (dryRun) return { work: next, previousDigest: current.brief.digest, briefDigest: newDigest, invalidatedTaskIds, recoveredBrief };
     const nextJson = `${JSON.stringify(next, null, 2)}\n`;
     if (pending && byteDigest(nextJson) !== pending.newWorkDigest) throw new KyroCoreError('STATE_DIVERGED', `Work ${id} pending amendment no longer produces its declared Work digest.`, 'Restore the CLI-owned transaction before retrying.');

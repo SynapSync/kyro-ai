@@ -2,6 +2,9 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sha256 } from '../checkpoints/sprint-close';
 import { KyroCoreError } from '../core/errors';
+import { resolveScopeAuthorFromGit } from '../core/actor';
+import { validateScopeAuthor } from '../artifacts/schema';
+import type { ValidationIssue } from '../artifacts/schema';
 import { WORK_ROOT, amendWorkBrief, assertBriefIntegrity, assertPromotionReciprocal, assertWorkId, createWork, promoteWork, readPromotionJournal, readWork, reopenWork, updateWork } from '../work/store';
 import { readBriefSourceBytes } from '../work/brief-source';
 import { planPromotionPreview } from '../work/promotion';
@@ -195,6 +198,12 @@ function create(args: string[]): void {
   // brief.digest binds the original source bytes (equal to sha256(briefText) by
   // the lossless round-trip proven above); the writer publishes those bytes verbatim.
   const work: WorkFile = { schemaVersion: 1, kind: 'organic-work', id, title: firstTitle(briefText), objective, brief: { path: 'brief.md', digest: briefSource.digest, sourceIdea }, state: 'draft', revision: 1, createdAt: now, updatedAt: now, handoff: { nextAction: 'plan_tasks', nextTaskId: null, blockedReason: null }, tasks: [], activity: [{ seq: 1, at: now, event: 'created', taskId: null, by, reason: 'Created through the Work CLI.', revision: 1 }], closure: null, promotion: null };
+  const author = resolveScopeAuthorFromGit({ cwd: process.cwd(), now: () => new Date(now) });
+  if (author) {
+    const authorIssues: ValidationIssue[] = [];
+    validateScopeAuthor(author, 'work.json', 'author', authorIssues);
+    if (!authorIssues.length) work.author = author;
+  }
   createWork(work, briefSource.bytes, options.dryRun === true); output({ work: id, path: `${WORK_ROOT}/${id}`, revision: 1, state: 'draft', nextAction: 'plan_tasks', dryRun: options.dryRun === true }, Boolean(options.json));
 }
 function transition(args: string[], action: 'start' | 'block' | 'unblock'): void {
@@ -508,7 +517,7 @@ function status(args: string[], context: boolean): void {
     if (taskReadModel.status === 'awaiting_review') recipes.push(`${prefix} review ${target} --from <review.json> --verdict <pass-or-fail> --by <checker> ${revision}`);
   }
   const data = {
-    schemaVersion: 1, work: { id: work.id, revision: work.revision, state: work.state, briefDigest: work.brief.digest },
+    schemaVersion: 1, work: { id: work.id, revision: work.revision, state: work.state, briefDigest: work.brief.digest, ...('author' in work ? { author: work.author } : {}) },
     nextAction: anomaly ? 'resolve_blocker' : work.handoff.nextAction, nextTaskId: anomaly ? null : work.handoff.nextTaskId,
     blockedReason: anomaly ?? work.handoff.blockedReason, anomalies: anomaly ? [anomaly] : [], tasks: workTasks, task: taskReadModel,
     summary: workClosureSummary(work), closure: work.closure,

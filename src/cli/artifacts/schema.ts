@@ -589,7 +589,7 @@ function validateSpec(value: unknown, path: string, prefix: string, issues: Vali
   requireStringArrayField(value, 'openQuestions', path, issues, `${prefix}.openQuestions`);
 }
 
-function validateScopeAuthor(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
+export function validateScopeAuthor(value: unknown, path: string, prefix: string, issues: ValidationIssue[]): void {
   if (!isRecord(value)) {
     issues.push({ path, field: prefix, message: 'must be an object { name?, email?, source, capturedAt } with at least one of name/email' });
     return;

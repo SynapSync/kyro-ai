@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnWithAuthor as spawnSync, seedLegacyWork } from './work-author-fixtures.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'kyro-work-closure-'));
 const cli = resolve('dist/cli.js');
@@ -218,5 +218,35 @@ try {
   assert.equal(JSON.parse(readFileSync(path('reopen-contrast'), 'utf8')).state, 'active');
   assert(existsSync(join(root, contrastOpened.closureHistoryPath)), 'a stopped reopen must preserve its closure history');
   for (const [index, entry] of forge.entries()) assert.deepEqual(readFileSync(join(root, entry)), forgeBefore[index]);
+  // Fixed authorless Works preserve absence through every close/reopen form.
+  for (const planned of [false, true]) for (const outcome of (planned ? ['completed', 'stopped'] : ['stopped'])) {
+    const id = `closure-${planned ? 'active' : 'draft'}-${outcome}-legacy`;
+    seedLegacyWork(root, id);
+    const originalCreatedAt = JSON.parse(readFileSync(path(id))).createdAt;
+    let revision = 1;
+    if (planned) {
+      ok(['plan', '--work', id, '--from', 'plan.json', '--expect-revision', String(revision++)]);
+      if (outcome === 'completed') for (const task of ['W1', 'W2']) {
+        ok(['dispose', '--work', id, '--task', task, '--kind', 'cancelled', '--reason', 'Explicitly cancelled.', '--by', 'Disposition actor', '--expect-revision', String(revision++)]);
+      }
+    }
+    for (let cycle = 0; cycle < 2; cycle++) {
+      ok(close(id, outcome, revision++));
+      const closed = JSON.parse(readFileSync(path(id)));
+      assert.equal(Object.hasOwn(closed, 'author'), false);
+      assert.equal(closed.closure.by, 'fixture-owner');
+      bad(/Injected Work reopen failure/i, reopen(id, revision), { KYRO_WORK_INJECT_FAILURE: 'reopen-after-history' });
+      const historyPath = join(root, '.agents/kyro/work', id, `closure-history/closure-r${revision}.json`);
+      const historyBytes = readFileSync(historyPath);
+      ok(reopen(id, revision++));
+      assert.deepEqual(readFileSync(historyPath), historyBytes);
+      const reopened = JSON.parse(readFileSync(path(id)));
+      assert.equal(Object.hasOwn(reopened, 'author'), false);
+      assert.equal(reopened.createdAt, originalCreatedAt);
+      assert.equal(reopened.state, planned ? 'active' : 'draft');
+      assert.equal(reopened.activity.at(-1).by, 'fixture-owner');
+      assert.equal(Object.hasOwn(JSON.parse(historyBytes), 'author'), false);
+    }
+  }
   console.log('Work close/reopen provenance, failure retry, honest summary, and Forge isolation fixtures passed.');
 } finally { rmSync(root, { recursive: true, force: true }); }

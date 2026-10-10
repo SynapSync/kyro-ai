@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync,
+  chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync,
   renameSync, rmSync, symlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import { validateSprintFile } from '../dist/cli/artifacts/schema.js';
+import { configureCreator, isolatedGitEnv, seedLegacyWork } from './work-author-fixtures.mjs';
 const cli = resolve('dist/cli.js');
-const closedScope = resolve('.agents/kyro/scopes/organic-work/sprint.json');
 const roots = [];
 const workspace = () => {
   const root = mkdtempSync(join(tmpdir(), 'kyro-work-doctor-'));
@@ -18,7 +19,7 @@ const workspace = () => {
   writeFileSync(join(root, '.agents/kyro/local.json'), JSON.stringify({ schemaVersion: 4, activeScope: null, installedAdapters: [] }));
   return root;
 };
-const run = (root, ...args) => spawnSync(process.execPath, [cli, ...args, '--json'], { cwd: root, encoding: 'utf8' });
+const run = (root, ...args) => spawnSync(process.execPath, [cli, ...args, '--json'], { cwd: root, env: isolatedGitEnv(), encoding: 'utf8' });
 const doctorLines = (root) => {
   const result = run(root, 'doctor', '--artifacts');
   assert(result.stdout, result.stderr);
@@ -36,7 +37,18 @@ const createWork = (root) => {
 const forgeScope = (root) => {
   const destination = join(root, '.agents/kyro/scopes/organic-work');
   mkdirSync(destination, { recursive: true });
-  copyFileSync(closedScope, join(destination, 'sprint.json'));
+  // Complete standalone scope fixture; never read checkout-owned managed state.
+  const sprint = {
+    schemaVersion: 4, scope: 'organic-work', title: 'Doctor fixture', status: 'planning',
+    objective: 'Audit an isolated Forge and Work workspace.', successCriteria: ['Artifacts are readable.'],
+    spec: { requirements: [{ id: 'R1', statement: 'Artifacts must be readable.', priority: 'must', rationale: 'Audit fixture.' }], nonGoals: [], openQuestions: [], scenarios: [] },
+    clarifications: [], conventions: [], adrs: [],
+    roadmap: { plannedSprintCount: 1, sizingRationale: 'One fixture.', sprints: [{ n: 1, slug: 'fixture', title: 'Fixture', state: 'planned' }] },
+    ledger: [], previousSprint: null, activeSprint: null, debt: [],
+    handoff: { nextAction: 'plan_sprint', nextTaskId: null, blockers: [], note: 'Fixture ready.', lastUpdated: '2026-09-26' },
+  };
+  assert.deepEqual(validateSprintFile(sprint), []);
+  writeFileSync(join(destination, 'sprint.json'), JSON.stringify(sprint, null, 2) + '\n');
 };
 const snapshot = (root, withForge = false) => {
   const paths = ['.agents/kyro/project.json', '.agents/kyro/local.json', ...(withForge ? ['.agents/kyro/scopes/organic-work/sprint.json'] : [])];
@@ -104,6 +116,43 @@ try {
   symlinkSync(join(workAndForge, 'empty'), bothRoot);
   expectRootFailure(workAndForge, /symbolic link/);
   unchanged(workAndForge, bothBefore);
+
+  // Authored and fixed historical documents remain read-only under doctor.
+  const authored = workspace();
+  configureCreator(authored, 'Doctor creator', 'doctor@example.test');
+  createWork(authored);
+  const authoredPath = join(authored, '.agents/kyro/work/example/work.json');
+  const authoredBytes = readFileSync(authoredPath);
+  assert(workChecks(authored).some((line) => line.startsWith('[PASS] Work example promotion:')));
+  assert.deepEqual(readFileSync(authoredPath), authoredBytes);
+  const malformed = JSON.parse(authoredBytes); malformed.author = null;
+  writeFileSync(authoredPath, JSON.stringify(malformed));
+  assert(workChecks(authored).some((line) => line.startsWith('[FAIL] Work example promotion:') && line.includes('author')));
+  assert.equal(readFileSync(authoredPath, 'utf8'), JSON.stringify(malformed));
+  const historical = workspace();
+  writeFileSync(join(historical, 'brief.md'), '# Historical Work\n\nPreserve a historical outcome.\n');
+  seedLegacyWork(historical, 'example');
+  configureCreator(historical, 'Later identity', 'later@example.test');
+  const historicalPath = join(historical, '.agents/kyro/work/example/work.json');
+  const legacyArgs = (verb, ...extra) => [verb, '--work', 'example', ...extra];
+  const unchangedReads = () => {
+    const bytes = readFileSync(historicalPath);
+    assert(workChecks(historical).some((line) => line.startsWith('[PASS] Work example promotion:')));
+    for (const verb of ['status', 'context-pack']) {
+      const result = run(historical, 'work', ...legacyArgs(verb));
+      assert.equal(result.status, 0, result.stdout || result.stderr);
+      assert.equal(Object.hasOwn(JSON.parse(result.stdout).data.work, 'author'), false);
+    }
+    assert.deepEqual(readFileSync(historicalPath), bytes);
+    assert.equal(Object.hasOwn(JSON.parse(bytes), 'author'), false);
+  };
+  unchangedReads();
+  const plan = { tasks: [{ id: 'W1', title: 'Historical task', description: 'Deliver the historical task.', context: '', filesToTouch: [], acceptanceCriteria: ['Task transfers.'], dependsOn: [] }] };
+  writeFileSync(join(historical, 'plan.json'), JSON.stringify(plan));
+  const mutate = (...args) => { const result = run(historical, 'work', ...args); assert.equal(result.status, 0, result.stdout || result.stderr); unchangedReads(); };
+  mutate(...legacyArgs('plan', '--from', 'plan.json', '--expect-revision', '1'));
+  mutate(...legacyArgs('close', '--outcome', 'stopped', '--reason', 'Historical stop.', '--by', 'Closer', '--expect-revision', '2', '--yes'));
+  mutate(...legacyArgs('promote', '--to-scope', 'historical-scope', '--by', 'Promoter', '--expect-revision', '3', '--yes'));
 
   const unsafeAncestor = workspace();
   createWork(unsafeAncestor);

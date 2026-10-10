@@ -1180,4 +1180,22 @@ export interface WorkPromotionJournal {
   stagedTargetDigest: string;
   preparedAt: string;
 }
-export interface WorkFile { schemaVersion: 1; kind: 'organic-work'; id: string; title: string; objective: string; brief: WorkBrief; state: WorkState; revision: number; createdAt: string; updatedAt: string; handoff: WorkHandoff; tasks: WorkTask[]; activity: WorkActivity[]; closure: WorkClosure | null; promotion: WorkPromotion | null; }
+export interface WorkFile {
+  schemaVersion: 1;
+  kind: 'organic-work';
+  id: string;
+  title: string;
+  objective: string;
+  brief: WorkBrief;
+  state: WorkState;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+  /** Creation-time Git metadata, immutable thereafter; omitted for historical or unavailable identities. */
+  author?: ScopeAuthor;
+  handoff: WorkHandoff;
+  tasks: WorkTask[];
+  activity: WorkActivity[];
+  closure: WorkClosure | null;
+  promotion: WorkPromotion | null;
+}

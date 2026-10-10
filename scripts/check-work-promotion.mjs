@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnWithAuthor as spawnSync, seedLegacyWork } from './work-author-fixtures.mjs';
 import { pathToFileURL } from 'node:url';
 
 // T4.3: stage a validated Forge destination without changing the active scope.
@@ -178,7 +178,8 @@ try {
   const workPathFor = (id) => join(root, '.agents/kyro/work', id, 'work.json');
   const journalPathFor = (id) => join(root, '.agents/kyro/work', id, '.pending-promotion.json');
   const planSimpleWork = (id, tasks = [{ id: 'W1', title: 'Only task', description: 'Transfer one task.', context: '', filesToTouch: [], acceptanceCriteria: ['Output is transferred.'], dependsOn: [] }]) => {
-    data(run('work', 'create', '--id', id, '--from', 'brief.md', '--json'));
+    if (id.endsWith('-legacy')) seedLegacyWork(root, id);
+    else data(run('work', 'create', '--id', id, '--from', 'brief.md', '--json'));
     writeFileSync(join(root, `proposal-${id}.json`), JSON.stringify({ tasks }));
     data(run('work', 'plan', '--work', id, '--from', `proposal-${id}.json`, '--expect-revision', '1', '--json'));
   };
@@ -269,9 +270,9 @@ try {
 
   // Every injected publication boundary is resumable by an exact retry.
   const boundaries = ['promote-before-journal', 'promote-after-journal', 'promote-during-stage', 'promote-after-stage', 'promote-after-work', 'promote-before-target-rename', 'promote-after-target-rename', 'promote-after-target', 'promote-before-cleanup'];
-  for (const [index, boundary] of boundaries.entries()) {
-    const id = `boundary-${index}`;
-    const scope = `boundary-scope-${index}`;
+  for (const [index, boundary] of boundaries.entries()) for (const mode of ['stored', 'legacy']) {
+    const id = `boundary-${index}-${mode}`;
+    const scope = `boundary-scope-${index}-${mode}`;
     planSimpleWork(id);
     failInternal(applyWithInjection(id, scope, 2, boundary), boundary);
     if (boundary === 'promote-before-journal') assert(!existsSync(journalPathFor(id)), `${boundary} must record no intent`);
@@ -288,7 +289,20 @@ try {
       }
       assert.equal(run('status', 'full', '--kyro-scope', scope, '--json').status, 0, 'Forge status must discover only the complete target directory');
     }
+    const heldAuthor = readFileSync(workPathFor(id));
+    if (existsSync(journalPathFor(id))) {
+      const edited = JSON.parse(heldAuthor);
+      edited.author = { name: 'External edit', source: 'git', capturedAt: edited.createdAt };
+      const editedBytes = Buffer.from(JSON.stringify(edited, null, 2) + '\n');
+      writeFileSync(workPathFor(id), editedBytes);
+      fail(run(...applyArgs(id, scope, 2)), 'STATE_DIVERGED', /recoverable publication boundary/);
+      assert.deepEqual(readFileSync(workPathFor(id)), editedBytes);
+      writeFileSync(workPathFor(id), heldAuthor);
+    }
     const recovered = data(run(...applyArgs(id, scope, 2)));
+    const recoveredWork = JSON.parse(readFileSync(workPathFor(id)));
+    assert.deepEqual(recoveredWork.author, JSON.parse(heldAuthor).author);
+    assert.equal(Object.hasOwn(recoveredWork, 'author'), mode === 'stored');
     assert.equal(recovered.state, 'promoted', `${boundary} retry must promote`);
     assert(!existsSync(journalPathFor(id)), `${boundary} retry must clear the intent`);
     assert.deepEqual(workSchema.validateWorkFile(JSON.parse(readFileSync(workPathFor(id), 'utf8')), workPathFor(id)), [], `${boundary} recovery must leave a valid Work`);

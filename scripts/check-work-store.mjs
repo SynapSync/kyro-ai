@@ -1,3 +1,4 @@
+import { checkWorkAuthorStore } from './check-work-author-store.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -177,3 +178,5 @@ try {
   t41ForgeUnchanged('failed and valid creates');
   console.log('Work store isolation fixtures passed.');
 } finally { rmSync(root, { recursive: true, force: true }); }
+
+checkWorkAuthorStore();

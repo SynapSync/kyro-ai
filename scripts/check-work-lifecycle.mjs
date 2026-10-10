@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnWithAuthor as spawnSync, seedLegacyWork } from './work-author-fixtures.mjs';
 import { validateWorkFile } from '../dist/cli/work/schema.js';
 
 const cli = resolve('dist/cli.js');
@@ -189,6 +189,20 @@ try {
   assert.equal(inspect('stopped-case').nextAction, 'execute_task');
 
   for (const [path, bytes] of before) assert.deepEqual(readFileSync(join(root, path)), bytes, `${path} must remain byte-identical after Sprint 3 mutations`);
+  // Historical absence survives planning, execution, task edits and brief edits.
+  seedLegacyWork(root, 'lifecycle-legacy');
+  const legacyCreationTime = JSON.parse(readFileSync(workPath('lifecycle-legacy'))).createdAt;
+  data(run('work', 'plan', '--work', 'lifecycle-legacy', '--from', 'plan.json', '--expect-revision', '1', '--by', 'Planner B', '--json'));
+  data(run('work', 'start', '--work', 'lifecycle-legacy', '--task', 'W1', '--expect-revision', '2', '--by', 'Executor B', '--json'));
+  const legacyTask = { ...tasks[0], title: 'Historical parser clarified' }; delete legacyTask.id;
+  write('legacy-task.json', JSON.stringify(legacyTask));
+  data(run('work', 'amend-task', '--work', 'lifecycle-legacy', '--task', 'W1', '--from', 'legacy-task.json', '--reason', 'Clarify historical task.', '--by', 'Amender B', '--expect-revision', '3', '--json'));
+  write('legacy-brief.md', '# Historical brief amended\n\nDeliver an updated historical contract.\n');
+  data(run('work', 'amend-brief', '--work', 'lifecycle-legacy', '--from', 'legacy-brief.md', '--reason', 'Clarify historical brief.', '--by', 'Amender B', '--expect-revision', '4', '--json'));
+  const legacy = JSON.parse(readFileSync(workPath('lifecycle-legacy')));
+  assert.equal(Object.hasOwn(legacy, 'author'), false);
+  assert.equal(legacy.createdAt, legacyCreationTime);
+  assert.deepEqual(legacy.activity.slice(-4).map((event) => event.by), ['Planner B', 'Executor B', 'Amender B', 'Amender B']);
   console.log('Work end-to-end lifecycle and Forge-state isolation fixtures passed.');
 } finally {
   rmSync(root, { recursive: true, force: true });

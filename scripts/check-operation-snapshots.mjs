@@ -33,6 +33,7 @@
 //   - --baseline: record metrics and exit 0 even when backups are observed
 //     (pre-policy recording mode kept for comparison runs).
 import { createRequire } from 'node:module';
+import { legacyDraft } from './work-author-fixtures.mjs';
 import {
   chmodSync,
   existsSync,
@@ -363,6 +364,19 @@ try {
   const s2 = join(sandbox, 's2');
   mkdirSync(s2, { recursive: true });
 
+  // Work snapshots are opaque bytes in both v1 formats, including whitespace.
+  for (const authored of [false, true]) {
+    const dir = join(s2, authored ? 'work-authored' : 'work-legacy');
+    mkdirSync(dir, { recursive: true });
+    const target = join(dir, 'work.json');
+    const work = legacyDraft('snapshot-work', Buffer.from('Historical brief'));
+    if (authored) work.author = { name: 'Creator', source: 'git', capturedAt: work.createdAt };
+    const bytes = Buffer.from('  ' + JSON.stringify(work, null, 4) + '\n\n');
+    writeFileSync(target, bytes);
+    expectPlanThrow('Work byte rollback', [{ action: 'write', path: target, content: '{"replacement":true}\n' }, FAIL_TAIL(dir)]);
+    assert(readFileSync(target).equals(bytes), 'Work rollback must restore exact author-bearing or authorless bytes');
+    assert(planResidualNames().length === 0, 'Work rollback must dispose its backups');
+  }
   { // missing: created file vanishes on rollback
     const dir = join(s2, 'missing');
     mkdirSync(dir, { recursive: true });
