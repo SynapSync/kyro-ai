@@ -30,6 +30,7 @@ import type { OperationPlan, OperationProjectionResult } from '../types';
 import { PipelineOrchestrator } from './orchestrator';
 import type { PipelineResult, StagePlan, Step } from './types';
 import { assertStateWriterLeaseHealthy, withStateWriterLock } from './state-writer-lock';
+import { assertSafeCanonicalSkillWrite } from '../adapters/command-skills';
 import { assertSafeClaudeSkillWrite } from '../adapters/claude';
 import { assertSafeOpenCodeCommandWrite, assertSafeOpenCodeSkillWrite } from '../adapters/opencode';
 
@@ -46,7 +47,14 @@ type TargetSnapshot =
 
 export function applyOperationPlan(plan: OperationPlan[], context: OperationExecutionContext): OperationProjectionResult[] {
   return withStateWriterLock(() => {
+    // Check native ownership before canonical publication, including legacy migrations.
     for (const operation of plan) {
+      if (operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
+      if (operation.guard === 'opencode-skill') assertSafeOpenCodeSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
+      if (operation.guard === 'opencode-command') assertSafeOpenCodeCommandWrite(operation.path, operation.allowExistingManagedSkill === true);
+    }
+    for (const operation of plan) {
+      if (operation.guard === 'canonical-skill') assertSafeCanonicalSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
       if (operation.action !== 'mkdir' && operation.action !== 'rmdir-if-empty') {
         assertNotRetiredSprintOverwrite(context.resolveManagedPath(operation.path));
       }
@@ -104,6 +112,7 @@ class OperationStep implements Step {
   run(): void {
     assertStateWriterLeaseHealthy();
     const target = this.context.resolveManagedPath(this.operation.path);
+    if (this.operation.guard === 'canonical-skill') assertSafeCanonicalSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
     if (this.operation.guard === 'opencode-skill') assertSafeOpenCodeSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
     if (this.operation.guard === 'opencode-command') assertSafeOpenCodeCommandWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
     if (this.operation.guard === 'claude-skill') assertSafeClaudeSkillWrite(this.operation.path, this.operation.allowExistingManagedSkill === true);
@@ -204,7 +213,7 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
     assertStateWriterLeaseHealthy();
     mkdirSync(dirname(target), { recursive: true });
     assertStateWriterLeaseHealthy();
-    if (operation.guard === 'opencode-command') writeOpenCodeCommand(operation, target);
+    if (operation.guard === 'opencode-command' || operation.guard === 'canonical-skill') writeOpenCodeCommand(operation, target);
     else writeFileSync(target, operation.content ?? '', 'utf-8');
   } else if (operation.action === 'copy') {
     if (!operation.source) throw new Error(`Copy operation missing source for ${operation.path}`);
@@ -262,7 +271,8 @@ function applyOperation(operation: OperationPlan, target: string, context: Opera
 
 /** Open without truncation or symlink traversal, then verify before writing. */
 function writeOpenCodeCommand(operation: OperationPlan, target: string): void {
-  assertSafeOpenCodeCommandWrite(operation.path, operation.allowExistingManagedSkill === true);
+  if (operation.guard === 'canonical-skill') assertSafeCanonicalSkillWrite(operation.path, operation.allowExistingManagedSkill === true);
+  else assertSafeOpenCodeCommandWrite(operation.path, operation.allowExistingManagedSkill === true);
   let previous: ReturnType<typeof lstatSync> | null = null;
   try { previous = lstatSync(target); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }

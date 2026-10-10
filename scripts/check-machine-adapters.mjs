@@ -8,6 +8,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
+import { checkDirectorRegressions } from './check-director-regressions.mjs';
+checkDirectorRegressions();
+
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const require = createRequire(import.meta.url);
 const root = fs.mkdtempSync(join(tmpdir(), 'kyro-machine-adapters-'));

@@ -847,7 +847,7 @@ export interface OperationPlan {
   /** Literal token -> value replacements applied to `copy` operations at apply time (e.g. `{{KYRO_CLI}}`). */
   substitutions?: Record<string, string>;
   /** A host-owned write guard enforced immediately before publication. */
-  guard?: 'claude-skill' | 'opencode-skill' | 'opencode-command';
+  guard?: 'canonical-skill' | 'claude-skill' | 'opencode-skill' | 'opencode-command';
   /** Existing adapter paths may be replaced only when the previous manifest owned them. */
   allowExistingManagedSkill?: boolean;
 }

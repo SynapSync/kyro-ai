@@ -277,6 +277,13 @@ try {
     assert.deepEqual(fs.readFileSync(join(canonical, 'SKILL.md')), canonicalBefore);
     console.log('PASS C6: file-level legacy purge unlinks directory before canonical traversal');
 
+    // The canonical stubs seeded above belong to this fixture's old install.
+    // Declare that ownership before exercising reinstall through a linked HOME.
+    const priorManifestPath = resolveManagedPath('~/.agents/kyro/current/manifest.json');
+    const priorManifest = JSON.parse(fs.readFileSync(priorManifestPath, 'utf8'));
+    priorManifest.managedFiles.push('~/.agents/skills/kyro-work/SKILL.md', '~/.agents/skills/kyro-forge/SKILL.md');
+    fs.writeFileSync(priorManifestPath, JSON.stringify(priorManifest));
+
     // Re-sync must accept Kyro's own projection through a symlinked HOME.
     const realHome = process.env.HOME;
     const linkedHome = join(root, 'linked-home');
