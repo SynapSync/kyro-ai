@@ -130,9 +130,10 @@ function assertMcpProjection() {
     const noKyroPath = join(root, '.home');
     // Model an installed Codex harness while keeping the Kyro invocation off PATH.
     mkdirSync(join(root, '.home/.codex'));
+    const configPath = join(root, '.home/.codex/config.toml');
+    writeFileSync(configPath, '# User settings\nmodel = "user-selected-model"\n');
     const install = run(['install', '--agent', 'codex', '--integrations', '--scope', 'workspace', '--init-workspace', '--yes'], root, { PATH: noKyroPath });
     assert(install.status === 0, `codex install should pass: ${install.stderr || install.stdout}`);
-    const configPath = join(root, '.home/.codex/config.toml');
     const first = readFileSync(configPath, 'utf-8');
     assert(first.includes('# kyro-ai:mcp-server-kyro:start'), 'codex MCP block should use TOML-safe hash markers');
     assert(first.includes('[mcp_servers.kyro]'), 'codex MCP block should declare mcp_servers.kyro');
@@ -141,14 +142,21 @@ function assertMcpProjection() {
     // spawns the command without a shell, so a literal `~` would not expand and cli.js would not resolve.
     const expectedCli = join(root, '.home', '.agents/kyro/current/dist/cli.js');
     assert(first.includes(`args = [${JSON.stringify(expectedCli)},"mcp","serve"]`), `codex MCP block should register the ~-expanded runtime cli.js mcp serve invocation (expected ${expectedCli})`);
+    writeFileSync(configPath, `${first}\n# User MCP server\n[mcp_servers.user]\ncommand = "user-server"\n`);
     const reinstall = run(['install', '--agent', 'codex', '--integrations', '--scope', 'workspace', '--yes'], root, { PATH: noKyroPath });
     assert(reinstall.status === 0, 'codex reinstall should pass');
     const second = readFileSync(configPath, 'utf-8');
     assert(second.split('# kyro-ai:mcp-server-kyro:start').length - 1 === 1, 'codex MCP projection should be idempotent');
-    const uninstall = run(['uninstall', '--yes'], root);
+    const uninstall = run(['uninstall', '--yes'], root, { PATH: noKyroPath });
     assert(uninstall.status === 0, `uninstall should pass: ${uninstall.stderr || uninstall.stdout}`);
     const removed = readFileSync(configPath, 'utf-8');
-    assert(!removed.includes('[mcp_servers.kyro]'), 'codex MCP projection should be removable');
+    assert(removed.includes('[mcp_servers.kyro]') && removed === second, 'workspace uninstall must preserve the codex MCP block and config bytes');
+    const outsideKyroBlock = second.replace(/# kyro-ai:mcp-server-kyro:start\n[\s\S]*?# kyro-ai:mcp-server-kyro:end\n?/, '');
+    const machineUninstall = run(['uninstall', '--machine', '--yes'], root, { PATH: noKyroPath });
+    assert(machineUninstall.status === 0, `machine uninstall should pass: ${machineUninstall.stderr || machineUninstall.stdout}`);
+    const machineRemoved = readFileSync(configPath, 'utf-8');
+    assert(!machineRemoved.includes('[mcp_servers.kyro]'), 'codex MCP projection should be removable by machine uninstall');
+    assert(machineRemoved === outsideKyroBlock, 'machine uninstall must preserve every config byte outside the Kyro block');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
