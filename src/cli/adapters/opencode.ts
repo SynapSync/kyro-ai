@@ -2,7 +2,7 @@ import { AGENT, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_R
 import type { AdapterDefinition } from './registry-types';
 import { addCommandSkillProjection, buildCommandSkillManagedFilesForRoot, getCommandDescription } from './command-skills';
 import { addLinkDirectoryPlan, managedPathExists, resolveManagedPath } from '../fs';
-import { lstatSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { KyroCoreError } from '../core/errors';
 import { assertSafeLinkedSkillWrite } from './claude';
@@ -186,7 +186,13 @@ function checkOpenCodeProjection(runtimeVersion?: string): CheckResult {
     catch (error) { return { ...check, status: 'fail', detail: `${check.detail}; ${String(error)}`, remedy: FULL_PACKAGE_SYNC_REMEDY }; }
   }
   for (const command of COMMAND_NAMES) {
-    try { assertSafeOpenCodeCommandWrite(`${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`, true); }
+    const path = `${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`;
+    try {
+      assertSafeOpenCodeCommandWrite(path, true);
+      if (managedPathExists(path) && !readFileSync(resolveManagedPath(path)).equals(Buffer.from(buildOpenCodeCommand(command), 'utf8'))) {
+        throw new Error(`Native OpenCode command content mismatch: ${resolveManagedPath(path)}.`);
+      }
+    }
     catch (error) { return { ...check, status: 'fail', detail: `${check.detail}; ${String(error)}`, remedy: FULL_PACKAGE_SYNC_REMEDY }; }
   }
   if (check.status !== 'pass') return check;

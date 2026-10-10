@@ -151,5 +151,22 @@ export function checkDirectorRegressions() {
       }
     `);
     console.log('PASS lock-initialization-recovery');
+    const doctor = fixture('doctor-native-content');
+    fs.mkdirSync(join(doctor.home, '.config/opencode'), { recursive: true });
+    const install = cli(doctor, ['install', '--no-init-workspace']);
+    assert.equal(install.status, 0, install.stdout + install.stderr);
+    const nativePath = join(doctor.home, '.config/opencode/commands/kyro/work.md');
+    const health = () => cli(doctor, ['doctor', '--adapters']).stdout;
+    assert.match(health(), /\[PASS\] OpenCode adapter:/, 'doctor-native-command-content: healthy install must pass');
+    const broken = 'ARBITRARY BROKEN COMMAND\n'; put(nativePath, broken);
+    const output = health();
+    assert.match(output, /\[FAIL\] OpenCode adapter:/, 'doctor-native-command-content: corrupted stub must fail');
+    assert(output.includes(nativePath) || output.includes('~/.config/opencode/commands/kyro/work.md'), 'doctor-native-command-content: missing offending path');
+    assert.match(output, /Remedy:.*(?:sync|enable|install)/, 'doctor-native-command-content: missing remedy');
+    assert.equal(fs.readFileSync(nativePath, 'utf8'), broken, 'doctor-native-command-content: doctor must be read-only');
+    const repair = cli(doctor, ['install', '--no-init-workspace']);
+    assert.equal(repair.status, 0, repair.stdout + repair.stderr);
+    assert.match(health(), /\[PASS\] OpenCode adapter:/, 'doctor-native-command-content: repaired stub must pass');
+    console.log('PASS doctor-native-command-content');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }
