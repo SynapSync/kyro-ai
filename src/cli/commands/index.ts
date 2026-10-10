@@ -1,6 +1,7 @@
 export const CLI_COMMANDS = [
   'install',
   'detect',
+  'adapters',
   'doctor',
   'analyze',
   'review',

@@ -1,4 +1,9 @@
-import { AGENT_SKILLS_ROOT, KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
+import { KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH, MACHINE_ADAPTER_REGISTRY_PATH } from '../constants';
+import { readMachineAdapterRegistry, registerMachineAdapterPlan, withMachineAdapterRegistryLock } from '../adapters/machine-registry';
+import { getInstallableAdapters } from '../adapters/registry';
+import { setCliMachineResult } from '../core/cli-envelope';
+import { withStateWriterLock } from '../pipeline/state-writer-lock';
+import { assertRealRemovalParents, buildMachineRemovalPlan } from './adapters';
 import { getInstalledAdapterDefinitions } from '../adapters/registry';
 import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope } from '../options';
@@ -12,7 +17,8 @@ import {
 } from '../state';
 import type { CliOptions, OperationPlan } from '../types';
 
-export function uninstall(options: CliOptions): void {
+export function uninstall(options: CliOptions & { machine?: boolean }): void {
+  if (options.machine) { uninstallMachine(options); return; }
   assertWorkspaceScope(options.scope);
   const state = readProjectState();
   if (!state) {
@@ -22,22 +28,12 @@ export function uninstall(options: CliOptions): void {
 
   const nextState = { ...state, installedAdapters: [] };
   const plan: OperationPlan[] = [];
-  const purgeDirectories = new Set<string>();
+  // Only workspace-local instruction blocks belong to workspace uninstall.
+  // Machine links, canonical files, and home integrations survive even legacy purge.
   for (const adapter of getInstalledAdapterDefinitions(state.installedAdapters.map((installedAdapter) => installedAdapter.agent))) {
-    adapter.buildRemoval(plan);
-    if (adapter.capabilities().includes('mcp')) adapter.buildMcpRemoval(plan);
-    if (options.purgeAdapterAssets) {
-      for (const file of adapter.buildManagedFiles()) {
-        // Canonical skills are machine-owned and shared by every adapter.
-        // Only an explicit machine uninstall may remove them, never a workspace purge.
-        if (file === AGENT_SKILLS_ROOT || file.startsWith(`${AGENT_SKILLS_ROOT}/`)) continue;
-        plan.push({ action: 'remove', path: file });
-        purgeDirectories.add(parentPath(file));
-      }
-    }
-  }
-  for (const directory of [...purgeDirectories].sort((a, b) => b.length - a.length)) {
-    plan.push({ action: 'rmdir-if-empty', path: directory });
+    const removal: OperationPlan[] = [];
+    adapter.buildRemoval(removal);
+    plan.push(...removal.filter((operation) => !operation.path.startsWith('~/')));
   }
 
   // Clear installedAdapters on the correct layer; never recreate monolito when layers exist.
@@ -67,21 +63,29 @@ export function uninstall(options: CliOptions): void {
 
   applyPlan(plan);
   console.log('Kyro project bootstrap removed.');
-  if (options.purgeAdapterAssets) {
-    console.log('Adapter-owned entrypoint files were removed.');
-  } else {
-    console.log('Adapter-owned entrypoint files were preserved. Use --purge-adapter-assets to remove them.');
-  }
+  console.log('Machine projections and integrations were preserved. Use kyro uninstall --machine to remove them.');
   const preservedState = hasLayeredProjectStateOnDisk() || !hasMonolitoProjectStateOnDisk()
     ? `${PROJECT_STATE_PATH} + ${LOCAL_STATE_PATH}`
     : KYRO_STATE_PATH;
   console.log(`Note: ${preservedState}, scope artifacts, and global runtime were preserved.`);
 }
 
-function parentPath(path: string): string {
-  const index = path.lastIndexOf('/');
-  if (index <= 0) return path;
-  return path.slice(0, index);
+function uninstallMachine(options: CliOptions): void {
+  assertRealRemovalParents(MACHINE_ADAPTER_REGISTRY_PATH);
+  const run = (): void => {
+    readMachineAdapterRegistry(); // Validate before touching any owned path.
+    assertRealRemovalParents(MACHINE_ADAPTER_REGISTRY_PATH);
+    const plan = buildMachineRemovalPlan(getInstallableAdapters().map((adapter) => adapter.agent), true);
+    registerMachineAdapterPlan(plan, { schemaVersion: 1, adapters: [] });
+    // The registry is removed by the same transactional plan, under its machine lock.
+    plan.push({ action: 'remove', path: MACHINE_ADAPTER_REGISTRY_PATH });
+    printPlan('Machine uninstall plan', plan);
+    if (!options.dryRun) applyPlan(plan);
+    setCliMachineResult(options.dryRun ? 'preview' : 'applied', { machine: true, dryRun: options.dryRun, affectedFiles: plan.map((operation) => operation.path) });
+    console.log(options.dryRun ? 'Dry run complete. No files changed.' : 'Kyro-owned canonical skills, machine projections, integrations, and adapter registry removed. Global runtime and workspace state preserved.');
+  };
+  if (options.dryRun) run();
+  else withStateWriterLock(() => withMachineAdapterRegistryLock(run));
 }
 
 function printUninstallSummary(plan: OperationPlan[], purgeAdapterAssets: boolean): void {

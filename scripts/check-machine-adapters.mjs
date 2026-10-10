@@ -1,4 +1,4 @@
-/** W1 machine registry and W5 Pi contracts. Every invocation uses a disposable HOME. */
+/** W1 machine registry, W4 CLI and W5 Pi contracts. Every invocation uses a disposable HOME. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawn, spawnSync } from 'node:child_process';
@@ -49,8 +49,8 @@ function run(cwd, args, success = true, env = {}) {
 function tree(path) {
   const result = [];
   function walk(current, relative) {
-    if (!fs.existsSync(current)) return;
-    const stat = fs.lstatSync(current);
+    let stat;
+    try { stat = fs.lstatSync(current); } catch (error) { if (error.code === 'ENOENT') return; throw error; }
     const data = stat.isSymbolicLink() ? fs.readlinkSync(current) : stat.isFile() ? createHash('sha256').update(fs.readFileSync(current)).digest('hex') : 'directory';
     result.push([relative, stat.mode, data]);
     if (stat.isDirectory()) for (const name of fs.readdirSync(current).sort()) walk(join(current, name), `${relative}/${name}`);
@@ -485,8 +485,191 @@ try {
   assert.match(piDoctor.stdout, /\[PASS\] Pi adapter:.*\/skill:kyro-work.*enableSkillCommands/);
   console.log('PASS W5 doctor invocation / setting: CLI reports /skill:kyro-work and enableSkillCommands; manual invocation remains available');
   console.log('Pi adapter checks passed (W5 criteria 1-4).');
+
+  checkW4();
+  console.log('Machine adapter checks passed (W1, W4 and W5).');
 } finally {
   process.chdir(original.cwd);
   for (const key of ['HOME', 'USERPROFILE', 'npm_config_cache', 'PATH']) if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key];
   fs.rmSync(root, { recursive: true, force: true });
+}
+
+/** W4 CLI acceptance, with its own HOME and a local npm fixture (no network/install). */
+function checkW4() {
+  const w4 = join(root, 'w4'), w4home = join(w4, 'home'), bin = join(w4, 'prefix/bin');
+  const modules = join(w4, 'prefix/lib/node_modules'), installed = join(modules, 'kyro-ai');
+  const a = join(w4, 'a'), b = join(w4, 'b'), outside = join(w4, 'outside');
+  const registry = join(w4home, '.agents/kyro/adapters.json');
+  const canonical = join(w4home, '.agents/skills/kyro-work');
+  const claude = join(w4home, '.claude/skills/kyro-work');
+  const opencode = join(w4home, '.config/opencode/skills/kyro-work');
+  const native = join(w4home, '.config/opencode/commands/kyro/work.md');
+  const settings = join(w4home, '.config/opencode/opencode.json');
+  const config = join(w4home, '.codex/config.toml');
+  const put = (path, body) => { fs.mkdirSync(dirname(path), { recursive: true }); fs.writeFileSync(path, body); };
+  for (const cwd of [a, b, outside, bin, installed]) fs.mkdirSync(cwd, { recursive: true });
+  process.env.HOME = w4home; process.env.USERPROFILE = w4home; process.env.PATH = bin;
+  const listBeforeInstall = JSON.parse(run(outside, ['adapters', 'list', '--json']).stdout);
+  assert.equal(listBeforeInstall.schemaVersion, 1); assert.equal(listBeforeInstall.ok, true);
+  assert.equal(listBeforeInstall.command, 'adapters list'); assert.equal(listBeforeInstall.phase, 'result');
+  assert(!fs.existsSync(w4home), 'list must not create HOME');
+  assert(listBeforeInstall.data.adapters.every((row) => row.state === 'unregistered' && row.projection === null && row.integrations === false));
+  for (const harness of ['claude', 'codex', 'opencode', 'pi']) { put(join(bin, harness), '#!/bin/sh\nexit 0\n'); fs.chmodSync(join(bin, harness), 0o755); }
+  for (const args of [['adapters', 'enable', 'claude', '--integrations'], ['adapters', 'disable', 'claude'], ['uninstall', '--machine']]) {
+    assert.equal(JSON.parse(run(a, [...args, '--dry-run', '--json']).stdout).phase, 'preview');
+    assert(!fs.existsSync(w4home), 'new command previews must preserve an absent HOME');
+  }
+  fs.symlinkSync(process.execPath, join(bin, 'node'));
+  for (const path of ['dist', 'agents', 'commands', 'internal', 'package.json', 'config.json', 'WORKFLOW.yaml']) fs.cpSync(join(repo, path), join(installed, path), { recursive: true });
+  fs.symlinkSync(join(installed, 'dist/cli.js'), join(bin, 'kyro'));
+  const version = json(join(repo, 'package.json')).version;
+  put(join(bin, 'npm'), `#!/bin/sh\ncase "$1" in\n prefix) printf '%s\\n' '${join(w4, 'prefix')}' ;;\n root) printf '%s\\n' '${modules}' ;;\n view) printf '"${version}"\\n' ;;\n *) exit 91 ;;\nesac\n`);
+  fs.chmodSync(join(bin, 'npm'), 0o755);
+  put(config, '# User config\nmodel = "kept"\n');
+  put(settings, '{"model":"kept","agent":{"foreign":{"prompt":"untouched"}}}\n');
+  put(join(a, 'AGENTS.md'), '# Workspace A\n'); put(join(b, 'AGENTS.md'), '# Workspace B\n');
+  run(a, ['install', '--init-workspace', '--integrations']);
+  run(b, ['install', '--init-workspace']);
+  const implemented = load(a).machine && require(join(repo, 'dist/cli/adapters/registry.js')).getInstallableAdapters().map((adapter) => adapter.agent);
+  const inventory = JSON.parse(run(a, ['adapters', 'list', '--json']).stdout);
+  assert.deepEqual(inventory.data.adapters.map((row) => row.agent), implemented);
+  for (const row of inventory.data.adapters) {
+    assert.equal(typeof row.detected, 'boolean'); assert.equal(row.detected, true);
+    assert.equal(row.state, 'enabled'); assert.equal(typeof row.integrations, 'boolean');
+    assert(['link', 'copy', null].includes(row.projection));
+  }
+  const text = run(a, ['adapters', 'list']).stdout;
+  for (const agent of implemented) assert(text.includes(`${agent}: detected=true; state=enabled; projection=`));
+  console.log('PASS W4-list-envelope: every implemented adapter, detected/state/projection/integrations; standard JSON envelope; list is read-only');
+
+  for (const args of [['--help'], ['install', '--help'], ['sync', '--help']]) {
+    const help = run(a, args).stdout;
+    for (const agent of implemented) assert(help.includes(agent), `${args}: missing ${agent}`);
+  }
+  for (const agent of ['unknown', 'cursor']) {
+    const failure = JSON.parse(run(a, ['adapters', 'enable', agent, '--json'], false).stdout);
+    assert.equal(failure.error.code, 'INVALID_INPUT');
+    for (const implementedAgent of implemented) assert(failure.error.remedy.includes(implementedAgent));
+  }
+  // Adding an implemented entry must immediately change every help surface (W5 integration).
+  const registryModule = require(join(repo, 'dist/cli/adapters/registry.js'));
+  const helpModule = require(join(repo, 'dist/cli/help.js'));
+  const piIndex = registryModule.ADAPTERS.findIndex((adapter) => adapter.agent === 'pi');
+  const [realPi] = registryModule.ADAPTERS.splice(piIndex, 1);
+  const log = console.log; const helpWithoutPi = []; const helpOutput = [];
+  try {
+    console.log = (line) => helpWithoutPi.push(line);
+    helpModule.printHelp(); helpModule.printCommandHelp('install'); helpModule.printCommandHelp('sync');
+    assert(helpWithoutPi.every((line) => !line.includes('|pi')), 'help must track removal from the implemented registry');
+    registryModule.ADAPTERS.splice(piIndex, 0, realPi);
+    console.log = (line) => helpOutput.push(line);
+    helpModule.printHelp(); helpModule.printCommandHelp('install'); helpModule.printCommandHelp('sync');
+  } finally {
+    console.log = log;
+    if (!registryModule.ADAPTERS.includes(realPi)) registryModule.ADAPTERS.splice(piIndex, 0, realPi);
+  }
+  assert.equal(helpOutput.length, 3); assert(helpOutput.every((line) => line.includes('pi')));
+  console.log('PASS W4-help-registry: install/sync/agent help derives implemented adapters, includes claude, dynamically includes pi; invalid/planned agents fail INVALID_INPUT');
+
+  let snapshot = tree(w4home);
+  for (const args of [['adapters', 'disable', 'claude'], ['adapters', 'enable', 'claude', '--integrations'], ['uninstall', '--machine']]) {
+    const result = JSON.parse(run(a, [...args, '--dry-run', '--json']).stdout);
+    assert.equal(result.phase, 'preview'); assert.equal(result.ok, true);
+    assert.equal(tree(w4home), snapshot, args.join(' '));
+  }
+  console.log('PASS W4-dry-run: enable with integrations, disable, and machine uninstall preserve absent/populated HOME bytes, modes, links, and directories');
+
+  const canonicalBefore = tree(join(w4home, '.agents/skills'));
+  const disabled = JSON.parse(run(a, ['adapters', 'disable', 'claude', '--json']).stdout);
+  assert.equal(disabled.phase, 'applied'); assert.equal(disabled.data.state, 'disabled');
+  assert.match(disabled.data.note, /Canonical.*preserved/);
+  assert(!fs.existsSync(claude)); assert.equal(tree(join(w4home, '.agents/skills')), canonicalBefore);
+  assert(fs.existsSync(opencode));
+  run(b, ['sync']); run(a, ['update', '--yes']); run(b, ['install', '--init-workspace']);
+  assert(!fs.existsSync(claude)); assert.equal(json(registry).adapters.find((entry) => entry.agent === 'claude').state, 'disabled');
+  console.log('PASS W4-disable-sticky: Claude-only removal keeps canonical skills and OpenCode; disabled survives another workspace sync/install and real update with local npm fixture');
+
+  run(a, ['adapters', 'enable', 'claude']); assert(fs.existsSync(claude));
+  run(a, ['adapters', 'disable', 'claude']); run(b, ['sync', '--agent', 'claude']); assert(fs.existsSync(claude));
+  run(a, ['adapters', 'disable', 'claude']); run(a, ['install', '--agent', 'claude', '--init-workspace']); assert(fs.existsSync(claude));
+  run(a, ['adapters', 'enable', 'claude'], true, { KYRO_LINK_MODE: 'copy' });
+  assert(fs.lstatSync(claude).isDirectory());
+  assert.equal(json(registry).adapters.find((entry) => entry.agent === 'claude').projection, 'copy');
+  run(a, ['adapters', 'disable', 'claude']); assert(fs.existsSync(canonical));
+  run(a, ['adapters', 'enable', 'claude']);
+  console.log('PASS W4-enable-explicit: adapters enable and install/sync --agent restore Claude; disable safely removes owned copy fallback');
+
+  run(a, ['adapters', 'disable', 'codex']);
+  assert.equal(tree(join(w4home, '.agents/skills')), canonicalBefore);
+  assert.equal(fs.readFileSync(config, 'utf8'), '# User config\nmodel = "kept"\n');
+  assert(!fs.readFileSync(join(a, 'AGENTS.md'), 'utf8').includes('kyro-ai:agents-md'));
+  run(a, ['adapters', 'enable', 'codex', '--integrations']);
+  assert(fs.readFileSync(config, 'utf8').includes('kyro-ai:mcp-server-kyro'));
+  assert(fs.readFileSync(join(a, 'AGENTS.md'), 'utf8').includes('kyro-ai:agents-md'));
+  run(a, ['adapters', 'disable', 'opencode']);
+  assert(!fs.existsSync(opencode)); assert(!fs.existsSync(native)); assert.equal(json(settings).agent['kyro-orchestrator'], undefined);
+  assert.equal(json(settings).agent.foreign.prompt, 'untouched'); assert(fs.existsSync(claude)); assert(fs.existsSync(canonical));
+  run(a, ['adapters', 'enable', 'opencode', '--integrations']);
+  console.log('PASS W4-disable-integrations: Codex/OpenCode integrations removed and restored with opt-in; shared canonical and other harnesses survive');
+
+  snapshot = tree(w4home);
+  const bBefore = tree(b);
+  run(a, ['uninstall']); assert.equal(tree(w4home), snapshot); assert.equal(tree(b), bBefore);
+  run(a, ['uninstall', '--purge-adapter-assets']); assert.equal(tree(w4home), snapshot);
+  const doctor = run(b, ['doctor', '--adapters']).stdout;
+  assert(doctor.includes('[PASS] Claude Code adapter:')); assert(doctor.includes('[PASS] OpenCode adapter:'));
+  console.log('PASS W4-workspace-uninstall: normal and legacy purge preserve complete HOME and second workspace; its Claude/OpenCode doctor rows pass');
+
+  // Replacements at otherwise owned paths must fail before any removal/registry write.
+  const foreignTarget = join(w4, 'foreign-target'); put(foreignTarget, 'FOREIGN BYTES\n');
+  const cases = [
+    [claude, (path) => put(path, 'foreign file'), ['adapters', 'disable', 'claude']],
+    [claude, (path) => put(join(path, 'user.txt'), 'foreign directory'), ['adapters', 'disable', 'claude']],
+    [claude, (path) => fs.symlinkSync(foreignTarget, path), ['adapters', 'disable', 'claude']],
+    [opencode, (path) => put(path, 'foreign OpenCode file'), ['adapters', 'disable', 'opencode']],
+    [opencode, (path) => put(join(path, 'user.txt'), 'foreign OpenCode directory'), ['adapters', 'disable', 'opencode']],
+    [opencode, (path) => fs.symlinkSync(foreignTarget, path), ['adapters', 'disable', 'opencode']],
+    [canonical, (path) => put(path, 'foreign canonical file'), ['uninstall', '--machine']],
+    [canonical, (path) => put(join(path, 'user.txt'), 'foreign canonical directory'), ['uninstall', '--machine']],
+    [canonical, (path) => fs.symlinkSync(foreignTarget, path), ['uninstall', '--machine']],
+    [native, (path) => put(path, 'foreign native command'), ['uninstall', '--machine']],
+    [native, (path) => fs.symlinkSync(foreignTarget, path), ['uninstall', '--machine']],
+    [config, (path) => fs.symlinkSync(foreignTarget, path), ['uninstall', '--machine']],
+    [registry, (path) => fs.symlinkSync(foreignTarget, path), ['uninstall', '--machine']],
+  ];
+  for (const [path, replace, args] of cases) {
+    const backup = join(w4, 'backup'); fs.renameSync(path, backup); replace(path);
+    try {
+      const before = tree(w4home);
+      for (const flags of [[], ['--dry-run']]) {
+        const failure = run(a, [...args, ...flags, '--json'], false);
+        const output = JSON.parse(failure.stdout);
+        assert.equal(output.ok, false); assert.match(output.error.message, /foreign|Unsafe|REGISTRY_INVALID/);
+        const managed = `~/${path.slice(w4home.length + 1)}`;
+        assert(output.error.message.includes(path) || output.error.message.includes(managed), `refusal must name the path: ${path}: ${output.error.message}`);
+        assert.equal(tree(w4home), before); assert.equal(fs.readFileSync(foreignTarget, 'utf8'), 'FOREIGN BYTES\n');
+      }
+    } finally { fs.rmSync(path, { recursive: true, force: true }); fs.renameSync(backup, path); }
+  }
+  put(join(canonical, 'foreign.txt'), 'extra foreign bytes');
+  snapshot = tree(w4home); run(a, ['uninstall', '--machine'], false); assert.equal(tree(w4home), snapshot);
+  fs.unlinkSync(join(canonical, 'foreign.txt'));
+  console.log('PASS W4-removal-fail-closed: foreign files/directories/links, modified commands, integration/registry symlinks and mixed canonical directory preserve full HOME and foreign bytes in apply and preview');
+
+  put(join(w4home, '.agents/skills/user-skill/SKILL.md'), 'user canonical');
+  put(join(w4home, '.claude/skills/user-skill/SKILL.md'), 'user claude');
+  put(join(w4home, '.config/opencode/commands/user.md'), 'user command');
+  const workspaceBefore = tree(join(b, '.agents/kyro'));
+  const removed = JSON.parse(run(a, ['uninstall', '--machine', '--json']).stdout);
+  assert.equal(removed.phase, 'applied'); assert.equal(removed.ok, true);
+  assert(!fs.existsSync(registry)); assert(!fs.existsSync(canonical)); assert(!fs.existsSync(claude)); assert(!fs.existsSync(opencode)); assert(!fs.existsSync(native));
+  assert.equal(fs.readFileSync(join(w4home, '.agents/skills/user-skill/SKILL.md'), 'utf8'), 'user canonical');
+  assert.equal(fs.readFileSync(join(w4home, '.claude/skills/user-skill/SKILL.md'), 'utf8'), 'user claude');
+  assert.equal(fs.readFileSync(join(w4home, '.config/opencode/commands/user.md'), 'utf8'), 'user command');
+  assert.equal(fs.readFileSync(config, 'utf8'), '# User config\nmodel = "kept"\n');
+  assert.equal(json(settings).agent.foreign.prompt, 'untouched'); assert.equal(json(settings).agent['kyro-orchestrator'], undefined);
+  assert.equal(tree(join(b, '.agents/kyro')), workspaceBefore);
+  assert(fs.existsSync(join(w4home, '.agents/kyro/current/dist/cli.js')));
+  snapshot = tree(w4home); run(a, ['uninstall', '--machine']); assert.equal(tree(w4home), snapshot);
+  console.log('PASS W4-machine-uninstall: removes owned canonical/projections/integrations/registry only; user siblings, config fields, runtime and workspace state preserved; repeat is byte-idempotent');
 }

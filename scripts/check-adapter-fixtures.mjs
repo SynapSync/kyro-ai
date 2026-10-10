@@ -285,7 +285,7 @@ withWorkspace('kyro-claude-adapter-', (cwd) => {
   rmSync(workSkill);
   captureLogs(() => sync(cliOptions({ agents: [claude] })));
   captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true })));
-  assert(!existsSync(join(skillsRoot, 'kyro-forge')), 'claude: purge should remove managed skills');
+  assert(existsSync(join(skillsRoot, 'kyro-forge')), 'claude: workspace purge must preserve machine skills');
   for (const [index, file] of [settings, userSkill, legacyPlugin].entries()) {
     assert(readFileSync(file).equals(preserved[index]), `claude: purge touched unrelated file: ${file}`);
   }
@@ -689,7 +689,7 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
   assert(settings.model === 'user/model', 'opencode uninstall: did not preserve root setting');
   assert(settings.agent.existing.model === 'kept', 'opencode uninstall: did not preserve existing agent');
-  assert(!settings.agent['kyro-orchestrator'], 'opencode uninstall: Kyro orchestrator overlay still present');
+  assert(readFileSync(settingsPath, 'utf-8') === afterInstall, 'opencode uninstall: machine integrations must remain byte-identical');
   assert(settings.mcp['user-server'].command[1] === 'server.js', 'opencode uninstall: did not preserve existing MCP config');
   for (const command of EXPECTED_COMMAND_SKILLS) {
     assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode uninstall: should preserve native skill ${command} without purge`);
@@ -708,8 +708,8 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   const canonicalBeforePurge = canonicalSkills.map((path) => readFileSync(path));
   assert(!purgeDryRunOutput.split('\n').some((line) => /^- (remove|rmdir-if-empty) ~\/\.agents\/skills(?:\/|$)/.test(line)), 'opencode purge dry-run: must not remove canonical skills or their directories');
   assert(purgeDryRunOutput.includes('purgeAdapterAssets=yes'), 'opencode purge dry-run: summary should report purge enabled');
-  assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/skills/kyro-forge/SKILL.md'), 'opencode purge dry-run: plan should include native skill removal');
-  assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/commands/kyro/forge.md'), 'opencode purge dry-run: plan should include native command removal');
+  assert(!purgeDryRunOutput.includes('- remove ~/.config/opencode/skills/'), 'opencode purge dry-run: machine skills must be preserved');
+  assert(!purgeDryRunOutput.includes('- remove ~/.config/opencode/commands/'), 'opencode purge dry-run: machine commands must be preserved');
   assert(purgeDryRunOutput.includes('Dry run complete. No files changed.'), 'opencode purge dry-run: should report no file changes');
   settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
   assert(settings.agent['kyro-orchestrator'], 'opencode purge dry-run: Kyro orchestrator overlay should remain');
@@ -720,18 +720,18 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
 
   const purgeOutput = captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true })));
   assert(purgeOutput.includes('purgeAdapterAssets=yes'), 'opencode purge: summary should report purge enabled');
-  assert(purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/commands/kyro'), 'opencode purge: plan should clean command namespace directory');
-  assert(purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/skills/kyro-forge'), 'opencode purge: plan should clean skill directory');
+  assert(!purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/commands/kyro'), 'opencode purge: machine command directory must be preserved');
+  assert(!purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/skills/kyro-forge'), 'opencode purge: machine skill directory must be preserved');
   settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
   assert(settings.model === 'user/model', 'opencode purge: did not preserve root setting');
   assert(settings.agent.existing.model === 'kept', 'opencode purge: did not preserve existing agent');
-  assert(!settings.agent['kyro-orchestrator'], 'opencode purge: Kyro orchestrator overlay still present');
+  assert(readFileSync(settingsPath, 'utf-8') === afterInstall, 'opencode purge: machine integrations must remain byte-identical');
   for (const command of EXPECTED_COMMAND_SKILLS) {
-    assert(!existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode purge: native skill ${command} still present`);
-    assert(!existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode purge: native command ${command} still present`);
-    assert(!existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`)), `opencode purge: empty skill directory ${command} still present`);
+    assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode purge: native skill ${command} must remain`);
+    assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode purge: native command ${command} must remain`);
+    assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`)), `opencode purge: skill directory ${command} must remain`);
   }
-  assert(!existsSync(join(home, '.config', 'opencode', 'commands', 'kyro')), 'opencode purge: empty command namespace still present');
+  assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro')), 'opencode purge: machine command namespace must remain');
   assert(existsSync(join(home, '.config', 'opencode')), 'opencode purge: shared OpenCode config directory should remain');
   assert(existsSync(join(home, '.agents', 'skills', 'kyro-work', 'SKILL.md')), 'opencode purge: canonical Work skill must remain discoverable');
   canonicalSkills.forEach((path, index) => assert(readFileSync(path).equals(canonicalBeforePurge[index]), `opencode purge: canonical skill changed: ${path}`));
@@ -742,10 +742,8 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   assert(doctorAfterPurgeOutput.includes('[PASS] global runtime'), 'opencode purge doctor: global runtime should remain valid after purging adapter assets');
   assert(doctorAfterPurgeOutput.includes('[PASS] Standard .agents adapter:'), 'opencode purge doctor: Standard must remain healthy');
   const purgeDoctorFailures = doctorAfterPurgeOutput.split('\n').filter((line) => line.startsWith('[FAIL]'));
-  // W1 keeps the machine registration after a workspace purge. W4 owns machine uninstall;
-  // doctor must expose the missing registered projection rather than forget the machine entry.
-  assert(purgeDoctorFailures.some((line) => line.startsWith('[FAIL] OpenCode adapter:')), 'opencode purge doctor: missing registered machine projection must fail');
-  assert(purgeDoctorFailures.every((line) => line.startsWith('[FAIL] OpenCode adapter:') || (line.startsWith('[FAIL] CLI capabilities:') && line.includes('work'))), `opencode purge doctor: unexpected failure after purging adapter assets\n${doctorAfterPurgeOutput}`);
+  assert(doctorAfterPurgeOutput.includes('[PASS] OpenCode adapter:'), 'opencode purge doctor: machine projection must stay healthy');
+  assert(purgeDoctorFailures.every((line) => line.startsWith('[FAIL] CLI capabilities:') && line.includes('work')), `opencode purge doctor: unexpected failure\n${doctorAfterPurgeOutput}`);
   process.exitCode = priorExitCode;
 });
 

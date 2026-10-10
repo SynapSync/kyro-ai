@@ -12,6 +12,7 @@ import { runStatusCommand } from './commands/status';
 import { runScopeCommand } from './commands/scope';
 import { runCloseSprintCommand } from './commands/close-sprint';
 import { uninstall } from './commands/uninstall';
+import { runAdaptersCommand } from './commands/adapters';
 import { runEval } from './commands/eval';
 import { runMcpCommand } from './commands/mcp';
 import { runTraceCommand } from './commands/trace';
@@ -64,6 +65,11 @@ export async function runCli(): Promise<void> {
 
   if (command === 'work') {
     runWorkCommand(args);
+    return;
+  }
+
+  if (command === 'adapters') {
+    runAdaptersCommand(args);
     return;
   }
 

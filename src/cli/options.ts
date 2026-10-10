@@ -3,7 +3,7 @@ import { getAdapterDefinition, getInstallableAdapters } from './adapters/registr
 import { KyroCoreError } from './core/errors';
 import type { Agent, CliOptions, InstallScope, PackVerbosity } from './types';
 
-export function parseOptions(args: string[]): CliOptions {
+export function parseOptions(args: string[]): CliOptions & { machine: boolean } {
   const agents: Agent[] = [];
   let scope: InstallScope = SCOPE.WORKSPACE;
   let dryRun = false;
@@ -13,6 +13,7 @@ export function parseOptions(args: string[]): CliOptions {
   let artifacts = false;
   let adapters = false;
   let integrations = false;
+  let machine = false;
   let trace = false;
   let kyroScope: string | null = null;
   let task: string | null = null;
@@ -46,6 +47,8 @@ export function parseOptions(args: string[]): CliOptions {
       adapters = true;
     } else if (arg === '--integrations') {
       integrations = true;
+    } else if (arg === '--machine') {
+      machine = true;
     } else if (arg === '--trace') {
       trace = true;
     } else if (arg === '--json') {
@@ -141,6 +144,7 @@ export function parseOptions(args: string[]): CliOptions {
     artifacts,
     adapters,
     integrations,
+    machine,
     trace,
     kyroScope,
     task,

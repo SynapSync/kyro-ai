@@ -1,5 +1,12 @@
 import { readJsonFromPackage } from './fs';
 
+// Adapters use readPackageVersion while initializing. Load the registry only
+// when rendering help, after the adapter definitions have been initialized.
+const implementedAgents = (): string => {
+  const { getInstallableAdapters } = require('./adapters/registry') as typeof import('./adapters/registry');
+  return getInstallableAdapters().map((adapter) => adapter.agent).join('|');
+};
+
 export function readPackageVersion(): string {
   return readJsonFromPackage<{ version: string }>('package.json').version;
 }
@@ -11,6 +18,7 @@ Usage:
   kyro                         Open interactive TUI
   kyro install                 Install/update the global Kyro runtime
   kyro detect                  Detect local agent adapters
+  kyro adapters <subcommand>   List, enable, or disable machine adapters
   kyro doctor                  Check package/workspace health
   kyro analyze [options]       Semantic cross-check of a scope (clarity, coverage, deps, debt)
   kyro record-evidence <task>  Tool-owned maker evidence or disposition write
@@ -40,7 +48,7 @@ Usage:
   kyro uninstall [options]     Remove managed workspace assets
 
 Options:
-  --agent <name>               Agent adapter: standard, opencode, codex
+  --agent <name>               Agent adapter: ${implementedAgents()}
   --scope <scope>              Install scope: workspace (default)
   --kyro-scope <scope>         Select Kyro artifact scope
   --tokens                     Include token/context budget audit for doctor
@@ -51,7 +59,8 @@ Options:
   --integrations               Opt in to config blocks for selected/detected adapters
   --verbose                    Show detailed install/sync operation plans
   --verbosity <level>          Output depth for context-pack: concise or detailed (default)
-  --purge-adapter-assets       Remove adapter-owned entrypoint files during uninstall
+  --purge-adapter-assets       Legacy workspace option; machine projections are preserved
+  --machine                    Remove machine-owned skills, projections, and integrations
   --prune                      Clean obsolete adapter-owned files during sync
   --check                      Report update status without changing anything (update)
   --init-workspace             Initialize Kyro in this workspace during install
@@ -110,9 +119,12 @@ export function printCommandHelp(command: string): void {
     return;
   }
   if (command === 'install') {
-    console.log('Usage: kyro install [--agent standard|opencode|codex] --scope workspace [--init-workspace|--no-init-workspace] [--integrations] [--dry-run] [--yes]');
+    console.log(`Usage: kyro install [--agent ${implementedAgents()}] --scope workspace [--init-workspace|--no-init-workspace] [--integrations] [--dry-run] [--yes]`);
+  } else if (command === 'adapters') {
+    console.log(`Usage: kyro adapters list | enable|disable <${implementedAgents()}> [--integrations] [--json] [--dry-run]`);
+    console.log('Disable preserves canonical ~/.agents/skills skills shared by Codex, Pi, and OpenCode.');
   } else if (command === 'detect') {
-    console.log('Usage: kyro detect [--agent standard|opencode|codex|claude|cursor] [--json]');
+    console.log(`Usage: kyro detect [--agent ${implementedAgents()}] [--json]`);
   } else if (command === 'doctor') {
     console.log('Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--trace] [--kyro-scope <scope>]');
   } else if (command === 'repair') {
@@ -162,12 +174,12 @@ export function printCommandHelp(command: string): void {
   } else if (command === 'scope') {
     console.log('Usage: kyro scope list | inspect <scope> | set-active <scope> | complete --kyro-scope <scope> [--summary <text>] [--yes] | reopen --kyro-scope <scope> --reason <reason> [--yes] | retire --kyro-scope <scope> --reason <reason> [--digest <sha256> --yes]');
   } else if (command === 'sync') {
-    console.log('Usage: kyro sync [--agent standard|opencode|codex] [--integrations] [--prune] [--dry-run]');
+    console.log(`Usage: kyro sync [--agent ${implementedAgents()}] [--integrations] [--prune] [--dry-run]`);
   } else if (command === 'update') {
     console.log('Usage: kyro update [--agent <agent>] [--integrations] [--check] [--dry-run] [--yes] [--verbose]');
     console.log('Checks the registry for the latest kyro-ai release, updates the global package when behind, and refreshes the runtime + current workspace from the fresh package. Prompts before changing anything unless --yes.');
   } else if (command === 'uninstall') {
-    console.log('Usage: kyro uninstall [--purge-adapter-assets] [--dry-run] [--yes]');
+    console.log('Usage: kyro uninstall [--machine|--purge-adapter-assets] [--dry-run] [--json] [--yes]');
   } else {
     printHelp();
   }
