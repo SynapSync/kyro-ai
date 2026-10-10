@@ -1,8 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { AGENT, AGENT_SKILLS_ROOT, KYRO_ROOT } from '../constants';
-import { resolveManagedPath } from '../fs';
-import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
-import { buildCommandSkillManagedFiles, parseSkillRuntimeVersion } from './command-skills';
+import { checkCommandProjection } from './standard';
 import { detectFromPaths } from './detection';
 import type { AdapterDefinition } from './registry-types';
 
@@ -46,22 +43,7 @@ export const piAdapter: AdapterDefinition = {
   },
   doctor(manifest) {
     const name = 'Pi adapter';
-    const runtimeVersion = manifest?.packageVersion?.trim();
-    if (!runtimeVersion) {
-      return { status: 'fail', name, detail: `canonical skill freshness unknown: runtime packageVersion missing. ${INVOCATION_NOTE}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
-    }
-    const issues: string[] = [];
-    for (const path of buildCommandSkillManagedFiles()) {
-      try {
-        const pinned = parseSkillRuntimeVersion(readFileSync(resolveManagedPath(path), 'utf8'));
-        if (pinned !== runtimeVersion) issues.push(`${path}: runtimeVersion=${pinned ?? 'missing'}; expected=${runtimeVersion}`);
-      } catch {
-        issues.push(`${path}: missing or unreadable`);
-      }
-    }
-    if (issues.length) {
-      return { status: 'fail', name, detail: `canonical skills missing or stale: ${issues.join(', ')}. ${INVOCATION_NOTE}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
-    }
-    return { status: 'pass', name, detail: `canonical Kyro skills current (${runtimeVersion}) at ${AGENT_SKILLS_ROOT}. ${INVOCATION_NOTE}` };
+    const check = checkCommandProjection(name, manifest?.packageVersion);
+    return { ...check, detail: `${check.detail}. ${INVOCATION_NOTE}` };
   },
 };

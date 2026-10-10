@@ -1,4 +1,4 @@
-import { lstatSync, readFileSync, readlinkSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { lstatSync, readFileSync, readlinkSync, readdirSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { AGENT, AGENT_SKILLS_ROOT, KYRO_ROOT } from '../constants';
@@ -9,6 +9,7 @@ import { readManifest } from '../state';
 import type { AdapterDefinition } from './registry-types';
 import { addCommandSkillProjection, buildCommandSkillManagedFiles, buildCommandSkillManagedFilesForRoot, parseSkillRuntimeVersion } from './command-skills';
 import { detectFromPaths } from './detection';
+import { checkCommandProjection } from './standard';
 
 export const CLAUDE_SKILLS_ROOT = '~/.claude/skills';
 
@@ -71,47 +72,22 @@ export const claudeAdapter: AdapterDefinition = {
     };
   },
   doctor(manifest) {
-    if (!manifest?.adapters.some((adapter) => adapter.agent === AGENT.CLAUDE)) {
-      return { status: 'warn', name: 'Claude Code adapter', detail: 'not installed in this workspace' };
-    }
-    const missing: string[] = [];
-    const stale: string[] = [];
+    const check = checkCommandProjection('Claude Code adapter', manifest?.packageVersion, CLAUDE_SKILLS_ROOT);
+    // Keep the ownership guard stricter than metadata alone, including sibling files.
     for (const file of managedFiles()) {
-      try {
-        assertSafeClaudeSkillWrite(file, true);
-        const target = resolveManagedPath(file);
-        const stat = statSync(target);
-        if (!stat.isFile()) {
-          stale.push(file);
-          continue;
-        }
-        const body = readFileSync(target, 'utf8');
-        const name = file.split('/').at(-2);
-        if (!name || !body.includes(`name: ${name}\n`) || parseSkillRuntimeVersion(body) !== manifest.packageVersion) {
-          stale.push(file);
-        }
-      } catch (error: unknown) {
-        if (isNotFound(error)) missing.push(file);
-        else stale.push(file);
-      }
+      try { assertSafeClaudeSkillWrite(file, true); }
+      catch (error) { return { ...check, status: 'fail', detail: `${check.detail}; ${String(error)}`, remedy: FULL_PACKAGE_SYNC_REMEDY }; }
     }
-    if (missing.length || stale.length) {
-      return {
-        status: 'fail',
-        name: 'Claude Code adapter',
-        detail: `missing ${missing.join(', ') || 'none'}; invalid or stale ${stale.join(', ') || 'none'}`,
-        remedy: FULL_PACKAGE_SYNC_REMEDY,
-      };
-    }
+    if (check.status !== 'pass') return check;
     if (legacyClaudePluginDetected()) {
       return {
         status: 'warn',
         name: 'Claude Code adapter',
-        detail: 'CLI-managed skills are healthy, but a legacy Kyro Claude plugin may also be installed',
+        detail: `${check.detail}; a legacy Kyro Claude plugin may also be installed`,
         remedy: 'Disable or uninstall the old Kyro plugin using Claude Code after verifying the new /kyro-* skills. Kyro will not edit Claude plugin settings.',
       };
     }
-    return { status: 'pass', name: 'Claude Code adapter', detail: 'seven router skills and the full executor skill match the runtime' };
+    return check;
   },
 };
 

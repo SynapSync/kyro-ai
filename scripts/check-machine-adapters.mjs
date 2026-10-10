@@ -1,4 +1,4 @@
-/** W1 machine registry, W4 CLI and W5 Pi contracts. Every invocation uses a disposable HOME. */
+/** W1 machine registry, W4 CLI, W5 Pi and W6 doctor contracts in disposable HOME trees. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawn, spawnSync } from 'node:child_process';
@@ -487,11 +487,143 @@ try {
   console.log('Pi adapter checks passed (W5 criteria 1-4).');
 
   checkW4();
-  console.log('Machine adapter checks passed (W1, W4 and W5).');
+  checkW6();
+  console.log('Machine adapter checks passed (W1, W4, W5 and W6).');
 } finally {
   process.chdir(original.cwd);
   for (const key of ['HOME', 'USERPROFILE', 'npm_config_cache', 'PATH']) if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key];
   fs.rmSync(root, { recursive: true, force: true });
+}
+
+/** W6 health rows through the existing text and JSON doctor output paths. */
+function checkW6() {
+  const area = join(root, 'w6'), isolatedHome = join(area, 'home'), bin = join(area, 'bin');
+  const inside = join(area, 'inside'), outside = join(area, 'outside');
+  for (const path of [bin, inside, outside]) fs.mkdirSync(path, { recursive: true });
+  process.env.HOME = process.env.USERPROFILE = isolatedHome;
+  process.env.PATH = bin;
+  load(outside);
+  const adapters = require(join(repo, 'dist/cli/adapters/registry.js')).getInstallableAdapters();
+  const names = adapters.map((adapter) => `${adapter.displayName} adapter`);
+  const inspect = (cwd, failed = false) => {
+    const before = tree(isolatedHome);
+    const result = run(cwd, ['doctor', '--json'], !failed);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.schemaVersion, 1);
+    assert.equal(payload.command, 'doctor');
+    assert.equal(payload.phase, 'result');
+    assert.equal(payload.ok, true, 'diagnostic failure remains an existing success envelope with failing output rows');
+    const output = payload.data.output;
+    const rows = names.map((name) => {
+      const matches = output.filter((line) => /^\[(PASS|WARN|FAIL)\]/.test(line) && line.includes(`] ${name}:`));
+      assert.equal(matches.length, 1, `${name}: exactly one health row`);
+      const line = matches[0];
+      assert.match(line, /detected=(true|false); state=(enabled|disabled|unknown);/);
+      assert.match(line, /projection=(none|canonical|link|copy|mixed|unknown);/);
+      assert.match(line, /health=(pass|warn|fail);/);
+      assert(!line.includes('not installed in this workspace'));
+      return { agent: adapters[names.indexOf(name)].agent, line, remedy: output[output.indexOf(line) + 1] };
+    });
+    assert.equal(tree(isolatedHome), before, 'doctor must be read-only including links, bytes, modes and directories');
+    return rows;
+  };
+  // The canonical root is always required, even without any detected harnesses.
+  const pristine = inspect(outside);
+  assert.match(pristine.find((row) => row.agent === 'standard').line, /^\[WARN\].*projection=none;/);
+  assert.equal(pristine.find((row) => row.agent === 'standard').remedy, 'Remedy: kyro install --no-init-workspace');
+  assert(!fs.existsSync(isolatedHome));
+  run(outside, ['install', '--no-init-workspace']);
+  const absent = inspect(outside);
+  assert(absent.filter((row) => row.agent !== 'standard').every((row) => row.line.includes('detected=false') && row.line.startsWith('[PASS]')));
+  for (const path of ['.claude', '.codex', '.config/opencode', '.pi']) assert(!fs.existsSync(join(isolatedHome, path)));
+  for (const agent of ['claude', 'codex', 'opencode', 'pi']) {
+    fs.writeFileSync(join(bin, process.platform === 'win32' ? `${agent}.cmd` : agent), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  }
+  const unprojected = inspect(outside);
+  for (const agent of ['claude', 'opencode']) {
+    const row = unprojected.find((row) => row.agent === agent);
+    assert.match(row.line, /^\[WARN\].*detected=true; state=enabled;.*health=warn; projection=none;/);
+    assert.equal(row.remedy, `Remedy: kyro adapters enable ${agent}`);
+    run(outside, ['adapters', 'enable', agent]);
+    assert.match(inspect(outside).find((row) => row.agent === agent).line, /^\[PASS\]/, 'exact remedy must repair the reported harness');
+  }
+  console.log('PASS W6-unprojected-remedy: detected enabled missing harnesses warn; exact adapters enable commands repair them');
+  run(inside, ['install', '--init-workspace', '--integrations']);
+  for (const cwd of [inside, outside]) {
+    assert(inspect(cwd).every((row) => row.line.startsWith('[PASS]') && row.line.includes('detected=true')));
+    const text = run(cwd, ['doctor']).stdout;
+    for (const name of names) assert.equal(text.split('\n').filter((line) => line.includes(`] ${name}:`)).length, 1);
+    assert(!text.includes('not installed in this workspace'));
+  }
+  console.log('PASS W6-rows-inside-outside-json: one row per implemented adapter in text and existing JSON envelope; detected/state/projection/health present; opted-in workspace block is not required outside');
+
+  const canonical = join(isolatedHome, '.agents/skills/kyro-work');
+  const foreign = join(area, 'foreign'); fs.cpSync(canonical, foreign, { recursive: true });
+  for (const [agent, rootPath] of [['claude', '.claude/skills'], ['opencode', '.config/opencode/skills']]) {
+    const projected = join(isolatedHome, rootPath, 'kyro-work');
+    const originalTarget = fs.readlinkSync(projected);
+    for (const target of [join(area, 'missing'), foreign, join(isolatedHome, '.agents/skills/kyro-forge')]) {
+      fs.unlinkSync(projected); fs.symlinkSync(target, projected, 'dir');
+      try {
+        for (const cwd of [inside, outside]) {
+          const row = inspect(cwd, true).find((row) => row.agent === agent);
+          assert.match(row.line, /^\[FAIL\].*health=fail;.*dangling or non-canonical link/);
+          assert(row.line.includes(projected));
+          assert(row.remedy.includes(`kyro adapters enable ${agent}`));
+        }
+        assert.equal(fs.readlinkSync(projected), target);
+      } finally { fs.unlinkSync(projected); fs.symlinkSync(originalTarget, projected, 'dir'); }
+    }
+  }
+  console.log('PASS W6-invalid-links: dangling, foreign and wrong-skill links fail inside/outside, name path/remedy, and preserve link/foreign bytes');
+  run(outside, ['install', '--no-init-workspace'], true, { KYRO_LINK_MODE: 'copy' });
+  assert(inspect(outside).filter((row) => ['claude', 'opencode'].includes(row.agent)).every((row) => row.line.includes('projection=copy')));
+  const { buildCommandSkillManagedFilesForRoot } = require(join(repo, 'dist/cli/adapters/command-skills.js'));
+  for (const [rootPath, agents] of [['~/.claude/skills', ['claude']], ['~/.config/opencode/skills', ['opencode']], ['~/.agents/skills', ['standard', 'codex', 'pi']]]) {
+    for (const managed of buildCommandSkillManagedFilesForRoot(rootPath)) {
+      const path = managed.replace('~', isolatedHome), body = fs.readFileSync(path, 'utf8');
+      fs.writeFileSync(path, body.replace(/runtimeVersion: "[^"\n]+"/, 'runtimeVersion: "0.0.0-w6-stale"'));
+      try {
+        const rows = inspect(outside, true);
+        for (const agent of agents) {
+          const row = rows.find((row) => row.agent === agent);
+          assert.match(row.line, /^\[FAIL\].*health=fail;/);
+          assert(row.line.includes(managed) && row.line.includes('0.0.0-w6-stale'));
+        }
+      } finally { fs.writeFileSync(path, body); }
+    }
+  }
+  assert(inspect(outside).every((row) => row.line.startsWith('[PASS]')));
+  console.log('PASS W6-copy-runtime-version: healthy copies pass; every stale router/full skill fails for Claude/OpenCode and shared Standard/Codex/Pi');
+  // Missing stubs must never turn foreign copies or native command links into warnings.
+  for (const [agent, rootPath] of [['claude', '.claude/skills'], ['opencode', '.config/opencode/skills']]) {
+    const projectedRoot = join(isolatedHome, rootPath), backup = join(area, `${agent}-backup`);
+    fs.renameSync(projectedRoot, backup);
+    fs.mkdirSync(join(projectedRoot, 'kyro-work'), { recursive: true });
+    fs.writeFileSync(join(projectedRoot, 'kyro-work/foreign.txt'), 'FOREIGN BYTES\n');
+    try {
+      const row = inspect(outside, true).find((row) => row.agent === agent);
+      assert.match(row.line, /^\[FAIL\].*health=fail;/);
+      assert(row.line.includes('kyro-work') && row.remedy.includes(`kyro adapters enable ${agent}`));
+    } finally { fs.rmSync(projectedRoot, { recursive: true }); fs.renameSync(backup, projectedRoot); }
+  }
+  const nativeCommand = join(isolatedHome, '.config/opencode/commands/kyro/work.md');
+  const nativeBody = fs.readFileSync(nativeCommand);
+  fs.unlinkSync(nativeCommand); fs.symlinkSync(join(canonical, 'SKILL.md'), nativeCommand);
+  try { assert.match(inspect(outside, true).find((row) => row.agent === 'opencode').line, /^\[FAIL\].*Unsafe or foreign OpenCode command/); }
+  finally { fs.unlinkSync(nativeCommand); fs.writeFileSync(nativeCommand, nativeBody); }
+  console.log('PASS W6-foreign-guards: empty foreign copies and native command symlinks fail; missing stubs never bypass ownership guards');
+  for (const agent of ['claude', 'codex', 'opencode', 'pi']) run(outside, ['adapters', 'disable', agent]);
+  for (const cwd of [inside, outside]) {
+    const rows = inspect(cwd);
+    assert(rows.filter((row) => row.agent !== 'standard').every((row) => row.line.startsWith('[PASS]') && row.line.includes('state=disabled')));
+  }
+  console.log('PASS W6-disabled-not-detected: disabled and absent harnesses report pass without failing doctor or creating harness directories');
+  const manifest = json(join(isolatedHome, '.agents/kyro/current/manifest.json'));
+  for (const adapter of adapters) for (const value of [manifest, null, { ...manifest, adapters: [] }]) {
+    assert(!adapter.doctor(value).detail.includes('not installed in this workspace'));
+  }
+  console.log('PASS W6-no-workspace-message: every implemented adapter doctor, including absent/null manifest, removes obsolete workspace installation wording');
 }
 
 /** W4 CLI acceptance, with its own HOME and a local npm fixture (no network/install). */

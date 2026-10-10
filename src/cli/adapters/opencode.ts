@@ -10,6 +10,7 @@ import { detectFromPaths } from './detection';
 import type { CheckResult, KyroCommandName, OperationPlan } from '../types';
 import { readManifest } from '../state';
 import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
+import { checkCommandProjection } from './standard';
 
 const OPENCODE_SKILLS_ROOT = '~/.config/opencode/skills';
 const OPENCODE_COMMANDS_ROOT = '~/.config/opencode/commands';
@@ -61,10 +62,7 @@ export const openCodeAdapter: AdapterDefinition = {
     };
   },
   doctor(manifest) {
-    if (!manifest?.adapters.some((adapter) => adapter.agent === AGENT.OPENCODE)) {
-      return { status: 'warn', name: 'OpenCode adapter', detail: 'not installed in this workspace' };
-    }
-    return checkOpenCodeProjection();
+    return checkOpenCodeProjection(manifest?.packageVersion);
   },
 };
 
@@ -181,10 +179,20 @@ function buildOpenCodeAgentPrompt(): string {
   ].join('\n');
 }
 
-function checkOpenCodeProjection(): CheckResult {
+function checkOpenCodeProjection(runtimeVersion?: string): CheckResult {
+  const check = checkCommandProjection('OpenCode adapter', runtimeVersion, OPENCODE_SKILLS_ROOT);
+  for (const file of buildCommandSkillManagedFilesForRoot(OPENCODE_SKILLS_ROOT)) {
+    try { assertSafeOpenCodeSkillWrite(file, true); }
+    catch (error) { return { ...check, status: 'fail', detail: `${check.detail}; ${String(error)}`, remedy: FULL_PACKAGE_SYNC_REMEDY }; }
+  }
+  for (const command of COMMAND_NAMES) {
+    try { assertSafeOpenCodeCommandWrite(`${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`, true); }
+    catch (error) { return { ...check, status: 'fail', detail: `${check.detail}; ${String(error)}`, remedy: FULL_PACKAGE_SYNC_REMEDY }; }
+  }
+  if (check.status !== 'pass') return check;
   const missing = buildOpenCodeManagedFiles().filter((file) => !managedPathExists(file));
   if (missing.length > 0) {
-    return { status: 'fail', name: 'OpenCode adapter', detail: `missing ${missing.join(', ')}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
+    return { ...check, status: 'fail', detail: `${check.detail}; missing ${missing.join(', ')}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
   }
-  return { status: 'pass', name: 'OpenCode adapter', detail: 'native OpenCode skills and slash commands present' };
+  return { ...check, detail: `${check.detail}; native OpenCode slash commands present` };
 }
