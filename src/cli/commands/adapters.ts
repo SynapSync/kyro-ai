@@ -2,7 +2,7 @@ import { lstatSync, readFileSync, readlinkSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { AGENT, AGENT_SKILLS_ROOT, KYRO_MANIFEST_PATH, MACHINE_ADAPTER_REGISTRY_PATH, SCOPE } from '../constants';
-import { buildCommandSkillManagedFiles, parseSkillRuntimeVersion } from '../adapters/command-skills';
+import { buildCommandSkillManagedFiles, normalizeEol, parseSkillRuntimeVersion } from '../adapters/command-skills';
 import { readMachineAdapterRegistry, registerMachineAdapterPlan, withMachineAdapterRegistryLock } from '../adapters/machine-registry';
 import { getAdapterDefinition, getInstallableAdapters } from '../adapters/registry';
 import { setCliMachineResult } from '../core/cli-envelope';
@@ -119,7 +119,7 @@ function addSkillRemoval(plan: OperationPlan[], path: string, manifest: KyroMani
     if (!stat.isDirectory() || readdirSync(absolute).length !== 1 || readdirSync(absolute)[0] !== 'SKILL.md') foreign(path);
     const file = `${absolute}/SKILL.md`;
     if (!lstatSync(file).isFile()) foreign(file);
-    const body = readFileSync(file, 'utf8');
+    const body = normalizeEol(readFileSync(file, 'utf8'));
     if (!body.includes(`name: ${path.split('/').at(-1)}\n`) || !/^\s*author: synapsync\s*$/m.test(body) || !parseSkillRuntimeVersion(body)) foreign(file);
   }
   plan.push({ action: 'remove', path });

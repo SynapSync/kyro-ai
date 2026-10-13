@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { resolveManagedPath } from '../fs';
 import type { AdapterDefinition } from './registry-types';
 import type { CheckResult } from '../types';
-import { addCommandSkillProjection, buildCommandSkillManagedFiles, buildCommandSkillManagedFilesForRoot, parseSkillRuntimeVersion } from './command-skills';
+import { addCommandSkillProjection, buildCommandSkillManagedFiles, buildCommandSkillManagedFilesForRoot, normalizeEol, parseSkillRuntimeVersion } from './command-skills';
 import { detectFromPaths } from './detection';
 import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 
@@ -91,7 +91,7 @@ export function checkCommandProjection(name: string, runtimeVersion?: string, ro
       const stat = projectionStat(target);
       if (!stat) { missing.push(file); continue; }
       if (!stat.isFile()) throw new Error('skill must be a regular file');
-      const body = readFileSync(target, 'utf8');
+      const body = normalizeEol(readFileSync(target, 'utf8'));
       const pinned = parseSkillRuntimeVersion(body);
       if (!body.includes(`name: ${file.split('/').at(-2)}\n`) || !runtimeVersion?.trim() || pinned !== runtimeVersion.trim()) {
         throw new Error(`runtimeVersion=${pinned ?? 'missing'}; expected=${runtimeVersion?.trim() || 'unknown'}`);

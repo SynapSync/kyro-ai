@@ -7,7 +7,7 @@ import { addLinkDirectoryPlan, resolveManagedPath } from '../fs';
 import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
 import { readManifest } from '../state';
 import type { AdapterDefinition } from './registry-types';
-import { addCommandSkillProjection, buildCommandSkillManagedFiles, buildCommandSkillManagedFilesForRoot, parseSkillRuntimeVersion } from './command-skills';
+import { addCommandSkillProjection, buildCommandSkillManagedFiles, buildCommandSkillManagedFilesForRoot, normalizeEol, parseSkillRuntimeVersion } from './command-skills';
 import { detectFromPaths } from './detection';
 import { checkCommandProjection } from './standard';
 
@@ -162,7 +162,7 @@ export function assertSafeLinkedSkillWrite(managedPath: string, allowExisting: b
   if (!stat.isFile()) {
     throw new KyroCoreError('INVALID_INPUT', `Unsafe ${nameOfAdapter} skill target: ${managedPath}.`, 'Move the symlink or non-file aside; Kyro will not overwrite it.');
   }
-  const body = readFileSync(target, 'utf8');
+  const body = normalizeEol(readFileSync(target, 'utf8'));
   if (!name || !body.includes(`name: ${name}\n`) || !parseSkillRuntimeVersion(body)) {
     throw new KyroCoreError('INVALID_INPUT', `Foreign ${nameOfAdapter} skill target: ${managedPath}.`, `Move the foreign file aside before installing the ${nameOfAdapter} adapter.`);
   }

@@ -25,7 +25,7 @@ function withWorkspace(prefix, callback) {
   const cwd = createWorkspace(prefix);
   const previousCwd = process.cwd();
   const previousHome = process.env.HOME;
-  const previousEnv = Object.fromEntries(['USERPROFILE', 'npm_config_cache', 'PATH'].map((key) => [key, process.env[key]]));
+  const previousEnv = Object.fromEntries(['USERPROFILE', 'npm_config_cache', 'PATH', 'KYRO_LINK_MODE'].map((key) => [key, process.env[key]]));
   try {
     process.chdir(cwd);
     process.env.HOME = join(cwd, '.home');
@@ -122,6 +122,85 @@ function assertCommonPlan(plan, name) {
 }
 
 const EXPECTED_COMMAND_SKILLS = ['forge', 'status', 'task-context', 'idea', 'qa', 'scope-retire', 'work'];
+
+withWorkspace('kyro-crlf-owned-projections-', () => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install } = require(join(repo, 'dist/cli/commands/install.js'));
+  const { resolveManagedPath } = require(join(repo, 'dist/cli/fs.js'));
+  const { readManifest } = require(join(repo, 'dist/cli/state.js'));
+  const { buildCommandSkillManagedFilesForRoot, assertSafeCanonicalSkillWrite } = require(join(repo, 'dist/cli/adapters/command-skills.js'));
+  const { claudeAdapter, assertSafeClaudeSkillWrite } = require(join(repo, 'dist/cli/adapters/claude.js'));
+  const { openCodeAdapter, assertSafeOpenCodeSkillWrite } = require(join(repo, 'dist/cli/adapters/opencode.js'));
+  const { standardAgentsAdapter } = require(join(repo, 'dist/cli/adapters/standard.js'));
+  const { buildMachineRemovalPlan } = require(join(repo, 'dist/cli/commands/adapters.js'));
+  process.env.KYRO_LINK_MODE = 'copy';
+  captureLogs(() => install(cliOptions({ agents: [parseAgent('claude'), parseAgent('opencode')] })));
+  const manifest = readManifest();
+  const projections = [
+    { root: '~/.agents/skills', guard: assertSafeCanonicalSkillWrite, adapter: standardAgentsAdapter },
+    { root: '~/.claude/skills', guard: assertSafeClaudeSkillWrite, adapter: claudeAdapter },
+    { root: '~/.config/opencode/skills', guard: assertSafeOpenCodeSkillWrite, adapter: openCodeAdapter },
+  ];
+  const failures = [];
+  const check = (label, callback) => {
+    try { callback(); }
+    catch (error) {
+      console.log(`FAIL CRLF owned projections: ${label}: ${String(error)}`);
+      failures.push(label);
+    }
+  };
+  const refuses = (callback, label) => {
+    let refused = false;
+    try { callback(); } catch { refused = true; }
+    assert(refused, `CRLF owned projections: ${label} must still be refused`);
+  };
+  for (const { root, guard, adapter } of projections) {
+    for (const path of buildCommandSkillManagedFilesForRoot(root)) {
+      const target = resolveManagedPath(path);
+      const lf = readFileSync(target, 'utf8').replaceAll('\r\n', '\n');
+      writeFileSync(target, lf);
+      guard(path, true);
+      const crlf = lf.replaceAll('\n', '\r\n');
+      writeFileSync(target, crlf);
+      check(path, () => guard(path, true));
+      // Metadata alone never authorizes an unowned file.
+      refuses(() => guard(path, false), `${path} without manifest ownership`);
+      for (const [label, body] of [
+        ['missing name', crlf.replace(/^name:.*\r\n/m, '')],
+        ['missing runtimeVersion', crlf.replace(/^.*runtimeVersion:.*\r\n/m, '')],
+        ['foreign body', 'Foreign skill\r\n'],
+      ]) {
+        writeFileSync(target, body);
+        refuses(() => guard(path, true), `${path} ${label}`);
+        assert(adapter.doctor(manifest).status === 'fail', `CRLF owned projections: doctor must reject ${path} ${label}`);
+      }
+      writeFileSync(target, crlf);
+      const foreign = join(process.env.HOME, 'foreign-SKILL.md');
+      writeFileSync(foreign, crlf);
+      rmSync(target);
+      symlinkSync(foreign, target);
+      refuses(() => guard(path, true), `${path} symlink`);
+      assert(adapter.doctor(manifest).status === 'fail', `CRLF owned projections: doctor must reject ${path} symlink`);
+      assert(readFileSync(foreign, 'utf8') === crlf, 'CRLF owned projections: symlink target bytes must be preserved');
+      rmSync(target);
+      writeFileSync(target, crlf);
+    }
+    check(`${root} doctor`, () => {
+      const result = adapter.doctor(manifest);
+      assert(result.status === 'pass', result.detail);
+    });
+  }
+  check('machine removal ownership', () => {
+    const plan = buildMachineRemovalPlan([parseAgent('claude'), parseAgent('opencode')], true);
+    for (const { root } of projections) {
+      for (const path of buildCommandSkillManagedFilesForRoot(root)) {
+        assert(plan.some((operation) => operation.path === path.slice(0, -'/SKILL.md'.length)), `CRLF owned projections: missing removal for ${path}`);
+      }
+    }
+  });
+  assert(failures.length === 0, `CRLF owned projections: ${failures.length} checks failed (LF guards accepted all skills)`);
+  console.log('PASS CRLF owned projections: all command/full skills accepted by canonical/Claude/OpenCode guards, doctors and removal; missing name/pin, unowned/foreign bodies and symlinks refused');
+});
 
 function assertStandardCommandSkills(plan, name) {
   for (const command of EXPECTED_COMMAND_SKILLS) {

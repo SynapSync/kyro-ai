@@ -125,6 +125,11 @@ export function buildCommandSkill(command: KyroCommandName): string {
   ].join('\n');
 }
 
+/** Normalize Windows line endings before comparing projected skill bodies. */
+export function normalizeEol(body: string): string {
+  return body.replaceAll('\r\n', '\n');
+}
+
 /** Extract metadata.runtimeVersion from a projected skill stub body (null if absent/unparseable). */
 export function parseSkillRuntimeVersion(skillMarkdown: string): string | null {
   const match = skillMarkdown.match(/^\s*runtimeVersion:\s*["']?([^"'#\n]+?)["']?\s*$/m);
@@ -164,7 +169,7 @@ export function assertSafeCanonicalSkillWrite(path: string, allowExisting: boole
   try {
     const stat = lstatSync(target);
     if (!stat.isFile() || stat.nlink !== 1 || !allowExisting) fail(target);
-    const body = readFileSync(target, 'utf8');
+    const body = normalizeEol(readFileSync(target, 'utf8'));
     const name = dirname(target).split(/[\\/]/).at(-1);
     if (!body.includes(`name: ${name}\n`) || !parseSkillRuntimeVersion(body)) fail(target);
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
