@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import {
   ARTIFACT_ROOT,
@@ -35,7 +36,8 @@ import {
 } from '../state';
 import { KyroCoreError } from '../core/errors';
 import { TOOL_OWNED_VERBS } from '../core/capabilities';
-import { ADAPTERS, getAdapterDefinition } from '../adapters/registry';
+import { ADAPTERS, getInstallableAdapters } from '../adapters/registry';
+import { readMachineAdapterRegistry } from '../adapters/machine-registry';
 import { guardEnforcement } from '../adapters/registry-types';
 import { getCommandSkillPath, getFullSkillPath, PROJECTED_FULL_SKILLS, parseSkillRuntimeVersion } from '../adapters/command-skills';
 import { GUARDED_OPERATIONS, guardedOperationLevel, makerCheckerPolicy } from '../core/policy';
@@ -52,7 +54,7 @@ import { listForeignScopeDirectories } from '../artifacts/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
 import { diagnoseKyroGitTrackability } from '../core/git-trackability';
-import type { Agent, CheckResult, CliOptions } from '../types';
+import type { CheckResult, CliOptions, MachineAdapterRegistry } from '../types';
 
 const PROJECT_STATE_INSTALL_REMEDY = PROJECT_STATE_BOOTSTRAP_REMEDY;
 const GLOBAL_RUNTIME_INSTALL_REMEDY = FULL_PACKAGE_INSTALL_REMEDY;
@@ -720,21 +722,47 @@ function checkSkillRuntimeSkew(): CheckResult {
 }
 
 function checkAdapterProjections(): CheckResult[] {
-  const state = readProjectState();
   const manifest = readManifest();
-  // An incomplete kyro.json (missing installedAdapters) is reported by checkProjectState — do not
-  // crash the whole diagnostic here. A diagnostic must survive exactly the data it diagnoses.
-  if (!state || !Array.isArray(state.installedAdapters)) return [];
-
-  return state.installedAdapters.map((installedAdapter) => {
+  const adapters = getInstallableAdapters();
+  let registry: MachineAdapterRegistry;
+  try { registry = readMachineAdapterRegistry(); }
+  catch (error) {
+    return adapters.map((adapter) => ({
+      status: 'fail', name: `${adapter.displayName} adapter`,
+      detail: `detected=${adapter.agent === 'standard' || adapter.detect({ homeDir: homedir() }).installed}; state=unknown; projection=unknown; health=fail; ${errorMessage(error)}`,
+      remedy: error instanceof KyroCoreError ? error.remedy : FULL_PACKAGE_SYNC_REMEDY,
+    }));
+  }
+  return adapters.map((adapter) => {
+    const detected = adapter.agent === 'standard' || adapter.detect({ homeDir: homedir() }).installed;
+    const state = registry.adapters.find((entry) => entry.agent === adapter.agent)?.state ?? 'enabled';
+    const name = `${adapter.displayName} adapter`;
+    const command = adapter.agent === 'standard' ? 'kyro install --no-init-workspace' : `kyro adapters enable ${adapter.agent}`;
+    if (state === 'disabled' || !detected) {
+      return {
+        status: 'pass', name,
+        detail: `detected=${detected}; state=${state}; projection=none; health=pass; ${state === 'disabled' ? 'disabled by machine choice; canonical skills remain shared' : 'not detected; projection not required'}`,
+        ...(state === 'disabled' ? { remedy: command } : {}),
+      };
+    }
     try {
-      return getAdapterDefinition(installedAdapter.agent as Agent).doctor(manifest ? { ...manifest, adapters: state.installedAdapters } : null);
+      const check = adapter.doctor(manifest);
+      return {
+        ...check, name,
+        detail: `detected=${detected}; state=${state}; health=${check.status}; ${check.detail}`,
+        ...(check.status !== 'pass' ? {
+          remedy: check.detail.includes('legacy Kyro Claude plugin') ? check.remedy
+            : check.detail.includes('missing Kyro block in AGENTS.md') ? 'kyro sync --agent codex'
+            : /unsafe|foreign|dangling|non-canonical|non-directory|regular file/i.test(check.detail)
+              ? `Move the reported foreign or dangling path aside first; then run ${command}.`
+              : command,
+        } : {}),
+      };
     } catch (error: unknown) {
       return {
-        status: 'fail',
-        name: `${installedAdapter.agent} adapter`,
-        detail: errorMessage(error),
-        remedy: FULL_PACKAGE_SYNC_REMEDY,
+        status: 'fail', name,
+        detail: `detected=${detected}; state=${state}; projection=unknown; health=fail; ${errorMessage(error)}`,
+        remedy: command,
       };
     }
   });

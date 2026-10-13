@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnWithAuthor as spawnSync, isolatedGitEnv } from './work-author-fixtures.mjs';
 import { pathToFileURL } from 'node:url';
 
 const root = mkdtempSync(join(tmpdir(), 'kyro-work-promotion-contract-'));
@@ -171,6 +171,25 @@ try {
   // --- Pure planner units: validator coherence, request digest, sidecar/journal ---
   const promotionModule = await import(pathToFileURL(resolve('dist/cli/work/promotion.js')).href);
   const schemaModule = await import(pathToFileURL(resolve('dist/cli/work/schema.js')).href);
+  const targetProbe = `
+    import assert from 'node:assert/strict';
+    import { execFileSync } from 'node:child_process';
+    import { buildPromotionTargetSprint, planPromotionPreview } from ${JSON.stringify(pathToFileURL(resolve('dist/cli/work/promotion.js')).href)};
+    const stored = ${JSON.stringify(stoppedWork)};
+    const request = { toScope: 'stopped-target', actor: 'fixture-owner', expectedRevision: 10 };
+    const authoredPreview = planPromotionPreview(stored, request);
+    const authoredTarget = JSON.stringify(buildPromotionTargetSprint(stored, authoredPreview));
+    const legacy = { ...stored }; delete legacy.author;
+    execFileSync('git', ['config', 'user.name', 'Changed promoter identity']);
+    execFileSync('git', ['config', 'user.email', 'changed@example.test']);
+    const legacyPreview = planPromotionPreview(legacy, request);
+    assert.equal(legacyPreview.requestDigest, authoredPreview.requestDigest);
+    assert.equal(JSON.stringify(buildPromotionTargetSprint(legacy, legacyPreview)), authoredTarget);
+    assert.equal(Object.hasOwn(JSON.parse(authoredTarget), 'author'), false);
+  `;
+  const targetProbePath = join(root, 'target-author-probe.mjs'); writeFileSync(targetProbePath, targetProbe);
+  const targetResult = spawnSync(process.execPath, [targetProbePath], { cwd: root, env: isolatedGitEnv(), encoding: 'utf8' });
+  assert.equal(targetResult.status, 0, targetResult.stderr);
   const firstDigest = promotionModule.promotionRequestDigest('contract', { toScope: 'stopped-target', actor: 'fixture-owner', expectedRevision: 10 });
   assert.equal(firstDigest, stoppedPreview.requestDigest, 'the CLI preview must carry the canonical request digest');
   assert.equal(promotionModule.promotionRequestDigest('contract', { toScope: 'stopped-target', actor: 'fixture-owner', expectedRevision: 10 }), firstDigest, 'the request digest must be deterministic');

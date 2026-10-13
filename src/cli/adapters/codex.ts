@@ -7,6 +7,7 @@ import { checkCommandProjection } from './standard';
 import type { AdapterDefinition } from './registry-types';
 import { detectFromPaths } from './detection';
 import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
+import { hasPersistedProjectStateOnDisk } from '../state';
 
 const AGENTS_PATH = 'AGENTS.md';
 const KYRO_AGENTS_BLOCK = 'agents-md';
@@ -37,8 +38,9 @@ export const codexAdapter: AdapterDefinition = {
   mcpStrategy() {
     return 'toml-file';
   },
-  buildProjection(plan) {
+  buildProjection(plan, options) {
     addCommandSkillProjection(plan);
+    if (!options?.integrations || !options.includeWorkspace) return;
     plan.push({
       action: 'upsert-block',
       path: AGENTS_PATH,
@@ -86,15 +88,12 @@ export const codexAdapter: AdapterDefinition = {
     };
   },
   doctor(manifest) {
-    if (!manifest?.adapters.some((adapter) => adapter.agent === AGENT.CODEX)) {
-      return { status: 'warn', name: 'Codex adapter', detail: 'not installed in this workspace' };
-    }
-    const commandCheck = checkCommandProjection('Codex adapter');
+    const commandCheck = checkCommandProjection('Codex adapter', manifest?.packageVersion);
     if (commandCheck.status !== 'pass') return commandCheck;
-    if (!hasManagedBlock(AGENTS_PATH, KYRO_AGENTS_BLOCK)) {
-      return { status: 'fail', name: 'Codex adapter', detail: `missing Kyro block in ${AGENTS_PATH}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
+    if (hasPersistedProjectStateOnDisk() && manifest?.managedBlocks.includes(`${AGENTS_PATH}#${KYRO_AGENTS_BLOCK}`) && !hasManagedBlock(AGENTS_PATH, KYRO_AGENTS_BLOCK)) {
+      return { status: 'fail', name: 'Codex adapter', detail: `${commandCheck.detail}; missing Kyro block in ${AGENTS_PATH}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
     }
-    return { status: 'pass', name: 'Codex adapter', detail: 'projected Kyro command skills and root AGENTS.md block present' };
+    return commandCheck;
   },
 };
 

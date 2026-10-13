@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { WorkFile, WorkTask, WorkTaskDefinition } from '../types';
 import type { ValidationIssue } from '../artifacts/schema';
+import { validateScopeAuthor } from '../artifacts/schema';
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -15,7 +16,11 @@ export function validateWorkFile(value: unknown, path = 'work.json'): Validation
   const issues: ValidationIssue[] = [];
   if (!record(value)) return [{ path, field: '<root>', message: 'must be an object' }];
 
-  exact(value, ROOT, path, '', issues);
+  exact(value, ROOT, path, '', issues, ['author']);
+  if ('author' in value) {
+    validateScopeAuthor(value.author, path, 'author', issues);
+    if (record(value.author)) exact(value.author, ['source', 'capturedAt'], path, 'author', issues, ['name', 'email']);
+  }
   literal(value, 'schemaVersion', 1, path, issues);
   literal(value, 'kind', 'organic-work', path, issues);
   slug(value.id, path, 'id', issues);
@@ -632,8 +637,8 @@ export function hasDependencyCycle(tasks: ReadonlyArray<{ id: string; dependsOn:
   return queue.length !== pending.size;
 }
 
-function exact(value: Record<string, unknown>, keys: string[], path: string, field: string, issues: ValidationIssue[]): void {
-  for (const key of Object.keys(value)) if (!keys.includes(key)) issue(path, field ? `${field}.${key}` : key, 'is not allowed', issues);
+function exact(value: Record<string, unknown>, keys: string[], path: string, field: string, issues: ValidationIssue[], optionalKeys: string[] = []): void {
+  for (const key of Object.keys(value)) if (!keys.includes(key) && !optionalKeys.includes(key)) issue(path, field ? `${field}.${key}` : key, 'is not allowed', issues);
   for (const key of keys) if (!(key in value)) issue(path, field ? `${field}.${key}` : key, 'is required', issues);
 }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }

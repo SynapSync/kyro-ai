@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { asWorkFile, computeMaterialDigest, validateWorkFile } from '../dist/cli/work/schema.js';
+import { asWorkFile, computeEvidenceDigest, computeMaterialDigest, validateWorkFile } from '../dist/cli/work/schema.js';
 
 const at = '2026-09-26T00:00:00.000Z';
 const digest = (value) => createHash('sha256').update(value).digest('hex');
@@ -160,3 +160,32 @@ rejects('supersession target must exist', active([superseded], { handoff: { next
 rejects('supersession target cannot be self', active([taskFor({ status: 'superseded', disposition: { kind: 'superseded', reason: 'Replaced.', by: 'cli', recordedAt: at, replacementTaskId: 'W1' } })], { handoff: { nextAction: 'ready_to_close', nextTaskId: null, blockedReason: null } }), 'replacementTaskId');
 
 console.log('Work v1 contract fixtures passed, including normative coherence and adversarial state coverage.');
+
+// Creator metadata is optional v1 metadata, independent of execution material.
+const author = { name: 'Creator A', email: 'creator@example.test', source: 'git', capturedAt: at };
+for (const candidate of [author, { name: author.name, source: 'git', capturedAt: at }, { email: author.email, source: 'git', capturedAt: at }, { ...author, capturedAt: '2026-09-26' }]) {
+  assert.deepEqual(validateWorkFile({ ...base, author: candidate }), []);
+}
+for (const candidate of [null, [], 'creator', 1, {}, { source: 'git', capturedAt: at },
+  ...['name', 'email'].flatMap((key) => ['', '  ', null, 42].map((value) => ({ ...author, [key]: value }))),
+  { ...author, email: 'invalid' }, { ...author, email: 'a b@c' }, { ...author, source: 'env' },
+  { ...author, source: undefined }, { ...author, capturedAt: undefined }, { ...author, capturedAt: 'bad' }, { ...author, extra: true }]) {
+  rejects('invalid present author', { ...base, author: candidate }, 'author');
+}
+for (const key of Object.keys(base)) {
+  const missing = { ...base, author }; delete missing[key];
+  rejects('required root key remains required', missing, key);
+}
+rejects('unrelated nested exactness', { ...base, brief: { ...base.brief, author } }, 'brief.author');
+for (const legacy of [base, active([taskFor()]), stoppedEmptyDraft, full]) {
+  const bytes = JSON.stringify(legacy);
+  assert.deepEqual(validateWorkFile(legacy), []);
+  assert.equal(asWorkFile(legacy), legacy, 'cast returns the original historical object');
+  assert.equal(JSON.stringify(legacy), bytes);
+  assert.equal(Object.hasOwn(legacy, 'author'), false);
+  const enriched = { ...legacy, author };
+  assert.deepEqual(validateWorkFile(enriched), []);
+  assert.equal(computeMaterialDigest(enriched.brief.digest, definitionFor()), expectedMaterialDigest);
+  assert.equal(computeEvidenceDigest(validPassTask.evidence), validPassTask.verdict.evidenceDigest);
+}
+console.log('Work optional author validation, fixed legacy states, and digest compatibility passed.');

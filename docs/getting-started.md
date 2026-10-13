@@ -12,11 +12,11 @@ Kyro is a portable sprint workflow kit for AI coding agents (**kyro-ai**, `sprin
 
 ## Install
 
-**Run every install/sync from the project root** (the repository Kyro should manage). The global runtime and skills always land under your home directory; **project state** (layered files under `.agents/kyro/` and registration of `scopes/`) is written relative to the **current working directory**. If you install from `~` or another folder, you still get the runtime—but Kyro state appears in the wrong place.
+Run workspace initialization and sync from the project root: project state is relative to the current directory. Machine-only `kyro install --no-init-workspace` can run outside a project and does not create workspace state. Runtime and skills always land under your home directory.
 
 Install the complete npm package globally once. Open a new terminal so its `kyro` command is on PATH; then initialize each project from its root. The projected runtime under `~/.agents/kyro/current/` is for workflow commands and cannot install or sync package assets.
 
-Default standard install:
+One install for all detected, enabled harnesses:
 
 ```bash
 npm install -g kyro-ai
@@ -27,18 +27,21 @@ kyro install --scope workspace --init-workspace --yes
 `--init-workspace` creates or refreshes **layered** project state in this directory (non-interactive):
 
 - `.agents/kyro/project.json` — shared (safe to commit): principles, global conventions, team policy
-- `.agents/kyro/local.json` — personal/machine (gitignored): `activeScope`, installed adapters
+- `.agents/kyro/local.json` — personal/machine (gitignored): `activeScope`, optional local execution settings
 - `.agents/kyro/.gitignore` — ignores local-only files; never ignores `project.json` or `scopes/`
 
 It reads scopes from valid matching `scopes/<id>/sprint.json` files (common after cloning a team repo that commits scopes + `project.json` while each developer keeps a personal `local.json`).
 
-Agent-specific installs (still from the project root):
+Install publishes canonical skills and projects detected Claude/OpenCode harnesses automatically; Codex and Pi read the canonical root. No per-harness `--agent` flag is required. Machine choices persist in `~/.agents/kyro/adapters.json` across projects. Existing workspace `installedAdapters` records migrate with integrations preserved and stop being written to `local.json`.
 
 ```bash
-kyro install --agent opencode --scope workspace --init-workspace --yes
-kyro install --agent codex --scope workspace --init-workspace --yes
-kyro install --agent claude --scope workspace --init-workspace --yes
+kyro adapters list
+kyro adapters disable claude --dry-run
+kyro adapters enable codex --integrations
+kyro doctor --adapters
 ```
+
+Disable is a persistent machine opt-out and preserves canonical skills. Config edits (Codex MCP and workspace `AGENTS.md`, OpenCode agent overlay) require integrations opt-in on new installs. `--agent` explicitly selects/re-enables a detected adapter. Workspace uninstall keeps machine projections and integrations; `kyro uninstall --machine` removes Kyro-owned skills, projections, integration blocks, and the registry. Preview mutations with `--dry-run`.
 
 Claude Code receives native `kyro-*` skills under `~/.claude/skills/` from its CLI adapter. If you have an older Kyro plugin, verify the new skills before disabling or uninstalling the plugin in Claude Code. Kyro never changes those plugin settings automatically; see [Agent adapters](agent-adapters.md#claude).
 
@@ -72,8 +75,7 @@ Global command skills:
 └── kyro-work/SKILL.md
 ```
 
-OpenCode installs equivalent native entrypoints under `~/.config/opencode/` when you use `--agent opencode`.
-Claude projects the same command skills under `~/.claude/skills/` when you use `--agent claude`.
+Detected OpenCode receives native commands and skill links under `~/.config/opencode/`; detected Claude receives skill links under `~/.claude/skills/`. Links fall back to version-pinned copies when symlinks are unavailable, or when `KYRO_LINK_MODE=copy` is set. Pi reads the canonical skills and creates no files of its own. Invoke Work as Claude `/kyro-work`, Codex `kyro-work`, OpenCode `/kyro/work`, or Pi `/skill:kyro-work`; see [Agent adapters](agent-adapters.md#invocation-by-harness).
 
 Project state (layered):
 

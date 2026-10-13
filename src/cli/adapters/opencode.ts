@@ -1,10 +1,16 @@
-import { AGENT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
+import { AGENT, AGENT_SKILLS_ROOT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
 import type { AdapterDefinition } from './registry-types';
-import { addCommandSkillProjectionToRoot, buildCommandSkillManagedFilesForRoot, getCommandDescription } from './command-skills';
-import { managedPathExists } from '../fs';
+import { addCommandSkillProjection, buildCommandSkillManagedFilesForRoot, getCommandDescription } from './command-skills';
+import { addLinkDirectoryPlan, managedPathExists, resolveManagedPath } from '../fs';
+import { lstatSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { KyroCoreError } from '../core/errors';
+import { assertSafeLinkedSkillWrite } from './claude';
 import { detectFromPaths } from './detection';
 import type { CheckResult, KyroCommandName, OperationPlan } from '../types';
+import { readManifest } from '../state';
 import { FULL_PACKAGE_SYNC_REMEDY } from '../package-root-mode';
+import { checkCommandProjection } from './standard';
 
 const OPENCODE_SKILLS_ROOT = '~/.config/opencode/skills';
 const OPENCODE_COMMANDS_ROOT = '~/.config/opencode/commands';
@@ -56,22 +62,33 @@ export const openCodeAdapter: AdapterDefinition = {
     };
   },
   doctor(manifest) {
-    if (!manifest?.adapters.some((adapter) => adapter.agent === AGENT.OPENCODE)) {
-      return { status: 'warn', name: 'OpenCode adapter', detail: 'not installed in this workspace' };
-    }
-    return checkOpenCodeProjection();
+    return checkOpenCodeProjection(manifest?.packageVersion);
   },
 };
 
-function addOpenCodeProjection(plan: OperationPlan[]): void {
-  addCommandSkillProjectionToRoot(plan, OPENCODE_SKILLS_ROOT);
+function addOpenCodeProjection(plan: OperationPlan[], options?: { integrations: boolean; includeWorkspace: boolean }): void {
+  addCommandSkillProjection(plan);
+  const previous = readManifest();
+  for (const file of buildCommandSkillManagedFilesForRoot(OPENCODE_SKILLS_ROOT)) {
+    const path = file.slice(0, -'/SKILL.md'.length);
+    addLinkDirectoryPlan(plan, `${AGENT_SKILLS_ROOT}/${path.split('/').at(-1)}`, path);
+    const operation = plan.find((operation) => operation.path === path)!;
+    operation.guard = 'opencode-skill';
+    operation.allowExistingManagedSkill = previous?.adapters.some((adapter) => adapter.agent === AGENT.OPENCODE)
+      && (previous.managedFiles.includes(file) || previous.managedFiles.includes(path));
+  }
   for (const command of COMMAND_NAMES) {
+    const path = `${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`;
     plan.push({
       action: 'write',
-      path: `${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`,
+      path,
       content: buildOpenCodeCommand(command),
+      guard: 'opencode-command',
+      allowExistingManagedSkill: previous?.adapters.some((adapter) => adapter.agent === AGENT.OPENCODE)
+        && previous.managedFiles.includes(path),
     });
   }
+  if (!options?.integrations) return;
   plan.push({
     action: 'merge-json',
     path: OPENCODE_SETTINGS_PATH,
@@ -79,12 +96,54 @@ function addOpenCodeProjection(plan: OperationPlan[]): void {
   });
 }
 
+/** Native commands must be real, manifest-owned files; never follow a link. */
+export function assertSafeOpenCodeCommandWrite(managedPath: string, allowExisting: boolean): void {
+  if (!COMMAND_NAMES.some((command) => managedPath === `${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`)) {
+    throw new KyroCoreError('INVALID_INPUT', `Not an OpenCode command projection: ${managedPath}.`);
+  }
+  const target = resolveManagedPath(managedPath);
+  assertRealOpenCodeDirectories(dirname(target));
+  const stat = openCodeStatIfPresent(target);
+  if (stat && (!stat.isFile() || !allowExisting)) {
+    throw new KyroCoreError('INVALID_INPUT', `Unsafe or foreign OpenCode command target: ${target}.`, 'Move the existing path aside; Kyro writes only real files owned by the previous manifest.');
+  }
+}
+
+export function assertSafeOpenCodeSkillWrite(managedPath: string, allowExisting: boolean): void {
+  assertRealOpenCodeDirectories(resolveManagedPath(OPENCODE_SKILLS_ROOT));
+  const directory = managedPath.endsWith('/SKILL.md') ? dirname(resolveManagedPath(managedPath)) : resolveManagedPath(managedPath);
+  if (!allowExisting && openCodeStatIfPresent(directory)) {
+    throw new KyroCoreError('INVALID_INPUT', `Foreign OpenCode skill target: ${directory}.`, 'Move the existing path aside; the previous manifest did not own it.');
+  }
+  assertSafeLinkedSkillWrite(managedPath, allowExisting, OPENCODE_SKILLS_ROOT, 'OpenCode');
+}
+
+function assertRealOpenCodeDirectories(directory: string): void {
+  const home = resolveManagedPath('~');
+  for (let current = directory; current !== home; current = dirname(current)) {
+    const stat = openCodeStatIfPresent(current);
+    if (stat && !stat.isDirectory()) {
+      throw new KyroCoreError('INVALID_INPUT', `Unsafe OpenCode directory: ${current}.`, 'Move the symlink or non-directory aside; Kyro will not follow it.');
+    }
+  }
+}
+
+function openCodeStatIfPresent(path: string): ReturnType<typeof lstatSync> | null {
+  try { return lstatSync(path); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 function removeOpenCodeProjection(plan: OperationPlan[]): void {
   plan.push({ action: 'remove-json-key', path: OPENCODE_SETTINGS_PATH, jsonPath: `agent.${KYRO_OPENCODE_AGENT}` });
 }
 
 function buildOpenCodeManagedFiles(): string[] {
+  // Own only native links and commands; their canonical targets belong to the machine.
   return [
+    ...buildCommandSkillManagedFilesForRoot(OPENCODE_SKILLS_ROOT).map((file) => file.slice(0, -'/SKILL.md'.length)),
     ...buildCommandSkillManagedFilesForRoot(OPENCODE_SKILLS_ROOT),
     ...COMMAND_NAMES.map((command) => `${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`),
   ];
@@ -120,10 +179,26 @@ function buildOpenCodeAgentPrompt(): string {
   ].join('\n');
 }
 
-function checkOpenCodeProjection(): CheckResult {
+function checkOpenCodeProjection(runtimeVersion?: string): CheckResult {
+  const check = checkCommandProjection('OpenCode adapter', runtimeVersion, OPENCODE_SKILLS_ROOT);
+  for (const file of buildCommandSkillManagedFilesForRoot(OPENCODE_SKILLS_ROOT)) {
+    try { assertSafeOpenCodeSkillWrite(file, true); }
+    catch (error) { return { ...check, status: 'fail', detail: `${check.detail}; ${String(error)}`, remedy: FULL_PACKAGE_SYNC_REMEDY }; }
+  }
+  for (const command of COMMAND_NAMES) {
+    const path = `${OPENCODE_COMMANDS_ROOT}/kyro/${command}.md`;
+    try {
+      assertSafeOpenCodeCommandWrite(path, true);
+      if (managedPathExists(path) && !readFileSync(resolveManagedPath(path)).equals(Buffer.from(buildOpenCodeCommand(command), 'utf8'))) {
+        throw new Error(`Native OpenCode command content mismatch: ${resolveManagedPath(path)}.`);
+      }
+    }
+    catch (error) { return { ...check, status: 'fail', detail: `${check.detail}; ${String(error)}`, remedy: FULL_PACKAGE_SYNC_REMEDY }; }
+  }
+  if (check.status !== 'pass') return check;
   const missing = buildOpenCodeManagedFiles().filter((file) => !managedPathExists(file));
   if (missing.length > 0) {
-    return { status: 'fail', name: 'OpenCode adapter', detail: `missing ${missing.join(', ')}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
+    return { ...check, status: 'fail', detail: `${check.detail}; missing ${missing.join(', ')}`, remedy: FULL_PACKAGE_SYNC_REMEDY };
   }
-  return { status: 'pass', name: 'OpenCode adapter', detail: 'native OpenCode skills and slash commands present' };
+  return { ...check, detail: `${check.detail}; native OpenCode slash commands present` };
 }

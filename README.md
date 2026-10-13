@@ -33,14 +33,21 @@ kyro doctor --artifacts
 
 Installation projects the runtime and command skills under `~/.agents/`, and initializes project-local `.agents/kyro/` state. Check `kyro capabilities --json` before relying on a command such as `work`: a locally installed older runtime does not gain new verbs merely because this repository was built. `kyro update` refreshes an installed runtime from a published package; it is not part of developing or testing a release candidate.
 
-For Claude Code, install its native skills through the same CLI-managed runtime:
+One install publishes canonical `~/.agents/skills/kyro-*` skills and projects to every detected, enabled harness. Claude and OpenCode use native skill links with a copy fallback; Codex and Pi discover the canonical skills directly. Detection uses the harness binary on PATH or an existing config directory. Use `kyro install --no-init-workspace` for machine assets alone. `--agent` is an explicit selection that can re-enable a detected harness, not a required per-harness install step.
 
 ```bash
-kyro install --agent claude --scope workspace --init-workspace --yes
+kyro adapters list
+kyro adapters disable claude       # Persistent machine opt-out; keeps canonical skills
+kyro adapters enable claude
+kyro adapters enable codex --integrations
 kyro doctor --adapters
 ```
 
-Claude discovers `/kyro-forge`, `/kyro-work`, and the other `kyro-*` skills under `~/.claude/skills/`. The former plugin commands (`/kyro-ai:*`) are not installed by this adapter. If you previously installed the Kyro plugin, verify the new skills and then disable or uninstall that plugin in Claude Code to avoid duplicate or stale entrypoints; Kyro never changes your plugin settings automatically. Use `kyro update` for future published updates. Codex uses projected `kyro-*` skills; OpenCode has native `/kyro/*` commands and skills. See [agent adapters](docs/agent-adapters.md) for the full migration. If a team shares project state, each member initializes from their own clone; `local.json` remains personal.
+Config integrations are opt-in: the Codex MCP/root `AGENTS.md` blocks and OpenCode agent overlay are unchanged on fresh installs without `--integrations`. Machine choices live in `~/.agents/kyro/adapters.json`; install/sync migrates legacy workspace `installedAdapters` with existing integrations preserved. Sync/update discovers newly added harnesses and respects disabled choices across workspaces. Doctor shows one row per implemented adapter.
+
+Invoke Work as Claude `/kyro-work`, Codex `kyro-work`, OpenCode `/kyro/work`, or Pi `/skill:kyro-work`. Pi has no files of its own. If you previously installed the Claude Kyro plugin, verify the new skills and then disable or uninstall the plugin in Claude Code; Kyro never changes plugin settings automatically. See [agent adapters](docs/agent-adapters.md) for discovery, link/copy behavior, invocation names, and migration.
+
+Workspace `kyro uninstall` preserves machine projections and integrations. `kyro uninstall --machine` removes Kyro-owned canonical skills, projections, integration blocks, and the registry. Each team member initializes their own clone; `local.json` remains personal and harness choices are per machine.
 
 ## First steps
 
@@ -83,7 +90,7 @@ These entry points guide an agent; the CLI owns deterministic state changes. For
 ```text
 .agents/kyro/
 ├── project.json             # shared project policy; commit
-├── local.json               # personal active scope and adapters; ignore
+├── local.json               # personal active scope; ignore
 ├── scopes/<scope>/           # shared Forge sprint state and close archives; commit
 └── work/<id>/               # shared Work brief, state, and durable history; commit
 ```
@@ -102,7 +109,7 @@ The global runtime lives at `~/.agents/kyro/current/`; it is not a project file.
 
 ### Legacy debt remediation
 
-Kyro **4.43.5 is origin-only**: `debt.origin.set` changes `origin` but cannot repair an entire legacy debt record. Kyro **4.44.0 and later**, including **6.2.0**, supports `debt.canonicalize` (remediation protocol v3) for a record with missing canonical fields or legacy-only keys. Protocol v5 also records post-close debt transitions so an owner can reconcile debt and complete a scope without changing historical checkpoints. The older `resolvedSprint` compatibility migration no longer runs during install, sync, or update. Nothing is migrated for you: upgrading never rewrites an existing scope, and closed-scope checkpoints remain immutable.
+Kyro **4.43.5 is origin-only**: `debt.origin.set` changes `origin` but cannot repair an entire legacy debt record. Kyro **4.44.0 and later**, including **6.2.0** and **6.3.0**, supports `debt.canonicalize` (remediation protocol v3) for a record with missing canonical fields or legacy-only keys. Protocol v5 also records post-close debt transitions so an owner can reconcile debt and complete a scope without changing historical checkpoints. The older `resolvedSprint` compatibility migration no longer runs during install, sync, or update. Nothing is migrated for you: upgrading never rewrites an existing scope, and closed-scope checkpoints remain immutable.
 
 The explicit path is doctor → prepare → supply values → preview → apply with confirmation → doctor → recertify. Kyro does not guess `priority` or `targetSprint`; a suggestion is never an authorization. [Kyro Lens](https://github.com/synapsync/kyro-lens) verifies the resulting commitments read-only and does not repair them. See the [CLI remediation guide](docs/cli.md) and [release checklist](docs/release-checklist.md).
 

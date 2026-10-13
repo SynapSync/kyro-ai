@@ -4,6 +4,8 @@
 
 Kyro is a **workflow** (not a standalone skill) with separate Forge and Work paths, CLI-owned state, built-in checkpoints, and persistent learning.
 
+Invocation depends on the harness: Claude `/kyro-work`, Codex `kyro-work`, OpenCode `/kyro/work`, Pi `/skill:kyro-work`. Other command names follow the same host pattern. Pi reads canonical `~/.agents/skills/kyro-*` and has no projection files of its own. Host invocations are separate from shell `kyro work ...`; choose Work only when explicitly invoked. Machine adapter choices live in `~/.agents/kyro/adapters.json`; see [Agent adapters](docs/agent-adapters.md).
+
 ## Architecture: Command → Agent → Skill
 
 ```
@@ -123,10 +125,10 @@ When bumping version or changing the description:
 <!-- kyro-ai:agents-md:start -->
 ## Kyro AI
 
-Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-qa`, `kyro-idea`, `kyro-scope-retire`.
+Use installed Kyro command skills: `kyro-forge`, `kyro-status`, `kyro-task-context`, `kyro-idea`, `kyro-qa`, `kyro-scope-retire`, `kyro-work`. Choose Work only when explicitly invoked; Forge routing is unchanged. Complete a finished scope through `kyro-forge` (`scope complete`). `kyro-scope-retire` is only for obsolete, superseded, or discarded scopes.
 
 Runtime: `~/.agents/kyro/current/`
-Project state: `.agents/kyro/project.json` + `local.json`
+Project state: `.agents/kyro/project.json` + `local.json` (legacy `kyro.json` dual-read)
 Artifacts: `.agents/kyro/scopes/{scope}/`
 Skills: `~/.agents/skills/kyro-*`
 

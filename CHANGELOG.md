@@ -4,7 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [6.3.0] - 2026-10-13
+
+### Changed
+
+- Install, sync, and update now reconcile machine-level adapter choices: canonical `~/.agents/skills/kyro-*` plus all detected, enabled Claude, Codex, OpenCode, and Pi harnesses. `--agent` explicitly selects/re-enables a detected harness; per-harness installs are no longer required. Claude/OpenCode skill directories link to canonical skills with a version-pinned copy fallback (`KYRO_LINK_MODE=copy` forces copies). Pi uses canonical discovery with `/skill:kyro-work` and creates no files of its own.
+- `~/.agents/kyro/adapters.json` is the persistent machine registry. Legacy workspace `installedAdapters` records migrate as a union when each workspace is installed/synced, preserving integrations; existing machine choices win. Install/sync no longer writes that field to `local.json`, and the runtime manifest no longer follows the last synced workspace.
+- New config integrations are opt-in (`--integrations`): Codex MCP/workspace `AGENTS.md` blocks and OpenCode's agent overlay. Default OpenCode native commands remain projected. `kyro adapters list|enable|disable` manages machine state; disabled choices persist across workspaces and refreshes, while canonical skills remain shared.
+- Workspace uninstall preserves machine projections and home integrations, including with legacy `--purge-adapter-assets`. `kyro uninstall --machine` removes only Kyro-owned canonical skills, projections, integration blocks, and the registry, preserving runtime, workspace state, artifacts and unrelated content. Doctor reports one row per implemented adapter with detection, state, projection health and remedies.
+
+### Fixed
+
+- Windows checkouts (`* text=auto` writes CRLF) no longer make `kyro sync` reject the Kyro-owned `kyro-sprint-executor/SKILL.md`. The canonical, Claude/OpenCode guards, doctor and removal now compare skill bodies after normalizing CRLF to LF.
 
 ## [6.2.0] - 2026-10-05
 

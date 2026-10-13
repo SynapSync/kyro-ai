@@ -1,26 +1,30 @@
 # Codex Adapter Guide
 
-Codex should use the installed Kyro command skills and root `AGENTS.md` bootstrap. Do not load the whole runtime manually.
+Codex should use the installed Kyro command skills and, when integrations are enabled, the root `AGENTS.md` bootstrap. Do not load the whole runtime manually.
 
 ## Setup
 
 ```bash
 npm install -g kyro-ai
 cd /path/to/your-app
-kyro install --agent codex --scope workspace --init-workspace --yes
+kyro install --init-workspace --yes
 ```
+
+One install projects all detected, enabled harnesses; no per-harness `--agent` is required. `--agent` is an explicit selection/re-enable and still requires detection. Manage persistent machine choices with `kyro adapters list|enable|disable`. See [Agent adapters](agent-adapters.md) for migration and opt-out.
 
 This installs:
 
 - global runtime: `~/.agents/kyro/current/`
 - global command skills: `~/.agents/skills/kyro-*`
 - project state: `.agents/kyro/project.json` + `local.json`
-- a small Kyro managed block in root `AGENTS.md`
+
+To opt in to the managed root `AGENTS.md` block and Codex MCP registration, run `kyro adapters enable codex --integrations` from this initialized workspace. Fresh installs leave these config files unchanged without opt-in.
 
 ## Usage
 
 Invoke the command-like skills:
 
+- `kyro-work` — explicitly chosen Work lifecycle
 - `kyro-forge` — route analyze/plan/execute/review/close
 - `kyro-status` — summary-first progress and debt report
 - `kyro-task-context` — generate a copy-paste prompt for a fresh context

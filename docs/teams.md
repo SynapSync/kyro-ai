@@ -9,10 +9,12 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 | Path | Commit? | Owner | Contents |
 | ---- | ------- | ----- | -------- |
 | `.agents/kyro/project.json` | **Yes** | Team / shared | `schemaVersion`, `artifactRoot`, `principles[]`, global `conventions[]`, optional `team` policy |
-| `.agents/kyro/local.json` | **No** | Personal / machine | `activeScope`, `installedAdapters`, optional `runtimePath`, optional `execution.delegationEnabled` (L1 delegation opt-in) |
+| `.agents/kyro/local.json` | **No** | Personal / machine | `activeScope`, optional `runtimePath`, optional `execution.delegationEnabled` (L1 delegation opt-in) |
 | `.agents/kyro/scopes/**` | **Yes** | Team | Per-scope `sprint.json`, archives, findings |
 | `.agents/kyro/.gitignore` | **Yes** (recommended) | Team | Written/updated by install/sync so local-only files stay untracked |
 | Legacy monolito (see [Migration](#migration--dual-read)) | **No** | Migration only | Superseded by the two files above |
+
+Harness choice is per machine, shared by all workspaces on that machine. One install projects canonical skills and every detected, enabled harness; teammates can use different harnesses without changing shared project state. `kyro adapters list|enable|disable` manages machine choices, and disable survives another project's sync/update. Config integrations require opt-in on fresh installs. Workspace uninstall preserves machine projections and home integrations; machine removal requires `kyro uninstall --machine`. See [Agent adapters](agent-adapters.md).
 
 **Never store CLI invocation on project files.** `kyroInvocation` lives only in `~/.agents/kyro/current/manifest.json` (global runtime).
 
@@ -25,7 +27,8 @@ This page is the **multi-dev contract**. Behavior is enforced by install/sync, `
 | `team` (e.g. `minPackageVersion`) | shared only | Optional fleet floor — doctor **WARN**s if runtime is older (non-blocking) |
 | `scopes[]` | derived from disk | Valid matching `scopes/<id>/sprint.json` files determine the effective scope list; not stored in `project.json` |
 | `activeScope` | local only | Personal — never on `project.json` |
-| `installedAdapters` | local only | Per-machine adapter records |
+| `installedAdapters` | legacy local read only | Migrated into the machine registry; no longer written by install/sync |
+| Adapter choices | machine only | `~/.agents/kyro/adapters.json`; never committed or selected by project state |
 | `execution.delegationEnabled` | local only | L1 delegation opt-in; default off; surfaced on `context-pack` JSON |
 
 ### Delegation opt-in (L1)
@@ -106,6 +109,10 @@ kyro install --scope workspace --init-workspace --yes
 ```
 
 Then confirm `project.json` + `local.json` hold what you expect and remove `kyro.json.migrated`.
+
+### Legacy adapter migration
+
+Older `local.json` files may contain `installedAdapters`. Install/sync continues reading those records and unions newly encountered adapters into `~/.agents/kyro/adapters.json`, enabling integrations for legacy entries to preserve existing configuration. Existing machine choices take precedence, including opt-out. The runtime manifest derives adapters from that machine registry; syncing a different workspace no longer replaces the selection. Install/sync no longer writes `installedAdapters` to `local.json`. Migrate each legacy clone through install/sync; the registry does not scan other workspaces automatically.
 
 ## Optional team package floor
 

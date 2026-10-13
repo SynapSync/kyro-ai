@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnWithAuthor as spawnSync } from './work-author-fixtures.mjs';
 
 const cli = resolve('dist/cli.js');
 const root = mkdtempSync(join(tmpdir(), 'kyro-work-review-'));
@@ -104,7 +104,20 @@ try {
   const stale = run('work', 'review', '--work', 'review-fail', '--task', 'W2', '--from', 'review.json', '--verdict', 'pass', '--expect-revision', '1', '--json');
   assert.notEqual(stale.status, 0);
   assert.equal(JSON.parse(stale.stdout).error.code, 'STATE_DIVERGED');
-  console.log('Work review contract fixtures passed.');
+  // The creator is allowed to check another maker; maker equality remains forbidden.
+  createEvidence('creator-checker');
+  const creatorWork = JSON.parse(readFileSync(workFile('creator-checker')));
+  assert.equal(creatorWork.author.name, 'fixture-checker');
+  assert.equal(creatorWork.tasks[0].evidence.by, 'fixture-maker');
+  const makerSelfReview = spawnSync(process.execPath, [cli, 'work', 'review', '--work', 'creator-checker', '--task', 'W1', '--from', 'review.json', '--verdict', 'pass', '--by', 'fixture-maker', '--expect-revision', '4', '--json'], { cwd: root, encoding: 'utf8' });
+  assert.notEqual(makerSelfReview.status, 0);
+  assert.match(JSON.parse(makerSelfReview.stdout).error.message, /maker|different|own evidence/i);
+  assert.deepEqual(JSON.parse(readFileSync(workFile('creator-checker'))), creatorWork);
+  assert.equal(data(review('creator-checker', 'pass')).status, 'verified');
+  const approved = JSON.parse(readFileSync(workFile('creator-checker')));
+  assert.equal(approved.tasks[0].verdict.by, approved.author.name);
+  assert.deepEqual(approved.author, creatorWork.author);
+  console.log('Work review contract and creator/maker/checker separation fixtures passed.');
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

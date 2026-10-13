@@ -4,6 +4,7 @@ import { codexAdapter } from './codex';
 import { claudeAdapter } from './claude';
 import { detectFromPaths } from './detection';
 import { openCodeAdapter } from './opencode';
+import { piAdapter } from './pi';
 import { standardAgentsAdapter } from './standard';
 import type { AdapterDefinition, AdapterPaths, MCPStrategy, SystemPromptStrategy } from './registry-types';
 
@@ -56,6 +57,7 @@ export const ADAPTERS: AdapterDefinition[] = [
   openCodeAdapter,
   codexAdapter,
   claudeAdapter,
+  piAdapter,
   plannedAdapter(
     AGENT.CURSOR,
     'Cursor',

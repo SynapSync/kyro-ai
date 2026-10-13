@@ -14,6 +14,8 @@ import {
   PROJECT_STATE_PATH,
   WORKFLOW_NAME,
 } from './constants';
+import { registerMachineAdapterPlan } from './adapters/machine-registry';
+import { reconcileAdapters, recordReconciliation } from './adapters/reconcile';
 import { getAdapterDefinition, getInstalledAdapterDefinitions } from './adapters/registry';
 import { addCopyDirectoryPlan, addCopyFilePlan, listRelativeFiles, resolveManagedPath } from './fs';
 import { readPackageVersion } from './help';
@@ -45,18 +47,18 @@ export const KYRO_PROJECT_GITIGNORE_ENTRIES = [
   '.kyro-state-writer.lock/',
 ] as const;
 
-export function buildInstallPlan(agents: Agent[], scope: InstallScope, projectedEntries: ReadonlyMap<string, KyroScopeEntry> = new Map()): OperationPlan[] {
-  return buildInstallPlanForMode(agents, scope, { includeWorkspace: true, projectedEntries });
+export function buildInstallPlan(agents: Agent[], scope: InstallScope, projectedEntries: ReadonlyMap<string, KyroScopeEntry> = new Map(), integrations = false): OperationPlan[] {
+  return buildInstallPlanForMode(agents, scope, { includeWorkspace: true, projectedEntries, integrations });
 }
 
-export function buildRuntimeInstallPlan(scope: InstallScope): OperationPlan[] {
-  return buildInstallPlanForMode([], scope, { includeWorkspace: false });
+export function buildRuntimeInstallPlan(scope: InstallScope, agents: Agent[] = [], integrations = false): OperationPlan[] {
+  return buildInstallPlanForMode(agents, scope, { includeWorkspace: false, integrations });
 }
 
 function buildInstallPlanForMode(
   agents: Agent[],
   scope: InstallScope,
-  options: { includeWorkspace: boolean; projectedEntries?: ReadonlyMap<string, KyroScopeEntry> },
+  options: { includeWorkspace: boolean; integrations?: boolean; projectedEntries?: ReadonlyMap<string, KyroScopeEntry> },
 ): OperationPlan[] {
   const now = new Date().toISOString();
   const packageVersion = readPackageVersion();
@@ -66,10 +68,15 @@ function buildInstallPlanForMode(
   // SoT is the global runtime manifest only — never project kyro.json (avoids multi-workspace drift).
   const kyroInvocation = resolveKyroInvocation().raw;
   const state = options.includeWorkspace ? mergeProjectState(agents, scope, now) : null;
-  const manifestAgents = state?.installedAdapters.map((adapter) => adapter.agent) ?? [];
-  const adapters = state?.installedAdapters ?? [];
+  const reconciliation = reconcileAdapters(agents, options.integrations);
+  const machineRegistry = reconciliation.registry;
+  const manifestAgents = machineRegistry.adapters.filter((adapter) => adapter.state === 'enabled')
+    .map((adapter) => adapter.agent).filter((agent) => getAdapterDefinition(agent).status === 'implemented');
+  const adapters = machineRegistry.adapters.filter((adapter) => manifestAgents.includes(adapter.agent))
+    .map((adapter) => getAdapterDefinition(adapter.agent).buildInstalledAdapter(scope, adapter.updatedAt));
+  const integrationAgents = machineRegistry.adapters.filter((entry) => entry.integrations && manifestAgents.includes(entry.agent)).map((entry) => entry.agent);
   const managedFiles = buildManagedFiles(manifestAgents, runtimeRoot);
-  const managedBlocks = buildManagedBlocks(manifestAgents);
+  const managedBlocks = buildManagedBlocks(integrationAgents).filter((block) => options.includeWorkspace || !block.startsWith('AGENTS.md#'));
   const manifest: KyroManifest = {
     schemaVersion: 1,
     packageName: WORKFLOW_NAME,
@@ -93,6 +100,7 @@ function buildInstallPlanForMode(
 
   if (state) {
     const { shared, local } = splitMonolitoToLayers(state);
+    delete local.installedAdapters;
     // Never let content vanish under a success message. Aliases from hand-authored state are mapped
     // by the clone helpers; whatever still has no recoverable text is named here so the user can
     // restore it, instead of finding a hollow `{ id }` entry later.
@@ -153,13 +161,20 @@ function buildInstallPlanForMode(
   // Clean the retired multi-version runtime root. Kyro now keeps only one active runtime.
   plan.push({ action: 'remove', path: KYRO_LEGACY_VERSIONS_ROOT });
 
-  if (state) {
-    for (const adapter of getInstalledAdapterDefinitions(manifestAgents)) {
-      adapter.buildProjection(plan);
-      if (adapter.capabilities().includes('mcp')) adapter.buildMcpProjection(plan);
+  const projections = new Map<Agent, OperationPlan[]>();
+  for (const adapter of getInstalledAdapterDefinitions(reconciliation.desired)) {
+    const projection: OperationPlan[] = [];
+    const integrations = integrationAgents.includes(adapter.agent);
+    adapter.buildProjection(projection, { integrations, includeWorkspace: options.includeWorkspace });
+    if (integrations && adapter.capabilities().includes('mcp')) adapter.buildMcpProjection(projection);
+    projections.set(adapter.agent, projection);
+    for (const operation of projection) {
+      if (!plan.some((existing) => existing.path === operation.path && existing.action === operation.action)) plan.push(operation);
     }
   }
+  recordReconciliation(plan, reconciliation, projections);
 
+  registerMachineAdapterPlan(plan, machineRegistry);
   return plan;
 }
 

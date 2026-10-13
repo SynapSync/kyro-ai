@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -25,9 +25,14 @@ function withWorkspace(prefix, callback) {
   const cwd = createWorkspace(prefix);
   const previousCwd = process.cwd();
   const previousHome = process.env.HOME;
+  const previousEnv = Object.fromEntries(['USERPROFILE', 'npm_config_cache', 'PATH', 'KYRO_LINK_MODE'].map((key) => [key, process.env[key]]));
   try {
     process.chdir(cwd);
     process.env.HOME = join(cwd, '.home');
+    process.env.USERPROFILE = process.env.HOME;
+    process.env.npm_config_cache = join(cwd, 'npm-cache');
+    process.env.PATH = join(cwd, 'bin');
+    mkdirSync(process.env.PATH);
     clearDistCache();
     return callback(cwd);
   } finally {
@@ -37,6 +42,7 @@ function withWorkspace(prefix, callback) {
     } else {
       process.env.HOME = previousHome;
     }
+    for (const [key, value] of Object.entries(previousEnv)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
     clearDistCache();
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -55,8 +61,12 @@ function captureLogs(callback) {
 }
 
 function cliOptions(overrides = {}) {
+  // Explicit selections model installed harnesses, independent of the developer's PATH.
+  for (const agent of overrides.agents ?? []) writeFileSync(join(process.env.PATH, agent), '#!/bin/sh\nexit 0\n');
   return {
     agents: [],
+    // Existing config-overlay fixtures explicitly opt in; defaults are covered by check:reconcile.
+    integrations: true,
     scope: 'workspace',
     dryRun: false,
     yes: true,
@@ -113,6 +123,85 @@ function assertCommonPlan(plan, name) {
 
 const EXPECTED_COMMAND_SKILLS = ['forge', 'status', 'task-context', 'idea', 'qa', 'scope-retire', 'work'];
 
+withWorkspace('kyro-crlf-owned-projections-', () => {
+  const { parseAgent } = require(join(repo, 'dist/cli/options.js'));
+  const { install } = require(join(repo, 'dist/cli/commands/install.js'));
+  const { resolveManagedPath } = require(join(repo, 'dist/cli/fs.js'));
+  const { readManifest } = require(join(repo, 'dist/cli/state.js'));
+  const { buildCommandSkillManagedFilesForRoot, assertSafeCanonicalSkillWrite } = require(join(repo, 'dist/cli/adapters/command-skills.js'));
+  const { claudeAdapter, assertSafeClaudeSkillWrite } = require(join(repo, 'dist/cli/adapters/claude.js'));
+  const { openCodeAdapter, assertSafeOpenCodeSkillWrite } = require(join(repo, 'dist/cli/adapters/opencode.js'));
+  const { standardAgentsAdapter } = require(join(repo, 'dist/cli/adapters/standard.js'));
+  const { buildMachineRemovalPlan } = require(join(repo, 'dist/cli/commands/adapters.js'));
+  process.env.KYRO_LINK_MODE = 'copy';
+  captureLogs(() => install(cliOptions({ agents: [parseAgent('claude'), parseAgent('opencode')] })));
+  const manifest = readManifest();
+  const projections = [
+    { root: '~/.agents/skills', guard: assertSafeCanonicalSkillWrite, adapter: standardAgentsAdapter },
+    { root: '~/.claude/skills', guard: assertSafeClaudeSkillWrite, adapter: claudeAdapter },
+    { root: '~/.config/opencode/skills', guard: assertSafeOpenCodeSkillWrite, adapter: openCodeAdapter },
+  ];
+  const failures = [];
+  const check = (label, callback) => {
+    try { callback(); }
+    catch (error) {
+      console.log(`FAIL CRLF owned projections: ${label}: ${String(error)}`);
+      failures.push(label);
+    }
+  };
+  const refuses = (callback, label) => {
+    let refused = false;
+    try { callback(); } catch { refused = true; }
+    assert(refused, `CRLF owned projections: ${label} must still be refused`);
+  };
+  for (const { root, guard, adapter } of projections) {
+    for (const path of buildCommandSkillManagedFilesForRoot(root)) {
+      const target = resolveManagedPath(path);
+      const lf = readFileSync(target, 'utf8').replaceAll('\r\n', '\n');
+      writeFileSync(target, lf);
+      guard(path, true);
+      const crlf = lf.replaceAll('\n', '\r\n');
+      writeFileSync(target, crlf);
+      check(path, () => guard(path, true));
+      // Metadata alone never authorizes an unowned file.
+      refuses(() => guard(path, false), `${path} without manifest ownership`);
+      for (const [label, body] of [
+        ['missing name', crlf.replace(/^name:.*\r\n/m, '')],
+        ['missing runtimeVersion', crlf.replace(/^.*runtimeVersion:.*\r\n/m, '')],
+        ['foreign body', 'Foreign skill\r\n'],
+      ]) {
+        writeFileSync(target, body);
+        refuses(() => guard(path, true), `${path} ${label}`);
+        assert(adapter.doctor(manifest).status === 'fail', `CRLF owned projections: doctor must reject ${path} ${label}`);
+      }
+      writeFileSync(target, crlf);
+      const foreign = join(process.env.HOME, 'foreign-SKILL.md');
+      writeFileSync(foreign, crlf);
+      rmSync(target);
+      symlinkSync(foreign, target);
+      refuses(() => guard(path, true), `${path} symlink`);
+      assert(adapter.doctor(manifest).status === 'fail', `CRLF owned projections: doctor must reject ${path} symlink`);
+      assert(readFileSync(foreign, 'utf8') === crlf, 'CRLF owned projections: symlink target bytes must be preserved');
+      rmSync(target);
+      writeFileSync(target, crlf);
+    }
+    check(`${root} doctor`, () => {
+      const result = adapter.doctor(manifest);
+      assert(result.status === 'pass', result.detail);
+    });
+  }
+  check('machine removal ownership', () => {
+    const plan = buildMachineRemovalPlan([parseAgent('claude'), parseAgent('opencode')], true);
+    for (const { root } of projections) {
+      for (const path of buildCommandSkillManagedFilesForRoot(root)) {
+        assert(plan.some((operation) => operation.path === path.slice(0, -'/SKILL.md'.length)), `CRLF owned projections: missing removal for ${path}`);
+      }
+    }
+  });
+  assert(failures.length === 0, `CRLF owned projections: ${failures.length} checks failed (LF guards accepted all skills)`);
+  console.log('PASS CRLF owned projections: all command/full skills accepted by canonical/Claude/OpenCode guards, doctors and removal; missing name/pin, unowned/foreign bodies and symlinks refused');
+});
+
 function assertStandardCommandSkills(plan, name) {
   for (const command of EXPECTED_COMMAND_SKILLS) {
     assert(plan.includes(`- write ~/.agents/skills/kyro-${command}/SKILL.md`), `${name}: missing ${command} command skill`);
@@ -137,18 +226,18 @@ assertStandardCommandSkills(combinedPlan, 'combined');
 assert(!standardPlan.includes('- upsert-block AGENTS.md # agents-md'), 'standard: should not manage AGENTS.md block');
 assert(!openCodePlan.includes('- upsert-block AGENTS.md # agents-md'), 'opencode: should not manage AGENTS.md block');
 assert(codexPlan.includes('- upsert-block AGENTS.md # agents-md'), 'codex: should manage AGENTS.md block');
-assert(claudePlan.includes('- write ~/.claude/skills/kyro-forge/SKILL.md'), 'claude: missing native forge skill');
-assert(claudePlan.includes('- write ~/.claude/skills/kyro-work/SKILL.md'), 'claude: missing native Work skill');
+assert(claudePlan.includes('- link ~/.claude/skills/kyro-forge <= ~/.agents/skills/kyro-forge'), 'claude: missing native forge skill link');
+assert(claudePlan.includes('- link ~/.claude/skills/kyro-work <= ~/.agents/skills/kyro-work'), 'claude: missing native Work skill link');
 assert(!claudePlan.includes('providers/claude/commands'), 'claude: must not project plugin wrappers');
 assert(combinedPlan.includes('- upsert-block AGENTS.md # agents-md'), 'combined: should manage AGENTS.md block once');
 
 assert(standardPlan.includes('- standard: status=implemented;'), 'standard: missing preflight status');
 assert(openCodePlan.includes('- opencode: status=implemented;'), 'opencode: missing preflight status');
 assert(codexPlan.includes('- codex: status=implemented;'), 'codex: missing preflight status');
-assert(openCodePlan.includes('- write ~/.config/opencode/skills/kyro-forge/SKILL.md'), 'opencode: missing native forge skill projection');
+assert(openCodePlan.includes('- link ~/.config/opencode/skills/kyro-forge <= ~/.agents/skills/kyro-forge'), 'opencode: missing native forge skill projection');
 assert(openCodePlan.includes('- write ~/.config/opencode/commands/kyro/forge.md'), 'opencode: missing native forge command projection');
 assert(openCodePlan.includes('- merge-json ~/.config/opencode/opencode.json'), 'opencode: missing native settings overlay');
-assert(!openCodePlan.includes('- write ~/.agents/skills/kyro-forge/SKILL.md'), 'opencode: should not use standard global command skill projection');
+assert(openCodePlan.includes('- write ~/.agents/skills/kyro-forge/SKILL.md'), 'opencode: canonical skills are always projected before native links');
 assert(countIncludes(combinedPlan, '- write ~/.agents/skills/kyro-forge/SKILL.md') === 1, 'combined: forge skill should be projected once');
 assert(countIncludes(combinedPlan, '- write ~/.agents/skills/kyro-work/SKILL.md') === 1, 'combined: Work skill should be projected once');
 assert(openCodePlan.includes('- write ~/.config/opencode/commands/kyro/work.md'), 'opencode: missing Work command projection');
@@ -259,7 +348,10 @@ withWorkspace('kyro-claude-adapter-', (cwd) => {
   writeFileSync(workSkill, readFileSync(workSkill, 'utf8').replace(`runtimeVersion: "${manifest.packageVersion}"`, 'runtimeVersion: "0.0.0"'));
   assert(adapter.doctor(manifest).status === 'fail', 'claude: stale skill must fail doctor');
   captureLogs(() => sync(cliOptions({ agents: [claude] })));
-  rmSync(workSkill);
+  // A directory projection follows the canonical skill. Create the foreign
+  // leaf in an owned copy so this fixture never edits the canonical source.
+  rmSync(resolve(workSkill, '..'), { recursive: true });
+  mkdirSync(resolve(workSkill, '..'), { recursive: true });
   symlinkSync(userSkill, workSkill);
   refused = false;
   try {
@@ -272,10 +364,61 @@ withWorkspace('kyro-claude-adapter-', (cwd) => {
   rmSync(workSkill);
   captureLogs(() => sync(cliOptions({ agents: [claude] })));
   captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true })));
-  assert(!existsSync(join(skillsRoot, 'kyro-forge')), 'claude: purge should remove managed skills');
+  assert(existsSync(join(skillsRoot, 'kyro-forge')), 'claude: workspace purge must preserve machine skills');
   for (const [index, file] of [settings, userSkill, legacyPlugin].entries()) {
     assert(readFileSync(file).equals(preserved[index]), `claude: purge touched unrelated file: ${file}`);
   }
+});
+
+// Adapted from the auditor's opencode-probe.cjs; never use the real HOME.
+withWorkspace('kyro-foreign-opencode-command-link-', (cwd) => {
+  const { parseOptions } = require(join(repo, 'dist/cli/options.js'));
+  const { install } = require(join(repo, 'dist/cli/commands/install.js'));
+  const home = process.env.HOME;
+  const foreign = join(cwd, 'user-notes.md');
+  const target = join(home, '.config/opencode/commands/kyro/work.md');
+  mkdirSync(resolve(target, '..'), { recursive: true });
+  writeFileSync(foreign, 'PRIVATE USER CONTENT\n');
+  symlinkSync(foreign, target);
+  const before = readFileSync(foreign);
+  let error = null;
+  const output = captureLogs(() => {
+    try { install(parseOptions(['--no-init-workspace'])); }
+    catch (caught) { error = caught; }
+  });
+  assert(error && String(error).includes(target), 'foreign OpenCode link: install must fail with the offending path');
+  assert(!output.includes('Kyro has been installed.'), 'foreign OpenCode link: failed install must not report success');
+  assert(readFileSync(foreign).equals(before), 'foreign OpenCode link: foreign bytes changed');
+  assert(lstatSync(target).isSymbolicLink(), 'foreign OpenCode link: symlink must survive');
+  for (const path of ['.agents/kyro/adapters.json', '.agents/kyro/current/manifest.json', '.agents/skills/kyro-work/SKILL.md', '.config/opencode/commands/kyro/forge.md']) {
+    assert(!existsSync(join(home, path)), `foreign OpenCode link: rollback left ${path}`);
+  }
+  console.log('PASS F1 foreign-opencode-command-link: install fails with path, original bytes and symlink preserved, no success report; registry/runtime/earlier commands rolled back');
+
+  // The same ownership rule protects regular foreign files and directories.
+  rmSync(target);
+  for (const directory of [false, true]) {
+    if (directory) mkdirSync(target);
+    else writeFileSync(target, before);
+    error = null;
+    captureLogs(() => { try { install(parseOptions(['--no-init-workspace'])); } catch (caught) { error = caught; } });
+    assert(error && String(error).includes(target), 'foreign OpenCode command: collision must fail with path');
+    assert(directory ? lstatSync(target).isDirectory() : readFileSync(target).equals(before), 'foreign OpenCode command: collision changed');
+    rmSync(target, { recursive: true });
+  }
+  captureLogs(() => install(parseOptions(['--no-init-workspace'])));
+  const managedBefore = readFileSync(target);
+  rmSync(target);
+  symlinkSync(foreign, target);
+  error = null;
+  captureLogs(() => { try { install(parseOptions(['--no-init-workspace'])); } catch (caught) { error = caught; } });
+  assert(error && String(error).includes(target), 'manifest-owned OpenCode path: symlink still must be refused');
+  assert(lstatSync(target).isSymbolicLink() && readFileSync(foreign).equals(before), 'manifest-owned OpenCode path: foreign link changed');
+  rmSync(target);
+  writeFileSync(target, managedBefore);
+  captureLogs(() => install(parseOptions(['--no-init-workspace'])));
+  assert(readFileSync(target).equals(managedBefore), 'manifest-owned OpenCode file: repeat install changed native command bytes');
+  console.log('PASS F1 OpenCode command ownership: foreign files/directories and owned-path symlinks refused; owned regular commands refresh successfully');
 });
 
 withWorkspace('kyro-claude-symlink-root-', (cwd) => {
@@ -382,7 +525,7 @@ withWorkspace('kyro-adapter-contract-', (cwd) => {
   mkdirSync(join(homeDir, '.claude'), { recursive: true });
   mkdirSync(join(homeDir, '.cursor'), { recursive: true });
 
-  assert(ADAPTERS.length === 5, `adapter contract: expected 5 adapters, got ${ADAPTERS.length}`);
+  assert(ADAPTERS.length === 6, `adapter contract: expected 6 adapters, got ${ADAPTERS.length}`);
   for (const adapter of ADAPTERS) {
     assert(typeof adapter.capabilities === 'function', `${adapter.agent}: missing capabilities()`);
     assert(typeof adapter.paths === 'function', `${adapter.agent}: missing paths()`);
@@ -478,7 +621,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!Object.hasOwn(sharedBeforeUpgrade, 'kyroInvocation'), 'install: shared state should not include kyroInvocation');
   assert(!Object.hasOwn(localBeforeUpgrade, 'kyroInvocation'), 'install: local state should not include kyroInvocation');
   const staleCodexInstalledAt = '2000-01-01T00:00:00.000Z';
-  const staleStandardInstalledAt = '2001-01-01T00:00:00.000Z';
+  const staleStandardInstalledAt = JSON.parse(readFileSync(join(home, '.agents/kyro/adapters.json'), 'utf8')).adapters.find((entry) => entry.agent === 'standard').updatedAt;
   const principles = [
     {
       id: 'preserve-principles',
@@ -502,7 +645,7 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   localBeforeUpgrade.kyroInvocation = 'kyro';
   localBeforeUpgrade.runtimeVersion = '0.0.0-legacy';
   localBeforeUpgrade.installedAdapters = [
-    { ...localBeforeUpgrade.installedAdapters[0], installedAt: staleCodexInstalledAt },
+    { agent: codex, scope: 'workspace', corePath: '~/.agents/kyro/current', installedAt: staleCodexInstalledAt },
     {
       agent: 'standard',
       scope: 'workspace',
@@ -523,13 +666,18 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!Object.hasOwn(sharedAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from shared');
   assert(!Object.hasOwn(localAfterSync, 'runtimeVersion'), 'sync: legacy runtimeVersion should be removed from local');
   assert(!Object.hasOwn(localAfterSync, 'kyroInvocation'), 'sync: legacy kyroInvocation should be removed from local');
-  const syncedCodex = localAfterSync.installedAdapters.find((adapter) => adapter.agent === 'codex');
-  const syncedStandard = localAfterSync.installedAdapters.find((adapter) => adapter.agent === 'standard');
-  assert(syncedCodex.installedAt !== staleCodexInstalledAt, 'sync: selected adapter installedAt was not refreshed');
-  assert(syncedStandard.installedAt === staleStandardInstalledAt, 'sync: unselected adapter installedAt should be preserved');
+  // Adapter installation metadata moved to the machine registry; local overlays omit it.
+  assert(!Object.hasOwn(localAfterSync, 'installedAdapters'), 'sync: local installedAdapters must be omitted');
+  const machineRegistryPath = join(home, '.agents', 'kyro', 'adapters.json');
+  const registryAfterSync = JSON.parse(readFileSync(machineRegistryPath, 'utf-8'));
+  const syncedCodex = registryAfterSync.adapters.find((adapter) => adapter.agent === 'codex');
+  const syncedStandard = registryAfterSync.adapters.find((adapter) => adapter.agent === 'standard');
+  assert(syncedCodex.updatedAt !== staleCodexInstalledAt, 'sync: selected adapter installedAt was not refreshed');
+  assert(syncedStandard.updatedAt === staleStandardInstalledAt, 'sync: unselected adapter installedAt should be preserved');
 
   const staleReinstallInstalledAt = '2002-01-01T00:00:00.000Z';
-  syncedCodex.installedAt = staleReinstallInstalledAt;
+  syncedCodex.updatedAt = staleReinstallInstalledAt;
+  writeFileSync(machineRegistryPath, `${JSON.stringify(registryAfterSync, null, 2)}\n`, 'utf-8');
   localAfterSync.runtimeVersion = '0.0.0-legacy';
   localAfterSync.kyroInvocation = 'kyro';
   sharedAfterSync.runtimeVersion = '0.0.0-legacy';
@@ -539,8 +687,10 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   captureLogs(() => install(cliOptions({ agents: [codex], initWorkspace: true })));
   const sharedAfterReinstall = JSON.parse(readFileSync(sharedPath, 'utf-8'));
   const localAfterReinstall = JSON.parse(readFileSync(localPath, 'utf-8'));
-  const reinstalledCodex = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'codex');
-  const reinstalledStandard = localAfterReinstall.installedAdapters.find((adapter) => adapter.agent === 'standard');
+  assert(!Object.hasOwn(localAfterReinstall, 'installedAdapters'), 'reinstall: local installedAdapters must be omitted');
+  const registryAfterReinstall = JSON.parse(readFileSync(machineRegistryPath, 'utf-8'));
+  const reinstalledCodex = registryAfterReinstall.adapters.find((adapter) => adapter.agent === 'codex');
+  const reinstalledStandard = registryAfterReinstall.adapters.find((adapter) => adapter.agent === 'standard');
   assert(JSON.stringify(sharedAfterReinstall.principles) === JSON.stringify(principles), 'reinstall: principles were not preserved');
   assert(!Object.hasOwn(sharedAfterReinstall, 'scopes'), 'reinstall: shared scopes[] must remain absent');
   assert(localAfterReinstall.activeScope === 'upgrade-scope', 'reinstall: activeScope was not preserved');
@@ -548,8 +698,8 @@ withWorkspace('kyro-adapter-install-', (installDir) => {
   assert(!Object.hasOwn(sharedAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from shared');
   assert(!Object.hasOwn(localAfterReinstall, 'runtimeVersion'), 'reinstall: legacy runtimeVersion should be removed from local');
   assert(!Object.hasOwn(localAfterReinstall, 'kyroInvocation'), 'reinstall: legacy kyroInvocation should be removed from local');
-  assert(reinstalledCodex.installedAt !== staleReinstallInstalledAt, 'reinstall: selected adapter installedAt was not refreshed');
-  assert(reinstalledStandard.installedAt === staleStandardInstalledAt, 'reinstall: unselected adapter installedAt should be preserved');
+  assert(reinstalledCodex.updatedAt !== staleReinstallInstalledAt, 'reinstall: selected adapter installedAt was not refreshed');
+  assert(reinstalledStandard.updatedAt === staleStandardInstalledAt, 'reinstall: unselected adapter installedAt should be preserved');
   assert(!existsSync(monoPath), 'reinstall: must not recreate live monolito kyro.json');
 
   captureLogs(() => uninstall(cliOptions()));
@@ -618,20 +768,27 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
   settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
   assert(settings.model === 'user/model', 'opencode uninstall: did not preserve root setting');
   assert(settings.agent.existing.model === 'kept', 'opencode uninstall: did not preserve existing agent');
-  assert(!settings.agent['kyro-orchestrator'], 'opencode uninstall: Kyro orchestrator overlay still present');
+  assert(readFileSync(settingsPath, 'utf-8') === afterInstall, 'opencode uninstall: machine integrations must remain byte-identical');
   assert(settings.mcp['user-server'].command[1] === 'server.js', 'opencode uninstall: did not preserve existing MCP config');
   for (const command of EXPECTED_COMMAND_SKILLS) {
     assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode uninstall: should preserve native skill ${command} without purge`);
     assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode uninstall: should preserve native command ${command} without purge`);
   }
 
-  assert(!existsSync(join(home, '.agents', 'skills', 'kyro-forge', 'SKILL.md')), 'opencode install: should not install standard global skill projection');
+  assert(existsSync(join(home, '.agents', 'skills', 'kyro-forge', 'SKILL.md')), 'opencode install: canonical skills must back the native links');
 
   captureLogs(() => install(cliOptions({ agents: [opencode], initWorkspace: true })));
   const purgeDryRunOutput = captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true, dryRun: true })));
+  const { getAdapterDefinition } = require(join(repo, 'dist/cli/adapters/registry.js'));
+  assert(getAdapterDefinition(opencode).buildManagedFiles().every((path) => path.startsWith('~/.config/opencode/skills/') || path.startsWith('~/.config/opencode/commands/kyro/')), 'opencode purge: managed files must contain only OpenCode-owned paths');
+  const registryBeforePurge = readFileSync(join(home, '.agents', 'kyro', 'adapters.json'));
+  assert(JSON.parse(registryBeforePurge).adapters.some((adapter) => adapter.agent === 'standard' && adapter.state === 'enabled'), 'opencode purge: Standard must be registered');
+  const canonicalSkills = EXPECTED_COMMAND_SKILLS.map((command) => join(home, '.agents', 'skills', `kyro-${command}`, 'SKILL.md'));
+  const canonicalBeforePurge = canonicalSkills.map((path) => readFileSync(path));
+  assert(!purgeDryRunOutput.split('\n').some((line) => /^- (remove|rmdir-if-empty) ~\/\.agents\/skills(?:\/|$)/.test(line)), 'opencode purge dry-run: must not remove canonical skills or their directories');
   assert(purgeDryRunOutput.includes('purgeAdapterAssets=yes'), 'opencode purge dry-run: summary should report purge enabled');
-  assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/skills/kyro-forge/SKILL.md'), 'opencode purge dry-run: plan should include native skill removal');
-  assert(purgeDryRunOutput.includes('- remove ~/.config/opencode/commands/kyro/forge.md'), 'opencode purge dry-run: plan should include native command removal');
+  assert(!purgeDryRunOutput.includes('- remove ~/.config/opencode/skills/'), 'opencode purge dry-run: machine skills must be preserved');
+  assert(!purgeDryRunOutput.includes('- remove ~/.config/opencode/commands/'), 'opencode purge dry-run: machine commands must be preserved');
   assert(purgeDryRunOutput.includes('Dry run complete. No files changed.'), 'opencode purge dry-run: should report no file changes');
   settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
   assert(settings.agent['kyro-orchestrator'], 'opencode purge dry-run: Kyro orchestrator overlay should remain');
@@ -642,25 +799,30 @@ withWorkspace('kyro-adapter-opencode-install-', (installDir) => {
 
   const purgeOutput = captureLogs(() => uninstall(cliOptions({ purgeAdapterAssets: true })));
   assert(purgeOutput.includes('purgeAdapterAssets=yes'), 'opencode purge: summary should report purge enabled');
-  assert(purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/commands/kyro'), 'opencode purge: plan should clean command namespace directory');
-  assert(purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/skills/kyro-forge'), 'opencode purge: plan should clean skill directory');
+  assert(!purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/commands/kyro'), 'opencode purge: machine command directory must be preserved');
+  assert(!purgeOutput.includes('- rmdir-if-empty ~/.config/opencode/skills/kyro-forge'), 'opencode purge: machine skill directory must be preserved');
   settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
   assert(settings.model === 'user/model', 'opencode purge: did not preserve root setting');
   assert(settings.agent.existing.model === 'kept', 'opencode purge: did not preserve existing agent');
-  assert(!settings.agent['kyro-orchestrator'], 'opencode purge: Kyro orchestrator overlay still present');
+  assert(readFileSync(settingsPath, 'utf-8') === afterInstall, 'opencode purge: machine integrations must remain byte-identical');
   for (const command of EXPECTED_COMMAND_SKILLS) {
-    assert(!existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode purge: native skill ${command} still present`);
-    assert(!existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode purge: native command ${command} still present`);
-    assert(!existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`)), `opencode purge: empty skill directory ${command} still present`);
+    assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`, 'SKILL.md')), `opencode purge: native skill ${command} must remain`);
+    assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro', `${command}.md`)), `opencode purge: native command ${command} must remain`);
+    assert(existsSync(join(home, '.config', 'opencode', 'skills', `kyro-${command}`)), `opencode purge: skill directory ${command} must remain`);
   }
-  assert(!existsSync(join(home, '.config', 'opencode', 'commands', 'kyro')), 'opencode purge: empty command namespace still present');
+  assert(existsSync(join(home, '.config', 'opencode', 'commands', 'kyro')), 'opencode purge: machine command namespace must remain');
   assert(existsSync(join(home, '.config', 'opencode')), 'opencode purge: shared OpenCode config directory should remain');
+  assert(existsSync(join(home, '.agents', 'skills', 'kyro-work', 'SKILL.md')), 'opencode purge: canonical Work skill must remain discoverable');
+  canonicalSkills.forEach((path, index) => assert(readFileSync(path).equals(canonicalBeforePurge[index]), `opencode purge: canonical skill changed: ${path}`));
+  assert(readFileSync(join(home, '.agents', 'kyro', 'adapters.json')).equals(registryBeforePurge), 'opencode purge: machine registrations must remain unchanged');
 
   const priorExitCode = process.exitCode;
   const doctorAfterPurgeOutput = captureLogs(() => doctor(cliOptions({ adapters: true })));
   assert(doctorAfterPurgeOutput.includes('[PASS] global runtime'), 'opencode purge doctor: global runtime should remain valid after purging adapter assets');
+  assert(doctorAfterPurgeOutput.includes('[PASS] Standard .agents adapter:'), 'opencode purge doctor: Standard must remain healthy');
   const purgeDoctorFailures = doctorAfterPurgeOutput.split('\n').filter((line) => line.startsWith('[FAIL]'));
-  assert(purgeDoctorFailures.every((line) => line.startsWith('[FAIL] CLI capabilities:') && line.includes('work')), `opencode purge doctor: unexpected failure after purging adapter assets\n${doctorAfterPurgeOutput}`);
+  assert(doctorAfterPurgeOutput.includes('[PASS] OpenCode adapter:'), 'opencode purge doctor: machine projection must stay healthy');
+  assert(purgeDoctorFailures.every((line) => line.startsWith('[FAIL] CLI capabilities:') && line.includes('work')), `opencode purge doctor: unexpected failure\n${doctorAfterPurgeOutput}`);
   process.exitCode = priorExitCode;
 });
 
@@ -857,5 +1019,15 @@ withWorkspace('kyro-adapter-detect-', () => {
   assert(payload.adapters[0].systemPromptStrategy === 'managed-block', 'detect --json: missing codex system prompt strategy');
   assert(payload.adapters[0].mcpStrategy === 'toml-file', 'detect --json: missing codex MCP strategy');
 });
+
+// A managed block replaced in place must keep the bytes that follow its end marker, and a second
+// upsert must be a byte-identical no-op. Losing one newline per run eroded user content over time.
+{
+  const { upsertManagedBlock } = require(join(repo, 'dist/cli/injectors/managed-block.js'));
+  const before = 'intro\n\n<!-- kyro-ai:agents-md:start -->\nOLD\n<!-- kyro-ai:agents-md:end -->\n\n\n<claude-mem-context>\nX\n</claude-mem-context>\n';
+  const once = upsertManagedBlock(before, 'agents-md', 'NEW');
+  assert(once.includes('<!-- kyro-ai:agents-md:end -->\n\n\n<claude-mem-context>\nX\n'), 'managed block replace: bytes after the end marker must be preserved');
+  assert(upsertManagedBlock(once, 'agents-md', 'NEW') === once, 'managed block replace: a second upsert must be a byte-identical no-op');
+}
 
 console.log('Adapter fixtures passed');

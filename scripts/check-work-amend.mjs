@@ -3,7 +3,7 @@ import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, mkdtempSyn
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnWithAuthor as spawnSync, seedLegacyWork } from './work-author-fixtures.mjs';
 import { validateWorkFile } from '../dist/cli/work/schema.js';
 import { readBoundedBriefDescriptor } from '../dist/cli/commands/work.js';
 
@@ -46,7 +46,8 @@ try {
     return work;
   };
   const planNewWork = (id) => {
-    data(run('work', 'create', '--id', id, '--from', 'brief.md', '--json'));
+    if (id.endsWith('-legacy')) seedLegacyWork(root, id);
+    else data(run('work', 'create', '--id', id, '--from', 'brief.md', '--json'));
     writeFileSync(join(root, 'proposal.json'), JSON.stringify({ tasks }));
     data(run('work', 'plan', '--work', id, '--from', 'proposal.json', '--expect-revision', '1', '--json'));
   };
@@ -285,8 +286,8 @@ try {
   }
   const interruptedArgs = ['work', 'amend-brief', '--work', 'amend-brief-basic', '--from', 'brief-v4.md', '--reason', 'Recover durable intent.', '--expect-revision', '8', '--by', 'maker', '--json'];
   writeFileSync(join(root, 'brief-v4.md'), '# Fourth brief\n\nDeliver a recoverable contract.\n');
-  for (const boundary of ['amend-brief-after-journal', 'amend-brief-before-write', 'amend-brief-after-brief', 'amend-brief-after-work']) {
-    const id = `boundary-${boundary.slice(12)}`;
+  for (const boundary of ['amend-brief-after-journal', 'amend-brief-before-write', 'amend-brief-after-brief', 'amend-brief-after-work']) for (const mode of ['stored', 'legacy']) {
+    const id = `boundary-${boundary.slice(12)}-${mode}`;
     planNewWork(id);
     const args = interruptedArgs.map((arg, index) => arg === 'amend-brief-basic' ? id : arg === '8' ? '2' : arg);
     const before = snapshot(id);
@@ -305,7 +306,16 @@ try {
       assert.deepEqual(readFileSync(workPath(id)), held.json, 'conflicting retry cannot publish Work');
       writeFileSync(briefPath(id), held.brief);
     }
+    const heldAuthor = readFileSync(workPath(id));
+    const edited = JSON.parse(heldAuthor);
+    edited.author = { name: 'External edit', source: 'git', capturedAt: edited.createdAt };
+    writeFileSync(workPath(id), JSON.stringify(edited, null, 2) + '\n');
+    fail(run(...args), 'STATE_DIVERGED');
+    assert.deepEqual(readFileSync(workPath(id)), Buffer.from(JSON.stringify(edited, null, 2) + '\n'));
+    writeFileSync(workPath(id), heldAuthor);
     const retried = data(run(...args));
+    assert.deepEqual(JSON.parse(readFileSync(workPath(id))).author, JSON.parse(before.json).author);
+    assert.equal(Object.hasOwn(JSON.parse(readFileSync(workPath(id))), 'author'), mode === 'stored');
     assert.equal(retried.revision, 3);
     assert.equal(existsSync(pendingPath(id)), false, `${boundary} retry removes intent`);
     assert.notDeepEqual(readFileSync(workPath(id)), before.json);

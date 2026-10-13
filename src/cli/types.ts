@@ -24,6 +24,19 @@ export interface KyroInstalledAdapter {
   skillsPath?: string;
 }
 
+export interface MachineAdapterEntry {
+  agent: Agent;
+  state: 'enabled' | 'disabled';
+  projection: 'link' | 'copy' | null;
+  integrations: boolean;
+  updatedAt: string;
+}
+
+export interface MachineAdapterRegistry {
+  schemaVersion: 1;
+  adapters: MachineAdapterEntry[];
+}
+
 /** Effective scope view derived from its sprint.json. */
 export interface KyroScopeEntry {
   id: string;
@@ -148,7 +161,7 @@ export interface ExecutionPreferences {
  * | team               | **shared only**               | TeamPolicy (minPackageVersion, …) |
  * | scopes             | derived from sprint.json      | Valid matching per-scope files define effective entries |
  * | activeScope        | **local only**                | Never on shared (git thrash) |
- * | installedAdapters  | **local only**                | Per-machine adapter install records |
+ * | installedAdapters  | **machine registry**          | Local records are legacy read-only |
  * | execution          | **local only**                | Personal delegation opt-in (L1); default off |
  * | runtimePath        | effective default / local     | Informational; not a git conflict surface |
  * | kyroInvocation     | **neither** (global only)     | `~/.agents/kyro/current/manifest.json` |
@@ -175,7 +188,8 @@ export interface KyroSharedProjectState {
 export interface KyroLocalProjectState {
   schemaVersion: 4;
   activeScope: string | null;
-  installedAdapters: KyroInstalledAdapter[];
+  /** Legacy read-only input; new install/sync writes omit this field. */
+  installedAdapters?: KyroInstalledAdapter[];
   /** Optional informational runtime path; defaults to global current when absent. */
   runtimePath?: string;
   /** Optional personal execution preferences (delegation opt-in). */
@@ -775,6 +789,8 @@ export interface KyroManifest {
 
 export interface CliOptions {
   agents: Agent[];
+  /** Allow config integrations for explicitly selected adapters, or all desired adapters. */
+  integrations?: boolean;
   scope: InstallScope;
   dryRun: boolean;
   yes: boolean;
@@ -818,19 +834,28 @@ export interface BudgetClassDefinition {
 export type BudgetManifest = Record<BudgetClassId, BudgetClassDefinition>;
 
 export interface OperationPlan {
-  action: 'write' | 'copy' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'merge-json' | 'remove-json-key';
+  action: 'write' | 'copy' | 'link' | 'mkdir' | 'remove' | 'rmdir-if-empty' | 'upsert-block' | 'remove-block' | 'merge-json' | 'remove-json-key';
   commentStyle?: 'html' | 'hash';
   path: string;
+  /** `link` sources are managed directory paths, resolved like `path` (not package-relative). */
   source?: string;
+  /** A plan's copy preference; KYRO_LINK_MODE=copy also forces fallback. */
+  projection?: 'link' | 'copy';
   content?: string;
   blockName?: string;
   jsonPath?: string;
   /** Literal token -> value replacements applied to `copy` operations at apply time (e.g. `{{KYRO_CLI}}`). */
   substitutions?: Record<string, string>;
   /** A host-owned write guard enforced immediately before publication. */
-  guard?: 'claude-skill';
-  /** Existing Claude skills may be replaced only when the previous manifest owned them. */
+  guard?: 'canonical-skill' | 'claude-skill' | 'opencode-skill' | 'opencode-command';
+  /** Existing adapter paths may be replaced only when the previous manifest owned them. */
   allowExistingManagedSkill?: boolean;
+}
+
+export interface OperationProjectionResult {
+  path: string;
+  source: string;
+  projection: 'link' | 'copy';
 }
 
 
@@ -1155,4 +1180,22 @@ export interface WorkPromotionJournal {
   stagedTargetDigest: string;
   preparedAt: string;
 }
-export interface WorkFile { schemaVersion: 1; kind: 'organic-work'; id: string; title: string; objective: string; brief: WorkBrief; state: WorkState; revision: number; createdAt: string; updatedAt: string; handoff: WorkHandoff; tasks: WorkTask[]; activity: WorkActivity[]; closure: WorkClosure | null; promotion: WorkPromotion | null; }
+export interface WorkFile {
+  schemaVersion: 1;
+  kind: 'organic-work';
+  id: string;
+  title: string;
+  objective: string;
+  brief: WorkBrief;
+  state: WorkState;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+  /** Creation-time Git metadata, immutable thereafter; omitted for historical or unavailable identities. */
+  author?: ScopeAuthor;
+  handoff: WorkHandoff;
+  tasks: WorkTask[];
+  activity: WorkActivity[];
+  closure: WorkClosure | null;
+  promotion: WorkPromotion | null;
+}

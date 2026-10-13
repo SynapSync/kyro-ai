@@ -9,7 +9,7 @@
  * The live registry query is fail-soft by design and covered by inspection, not here.
  */
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync, lstatSync, readdirSync, readlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
@@ -84,6 +84,8 @@ assert(assessUpdateConsistency({ ...consistent, runtimeVersion: '4.48.3' }) === 
     assert(JSON.stringify(JSON.parse(readFileSync(argsFile, 'utf8'))) === JSON.stringify(['sync', '--scope', 'workspace']), 'workspace refresh uses sync');
     refreshFromCli(cli, false, false);
     assert(JSON.stringify(JSON.parse(readFileSync(argsFile, 'utf8'))) === JSON.stringify(['install', '--scope', 'workspace', '--no-init-workspace']), 'no workspace only refreshes runtime');
+    refreshFromCli(cli, false, true, { agents: ['claude'], integrations: true });
+    assert(JSON.stringify(JSON.parse(readFileSync(argsFile, 'utf8'))) === JSON.stringify(['install', '--scope', 'workspace', '--no-init-workspace', '--verbose', '--agent', 'claude', '--integrations']), 'update forwards explicit adapter and integrations choices');
     writeFileSync(cli, 'process.exit(7);');
     let failed = false;
     try { refreshFromCli(cli, true, false); } catch (error) { failed = String(error).includes('Workspace refresh failed'); }
@@ -107,7 +109,7 @@ if (process.platform !== 'win32') {
     const npmStub = join(bin, 'npm');
     writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\nif [ "$1" = view ]; then printf '"4.49.0"\\n'; fi\n`);
     chmodSync(npmStub, 0o755);
-    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    const env = { HOME: home, USERPROFILE: home, npm_config_cache: join(home, 'npm-cache'), PATH: `${bin}:/usr/bin:/bin` };
     for (const flag of ['--check', '--dry-run']) {
       const preview = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', flag], { cwd: fixture, env, encoding: 'utf8' });
       assert(preview.status === 0 && preview.stdout.includes('No global kyro command'), `preview ${flag} diagnoses migration: ${preview.stderr || preview.stdout}`);
@@ -142,7 +144,7 @@ if (process.platform !== 'win32') {
     const npmStub = join(bin, 'npm');
     writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${packageVersion}"\\n' ;;\nesac\n`);
     chmodSync(npmStub, 0o755);
-    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    const env = { HOME: home, USERPROFILE: home, npm_config_cache: join(home, 'npm-cache'), PATH: `${bin}:/usr/bin:/bin` };
     for (const flag of ['--check', '--yes']) {
       const result = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', flag], { cwd: fixture, env, encoding: 'utf8' });
       const output = result.stdout + result.stderr;
@@ -178,7 +180,7 @@ if (process.platform !== 'win32') {
     const npmStub = join(bin, 'npm');
     writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${packageVersion}"\\n' ;;\nesac\n`);
     chmodSync(npmStub, 0o755);
-    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    const env = { HOME: home, USERPROFILE: home, npm_config_cache: join(home, 'npm-cache'), PATH: `${bin}:/usr/bin:/bin` };
     for (const flag of ['--check', '--dry-run', '--yes']) {
       const result = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', flag], { cwd: fixture, env, encoding: 'utf8' });
       const output = result.stdout + result.stderr;
@@ -218,7 +220,7 @@ if (process.platform !== 'win32') {
     const npmStub = join(bin, 'npm');
     writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${npmLog}"\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${packageVersion}"\\n' ;;\nesac\n`);
     chmodSync(npmStub, 0o755);
-    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    const env = { HOME: home, USERPROFILE: home, npm_config_cache: join(home, 'npm-cache'), PATH: `${bin}:/usr/bin:/bin` };
     const newerRuntimeVersion = `${Number(packageVersion.split('.')[0]) + 1}.0.0`;
     for (const [runtimeVersion, expected] of [[null, 'refresh'], ['4.0.0', 'refresh'], [packageVersion, 'latest'], [newerRuntimeVersion, 'blocked']]) {
       if (runtimeVersion === null) rmSync(manifest, { force: true });
@@ -241,7 +243,7 @@ if (process.platform !== 'win32') {
       }
     }
     assert(!readFileSync(npmLog, 'utf8').includes('install'), 'runtime matrix must not install packages');
-    assert(readFileSync(syncLog, 'utf8').trim().split('\n').length === 2, 'only missing and older runtime were refreshed');
+    assert(readFileSync(syncLog, 'utf8').trim().split('\n').length === 3, 'missing, older and current runtime reconcile projections');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
@@ -268,7 +270,7 @@ if (process.platform !== 'win32') {
     writeFileSync(cli, `#!/usr/bin/env node\nconsole.log(${JSON.stringify(packageVersion)});\n`);
     chmodSync(cli, 0o755);
     symlinkSync(cli, join(bin, 'kyro'));
-    const env = { HOME: home, PATH: `${bin}:/usr/bin:/bin` };
+    const env = { HOME: home, USERPROFILE: home, npm_config_cache: join(home, 'npm-cache'), PATH: `${bin}:/usr/bin:/bin` };
     for (const [errorCode, expectedRemedy] of [['EACCES', 'permission'], ['ENETUNREACH', 'network']]) {
       writeFileSync(npmStub, `#!/bin/sh\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${newerVersion}"\\n' ;;\n  install) printf 'install-started\\n'; printf 'npm ERR! code ${errorCode}\\n' >&2; exit 1 ;;\nesac\n`);
       chmodSync(npmStub, 0o755);
@@ -397,10 +399,12 @@ assert(buildUpdatePlan(facts({ latest: '4.48.3+different' })).action === 'ahead-
   assert(withCheck.check === true, '--check parses');
   const without = parseOptions([]);
   assert(without.check === false, '--check defaults off');
+  assert(without.integrations === false, 'integrations default off');
+  assert(parseOptions(['--agent', 'codex', '--integrations']).integrations === true, 'integrations opt-in parses');
 }
 {
   const help = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), 'update', '--help'], { encoding: 'utf8' });
-  assert(help.status === 0 && help.stdout.includes('kyro update [--check]'), `update --help advertises usage, got ${JSON.stringify(help.stdout)}`);
+  assert(help.status === 0 && help.stdout.includes('Usage: kyro update ') && ['[--agent <agent>]', '[--integrations]', '[--check]', '[--dry-run]', '[--yes]'].every((flag) => help.stdout.includes(flag)), `update --help advertises usage, got ${JSON.stringify(help.stdout)}`);
   const top = spawnSync(process.execPath, [resolve(repo, 'dist/cli.js'), '--help'], { encoding: 'utf8' });
   assert(top.status === 0 && top.stdout.includes('kyro update [options]'), 'top-level help lists update');
 }
@@ -437,6 +441,8 @@ if (process.platform !== 'win32') {
     const npmPath = join(fakeBin, 'npm');
     writeFileSync(npmPath, `#!/bin/sh\ncase "$1" in\n  prefix) printf '%s\\n' '${prefix}' ;;\n  root) printf '%s\\n' '${join(prefix, 'lib', 'node_modules')}' ;;\n  view) printf '"${packageVersion}"\\n' ;;\n  *) exit 90 ;;\nesac\n`);
     chmodSync(npmPath, 0o755);
+    writeFileSync(join(fakeBin, 'opencode'), '#!/bin/sh\nexit 0\n');
+    chmodSync(join(fakeBin, 'opencode'), 0o755);
     const projectPath = join(projectDir, 'project.json');
     writeFileSync(projectPath, `${JSON.stringify({ schemaVersion: 4, scopes: [{ id: 'legacy', title: 'Legacy', status: 'planning' }] }, null, 2)}\n`);
     writeFileSync(join(projectDir, 'local.json'), `${JSON.stringify({ schemaVersion: 4, activeScope: null, installedAdapters: [] })}\n`);
@@ -541,6 +547,7 @@ if (process.platform !== 'win32') {
     writeFileSync(projectPath, originalProject);
     const manifestDir = join(home, '.agents', 'kyro', 'current');
     mkdirSync(manifestDir, { recursive: true });
+    const previousManifest = readFileSync(join(manifestDir, 'manifest.json'));
     writeFileSync(join(manifestDir, 'manifest.json'), JSON.stringify({
       schemaVersion: 1, packageName: 'kyro-ai', packageVersion,
       installedAt: '2026-09-23T00:00:00.000Z', installScope: 'workspace',
@@ -552,6 +559,29 @@ if (process.platform !== 'win32') {
         `${flag} previews safe migration: ${preview.stderr}\n${preview.stdout}`);
       assert(Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), `${flag} remains read-only`);
     }
+    const installSnapshot = () => {
+      const entries = [];
+      function visit(path) {
+        if (!existsSync(path)) return;
+        const stat = lstatSync(path);
+        entries.push([path, stat.mode, stat.isSymbolicLink() ? readlinkSync(path) : stat.isFile() ? readFileSync(path).toString('base64') : 'directory']);
+        if (stat.isDirectory()) for (const name of readdirSync(path).sort()) visit(join(path, name));
+      }
+      [home, projectDir, join(root, 'AGENTS.md')].forEach(visit);
+      return JSON.stringify(entries);
+    };
+    const foreignPath = join(home, '.config/opencode/skills/kyro-forge');
+    assert(lstatSync(foreignPath).isSymbolicLink(), 'empty-manifest case must exercise an existing native link');
+    const beforeFailure = installSnapshot();
+    const refused = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
+    assert(!refused.error && refused.status !== null && refused.status !== 0, 'empty-manifest update must fail with a non-zero exit');
+    assert(refused.stderr.includes(`Foreign OpenCode skill target: ${foreignPath}.`), `empty-manifest refusal must name the foreign path: ${refused.stderr}`);
+    assert(installSnapshot() === beforeFailure, 'empty-manifest failure must preserve foreign bytes, link targets and all install state');
+    assert(!existsSync(join(root, '.kyro-state-writer.lock')) && !existsSync(join(home, '.agents/kyro/.adapters.lock')) && !existsSync(join(home, '.agents/kyro/.adapters.lock.reclaim')), 'empty-manifest failure must release all writer locks');
+    console.log(`PASS empty-manifest update fails closed: exit=${refused.status}; foreign path named; bytes, links and install state preserved`);
+
+    // Separate positive case: restore the real manifest saved before clearing ownership.
+    writeFileSync(join(manifestDir, 'manifest.json'), previousManifest);
     const result = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
     assert(result.status === 0, `update --yes failed: ${result.stderr}\n${result.stdout}`);
     assert(!Object.hasOwn(JSON.parse(readFileSync(projectPath, 'utf8')), 'scopes'), 'update --yes removes shared scopes[]');
@@ -559,7 +589,9 @@ if (process.platform !== 'win32') {
     assert(!existsSync(join(projectDir, 'legacy-migrations')), 'update creates no migration backup');
     const second = spawnSync(process.execPath, [cli, 'update', '--yes'], { cwd: root, env, encoding: 'utf8' });
     assert(second.status === 0, `second update must remain idempotent: ${second.stderr}\n${second.stdout}`);
+    assert(result.stdout.includes('Runtime refreshed') && second.stdout.includes('Adapter opencode: unchanged;'), 'owned-manifest update must report refresh followed by an unchanged projection');
     assert(!existsSync(join(projectDir, 'legacy-migrations')), 'repeated update creates no backup directory');
+    console.log('PASS restored-owned-manifest update succeeds: exit=0; scopes[] removed; repeat exit=0 and projection unchanged');
     const previousBackupDir = join(projectDir, 'legacy-migrations');
     mkdirSync(previousBackupDir);
     writeFileSync(join(previousBackupDir, 'existing.txt'), 'from a previous release\n');

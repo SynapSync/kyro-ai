@@ -5,6 +5,7 @@ export const AGENT = {
   OPENCODE: 'opencode',
   CLAUDE: 'claude',
   CODEX: 'codex',
+  PI: 'pi',
   CURSOR: 'cursor',
 } as const;
 
@@ -28,7 +29,7 @@ export const ARTIFACT_ROOT = `${KYRO_PROJECT_ROOT}/scopes`;
 export const PROJECT_STATE_PATH = `${KYRO_PROJECT_ROOT}/project.json`;
 /**
  * Local (personal/machine) overlay — gitignored under `.agents/kyro/`.
- * Holds activeScope and installedAdapters.
+ * Holds activeScope; installedAdapters is read only for legacy migration.
  */
 export const LOCAL_STATE_PATH = `${KYRO_PROJECT_ROOT}/local.json`;
 /**
@@ -41,6 +42,8 @@ export const KYRO_STATE_PATH = `${KYRO_PROJECT_ROOT}/kyro.json`;
 export const PROJECT_STATE_LAYER_PATHS = [PROJECT_STATE_PATH, LOCAL_STATE_PATH, KYRO_STATE_PATH] as const;
 export const GLOBAL_AGENTS_ROOT = '~/.agents';
 export const KYRO_GLOBAL_ROOT = `${GLOBAL_AGENTS_ROOT}/kyro`;
+export const MACHINE_ADAPTER_REGISTRY_PATH = `${KYRO_GLOBAL_ROOT}/adapters.json`;
+export const MACHINE_ADAPTER_LOCK_PATH = `${KYRO_GLOBAL_ROOT}/.adapters.lock`;
 export const KYRO_ROOT = `${KYRO_GLOBAL_ROOT}/current`;
 export const KYRO_LEGACY_VERSIONS_ROOT = `${KYRO_GLOBAL_ROOT}/versions`;
 export const KYRO_CORE_ROOT = `${KYRO_ROOT}/core`;

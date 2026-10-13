@@ -7,7 +7,7 @@ export function detectFromPaths(agent: Agent, binaryName: string | null, paths: 
   const binaryPath = binaryName ? findExecutable(binaryName, context.envPath ?? process.env.PATH ?? '') : null;
   const configPath = paths.globalConfigDir ?? null;
   const configFound = configPath ? directoryExists(configPath) : false;
-  const installed = binaryName ? binaryPath !== null : configFound;
+  const installed = binaryName ? binaryPath !== null || configFound : configFound;
   const detail = configPath
     ? `config=${configPath}; binary=${binaryPath ?? 'not-found'}`
     : fallbackDetail;

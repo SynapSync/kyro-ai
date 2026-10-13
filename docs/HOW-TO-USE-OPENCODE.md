@@ -7,21 +7,25 @@ OpenCode should discover Kyro through native OpenCode skills and slash commands.
 ```bash
 npm install -g kyro-ai
 cd /path/to/your-app
-kyro install --agent opencode --scope workspace --init-workspace --yes
+kyro install --init-workspace --yes
 ```
+
+One install projects all detected, enabled harnesses; no per-harness `--agent` is required. `--agent` is an explicit selection/re-enable and still requires detection. Manage persistent machine choices with `kyro adapters list|enable|disable`. See [Agent adapters](agent-adapters.md) for migration and opt-out.
 
 This installs:
 
 - global runtime: `~/.agents/kyro/current/`
-- native OpenCode skills: `~/.config/opencode/skills/kyro-*`
+- native OpenCode skill links (copy fallback): `~/.config/opencode/skills/kyro-*`
 - native OpenCode commands: `~/.config/opencode/commands/kyro/*.md`
-- OpenCode agent overlay: `~/.config/opencode/opencode.json` key `agent.kyro-orchestrator`
 - project state: `.agents/kyro/project.json` + `local.json`
+
+To opt in to the OpenCode `agent.kyro-orchestrator` overlay, run `kyro adapters enable opencode --integrations`. Fresh installs leave `opencode.json` unchanged without opt-in; native command files are still projected.
 
 ## Usage
 
 Use the installed commands or command-like skills:
 
+- `/kyro/work` or `kyro-work` — explicitly chosen Work lifecycle
 - `/kyro/forge` or `kyro-forge` — route analyze/plan/execute/review/close
 - `/kyro/status` or `kyro-status` — summary-first progress and debt report
 - `/kyro/task-context` or `kyro-task-context` — generate a copy-paste prompt for a fresh context

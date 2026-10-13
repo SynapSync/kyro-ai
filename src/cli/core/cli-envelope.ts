@@ -73,7 +73,7 @@ export function prepareMachineInvocation(rawArgv: string[]): MachineInvocation {
   const help = command === 'help' || withoutJson.includes('--help') || withoutJson.includes('-h');
   if (!requested) return { enabled: false, argv: rawArgv, command: commandName(withoutJson) };
   if (help) return { enabled: false, argv: withoutJson, command: commandName(withoutJson) };
-  if (LEGACY_JSON_VERBS.has(command)) return { enabled: false, argv: rawArgv, command: commandName(withoutJson) };
+  if (LEGACY_JSON_VERBS.has(command) && !(command === 'uninstall' && withoutJson.includes('--machine'))) return { enabled: false, argv: rawArgv, command: commandName(withoutJson) };
 
   const argv = NATIVE_JSON_VERBS.has(command) ? [...withoutJson, '--json'] : withoutJson;
   return { enabled: true, argv, command: commandName(withoutJson) };
@@ -147,7 +147,7 @@ function writeEnvelope(envelope: CliEnvelopeV1<unknown>): void {
 
 function commandName(argv: string[]): string {
   const [command = '', subcommand = ''] = argv;
-  if (command === 'work' && subcommand && !subcommand.startsWith('-')) return `work ${subcommand}`;
+  if (['work', 'adapters'].includes(command) && subcommand && !subcommand.startsWith('-')) return `${command} ${subcommand}`;
   if (['scope', 'repair', 'debt', 'scenario', 'adr', 'rule'].includes(command) && subcommand && !subcommand.startsWith('-')) {
     return `${command} ${subcommand}`;
   }

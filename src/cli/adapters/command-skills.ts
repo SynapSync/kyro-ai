@@ -1,5 +1,9 @@
+import { lstatSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname } from 'node:path';
+import { readManifest } from '../state';
 import { AGENT_SKILLS_ROOT, ARTIFACT_ROOT, COMMAND_NAMES, KYRO_COMMANDS_ROOT, KYRO_ROOT } from '../constants';
-import { readPackageText } from '../fs';
+import { resolveManagedPath, readPackageText } from '../fs';
 import { readPackageVersion } from '../help';
 import { resolveKyroInvocation } from '../invocation';
 import type { KyroCommandName, OperationPlan } from '../types';
@@ -14,6 +18,7 @@ export function addCommandSkillProjection(plan: OperationPlan[]): void {
 }
 
 export function addCommandSkillProjectionToRoot(plan: OperationPlan[], skillsRoot: string): void {
+  const previous = skillsRoot === AGENT_SKILLS_ROOT ? readManifest() : null;
   for (const command of COMMAND_NAMES) {
     const path = getCommandSkillPathForRoot(command, skillsRoot);
     if (plan.some((operation) => operation.path === path)) {
@@ -22,6 +27,7 @@ export function addCommandSkillProjectionToRoot(plan: OperationPlan[], skillsRoo
     plan.push({
       action: 'write',
       path,
+      ...(skillsRoot === AGENT_SKILLS_ROOT ? { guard: 'canonical-skill' as const, allowExistingManagedSkill: previous?.managedFiles.includes(path) === true } : {}),
       content: buildCommandSkill(command),
     });
   }
@@ -33,6 +39,7 @@ export function addCommandSkillProjectionToRoot(plan: OperationPlan[], skillsRoo
     plan.push({
       action: 'write',
       path,
+      ...(skillsRoot === AGENT_SKILLS_ROOT ? { guard: 'canonical-skill' as const, allowExistingManagedSkill: previous?.managedFiles.includes(path) === true } : {}),
       content: buildFullSkill(skill),
     });
   }
@@ -118,6 +125,11 @@ export function buildCommandSkill(command: KyroCommandName): string {
   ].join('\n');
 }
 
+/** Normalize Windows line endings before comparing projected skill bodies. */
+export function normalizeEol(body: string): string {
+  return body.replaceAll('\r\n', '\n');
+}
+
 /** Extract metadata.runtimeVersion from a projected skill stub body (null if absent/unparseable). */
 export function parseSkillRuntimeVersion(skillMarkdown: string): string | null {
   const match = skillMarkdown.match(/^\s*runtimeVersion:\s*["']?([^"'#\n]+?)["']?\s*$/m);
@@ -142,4 +154,23 @@ function getCommandTitle(command: KyroCommandName): string {
   if (command === 'qa') return 'Kyro QA';
   if (command === 'scope-retire') return 'Kyro Scope Retire';
   return `Kyro ${command.slice(0, 1).toUpperCase()}${command.slice(1)}`;
+}
+
+/** Refuse foreign canonical leaves and symlinked parents before publishing any stub. */
+export function assertSafeCanonicalSkillWrite(path: string, allowExisting: boolean): void {
+  const target = resolveManagedPath(path);
+  const fail = (unsafe: string): never => { throw new Error(`Unsafe canonical skill target: ${unsafe}. Move the foreign path aside before running kyro install.`); };
+  if (!buildCommandSkillManagedFiles().includes(path)) fail(target);
+  for (let parent = dirname(target); parent !== homedir(); parent = dirname(parent)) {
+    if (dirname(parent) === parent) fail(parent);
+    try { if (!lstatSync(parent).isDirectory()) fail(parent); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  }
+  try {
+    const stat = lstatSync(target);
+    if (!stat.isFile() || stat.nlink !== 1 || !allowExisting) fail(target);
+    const body = normalizeEol(readFileSync(target, 'utf8'));
+    const name = dirname(target).split(/[\\/]/).at(-1);
+    if (!body.includes(`name: ${name}\n`) || !parseSkillRuntimeVersion(body)) fail(target);
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
 }

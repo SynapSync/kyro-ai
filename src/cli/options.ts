@@ -3,7 +3,7 @@ import { getAdapterDefinition, getInstallableAdapters } from './adapters/registr
 import { KyroCoreError } from './core/errors';
 import type { Agent, CliOptions, InstallScope, PackVerbosity } from './types';
 
-export function parseOptions(args: string[]): CliOptions {
+export function parseOptions(args: string[]): CliOptions & { machine: boolean } {
   const agents: Agent[] = [];
   let scope: InstallScope = SCOPE.WORKSPACE;
   let dryRun = false;
@@ -12,6 +12,8 @@ export function parseOptions(args: string[]): CliOptions {
   let tokens = false;
   let artifacts = false;
   let adapters = false;
+  let integrations = false;
+  let machine = false;
   let trace = false;
   let kyroScope: string | null = null;
   let task: string | null = null;
@@ -43,6 +45,10 @@ export function parseOptions(args: string[]): CliOptions {
       artifacts = true;
     } else if (arg === '--adapters') {
       adapters = true;
+    } else if (arg === '--integrations') {
+      integrations = true;
+    } else if (arg === '--machine') {
+      machine = true;
     } else if (arg === '--trace') {
       trace = true;
     } else if (arg === '--json') {
@@ -137,6 +143,8 @@ export function parseOptions(args: string[]): CliOptions {
     tokens,
     artifacts,
     adapters,
+    integrations,
+    machine,
     trace,
     kyroScope,
     task,
@@ -162,6 +170,7 @@ export function parseAgent(value: string): Agent {
   if (normalized === 'opencode') return AGENT.OPENCODE;
   if (normalized === 'claude' || normalized === 'claude-code') return AGENT.CLAUDE;
   if (normalized === 'codex') return AGENT.CODEX;
+  if (normalized === 'pi') return AGENT.PI;
   if (normalized === 'cursor') return AGENT.CURSOR;
   throw invalidInput(
     `Unsupported agent: ${value}.`,

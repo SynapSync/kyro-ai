@@ -4,7 +4,9 @@ export function upsertManagedBlock(existing: string, blockName: string, content:
   const block = formatManagedBlock(blockName, content, style);
   const pattern = managedBlockPattern(blockName, style);
   if (pattern.test(existing)) {
-    return existing.replace(pattern, block);
+    // The pattern consumes one newline after the end marker. Keep it, so replacing a block never
+    // joins the marker to the content that follows it.
+    return existing.replace(pattern, (match) => (match.endsWith('\n') ? `${block}\n` : block));
   }
   const separator = existing.trim().length === 0 ? '' : '\n\n';
   return `${existing.trimEnd()}${separator}${block}\n`;

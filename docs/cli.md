@@ -6,7 +6,7 @@ Kyro includes a small CLI for installing workspace harness assets, projecting co
 
 ```bash
 kyro                    # Open the interactive TUI
-kyro install            # Install standard .agents assets by default
+kyro install            # Publish canonical skills and reconcile detected machine adapters
 kyro doctor             # Read-only package/workspace health check
 kyro doctor --tokens    # Audit context/token budgets
 kyro status             # Read-only brief status for the active Kyro scope
@@ -24,8 +24,12 @@ kyro scope retire --kyro-scope <scope> --reason "..."  # Read-only retirement pr
 kyro repair integrity prepare --json                   # Read-only integrity diagnosis
 kyro repair integrity apply --digest <sha256> --yes    # Digest-bound integrity apply
 kyro trace              # Read append-only trace events for a scope
-kyro sync               # Refresh managed workspace assets
-kyro uninstall          # Remove managed workspace assets, preserving scope artifacts
+kyro adapters list      # Show detection, machine state, projection and integrations
+kyro adapters enable claude [--integrations] # Enable a detected machine adapter
+kyro adapters disable claude # Persistent opt-out; canonical skills stay
+kyro sync               # Refresh workspace assets and reconcile machine adapters
+kyro uninstall          # Remove workspace bootstrap; preserve machine projections/integrations
+kyro uninstall --machine # Remove Kyro-owned skills, projections, integrations and registry
 ```
 
 Install with `npm install -g kyro-ai`, open a new terminal, and run `kyro install` from the project root. `kyro update` checks the npm registry and updates the verified global installation before refreshing the projected runtime.
@@ -110,6 +114,7 @@ Global runtime files are installed as a single active runtime:
 
 ```text
 ~/.agents/kyro/
+├── adapters.json                 # machine registry, survives runtime replacement
 └── current/
     ├── core/
     ├── commands/
@@ -176,7 +181,7 @@ The project keeps only state and artifacts (layered):
 ```text
 .agents/kyro/
 ├── project.json                 # SHARED — commit: principles, team policy
-├── local.json                   # LOCAL — gitignored: activeScope, installedAdapters
+├── local.json                   # LOCAL — gitignored: activeScope, execution settings
 ├── .gitignore                   # install/sync assist (local-only files; never project.json/scopes/)
 ├── trace/{scope}/               # LOCAL — gitignored: append-only per-machine event log
 └── scopes/
@@ -205,61 +210,59 @@ Full commit matrix, including migration off the pre-layered monolito: [Teams](te
 
 ## Adapters
 
-Implemented workspace adapters:
-
-| Adapter    | Purpose                                                                                                                      |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `standard` | Base `~/.agents/skills/kyro-*` command skill projection for compatible agents                                                |
-| `opencode` | Native OpenCode skills, commands under `~/.config/opencode/commands/kyro/`, and `agent.kyro-orchestrator` in `opencode.json` |
-| `codex`    | Codex adapter with projected Kyro command skills plus a managed root `AGENTS.md` block                                       |
-
-Default install uses `standard`. **Always run install/sync from the project root:** global runtime and skills go under `~/.agents/…`; project state (`.agents/kyro/`) is created in the current working directory.
+Implemented machine adapters: `standard`, `claude`, `codex`, `opencode`, and `pi`. `standard` always publishes canonical `~/.agents/skills/kyro-*` skills; detected Claude and OpenCode get native skill links (copy fallback), and OpenCode also gets `/kyro/*` command files. Codex and Pi discover the canonical skills directly; Pi creates no files of its own. Cursor remains planned.
 
 ```bash
 npm install -g kyro-ai
 cd /path/to/your-app
-kyro install --scope workspace --dry-run
-kyro install --scope workspace --init-workspace --yes
+kyro install --dry-run
+kyro install --init-workspace --yes
+kyro adapters list --json
 ```
 
-`--init-workspace` non-interactively writes layered project state (`project.json` + `local.json`), ensures `.agents/kyro/.gitignore` for local-only files, and reads on-disk `scopes/`. Without it, a non-interactive install may install only the global runtime. `--yes` alone does not initialize a new workspace.
+Initialize a workspace from its project root. `--init-workspace` writes layered state and the local-only ignore assist; `--yes` alone does not initialize a new workspace. Without explicit initialization, an interactive install asks; non-interactive install can publish machine assets alone. `kyro install --no-init-workspace` explicitly skips new workspace initialization and may run outside a workspace.
 
-Agent-specific installs (from the project root):
+Detection uses the harness binary on PATH or its existing config directory. Install, sync and update project every detected, enabled harness; they do not create config directories for undetected harnesses. `--agent <standard|opencode|codex|claude|pi>` explicitly selects/re-enables an adapter and requires detection for harnesses; it does not replace automatic reconciliation.
+
+### Adapter management
 
 ```bash
-kyro install --agent opencode --scope workspace --init-workspace --yes
-kyro install --agent codex --scope workspace --init-workspace --yes
-kyro install --agent standard,opencode,codex --scope workspace --init-workspace --yes
+kyro adapters list
+kyro adapters enable claude --dry-run
+kyro adapters enable claude
+kyro adapters disable claude --dry-run
+kyro adapters disable claude
+kyro adapters enable codex --integrations
+kyro adapters enable opencode --integrations
 ```
 
-The adapters project Kyro workflows into concrete agent entrypoints so compatible agents can discover command-like skills without asking the user to invoke Kyro through prose. `standard` and `codex` use `~/.agents/skills/`; OpenCode uses its native config tree and preserves non-Kyro `opencode.json` keys.
+`list` reports every implemented adapter's detection, state, projection and integrations. `enable` restores a detected adapter. `disable` removes its Kyro-owned native projections and integrations and persists the disabled choice across workspaces, sync, install and update. Canonical skills remain shared and visible to Codex, Pi and OpenCode; `standard` cannot be disabled. All subcommands accept `--json`; mutations accept `--dry-run` without writes.
 
-Projected skills:
+New installs leave Codex's `~/.codex/config.toml` MCP block, workspace `AGENTS.md` block, and OpenCode's `opencode.json` agent overlay untouched without integrations opt-in. `--integrations` on enable or install/sync opts in for explicitly selected adapters, or all detected adapters when no `--agent` is supplied. The choice persists in the machine registry. Codex's workspace block requires workspace initialization; OpenCode native command files do not require integrations.
 
-- `kyro-forge`
-- `kyro-status`
-- `kyro-task-context`
-- `kyro-idea`
+Claude/OpenCode skill links resolve to the canonical directory of the same name. Unsupported or denied symlinks fall back to version-pinned copies; `KYRO_LINK_MODE=copy` forces copies. Foreign paths fail closed. See [Agent adapters](agent-adapters.md) for the path and ownership contracts.
 
-Each projected skill references the managed Kyro runtime in `~/.agents/kyro/current/` instead of duplicating long workflow instructions.
+Invoke Work as Claude `/kyro-work`, Codex `kyro-work`, OpenCode `/kyro/work`, or Pi `/skill:kyro-work`. These are host entrypoints, separate from shell `kyro work ...`. Each command skill reads its thin runtime router first.
+
+`kyro doctor --adapters` emits one row per implemented adapter, including detection, machine state and projection health/mode. Disabled and undetected adapters pass as skipped; all command skills missing on a detected harness warn; partial projections, broken/foreign links and stale runtime pins fail. Follow the row's remedy (`kyro adapters enable <agent>` for most projection problems; move a foreign path aside first when instructed). Pi's row checks canonical skills and explains `/skill:` invocation and `enableSkillCommands`.
 
 ## Uninstall
 
-Default uninstall removes project bootstraps and adapter overlays, but preserves adapter entrypoint files:
+Workspace uninstall preserves shared machine projections and home integrations, along with runtime, layered state and scope artifacts:
 
 ```bash
+kyro uninstall --dry-run
 kyro uninstall --yes
 ```
 
-To remove adapter-owned entrypoint files as well:
+Legacy `--purge-adapter-assets` does not remove machine projections. To remove Kyro-owned canonical skills, all harness projections, integration blocks (including the current workspace's block), and the machine registry:
 
 ```bash
-kyro uninstall --purge-adapter-assets --yes
+kyro uninstall --machine --dry-run
+kyro uninstall --machine --json
 ```
 
-Purge removes only files declared by the installed adapter, then removes Kyro-owned directories if they are empty. Shared config files such as `~/.config/opencode/opencode.json` are preserved; Kyro removes only its owned overlay key.
-
-The uninstall output includes a summary with overlay, purged file, and empty-directory counts.
+Machine uninstall preserves the global runtime, workspace state, scope artifacts and unrelated user content. Run it from an initialized project root to include that workspace's integration block; it does not scan other projects. Shared config files remain; only Kyro-owned blocks/keys are removed. Ownership checks refuse foreign paths before applying the transactional removal.
 
 ## State Model
 
@@ -298,7 +301,7 @@ Initial **effective** shape after merge (no scopes on disk yet):
 }
 ```
 
-Shared file omits `activeScope` / `installedAdapters`. Local file omits `principles` / `team`.
+Shared file omits `activeScope` / `installedAdapters`. Local file omits `principles` / `team` and no longer writes `installedAdapters`; the effective reader retains that legacy compatibility field. Machine adapter choices live in `~/.agents/kyro/adapters.json`.
 
 ### Multi-developer note
 
@@ -404,15 +407,20 @@ kyro scope retire --kyro-scope legacy-auth --reason "Superseded by auth-refactor
 
 ## Sync Semantics
 
-`kyro sync` without `--agent` refreshes the adapters already recorded in local project state (`local.json` / effective `installedAdapters`).
+Install, sync, and update reconcile a machine-wide desired set: canonical `standard` skills plus detected implemented harnesses, excluding persistent disabled choices, with explicit `--agent` selection re-enabling a detected adapter. Sync requires initialized workspace state; update outside a workspace refreshes runtime and machine projections without creating project state. Newly detected harnesses are added without a per-harness install recipe.
 
-It must not add the default `standard` adapter to an existing workspace unless the user explicitly passes it:
+`~/.agents/kyro/adapters.json` is the versioned, atomically written machine registry, protected by a machine lock and preserved outside the replaced `current/` directory. It stores enabled/disabled state, effective link/copy mode (or null), integrations opt-in and timestamps. The runtime manifest's adapter list is derived from it and no longer follows the last synced workspace.
+
+Legacy workspace `installedAdapters` is still read and unioned into the registry as each workspace is visited. Newly migrated records enable integrations to preserve old config blocks; existing machine choices win, including disabled state. Install/sync stops writing `local.json.installedAdapters`. Neither workspace initialization nor migration changes Forge/Work schemas or scope artifacts.
 
 ```bash
+kyro sync --dry-run
 kyro sync
-kyro sync --agent standard --dry-run
-kyro sync --agent codex --dry-run
+kyro sync --agent claude --dry-run  # Explicit re-enable preview
+kyro sync --agent codex --integrations
 ```
+
+Reconciliation reports each implemented adapter as `added`, `refreshed`, `unchanged`, `skipped(disabled)`, or `not-detected`, with projection mode. No detected harnesses means canonical skills only. `--dry-run` leaves registry and HOME assets unchanged. A corrupt registry fails closed with `MACHINE_ADAPTER_REGISTRY_INVALID`; back it up, remove the invalid file, and run `kyro install --init-workspace` in each legacy workspace as the reported remedy directs.
 
 ### Drift And Prune
 
@@ -442,7 +450,7 @@ kyro sync --prune
 
 If an old manifest lists shared config, sync reports it under `Shared config preserved` instead of pruning it.
 
-`--prune` is different from `kyro uninstall --purge-adapter-assets`. Prune cleans adapter-file drift by comparing old manifests against the current install plan. Purge removes adapter entrypoint files during uninstall for adapters recorded in the installed project state. Neither mode removes shared user config.
+`--prune` cleans adapter-file drift by comparing old manifests against the current install plan. Workspace uninstall, including legacy `--purge-adapter-assets`, preserves machine projections. Use `kyro adapters disable <agent>` for persistent harness opt-out or `kyro uninstall --machine` for machine removal. Shared user config files are preserved.
 
 ## Update (`kyro update`)
 
@@ -472,7 +480,7 @@ Behavior notes:
 
 ## Claude Code Adapter
 
-Run `kyro install --agent claude --scope workspace --init-workspace --yes` from the project root to project native `~/.claude/skills/kyro-*` entrypoints. `kyro sync --scope workspace` refreshes the installed adapter, and `kyro update` upgrades the published package and runtime. The CLI owns these skills but not Claude's plugin registry or user settings. Existing plugin users should verify `/kyro-forge` and the other new skills before disabling or uninstalling the old plugin in Claude Code. See [Agent adapters](agent-adapters.md#claude).
+Run `kyro install --init-workspace --yes` from the project root to project native `~/.claude/skills/kyro-*` entrypoints when Claude is detected and enabled. `kyro sync --scope workspace` reconciles detected machine adapters, and `kyro update` upgrades the published package and runtime. The CLI owns these skills but not Claude's plugin registry or user settings. Existing plugin users should verify `/kyro-forge` and the other new skills before disabling or uninstalling the old plugin in Claude Code. See [Agent adapters](agent-adapters.md#claude).
 
 ## Unsupported Generic Adapter
 
@@ -897,6 +905,7 @@ that leaves an immutable record of itself.
 | **6.1.0** | adds protocol v5 `debt.change` | Records post-close debt transitions, supports digest-bound debt reconciliation and explicit pending-debt acceptance at scope completion. |
 | **6.1.1** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; rejects taskless `completed` Work closures and provides revision-bound draft closure previews. |
 | **6.2.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds the read-only `analyze --matrix` scenario verification matrix and reports a missing `sprint.json` on scope complete/reopen as `SCOPE_NOT_FOUND`. |
+| **6.3.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds machine-level adapter reconciliation (`kyro adapters`, `uninstall --machine`) and accepts CRLF-checked-out skill bodies on Windows. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract
