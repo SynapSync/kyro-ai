@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.4.0] - 2026-10-24
+
 ### Added
 
 - Validation tiers. `kyro context-pack` returns `validation: { source, task, matchedRules, uncoveredFiles, close, sprint, issues }`: focused task commands mapped per file from `taskFiles` through an optional, committed `.agents/kyro/validation.json` (matching rules in order, then `fallback` for files no rule covers). All map keys are required. See [docs/validation-tiers.md](docs/validation-tiers.md).
