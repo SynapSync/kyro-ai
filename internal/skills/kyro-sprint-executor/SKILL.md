@@ -91,7 +91,7 @@ When routing reports `qa_or_close`:
 
 ## Close validation
 
-Once per sprint, per the runtime's `sprint-forge/assets/protocols/validation.md`: run the scope pack's `validation.close`; map absent or invalid → the project's full check; `close: []` → none. Reuse a passing run only on the same relevant state; rerun when a remediation changes its inputs. A failure blocks close.
+Once per sprint, follow the runtime's `sprint-forge/assets/protocols/close-validation.md`: reconcile the sprint's changes with git (`context-pack --sprint-file`), run `validation.sprint.commands` plus applicable task-created checks and focused checks for uncovered files, broaden with reason, and record the integration status in the close note. The aggregate runs at close only when declared in `close`, escalated, or justified. A failure blocks close.
 
 ## Sprint close (USER GATE)
 

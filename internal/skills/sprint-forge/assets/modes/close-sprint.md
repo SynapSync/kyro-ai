@@ -14,7 +14,7 @@ Register conventions through `{{KYRO_CLI}} rule add`; debt uses its tool-owned C
 
 ## Workflow
 
-1. Run the pre-close quality checkpoint. Run close validation once (`validation.close`; no valid map → full check; `close: []` → none) unless it passed on this state in qa-or-close; load `../protocols/validation.md` only if reuse is unclear. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason). **Run `{{KYRO_CLI}} analyze --kyro-scope {scope}` and do not proceed while any CRITICAL or HIGH finding remains** — resolve them first (route to `clarify` for `[NEEDS CLARIFICATION]` markers).
+1. Run the pre-close quality checkpoint. Load `../protocols/close-validation.md` only if close validation has not passed on this state in qa-or-close, and run it. Confirm every task has `status: "done"` and a passing `verdict` (or is explicitly carried/blocked with reason). **Run `{{KYRO_CLI}} analyze --kyro-scope {scope}` and do not proceed while any CRITICAL or HIGH finding remains** — resolve them first (route to `clarify` for `[NEEDS CLARIFICATION]` markers).
 2. Fill the retro reasoning: went well, did not go well, surprises, new debt. Capture recommendations for Sprint N+1 (you will pass them to the close command).
 3. **Additive writes first (safe-write).** These must happen before the close command, because the command re-serializes the current `sprint.json`:
    - Extract learned rules via `../helpers/learner.md`, ask whether each approved rule should also be global, then register it through `{{KYRO_CLI}} rule add` (with `--global` only after confirmation).

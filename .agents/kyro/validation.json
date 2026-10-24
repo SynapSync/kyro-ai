@@ -3,65 +3,240 @@
   "task": [
     {
       "id": "validation-tiers",
-      "paths": ["src/cli/core/validation.ts", "src/cli/commands/context-pack.ts", "src/cli/core/analysis.ts", "src/cli/commands/analyze.ts"],
-      "commands": ["npm run build", "npm run check:validation-tiers", "npm run check:analyze-metadata", "npm run check:token-budgets", "npm run check:mcp"]
+      "paths": [
+        "src/cli/core/validation.ts",
+        "src/cli/commands/context-pack.ts",
+        "src/cli/core/analysis.ts",
+        "src/cli/commands/analyze.ts"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:validation-tiers",
+        "npm run check:analyze-metadata",
+        "npm run check:token-budgets",
+        "npm run check:mcp"
+      ]
+    },
+    {
+      "id": "core",
+      "paths": [
+        "src/cli/core/**",
+        "src/cli/routing.ts"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:active-plan",
+        "npm run check:status",
+        "npm run check:analyze-metadata",
+        "npm run check:close-handoff",
+        "npm run check:eval"
+      ]
     },
     {
       "id": "adapters",
-      "paths": ["src/cli/adapters/**", "src/cli/install-plan.ts", "src/cli/commands/install.ts", "src/cli/commands/update.ts", "src/cli/commands/adapters.ts", "src/cli/commands/uninstall.ts", "providers/**"],
-      "commands": ["npm run build", "npm run check:adapters", "npm run check:adapter-links", "npm run check:machine-adapters", "npm run check:reconcile", "npm run check:update", "npm run check:guardrails"]
+      "paths": [
+        "src/cli/adapters/**",
+        "src/cli/install-plan.ts",
+        "src/cli/commands/install.ts",
+        "src/cli/commands/update.ts",
+        "src/cli/commands/adapters.ts",
+        "src/cli/commands/uninstall.ts",
+        "providers/**"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:adapters",
+        "npm run check:adapter-links",
+        "npm run check:machine-adapters",
+        "npm run check:reconcile",
+        "npm run check:update",
+        "npm run check:guardrails"
+      ]
     },
     {
       "id": "work",
-      "paths": ["src/cli/work/**", "src/cli/commands/work.ts", "internal/skills/organic-work/**"],
-      "commands": ["npm run build", "npm run check:work-contract", "npm run check:work-plan", "npm run check:work-execution", "npm run check:work-evidence", "npm run check:work-review", "npm run check:work-lifecycle", "npm run check:work-store", "npm run check:work-isolation", "npm run check:work-amend", "npm run check:work-disposition", "npm run check:work-closure", "npm run check:work-promotion-contract", "npm run check:work-promotion", "npm run check:work-doctor"]
+      "paths": [
+        "src/cli/work/**",
+        "src/cli/commands/work.ts",
+        "internal/skills/organic-work/**"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:work-contract",
+        "npm run check:work-plan",
+        "npm run check:work-execution",
+        "npm run check:work-evidence",
+        "npm run check:work-review",
+        "npm run check:work-lifecycle",
+        "npm run check:work-store",
+        "npm run check:work-isolation",
+        "npm run check:work-amend",
+        "npm run check:work-disposition",
+        "npm run check:work-closure",
+        "npm run check:work-promotion-contract",
+        "npm run check:work-promotion",
+        "npm run check:work-doctor"
+      ]
     },
     {
       "id": "skills",
-      "paths": ["internal/skills/**", "commands/**", "agents/**"],
-      "commands": ["npm run build", "npm run check:links", "npm run check:command-modes", "npm run check:token-budgets", "npm run check:budget-manifest", "npm run check:startup-contract", "npm run check:qa-or-close"]
+      "paths": [
+        "internal/skills/**",
+        "commands/**",
+        "agents/**"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:links",
+        "npm run check:command-modes",
+        "npm run check:token-budgets",
+        "npm run check:budget-manifest",
+        "npm run check:startup-contract",
+        "npm run check:qa-or-close"
+      ]
     },
     {
       "id": "review-evidence",
-      "paths": ["src/cli/commands/review.ts", "src/cli/commands/record-evidence.ts", "src/cli/core/review-material.ts", "src/cli/core/policy.ts"],
-      "commands": ["npm run build", "npm run check:maker-checker", "npm run check:record-evidence", "npm run check:guardrails"]
+      "paths": [
+        "src/cli/commands/review.ts",
+        "src/cli/commands/record-evidence.ts",
+        "src/cli/core/review-material.ts",
+        "src/cli/core/policy.ts"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:maker-checker",
+        "npm run check:record-evidence",
+        "npm run check:guardrails"
+      ]
     },
     {
       "id": "close-checkpoints",
-      "paths": ["src/cli/checkpoints/**", "src/cli/commands/close-sprint.ts"],
-      "commands": ["npm run build", "npm run check:lossless-checkpoints", "npm run check:close-handoff", "npm run check:close-policy-compatibility", "npm run check:scope-retire", "npm run check:lifecycle-replay"]
+      "paths": [
+        "src/cli/checkpoints/**",
+        "src/cli/commands/close-sprint.ts"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:lossless-checkpoints",
+        "npm run check:close-handoff",
+        "npm run check:close-policy-compatibility",
+        "npm run check:scope-retire",
+        "npm run check:lifecycle-replay"
+      ]
     },
     {
       "id": "remediation",
-      "paths": ["src/cli/remediation/**", "src/cli/commands/remediate.ts", "src/cli/commands/recertify.ts", "src/cli/repair/**", "src/cli/commands/repair.ts"],
-      "commands": ["npm run build", "npm run check:scope-remediation", "npm run check:repair-integrity", "npm run check:verification-states", "npm run check:replay-witness", "npm run check:compact-remediation-witness", "npm run check:canonicalization-gate"]
+      "paths": [
+        "src/cli/remediation/**",
+        "src/cli/commands/remediate.ts",
+        "src/cli/commands/recertify.ts",
+        "src/cli/repair/**",
+        "src/cli/commands/repair.ts"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:scope-remediation",
+        "npm run check:repair-integrity",
+        "npm run check:verification-states",
+        "npm run check:replay-witness",
+        "npm run check:compact-remediation-witness",
+        "npm run check:canonicalization-gate"
+      ]
     },
     {
       "id": "plan",
-      "paths": ["src/cli/commands/plan.ts", "src/cli/core/active-plan.ts", "src/cli/commands/add-emergent.ts", "src/cli/commands/scenario.ts", "src/cli/commands/clarify.ts"],
-      "commands": ["npm run build", "npm run check:plan", "npm run check:active-plan", "npm run check:emergent", "npm run check:scenario", "npm run check:clarify", "npm run check:spec-traceability"]
+      "paths": [
+        "src/cli/commands/plan.ts",
+        "src/cli/core/active-plan.ts",
+        "src/cli/commands/add-emergent.ts",
+        "src/cli/commands/scenario.ts",
+        "src/cli/commands/clarify.ts"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:plan",
+        "npm run check:active-plan",
+        "npm run check:emergent",
+        "npm run check:scenario",
+        "npm run check:clarify",
+        "npm run check:spec-traceability"
+      ]
     },
     {
       "id": "state",
-      "paths": ["src/cli/state.ts", "src/cli/project/**", "src/cli/artifacts/**"],
-      "commands": ["npm run build", "npm run check:layered-state", "npm run check:scope-registry-from-disk", "npm run check:install-rehydrate", "npm run check:sprint-loader", "npm run check:sprint-doctor-v4"]
+      "paths": [
+        "src/cli/state.ts",
+        "src/cli/project/**",
+        "src/cli/artifacts/**"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:layered-state",
+        "npm run check:scope-registry-from-disk",
+        "npm run check:install-rehydrate",
+        "npm run check:sprint-loader",
+        "npm run check:sprint-doctor-v4"
+      ]
     },
     {
       "id": "pipeline",
-      "paths": ["src/cli/pipeline/**"],
-      "commands": ["npm run build", "npm run check:operation-snapshots"]
+      "paths": [
+        "src/cli/pipeline/**"
+      ],
+      "commands": [
+        "npm run build",
+        "npm run check:operation-snapshots"
+      ]
     },
     {
       "id": "docs",
-      "paths": ["docs/**", "README.md", "CHANGELOG.md", "AGENTS.md", "CLAUDE.md"],
-      "commands": ["npm run check:links", "npm run check:remediation-release-docs"]
+      "paths": [
+        "docs/**",
+        "README.md",
+        "CHANGELOG.md",
+        "AGENTS.md",
+        "CLAUDE.md"
+      ],
+      "commands": [
+        "npm run check:links",
+        "npm run check:remediation-release-docs"
+      ]
     },
     {
       "id": "release",
-      "paths": ["package.json", "package-lock.json", "WORKFLOW.yaml"],
-      "commands": ["npm run check:versions", "npm run check:remediation-release-docs"]
+      "paths": [
+        "package.json",
+        "package-lock.json",
+        "WORKFLOW.yaml"
+      ],
+      "commands": [
+        "npm run check:versions",
+        "npm run check:remediation-release-docs"
+      ]
     }
   ],
-  "fallback": ["npm run build", "npm run typecheck"],
-  "close": ["npm run build", "npm run check"]
+  "fallback": [
+    "npm run build",
+    "npm run typecheck"
+  ],
+  "close": [
+    "npm run build"
+  ],
+  "integration": [
+    "npm run build",
+    "npm run check"
+  ],
+  "integrationBoundary": ".github/workflows/ci.yml job `validate` (runs npm run check on PRs to main/develop and pushes to main)",
+  "escalate": [
+    "src/cli/state.ts",
+    "src/cli/fs.ts",
+    "src/cli/artifacts/**",
+    "src/cli/checkpoints/**",
+    "src/cli/pipeline/**",
+    "src/cli/adapters/**",
+    "src/cli/install-plan.ts",
+    "package.json",
+    "package-lock.json"
+  ]
 }

@@ -263,11 +263,18 @@ function checkForbiddenRuntimeLoading(): CheckResult[] {
   // A routed file that unconditionally loads the validation protocol makes it part of that route's eager
   // context, so the route must count it. Conditional references ("load … when/before/only if …") are lazy.
   for (const definition of runtimePathDefinitions()) {
-    const requiring = definition.files.filter((file) => file !== VALIDATION_PROTOCOL_PATH && REQUIRED_PROTOCOL_LOAD.test(readFileSync(resolve(PACKAGE_ROOT, file), 'utf-8')));
-    if (requiring.length > 0 && !definition.files.includes(VALIDATION_PROTOCOL_PATH)) {
-      checks.push(fail(`runtime loading: ${definition.name} protocol`, `${requiring.join(', ')} require ${VALIDATION_PROTOCOL_PATH} but the route does not count it`, 'Add the protocol to the route files (and fit the budget) or make the reference conditional.'));
+    const missing: string[] = [];
+    for (const file of definition.files) {
+      const text = readFileSync(resolve(PACKAGE_ROOT, file), 'utf-8');
+      for (const match of text.matchAll(REQUIRED_PROTOCOL_LOAD)) {
+        const protocol = `${PROTOCOLS_DIR}/${match[1]}.md`;
+        if (protocol !== file && !definition.files.includes(protocol)) missing.push(`${file} → ${protocol}`);
+      }
+    }
+    if (missing.length > 0) {
+      checks.push(fail(`runtime loading: ${definition.name} protocol`, `required protocols not counted: ${[...new Set(missing)].join(', ')}`, 'Add the protocol to the route files (and fit the budget) or make the reference conditional.'));
     } else {
-      checks.push(pass(`runtime loading: ${definition.name} protocol`, requiring.length ? 'required validation protocol is counted' : 'no unconditional validation protocol load'));
+      checks.push(pass(`runtime loading: ${definition.name} protocol`, 'every unconditionally loaded protocol is counted'));
     }
   }
 
@@ -288,8 +295,9 @@ function checkForbiddenRuntimeLoading(): CheckResult[] {
   return checks;
 }
 
-const VALIDATION_PROTOCOL_PATH = 'internal/skills/sprint-forge/assets/protocols/validation.md';
-const REQUIRED_PROTOCOL_LOAD = /\b(?:load|use|per)\s+`[^`]*protocols\/validation\.md`(?!\s+(?:before|when|only|if)\b)/i;
+const PROTOCOLS_DIR = 'internal/skills/sprint-forge/assets/protocols';
+const VALIDATION_PROTOCOL_PATH = `${PROTOCOLS_DIR}/validation.md`;
+const REQUIRED_PROTOCOL_LOAD = /\b(?:load|use|per)\s+`[^`]*protocols\/([\w-]+)\.md`(?!\s+(?:before|when|only|if)\b)/gi;
 
 function runtimePathDefinitions(): RuntimePathDefinition[] {
   const commonForge = ['commands/forge.md', 'agents/orchestrator.md', 'internal/skills/sprint-forge/SKILL.md'];

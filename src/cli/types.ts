@@ -801,6 +801,8 @@ export interface CliOptions {
   trace: boolean;
   kyroScope: string | null;
   task: string | null;
+  /** context-pack only: files found by git reconciliation, added before close selection. */
+  sprintFiles: string[];
   json: boolean;
   verbosity: PackVerbosity;
   verbose: boolean;
@@ -1022,7 +1024,39 @@ export interface ValidationMap {
   validationVersion: 1;
   task: ValidationTaskRule[];
   fallback: string[];
+  /** Required at every sprint close, respected verbatim. */
   close: string[];
+  /** Aggregate suite; runs at the integration boundary, and at close only when escalated. */
+  integration: string[];
+  /** Declared mechanism that runs `integration` (e.g. a CI job), or null. Kyro does not verify it. */
+  integrationBoundary: string | null;
+  /** Minimum deterministic high-impact paths; a sprint touching one adds `integration` to close. */
+  escalate: string[];
+}
+
+export type SprintValidationFileSource = 'task' | 'evidence' | 'disposed-evidence' | 'reconciled';
+
+export interface SprintValidationFile {
+  path: string;
+  source: SprintValidationFileSource;
+}
+
+/**
+ * Proportional close validation for the active sprint. `commands` are configured and executable;
+ * `evidenceCandidates` are raw evidence lines for the agent to interpret, never commands. `escalated`
+ * only means an `escalate` pattern matched — false is not a low-risk claim.
+ */
+export interface SprintValidation {
+  files: SprintValidationFile[];
+  commands: string[];
+  matchedRules: string[];
+  uncoveredFiles: string[];
+  evidenceCandidates: Array<{ taskId: string; entries: string[] }>;
+  escalated: boolean;
+  escalatedBy: string[];
+  escalationUnconfigured: boolean;
+  integration: string[];
+  integrationBoundary: string | null;
 }
 
 /**
@@ -1036,6 +1070,8 @@ export interface ContextPackValidation {
   matchedRules: string[];
   uncoveredFiles: string[];
   close: string[];
+  /** Scope packs with an active sprint: proportional close validation; otherwise null. */
+  sprint: SprintValidation | null;
   issues: string[];
 }
 

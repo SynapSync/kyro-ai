@@ -15,4 +15,4 @@ Reuse maker evidence only with command, passing result and a verifiable tested-s
 
 ## Close tier
 
-Once per sprint: `validation.close`; map absent/invalid → the project's full check; `close: []` → none. Reuse a pass only on the same relevant state; rerun when a remediation changes its inputs.
+Proportional to the sprint's change, not the aggregate by default: follow `close-validation.md` at QA-or-close/close.

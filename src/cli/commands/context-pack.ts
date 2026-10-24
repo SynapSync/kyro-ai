@@ -10,7 +10,7 @@ import { deriveLiveWorkHandoff, deriveScopeStatus, taskExecutionInfo } from '../
 import { emitTraceEvent } from '../core/trace';
 import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
-import { resolveValidation } from '../core/validation';
+import { resolveSprintValidation, resolveValidation } from '../core/validation';
 import { hasStaleReview } from '../core/review-material';
 import { getPersistedKyroInvocation } from '../invocation';
 import { scopeFindingsToTask } from './review';
@@ -32,12 +32,12 @@ import type {
 } from '../types';
 import { resolveDelegationEnabled } from '../state';
 
-export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json' | 'verbosity'>): void {
+export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'json' | 'verbosity' | 'sprintFiles'>): void {
   const scope = resolveKyroScope(options.kyroScope);
   if (!scopeExists(scope)) {
     throw new KyroCoreError('SCOPE_NOT_FOUND', `Scope not found: ${scope}.`, 'Run kyro scope list to see available scopes.');
   }
-  const pack = buildContextPack(scope, options.task, options.verbosity);
+  const pack = buildContextPack(scope, options.task, options.verbosity, options.sprintFiles);
   if (options.json) {
     console.log(JSON.stringify(pack, null, 2));
     return;
@@ -45,7 +45,7 @@ export function contextPack(options: Pick<CliOptions, 'kyroScope' | 'task' | 'js
   printContextPackText(pack);
 }
 
-export function buildContextPack(scope: string, taskOption: string | null = null, verbosity: PackVerbosity = 'detailed'): ContextPackOutput {
+export function buildContextPack(scope: string, taskOption: string | null = null, verbosity: PackVerbosity = 'detailed', sprintFiles: string[] = []): ContextPackOutput {
   const warnings: string[] = [];
   const sprint = loadScopeSprint(scope);
 
@@ -85,6 +85,14 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   if (bootstrapRemedy) warnings.push(bootstrapRemedy);
   const delegationEnabled = resolveDelegationEnabled();
   const validation = resolveValidation(task ? task.files_to_touch ?? [] : null);
+  if (packMode === 'scope' && sprint.activeSprint) {
+    const tasks = sprint.activeSprint.phases.flatMap((phase) => phase.tasks).concat(sprint.activeSprint.emergentTasks);
+    const resolved = resolveSprintValidation({ tasks, reconciled: sprintFiles });
+    validation.sprint = resolved.sprint;
+    validation.issues.push(...resolved.issues);
+  } else if (sprintFiles.length > 0) {
+    warnings.push('--sprint-file applies only to scope packs with an active sprint; ignored');
+  }
   warnings.push(...validation.issues);
 
   // Concise trims long-form advisory prose (context, budget guidance) an agent does not need to
@@ -427,7 +435,14 @@ function printContextPackText(pack: ContextPackOutput): void {
   }
   if (pack.validation.task.length) console.log(`Task validation (focused${pack.validation.matchedRules.length ? `: ${pack.validation.matchedRules.join(', ')}` : ', fallback'}): ${pack.validation.task.join(' && ')}`);
   if (pack.validation.uncoveredFiles.length) console.log(`No validation rule: ${pack.validation.uncoveredFiles.join(', ')}`);
-  if (pack.validation.close.length) console.log(`Close validation (once per sprint): ${pack.validation.close.join(' && ')}`);
+  const sprintValidation = pack.validation.sprint;
+  if (sprintValidation) {
+    console.log(`Close validation: ${sprintValidation.commands.join(' && ') || '— (no configured commands; reasoned selection)'}`);
+    console.log(`  Sprint files: ${sprintValidation.files.length}; uncovered: ${sprintValidation.uncoveredFiles.join(', ') || 'none'}; escalated: ${sprintValidation.escalated ? sprintValidation.escalatedBy.join(', ') : 'no pattern matched'}`);
+    console.log(`  Integration: ${sprintValidation.integration.join(' && ') || 'not configured'} — boundary: ${sprintValidation.integrationBoundary ?? 'none declared'}`);
+  } else if (pack.validation.close.length) {
+    console.log(`Close validation: ${pack.validation.close.join(' && ')}`);
+  }
   if (pack.reviewPending.length) console.log(`Awaiting review: ${pack.reviewPending.join(', ')} (${pack.reviewPending.length})`);
   if (pack.nextTaskReview && pack.nextTaskReview.checkerFindings.length) {
     console.log(`Checker (${pack.nextTaskReview.taskId}): ${pack.nextTaskReview.checkerFindings.join(' | ')}`);

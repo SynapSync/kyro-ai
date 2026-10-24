@@ -59,6 +59,7 @@ Options:
   --integrations               Opt in to config blocks for selected/detected adapters
   --verbose                    Show detailed install/sync operation plans
   --verbosity <level>          Output depth for context-pack: concise or detailed (default)
+  --sprint-file <path>         context-pack scope pack: add a git-reconciled file before close selection (repeatable)
   --purge-adapter-assets       Legacy workspace option; machine projections are preserved
   --machine                    Remove machine-owned skills, projections, and integrations
   --prune                      Clean obsolete adapter-owned files during sync

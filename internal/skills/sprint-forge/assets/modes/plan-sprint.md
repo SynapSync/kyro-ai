@@ -25,7 +25,7 @@ If the user asked to complete/close the scope (work is done, no more sprints) ra
 
 ## Validation tiers
 
-Task criteria = behavior + a focused check (`validation.task`). The aggregate suite (`validation.close`) belongs in `definitionOfDone`, since `review` checks every criterion; name it in a task only for cross-cutting changes. Expensive proofs only when the contract requires them or `High risk:` (`../protocols/validation.md`).
+Task criteria = behavior + a focused check (`validation.task`). DoD names close validation, not the aggregate (`integration`); name it in a task only for cross-cutting changes (`review` checks every criterion). Expensive proofs only if the contract requires them or `High risk:` (`../protocols/validation.md`).
 
 ## Apply through the CLI
 

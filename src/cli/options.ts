@@ -17,6 +17,7 @@ export function parseOptions(args: string[]): CliOptions & { machine: boolean } 
   let trace = false;
   let kyroScope: string | null = null;
   let task: string | null = null;
+  const sprintFiles: string[] = [];
   let json = false;
   let verbosity: PackVerbosity = 'detailed';
   let verbose = false;
@@ -109,6 +110,13 @@ export function parseOptions(args: string[]): CliOptions & { machine: boolean } 
       }
     } else if (arg.startsWith('--task=')) {
       task = arg.slice('--task='.length);
+    } else if (arg === '--sprint-file') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) throw invalidInput('--sprint-file requires a path', 'Use --sprint-file <path> (repeatable).');
+      sprintFiles.push(value);
+      i += 1;
+    } else if (arg.startsWith('--sprint-file=')) {
+      sprintFiles.push(arg.slice('--sprint-file='.length));
     } else if (arg === '--agent' || arg === '--agents') {
       const value = args[i + 1];
       if (!value) throw invalidInput(`${arg} requires a value`, `Use ${arg} <agent>[,<agent>] or ${arg}=<agent>[,<agent>].`);
@@ -148,6 +156,7 @@ export function parseOptions(args: string[]): CliOptions & { machine: boolean } 
     trace,
     kyroScope,
     task,
+    sprintFiles,
     json,
     verbosity,
     verbose,

@@ -27,7 +27,7 @@ Use only from `plan-sprint.md` after the next sprint number is known. Produces t
   "n": 2, "slug": "validation-hardening", "title": "Validation hardening", "objective": "...", "status": "executing",
   "phases": [ { "id": "P1", "title": "...", "objective": "...", "status": "pending", "tasks": [ /* task objects */ ] } ],
   "emergentTasks": [],
-  "definitionOfDone": ["All tasks done with evidence", "All tasks pass verdict", "Close validation (aggregate suite) passes once"]
+  "definitionOfDone": ["All tasks done with evidence", "All tasks pass verdict", "Proportional close validation passes"]
 }
 ```
 
