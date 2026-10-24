@@ -10,6 +10,7 @@ import { deriveLiveWorkHandoff, deriveScopeStatus, taskExecutionInfo } from '../
 import { emitTraceEvent } from '../core/trace';
 import { KyroCoreError } from '../core/errors';
 import { collectCheckerFindings } from '../core/analysis';
+import { resolveValidation } from '../core/validation';
 import { hasStaleReview } from '../core/review-material';
 import { getPersistedKyroInvocation } from '../invocation';
 import { scopeFindingsToTask } from './review';
@@ -83,6 +84,8 @@ export function buildContextPack(scope: string, taskOption: string | null = null
   const bootstrapRemedy = detectProjectStateBootstrapNeed(unregisteredScopeFolders(projectState));
   if (bootstrapRemedy) warnings.push(bootstrapRemedy);
   const delegationEnabled = resolveDelegationEnabled();
+  const validation = resolveValidation(task ? task.files_to_touch ?? [] : null);
+  warnings.push(...validation.issues);
 
   // Concise trims long-form advisory prose (context, budget guidance) an agent does not need to
   // route/execute; the structured routing/task fields it acts on are always present. Detailed keeps
@@ -126,6 +129,7 @@ export function buildContextPack(scope: string, taskOption: string | null = null
     conventions,
     adrs,
     cliRecipes: buildCliRecipes(scope, sprint, task),
+    validation,
     warnings,
     routing: { modes: [...routing.modes] },
     budgetClass: routing.budgetClass,
@@ -396,6 +400,7 @@ function estimatePackTokens(pack: Omit<ContextPackOutput, 'estimatedTokens'>): n
     ...pack.conventions.map((c) => c.rule),
     ...pack.adrs.map((adr) => `${adr.id} ${adr.title} ${adr.status} ${adr.context} ${adr.decision} ${adr.consequences.join(' ')} ${adr.alternatives.join(' ')}`),
     ...pack.cliRecipes.map((recipe) => `${recipe.id} ${recipe.purpose} ${recipe.command}`),
+    ...pack.validation.task, ...pack.validation.close,
   ].filter(Boolean).join(' ');
   return Math.ceil(text.length / 4);
 }
@@ -420,6 +425,9 @@ function printContextPackText(pack: ContextPackOutput): void {
     if (pack.taskAcceptanceCriteria.length) console.log(`  Acceptance: ${pack.taskAcceptanceCriteria.join('; ')}`);
     if (pack.taskScenarios.length) console.log(`  Scenarios: ${pack.taskScenarios.map((s) => `${s.id}: Given ${s.given}; When ${s.when}; Then ${s.then}`).join(' | ')}`);
   }
+  if (pack.validation.task.length) console.log(`Task validation (focused${pack.validation.matchedRules.length ? `: ${pack.validation.matchedRules.join(', ')}` : ', fallback'}): ${pack.validation.task.join(' && ')}`);
+  if (pack.validation.uncoveredFiles.length) console.log(`No validation rule: ${pack.validation.uncoveredFiles.join(', ')}`);
+  if (pack.validation.close.length) console.log(`Close validation (once per sprint): ${pack.validation.close.join(' && ')}`);
   if (pack.reviewPending.length) console.log(`Awaiting review: ${pack.reviewPending.join(', ')} (${pack.reviewPending.length})`);
   if (pack.nextTaskReview && pack.nextTaskReview.checkerFindings.length) {
     console.log(`Checker (${pack.nextTaskReview.taskId}): ${pack.nextTaskReview.checkerFindings.join(' | ')}`);

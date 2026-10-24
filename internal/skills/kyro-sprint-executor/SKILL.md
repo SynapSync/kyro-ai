@@ -45,12 +45,12 @@ Never infer routing from file presence. Never open the full `sprint.json` to rou
 
 1. **Pack**: `{{KYRO_CLI}} context-pack --kyro-scope <scope> --task --json` — the task is self-contained (`taskDescription`, `taskFiles`, `taskContext`, `taskAcceptanceCriteria`, `conventions`). Respect `depends_on`.
 2. **Implement**: the smallest coherent change that satisfies the acceptance criteria, following the pack's conventions. Do not invent project patterns without justification.
-3. **Validate**, scoped to the touched area: run the checks the acceptance criteria imply (typecheck, lint, targeted tests, capped searches). Only tests for changed files; cap searches (`-l`, `-m N`, `| head`, or a path).
+3. **Validate** per the runtime's `sprint-forge/assets/protocols/validation.md`: focused by default (`validation.task` plus checks for `validation.uncoveredFiles`); broaden only with a stated reason; avoid redundant aggregate runs. Cap searches (`-l`, `-m N`, `| head`, or a path).
 4. **Record evidence** (maker):
    `{{KYRO_CLI}} record-evidence <task-id> --kyro-scope <scope> --summary "..." --validation "<check>" [--validation ...] [--file <path> ...] [--notes "..."]`
    - **No `--yes`/`--confirm` here** — those flags belong to `review`; passing them fails with `INVALID_INPUT`.
    - After **three** failed correction rounds: rerun with `--status blocked`, then stop that task and report — do not grind further. Do **not** review it: this is temporary, and Kyro routes any independent dependency-satisfied task. Re-read `context-pack`; dependents stay pending but are reported as derived blocked. Resume only through fresh `done` evidence, then review.
-5. **Review** (checker):
+5. **Review** (checker) — reuse maker evidence only with a verifiable tested-state reference (same protocol); otherwise rerun the affected focused checks:
    - Pass: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict pass [--by <actor>] --yes`
    - Fail: `{{KYRO_CLI}} review <task-id> --kyro-scope <scope> --verdict fail --finding critical:"..." --yes`
    - `--dry-run` and `--yes` are mutually exclusive.
@@ -84,16 +84,20 @@ Never create `RULES.md`, `rules.md`, or another rule artifact. If `rule` is miss
 
 When routing reports `qa_or_close`:
 
-1. Verify completeness with `{{KYRO_CLI}} status full --kyro-scope <scope>` and `{{KYRO_CLI}} analyze --kyro-scope <scope>`.
+1. Run **Close validation** (below), then verify completeness with `{{KYRO_CLI}} status full --kyro-scope <scope>` and `{{KYRO_CLI}} analyze --kyro-scope <scope>`.
 2. Ask whether to run QA or close without QA. Both initial choices are valid.
 3. QA selected: invoke the installed command/skill `kyro qa <scope>` through the host — it is not a verb for the resolved CLI binary — and follow `sprint-forge/assets/modes/qa-or-close.md` for verdict handling, emergent work, and mandatory same-session re-QA after a failure.
 4. Close selected: continue to Sprint close below without recording an omission.
+
+## Close validation
+
+Once per sprint, per the runtime's `sprint-forge/assets/protocols/validation.md`: run the scope pack's `validation.close`; map absent or invalid → the project's full check; `close: []` → none. Reuse a passing run only on the same relevant state; rerun when a remediation changes its inputs. A failure blocks close.
 
 ## Sprint close (USER GATE)
 
 When routing reports `close_sprint`, or QA-or-close has selected the close path:
 
-1. Verify completeness with `{{KYRO_CLI}} status full --kyro-scope <scope>`: no pending tasks, no missing evidence or verdicts, no unresolved critical findings.
+1. Run **Close validation** unless it already passed on this state in QA-or-close. Verify completeness with `{{KYRO_CLI}} status full --kyro-scope <scope>`: no pending tasks, no missing evidence or verdicts, no unresolved critical findings.
 2. **Ask the user for explicit approval.** Closing a sprint is a lifecycle gate — never proceed past it on your own.
 3. On approval: `{{KYRO_CLI}} close-sprint --kyro-scope <scope> --yes`. Never null `activeSprint` by hand. Confirm the CLI reports a successful close.
 

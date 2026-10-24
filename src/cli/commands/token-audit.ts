@@ -260,6 +260,17 @@ function checkForbiddenRuntimeLoading(): CheckResult[] {
     }
   }
 
+  // A routed file that unconditionally loads the validation protocol makes it part of that route's eager
+  // context, so the route must count it. Conditional references ("load … when/before/only if …") are lazy.
+  for (const definition of runtimePathDefinitions()) {
+    const requiring = definition.files.filter((file) => file !== VALIDATION_PROTOCOL_PATH && REQUIRED_PROTOCOL_LOAD.test(readFileSync(resolve(PACKAGE_ROOT, file), 'utf-8')));
+    if (requiring.length > 0 && !definition.files.includes(VALIDATION_PROTOCOL_PATH)) {
+      checks.push(fail(`runtime loading: ${definition.name} protocol`, `${requiring.join(', ')} require ${VALIDATION_PROTOCOL_PATH} but the route does not count it`, 'Add the protocol to the route files (and fit the budget) or make the reference conditional.'));
+    } else {
+      checks.push(pass(`runtime loading: ${definition.name} protocol`, requiring.length ? 'required validation protocol is counted' : 'no unconditional validation protocol load'));
+    }
+  }
+
   const orchestrator = readFileSync(resolve(PACKAGE_ROOT, 'agents/orchestrator.md'), 'utf-8');
   const eagerSprintHelperPattern = /SPRINT phase[^\n]*(sprint-generator|debt-tracker|learner)/i;
   if (eagerSprintHelperPattern.test(orchestrator)) {
@@ -276,6 +287,9 @@ function checkForbiddenRuntimeLoading(): CheckResult[] {
   }
   return checks;
 }
+
+const VALIDATION_PROTOCOL_PATH = 'internal/skills/sprint-forge/assets/protocols/validation.md';
+const REQUIRED_PROTOCOL_LOAD = /\b(?:load|use|per)\s+`[^`]*protocols\/validation\.md`(?!\s+(?:before|when|only|if)\b)/i;
 
 function runtimePathDefinitions(): RuntimePathDefinition[] {
   const commonForge = ['commands/forge.md', 'agents/orchestrator.md', 'internal/skills/sprint-forge/SKILL.md'];
@@ -322,7 +336,7 @@ function runtimePathDefinitions(): RuntimePathDefinition[] {
       name: 'runtime path: kyro-forge:review',
       budget: TOKEN_BUDGET.runtimeForgeReviewTokens,
       projectedSkill: 'forge',
-      files: [...commonForge, 'internal/skills/sprint-forge/assets/modes/SPRINT.md', 'internal/skills/sprint-forge/assets/modes/review-task.md', 'internal/skills/sprint-forge/assets/helpers/reviewer.md'],
+      files: [...commonForge, 'internal/skills/sprint-forge/assets/modes/SPRINT.md', 'internal/skills/sprint-forge/assets/modes/review-task.md', 'internal/skills/sprint-forge/assets/helpers/reviewer.md', VALIDATION_PROTOCOL_PATH],
       forbiddenFiles: ['internal/skills/sprint-forge/assets/helpers/sprint-generator.md', 'internal/skills/sprint-forge/assets/helpers/learner.md'],
     },
     {

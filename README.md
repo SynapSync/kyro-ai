@@ -124,6 +124,7 @@ The explicit path is doctor → prepare → supply values → preview → apply 
 | [Teams](docs/teams.md) | Shared versus personal state and clone bootstrap |
 | [Architecture](docs/architecture.md) | Components, storage, and data flow |
 | [Maker/checker](docs/maker-checker.md) | Evidence and review responsibilities |
+| [Validation tiers](docs/validation-tiers.md) | Focused task checks vs once-per-sprint aggregate suite |
 | [Sprint checkpoints](docs/sprint-close-checkpoints.md) | Lossless Forge closure and recovery |
 | [MCP](docs/mcp.md) · [Trace](docs/trace.md) · [Evals](docs/evals.md) | Structured tools and diagnostics |
 

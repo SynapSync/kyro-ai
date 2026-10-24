@@ -1010,6 +1010,35 @@ export interface ContextPackExecutionSummary {
   blockedTasks: TaskExecutionInfo[];
 }
 
+/** One focused validation rule from `.agents/kyro/validation.json`. */
+export interface ValidationTaskRule {
+  id: string;
+  paths: string[];
+  commands: string[];
+}
+
+/** Optional project-owned validation map (`.agents/kyro/validation.json`). */
+export interface ValidationMap {
+  validationVersion: 1;
+  task: ValidationTaskRule[];
+  fallback: string[];
+  close: string[];
+}
+
+/**
+ * Validation tiers surfaced on every pack: focused task commands for `taskFiles`, and the aggregate
+ * close commands that run once per sprint. `source: 'none'` when the project has no (valid) map.
+ * `uncoveredFiles` are task files no rule matched ("no rule", never "validated").
+ */
+export interface ContextPackValidation {
+  source: 'validation.json' | 'none';
+  task: string[];
+  matchedRules: string[];
+  uncoveredFiles: string[];
+  close: string[];
+  issues: string[];
+}
+
 export interface ContextPackOutput {
   schemaVersion: 4;
   packMode: ContextPackMode;
@@ -1051,6 +1080,8 @@ export interface ContextPackOutput {
   adrs: ContextPackAdr[];
   /** Copy-paste CLI argv for the current nextAction (+ common preflight). */
   cliRecipes: ContextPackCliRecipe[];
+  /** Focused task validation and once-per-sprint close validation. */
+  validation: ContextPackValidation;
   warnings: string[];
   estimatedTokens: number;
   routing: { modes: string[] };

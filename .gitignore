@@ -17,6 +17,7 @@ dist/
 /.agents/kyro/*
 !/.agents/kyro/.gitignore
 !/.agents/kyro/project.json
+!/.agents/kyro/validation.json
 !/.agents/kyro/scopes/
 !/.agents/kyro/work/
 !/.agents/kyro/plan/
