@@ -7,7 +7,7 @@ The active sprint has completed task-level maker/checker review. Ask the user wh
 ## Inputs
 
 1. Read `.agents/kyro/scopes/{scope}/sprint.json` only after routing here. Confirm every phase and emergent task is `done` with a passing task verdict and no disposition.
-2. Run `{{KYRO_CLI}} analyze --kyro-scope {scope}`. Do not offer close while CRITICAL or HIGH findings remain.
+2. Load `../protocols/close-validation.md` and run close validation (reconcile with git, then `validation.sprint`). Run `{{KYRO_CLI}} analyze --kyro-scope {scope}`. Do not offer close while CRITICAL or HIGH findings remain.
 3. Keep the current-session flag `qaRemediationPending` in orchestration context only. It is deliberately not persisted in Kyro state. Also inspect existing handoff/evidence notes for a known re-QA obligation carried through an active-plan update; recover its prior report or ask when ambiguous. Notes are workflow provenance, not a stored QA certificate.
 
 ## Initial decision

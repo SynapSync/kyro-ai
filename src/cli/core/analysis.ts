@@ -22,6 +22,7 @@ import { deriveActiveSprintStatus, derivePhaseStatus, deriveScopeStatus, normali
 import { emitBlockedReason, emitTraceEvent } from './trace';
 import { hasStaleReview } from './review-material';
 import { dependencyCycle } from './task-graph';
+import { aggregateValidationMentions, loadValidationMap } from './validation';
 
 const SEVERITY_ORDER: AnalysisSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const MAX_FINDINGS = 50;
@@ -143,6 +144,17 @@ export function collectFindings(sprint: SprintFile, principles: Principle[]): An
   }
   if (!Array.isArray(sprint.successCriteria) || sprint.successCriteria.length === 0) add('MEDIUM', 'spec', 'scope has no successCriteria', 'Add 2–5 technology-agnostic, measurable outcomes (see INIT).');
   if (!sprint.author) add('LOW', 'metadata', 'scope has no author (git identity was not captured at init)', 'Best-effort only — no action required. Future scopes: ensure INIT used `kyro plan --from <file>` so git identity is captured automatically.');
+  // Validation tiers are advisory (MEDIUM): they speed agents up, so they must never wall a close or
+  // feed the review veto. Appended last so existing finding ids stay stable.
+  const validationMap = loadValidationMap();
+  for (const issue of validationMap.issues) add('MEDIUM', 'validation-tier', `validation map ignored: ${issue}`, 'Fix .agents/kyro/validation.json or remove it; packs fall back to no suggested validation.');
+  if (active) {
+    for (const t of allTasks(active)) {
+      if (t.status === 'done' || t.disposition) continue;
+      const hits = (t.acceptance_criteria ?? []).flatMap((criterion) => aggregateValidationMentions(criterion, validationMap.map));
+      if (hits.length) add('MEDIUM', 'validation-tier', `task ${t.id} acceptance criteria require the aggregate suite (${[...new Set(hits)].join(', ')})`, 'Keep task criteria to focused checks (context-pack validation.task); run the aggregate suite once at sprint close via definitionOfDone.');
+    }
+  }
   return out.sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
 }
 

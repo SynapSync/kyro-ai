@@ -64,7 +64,7 @@ Never edit `sprint.json`, `project.json`, `local.json`, checkpoints, or `archive
 ## Gates and Quality
 
 - Ask for approval only at lifecycle gates (sprint close, scope completion), not after every internal checkpoint.
-- Run validation appropriate to touched files before task completion.
+- Load `assets/protocols/validation.md` only when the routed mode asks for it.
 - Block completion on failing tests/typecheck, debug artifacts, secrets, syntax errors, or broken imports.
 - On failure, reproduce, identify root cause, fix once, revalidate; after three failed correction rounds, mark the task blocked with evidence.
 

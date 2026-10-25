@@ -12,7 +12,7 @@ Execute the active sprint task, recording evidence through the Kyro CLI.
 For a `remedyCommand` blocker, load `../helpers/live-work.md`, follow it, then resume from its refreshed pack.
 
 1. Understand the task from its fields. Make the smallest coherent change.
-2. Validate per `acceptance_criteria` (tsc, lint, tests, grep, manual), **scoped to the touched area**: only tests for changed files; cap searches (`-l`, `-m N`, `| head`, or a path). After three failed correction rounds, mark `blocked` with evidence.
+2. Validate per `acceptance_criteria`: focused by default — the pack's `validation.task` plus checks for `validation.uncoveredFiles`; avoid redundant aggregate runs. Load `../protocols/validation.md` before broadening or skipping a criterion's check. Cap searches (`-l`, `-m N`, `| head`, or a path). After three failed correction rounds, mark `blocked` with evidence.
 3. Record evidence via CLI — never hand-edit `sprint.json`:
    `{{KYRO_CLI}} record-evidence <task-id> --kyro-scope {scope} --summary "..." --validation "<check>" [--validation ...] [--file <path> ...] [--notes "..."] [--status blocked] [--disposition deferred|superseded|cancelled --reason "..." [--target debt:<id>|task:<id>|sprint:<n>]]`
    `done` routes that task to `review_task`. Temporary `blocked` skips review; inspect `context-pack.execution` and continue only ready independent work. Dependents stay pending but computed blocked. Resume with fresh `done` evidence, then review. Terminal dispositions are deferred/superseded/cancelled; legacy `--disposition blocked` is read-only.

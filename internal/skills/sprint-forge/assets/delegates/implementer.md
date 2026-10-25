@@ -23,7 +23,7 @@ Built from `{{KYRO_CLI}} context-pack --kyro-scope {scope} --task <id> --json` â
 ## Workflow
 
 1. Implement the smallest coherent change that satisfies acceptance criteria.
-2. Run validation scoped to touched files (tests, lint, tsc â€” as implied by AC).
+2. Per `../protocols/validation.md`: run `validation.task` plus focused checks for `validation.uncoveredFiles`; broaden only with a stated reason. Report `git rev-parse HEAD` / `git status --porcelain` at test time in `validation.notes`.
 3. Return a **final status checkpoint** to the orchestrator (required):
 
 ```json

@@ -16,7 +16,7 @@ Include: `taskAcceptanceCriteria`, `taskFiles`, `taskScenarios`, and any maker e
 ## Workflow
 
 1. Review changes in `taskFiles` against `taskAcceptanceCriteria`.
-2. Run scoped validation on touched areas only.
+2. Per `../protocols/validation.md`: reuse maker evidence only with a verifiable tested-state reference; otherwise rerun the affected focused checks.
 3. Return **findings only**:
 
 ```json

@@ -65,6 +65,7 @@ function tuiInstallOptions(agent: Agent): CliOptions {
     trace: false,
     kyroScope: null,
     task: null,
+    sprintFiles: [],
     json: false,
     verbosity: 'detailed',
     verbose: false,

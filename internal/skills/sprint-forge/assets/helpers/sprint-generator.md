@@ -16,8 +16,9 @@ Use only from `plan-sprint.md` after the next sprint number is known. Produces t
 1. Resolve Sprint N and verify Sprint N-1 is closed (present in `ledger[]`) when N > 1.
 2. Extract title, focus, type, target version, suggested phases, dependencies, and verification needs. The `title` MUST be copied verbatim from `roadmap.sprints[]` for this sprint number and written into the `activeSprint` object (see shape below) — never leave it out, or the archive narrative renders `Sprint N: undefined`.
 3. For Sprint 2+, create a disposition for every previous recommendation: incorporated, deferred, resolved, N/A, or converted to phase. Nothing is silently dropped.
-4. Build `phases[]` from roadmap suggestions, incorporated recommendations, and due debt. Each task needs `id`, `title`, `description`, `files_to_touch`, `context` (fold in relevant `conventions[]`), `acceptance_criteria`, `depends_on`, optional `scenario_refs`, `status: "pending"`, `evidence: null`, `verdict: null`. When `sprint.json` has `spec.scenarios[]`, use `scenario_refs[]` to link each task to the scenarios it implements.
-5. Carry debt forward completely in `debt[]`: add new debt objects, mark due items `in_progress`, never delete resolved rows.
+4. Build `phases[]` from roadmap suggestions, incorporated recommendations, and due debt. Task fields and `scenario_refs[]` follow `plan-sprint.md` steps 4–6.
+5. Apply the `plan-sprint.md` validation tiers to every criterion.
+6. Carry debt forward completely in `debt[]`: add new debt objects, mark due items `in_progress`, never delete resolved rows.
 
 ## activeSprint shape produced
 
@@ -26,7 +27,7 @@ Use only from `plan-sprint.md` after the next sprint number is known. Produces t
   "n": 2, "slug": "validation-hardening", "title": "Validation hardening", "objective": "...", "status": "executing",
   "phases": [ { "id": "P1", "title": "...", "objective": "...", "status": "pending", "tasks": [ /* task objects */ ] } ],
   "emergentTasks": [],
-  "definitionOfDone": ["All tasks done with evidence", "All tasks pass verdict", "Quality gates pass"]
+  "definitionOfDone": ["All tasks done with evidence", "All tasks pass verdict", "Proportional close validation passes"]
 }
 ```
 

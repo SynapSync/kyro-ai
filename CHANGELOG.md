@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [6.4.0] - 2026-10-24
+
+### Added
+
+- Validation tiers. `kyro context-pack` returns `validation: { source, task, matchedRules, uncoveredFiles, close, sprint, issues }`: focused task commands mapped per file from `taskFiles` through an optional, committed `.agents/kyro/validation.json` (matching rules in order, then `fallback` for files no rule covers). All map keys are required. See [docs/validation-tiers.md](docs/validation-tiers.md).
+- Proportional close validation. `validation.json` adds `integration` (the aggregate suite), `integrationBoundary` (the declared mechanism that runs it, e.g. a CI job) and `escalate` (minimum high-impact paths); `close` is what every sprint close requires. Scope packs with an active sprint return `validation.sprint` (sprint files by source, configured commands, raw `evidenceCandidates`, `uncoveredFiles`, escalation); `kyro context-pack --sprint-file <path>` adds git-reconciled files before selection. The aggregate runs at close only when declared, escalated or justified, and every close records its integration status.
+- `kyro analyze` reports a MEDIUM `validation-tier` finding when a pending task criterion names the aggregate suite, or when `validation.json` is invalid. Advisory only: it never blocks close or the review veto.
+
+### Changed
+
+- Forge skills, delegates and the standalone executor share one validation protocol (`sprint-forge/assets/protocols/validation.md`, counted on the review route by the token audit, which now fails when a routed file requires the protocol without counting it); Work keeps an equivalent lifecycle-specific rule using its own evidence input and `work amend-*` commands. The protocol: focused task checks by default, broadened with a stated reason for cross-cutting changes; live criteria are satisfied or corrected through the authorized flow, never skipped; checkers reuse evidence only with a verifiable tested-state reference; expensive proofs run when the contract requires them or for `High risk:` tasks; close validation is proportional on both executor close paths (`protocols/close-validation.md`).
+- `npm run check` runs `check:dist` right after `typecheck`, so a stale `dist/` fails before dist-dependent checks.
+
 ## [6.3.0] - 2026-10-13
 
 ### Changed

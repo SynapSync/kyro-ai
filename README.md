@@ -6,6 +6,8 @@ Kyro gives AI coding agents a durable, CLI-governed way to plan, execute, and re
 
 Kyro works through a CLI and host adapters for Claude Code, Codex, OpenCode, and other skill-capable agents. The agent proposes and implements; the CLI validates and writes managed state. A passing task review is an attestation by a checker, not proof that tests ran or a substitute for independent QA.
 
+Version **6.4.0** adds focused validation suggestions and proportional Forge sprint closure. Projects can map changed files to checks, reserve the aggregate suite for an integration boundary, and require it at close for high-impact changes. Work retains its aggregate check before closure. See [Validation tiers](docs/validation-tiers.md).
+
 ## Choose a workflow
 
 | | Forge | Work |
@@ -124,6 +126,7 @@ The explicit path is doctor → prepare → supply values → preview → apply 
 | [Teams](docs/teams.md) | Shared versus personal state and clone bootstrap |
 | [Architecture](docs/architecture.md) | Components, storage, and data flow |
 | [Maker/checker](docs/maker-checker.md) | Evidence and review responsibilities |
+| [Validation tiers](docs/validation-tiers.md) | Focused task checks, proportional sprint close, aggregate at integration |
 | [Sprint checkpoints](docs/sprint-close-checkpoints.md) | Lossless Forge closure and recovery |
 | [MCP](docs/mcp.md) · [Trace](docs/trace.md) · [Evals](docs/evals.md) | Structured tools and diagnostics |
 

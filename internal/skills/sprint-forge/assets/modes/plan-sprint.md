@@ -23,6 +23,10 @@ If the user asked to complete/close the scope (work is done, no more sprints) ra
 5. Fold relevant `conventions[]` into each task's `context`.
 6. If `spec.requirements[]` exists, create or refine `spec.scenarios[]` as Given/When/Then checks per requirement, then set each task's `scenario_refs[]` to the scenarios it implements. Leave `scenario_refs: []` only when the task is intentionally non-spec work and explain that in `context`.
 
+## Validation tiers
+
+Task criteria = behavior + a focused check (`validation.task`). DoD names close validation, not the aggregate (`integration`); name it in a task only for cross-cutting changes (`review` checks every criterion). Expensive proofs only if the contract requires them or `High risk:` (`../protocols/validation.md`).
+
 ## Apply through the CLI
 
 Run `{{KYRO_CLI}} plan --from <file> --kyro-scope {scope}`. `sprint-forge` is a skill, not a Task subagent. The lean input must describe:

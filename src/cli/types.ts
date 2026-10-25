@@ -801,6 +801,8 @@ export interface CliOptions {
   trace: boolean;
   kyroScope: string | null;
   task: string | null;
+  /** context-pack only: files found by git reconciliation, added before close selection. */
+  sprintFiles: string[];
   json: boolean;
   verbosity: PackVerbosity;
   verbose: boolean;
@@ -1010,6 +1012,69 @@ export interface ContextPackExecutionSummary {
   blockedTasks: TaskExecutionInfo[];
 }
 
+/** One focused validation rule from `.agents/kyro/validation.json`. */
+export interface ValidationTaskRule {
+  id: string;
+  paths: string[];
+  commands: string[];
+}
+
+/** Optional project-owned validation map (`.agents/kyro/validation.json`). */
+export interface ValidationMap {
+  validationVersion: 1;
+  task: ValidationTaskRule[];
+  fallback: string[];
+  /** Required at every sprint close, respected verbatim. */
+  close: string[];
+  /** Aggregate suite; runs at the integration boundary, and at close only when escalated. */
+  integration: string[];
+  /** Declared mechanism that runs `integration` (e.g. a CI job), or null. Kyro does not verify it. */
+  integrationBoundary: string | null;
+  /** Minimum deterministic high-impact paths; a sprint touching one adds `integration` to close. */
+  escalate: string[];
+}
+
+export type SprintValidationFileSource = 'task' | 'evidence' | 'disposed-evidence' | 'reconciled';
+
+export interface SprintValidationFile {
+  path: string;
+  source: SprintValidationFileSource;
+}
+
+/**
+ * Proportional close validation for the active sprint. `commands` are configured and executable;
+ * `evidenceCandidates` are raw evidence lines for the agent to interpret, never commands. `escalated`
+ * only means an `escalate` pattern matched — false is not a low-risk claim.
+ */
+export interface SprintValidation {
+  files: SprintValidationFile[];
+  commands: string[];
+  matchedRules: string[];
+  uncoveredFiles: string[];
+  evidenceCandidates: Array<{ taskId: string; entries: string[] }>;
+  escalated: boolean;
+  escalatedBy: string[];
+  escalationUnconfigured: boolean;
+  integration: string[];
+  integrationBoundary: string | null;
+}
+
+/**
+ * Validation tiers surfaced on every pack: focused task commands for `taskFiles`, and the aggregate
+ * close commands that run once per sprint. `source: 'none'` when the project has no (valid) map.
+ * `uncoveredFiles` are task files no rule matched ("no rule", never "validated").
+ */
+export interface ContextPackValidation {
+  source: 'validation.json' | 'none';
+  task: string[];
+  matchedRules: string[];
+  uncoveredFiles: string[];
+  close: string[];
+  /** Scope packs with an active sprint: proportional close validation; otherwise null. */
+  sprint: SprintValidation | null;
+  issues: string[];
+}
+
 export interface ContextPackOutput {
   schemaVersion: 4;
   packMode: ContextPackMode;
@@ -1051,6 +1116,8 @@ export interface ContextPackOutput {
   adrs: ContextPackAdr[];
   /** Copy-paste CLI argv for the current nextAction (+ common preflight). */
   cliRecipes: ContextPackCliRecipe[];
+  /** Focused task validation and once-per-sprint close validation. */
+  validation: ContextPackValidation;
   warnings: string[];
   estimatedTokens: number;
   routing: { modes: string[] };
