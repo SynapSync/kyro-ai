@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- `kyro work create` and `kyro work amend-brief` work on native Windows. Node exposes no `O_NOFOLLOW` on win32, and the brief reader refused every source there. It now refuses symbolic links and non-regular entries before opening, adds `O_NOFOLLOW` where available, requires the opened descriptor's device/inode (bigint) to match the checked entry, and re-checks the path after opening, so a swap to a link or another file fails closed on every platform. Without `O_NOFOLLOW` (Windows), a link that appears and disappears entirely between the two checks can only reach the verified file, never different bytes. `check:work-brief-source` covers the platform path, a forced no-`O_NOFOLLOW` path, swap races (including a link to the same moved file), junctions, and full `work create`/`amend-brief` flows, and runs on the Windows CI job.
+- `check:repair-integrity` no longer depends on the developer machine: it runs the CLI against an isolated HOME (and agent config dirs) and rejects every doctor `[FAIL]`, removing the previous ad hoc tolerance for an installed-runtime capability skew.
+
 ## [6.4.0] - 2026-10-24
 
 ### Added

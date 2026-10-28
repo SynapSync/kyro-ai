@@ -62,6 +62,7 @@
       ],
       "commands": [
         "npm run build",
+        "npm run check:work-brief-source",
         "npm run check:work-contract",
         "npm run check:work-plan",
         "npm run check:work-execution",
