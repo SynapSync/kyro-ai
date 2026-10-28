@@ -84,10 +84,14 @@ export function createWork(work: WorkFile, brief: string | Buffer, dryRun = fals
   });
 }
 
+// Write and fsync through the same write handle: Windows FlushFileBuffers requires write access, so
+// fsync on a read-only reopen fails with EPERM there (the repo-wide durable-write pattern).
 function writeDurableFile(path: string, content: string | Buffer): void {
-  writeFileSync(path, content, { encoding: 'utf8', flag: 'wx' });
-  const descriptor = openSync(path, 'r');
-  try { fsyncSync(descriptor); } finally { closeSync(descriptor); }
+  const descriptor = openSync(path, 'wx');
+  try {
+    writeFileSync(descriptor, content, typeof content === 'string' ? 'utf8' : undefined);
+    fsyncSync(descriptor);
+  } finally { closeSync(descriptor); }
 }
 
 /** Snapshot before builders run: callbacks may mutate the input author in place. */
