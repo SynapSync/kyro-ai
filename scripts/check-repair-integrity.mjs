@@ -32,8 +32,21 @@ function assert(condition, message) {
   passed += 1;
 }
 
+// Doctor also inspects the machine (global runtime, adapter projections, agent config dirs). Run the CLI
+// against an isolated, empty HOME so those rows depend on this test, never on the developer machine.
+const isolatedHome = mkdtempSync(join(tmpdir(), 'kyro-integrity-home-'));
+const isolatedEnv = {
+  ...process.env,
+  HOME: isolatedHome,
+  USERPROFILE: isolatedHome,
+  XDG_CONFIG_HOME: join(isolatedHome, '.config'),
+  CODEX_HOME: join(isolatedHome, '.codex'),
+  CLAUDE_CONFIG_DIR: join(isolatedHome, '.claude'),
+};
+process.on('exit', () => rmSync(isolatedHome, { recursive: true, force: true }));
+
 function run(cwd, args) {
-  return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', env: process.env });
+  return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', env: isolatedEnv });
 }
 
 function doctorPreservesIntegrity(result, scope) {
@@ -45,10 +58,7 @@ function doctorPreservesIntegrity(result, scope) {
     `[PASS] ${scope}/remediation/`,
   ];
   if (result.stderr?.trim() || !requiredPasses.every((marker) => output.includes(marker))) return false;
-  if (result.status === 0) return failures.length === 0;
-  return result.status === 1
-    && failures.length === 1
-    && /^\[FAIL\] CLI capabilities: installed runtime \([^)]+\) is missing tool-owned verb\(s\): work$/.test(failures[0]);
+  return result.status === 0 && failures.length === 0;
 }
 
 function sha256(value) {
@@ -223,11 +233,20 @@ function main() {
     '[PASS] live-scope/checkpoint/sprint-001: APPLIED',
     '[PASS] live-scope/remediation/R-001: APPLIED',
   ].join('\n');
-  const knownCapabilitySkew = '[FAIL] CLI capabilities: installed runtime (5.0.1) is missing tool-owned verb(s): work';
-  assert(doctorPreservesIntegrity({ status: 1, stdout: `${knownCapabilitySkew}\n${integrityPasses}`, stderr: '' }, 'live-scope'), 'only the known external capability skew may be tolerated');
-  assert(!doctorPreservesIntegrity({ status: 1, stdout: `${knownCapabilitySkew}\n[FAIL] live-scope/checkpoint: broken\n${integrityPasses}`, stderr: '' }, 'live-scope'), 'an integrity failure must never be masked');
-  assert(!doctorPreservesIntegrity({ status: 1, stdout: knownCapabilitySkew, stderr: '' }, 'live-scope'), 'missing integrity PASS markers must fail');
-  assert(!doctorPreservesIntegrity({ status: 2, stdout: `${knownCapabilitySkew}\n${integrityPasses}`, stderr: '' }, 'live-scope'), 'unexpected doctor exit must fail');
+  // The CLI runs against an isolated HOME, so no machine row may be tolerated: every [FAIL] counts,
+  // including shared-state rows such as Git trackability.
+  assert(doctorPreservesIntegrity({ status: 0, stdout: integrityPasses, stderr: '' }, 'live-scope'), 'a clean integrity doctor must pass');
+  for (const failure of [
+    '[FAIL] CLI capabilities: installed runtime (5.0.1) is missing tool-owned verb(s): work',
+    '[FAIL] Codex adapter: unrelated machine configuration',
+    '[FAIL] Git trackability: shared Kyro state is ignored: scopes/**',
+    '[FAIL] Work root: workspace Work root is a symbolic link',
+    '[FAIL] live-scope/checkpoint: broken',
+  ]) {
+    assert(!doctorPreservesIntegrity({ status: 1, stdout: `${failure}\n${integrityPasses}`, stderr: '' }, 'live-scope'), `a doctor failure must never be masked: ${failure}`);
+  }
+  assert(!doctorPreservesIntegrity({ status: 0, stdout: '[PASS] live-scope/sprint.json: ok', stderr: '' }, 'live-scope'), 'missing integrity PASS markers must fail');
+  assert(!doctorPreservesIntegrity({ status: 2, stdout: integrityPasses, stderr: '' }, 'live-scope'), 'unexpected doctor exit must fail');
   const identities = family.scopes.flatMap((scope) => scope.sprints.map((sprint) => ({ scope: scope.id, ...sprint })));
   assert(identities.length === 11, `family must list 11 checkpoints, got ${identities.length}`);
 

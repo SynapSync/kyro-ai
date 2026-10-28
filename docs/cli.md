@@ -909,6 +909,7 @@ that leaves an immutable record of itself.
 | **6.2.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds the read-only `analyze --matrix` scenario verification matrix and reports a missing `sprint.json` on scope complete/reopen as `SCOPE_NOT_FOUND`. |
 | **6.3.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds machine-level adapter reconciliation (`kyro adapters`, `uninstall --machine`) and accepts CRLF-checked-out skill bodies on Windows. |
 | **6.4.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds focused validation suggestions, proportional Forge closure and advisory aggregate-suite findings. Work retains its existing close policy. |
+| **6.4.1** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; fixes native Windows `work create` and `work amend-brief` source ingestion and isolates integrity-repair tests from machine configuration. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

@@ -1,4 +1,4 @@
-import { closeSync, constants, fstatSync, openSync, readSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { KyroCoreError } from '../core/errors';
 
@@ -7,9 +7,15 @@ import { KyroCoreError } from '../core/errors';
  * and `work amend-brief`.
  *
  * Policy (documented in docs/work.md):
- * - Open exactly one source path with O_NOFOLLOW: symbolic links are refused
- *   before any byte is read. Platforms without O_NOFOLLOW refuse every source
- *   rather than silently weakening the policy.
+ * - Never follow a symbolic link. The path is lstat'ed first and a link (or any
+ *   non-regular entry) is refused before it is opened. The open adds O_NOFOLLOW
+ *   where the platform has it (not on Windows); either way the opened
+ *   descriptor's device/inode must equal the lstat'ed entry (bigint, so large
+ *   Windows file IDs compare exactly), and the path is lstat'ed again after the
+ *   open: it must still be that same non-link entry. A swap to a link or another
+ *   file therefore fails closed. Residual (no O_NOFOLLOW, i.e. Windows): a link
+ *   that appears and disappears entirely between the two checks can only be
+ *   traversed to the verified file itself — never to different bytes.
  * - The opened descriptor must be a regular file. Directories, FIFOs, sockets,
  *   and devices are rejected even when opening them succeeds.
  * - A pre-read size check rejects sources larger than the documented bound.
@@ -36,21 +42,49 @@ export function sha256Bytes(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+/** Test seams for the portable no-follow open; production callers pass nothing. */
+export interface BriefSourceOpenOptions {
+  /** Override the platform O_NOFOLLOW flag (`null` simulates a platform without it, e.g. Windows). */
+  noFollowFlag?: number | null;
+  /** Runs between the lstat check and the open, to exercise swap races. */
+  afterLinkCheck?: () => void;
+}
+
 /**
  * Open one brief source without following symbolic links, verify it, and read
  * its exact bytes. Throws INVALID_INPUT before any caller publishes state.
  */
-export function readBriefSourceBytes(source: string, displayPath: string): BriefSource {
-  if (typeof constants.O_NOFOLLOW !== 'number') {
+export function readBriefSourceBytes(source: string, displayPath: string, openOptions: BriefSourceOpenOptions = {}): BriefSource {
+  const platformNoFollow = typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : null;
+  const noFollowFlag = openOptions.noFollowFlag === undefined ? platformNoFollow : openOptions.noFollowFlag;
+  let entry;
+  try {
+    entry = lstatSync(source, { bigint: true });
+  } catch (error) {
     throw new KyroCoreError(
       'INVALID_INPUT',
-      'This platform cannot open brief sources without following symbolic links.',
-      'Use a platform with O_NOFOLLOW support; the source policy cannot be weakened.',
+      `Brief source cannot be opened: ${displayPath}.`,
+      `Provide an existing regular UTF-8 file. ${String(error)}`,
     );
   }
+  if (entry.isSymbolicLink()) {
+    throw new KyroCoreError(
+      'INVALID_INPUT',
+      `Brief source cannot be opened without following symbolic links: ${displayPath} is a symbolic link.`,
+      'Pass the regular file itself; brief sources never follow symbolic links.',
+    );
+  }
+  if (!entry.isFile()) {
+    throw new KyroCoreError(
+      'INVALID_INPUT',
+      `Brief source is not a regular file: ${displayPath}.`,
+      'Provide a regular UTF-8 brief file.',
+    );
+  }
+  openOptions.afterLinkCheck?.();
   let descriptor: number;
   try {
-    descriptor = openSync(source, constants.O_RDONLY | constants.O_NOFOLLOW);
+    descriptor = openSync(source, constants.O_RDONLY | (noFollowFlag ?? 0));
   } catch (error) {
     throw new KyroCoreError(
       'INVALID_INPUT',
@@ -59,7 +93,7 @@ export function readBriefSourceBytes(source: string, displayPath: string): Brief
     );
   }
   try {
-    const opened = fstatSync(descriptor);
+    const opened = fstatSync(descriptor, { bigint: true });
     if (!opened.isFile()) {
       throw new KyroCoreError(
         'INVALID_INPUT',
@@ -67,7 +101,29 @@ export function readBriefSourceBytes(source: string, displayPath: string): Brief
         'Provide a regular UTF-8 brief file.',
       );
     }
-    if (opened.size > BRIEF_SOURCE_LIMIT) {
+    if (opened.dev !== entry.dev || opened.ino !== entry.ino) {
+      throw new KyroCoreError(
+        'INVALID_INPUT',
+        `Brief source was replaced before it was opened: ${displayPath}.`,
+        'Provide a stable regular file; retry once writers have finished.',
+      );
+    }
+    // Without O_NOFOLLOW the open may traverse a link that replaced the path after the check. Re-check
+    // the path itself: it must still be the same non-link entry, so a persistent swap fails closed.
+    let after;
+    try {
+      after = lstatSync(source, { bigint: true });
+    } catch {
+      after = null;
+    }
+    if (!after || after.isSymbolicLink() || after.dev !== entry.dev || after.ino !== entry.ino) {
+      throw new KyroCoreError(
+        'INVALID_INPUT',
+        `Brief source cannot be opened without following symbolic links: ${displayPath} changed while it was opened.`,
+        'Provide a stable regular file that is not a symbolic link; retry once writers have finished.',
+      );
+    }
+    if (opened.size > BigInt(BRIEF_SOURCE_LIMIT)) {
       throw new KyroCoreError(
         'INVALID_INPUT',
         'Brief source exceeds the 1 MiB input limit.',

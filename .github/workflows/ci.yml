@@ -42,6 +42,9 @@ jobs:
       - name: Verify npm tarball global install and sync
         run: npm run check:windows-install-smoke
 
+      - name: Verify Work brief sources without O_NOFOLLOW
+        run: npm run check:work-brief-source
+
       - name: Verify state-writer lock
         run: npm run check:lossless-checkpoints
 

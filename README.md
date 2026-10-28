@@ -8,6 +8,8 @@ Kyro works through a CLI and host adapters for Claude Code, Codex, OpenCode, and
 
 Version **6.4.0** adds focused validation suggestions and proportional Forge sprint closure. Projects can map changed files to checks, reserve the aggregate suite for an integration boundary, and require it at close for high-impact changes. Work retains its aggregate check before closure. See [Validation tiers](docs/validation-tiers.md).
 
+Version **6.4.1** fixes native Windows brief ingestion for `work create` and `work amend-brief`, and isolates the integrity-repair tests from developer machine configuration. See the [Work guide](docs/work.md) for the portable source checks and their limits.
+
 ## Choose a workflow
 
 | | Forge | Work |
