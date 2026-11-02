@@ -168,7 +168,33 @@
     "openQuestions": []
   },
   "clarifications": [],
-  "conventions": [],
+  "conventions": [
+    {
+      "id": "arch-frozen-close-inputs",
+      "rule": "Any data recorded at sprint close must enter the checkpoint's frozen close inputs (and be derived from them), never be added to the ledger or post-close state directly; otherwise checkpoint re-derivation and retries break.",
+      "tags": [
+        "architecture"
+      ],
+      "addedSprint": 1
+    },
+    {
+      "id": "git-exclude-kyro-lock",
+      "rule": "Any git-based check of the working tree must exclude Kyro-managed paths: the workspace .agents/kyro/ and every root path starting with .kyro-state-writer.lock (including .reclaim-* leftovers).",
+      "tags": [
+        "architecture",
+        "testing"
+      ],
+      "addedSprint": 1
+    },
+    {
+      "id": "git-readonly-status",
+      "rule": "Read-only git status calls must pass --no-optional-locks so they never rewrite .git/index.",
+      "tags": [
+        "architecture"
+      ],
+      "addedSprint": 1
+    }
+  ],
   "adrs": [],
   "roadmap": {
     "plannedSprintCount": 2,
