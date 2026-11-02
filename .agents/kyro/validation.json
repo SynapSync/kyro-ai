@@ -121,6 +121,7 @@
         "npm run build",
         "npm run check:lossless-checkpoints",
         "npm run check:sprint-git-traceability",
+        "npm run check:sprint-close-commit",
         "npm run check:close-handoff",
         "npm run check:close-policy-compatibility",
         "npm run check:scope-retire",

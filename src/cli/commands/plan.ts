@@ -339,7 +339,7 @@ function runPlanSprintMode(raw: unknown, scope: string, currentSprint: SprintFil
     : `Git start: not recorded (${gitOutcome.reason}).`);
 
   if (args.dryRun) {
-    setCliMachineResult('preview', { mode: 'sprint', sprint: input.sprint.n, git: gitOutcome });
+    setCliMachineResult('preview', { outcome: 'preview', mode: 'sprint', sprint: input.sprint.n, git: gitOutcome });
     console.log('Dry run complete. No files changed.');
     return;
   }
@@ -352,7 +352,7 @@ function runPlanSprintMode(raw: unknown, scope: string, currentSprint: SprintFil
   const active = sprint.activeSprint!;
   const phaseCount = active.phases.length;
   const taskCount = active.phases.reduce((sum, phase) => sum + phase.tasks.length, 0);
-  setCliMachineResult('applied', { mode: 'sprint', sprint: active.n, phases: phaseCount, tasks: taskCount, nextAction: sprint.handoff.nextAction, git: gitOutcome });
+  setCliMachineResult('applied', { outcome: 'applied', mode: 'sprint', sprint: active.n, phases: phaseCount, tasks: taskCount, nextAction: sprint.handoff.nextAction, git: gitOutcome });
   console.log(`Sprint ${active.n} planned for "${scope}": ${phaseCount} phase(s), ${taskCount} task(s). Next action: ${sprint.handoff.nextAction}.`);
 }
 

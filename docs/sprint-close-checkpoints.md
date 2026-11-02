@@ -12,6 +12,22 @@ Every new sprint close publishes an immutable, versioned checkpoint before chang
 
 `ledger[].checkpoint` and `ledger[].checkpointSha256` are additive; `ledger[].snapshot` remains unchanged. The digest in the live ledger is an external commitment to the checkpoint payload. Historical legacy archives are not backfilled because their missing scope fields cannot be reconstructed honestly.
 
+## Sprint git range
+
+From 6.5.0, each sprint records the git range that implemented it, so its code can be reproduced as `git diff <startCommit>..<endCommit>`.
+
+| Field | Written | Content |
+| --- | --- | --- |
+| `activeSprint.git` | When the sprint is planned (`kyro plan`) | `{ branch, startCommit }` — HEAD and current branch (`null` when detached). |
+| checkpoint `close.git` | At close, before any close write | `{ branch, endCommit, dirty }` — frozen input of the close transaction. |
+| `ledger[].git` | Derived at close | `{ branch, startCommit, endCommit, dirty }`; `startCommit` is `null` when the sprint was planned without git capture. |
+
+`endCommit` is a frozen close input, not post-close state: checkpoint re-derivation reproduces `ledger[].git` from `beforeClose.activeSprint.git` and `close.git`, and a retried close reuses the frozen value instead of reading HEAD again. `dirty` is `true` when tracked or untracked non-ignored files outside `.agents/kyro/` (and the root `.kyro-state-writer.lock*` paths) had uncommitted changes at close; those changes are outside the range. Capture is read-only (`git --no-optional-locks status`) and never blocks: outside a repository, before the first commit, or when git fails, the range is omitted and `plan`/`close-sprint` report why. Sprints closed before 6.5.0 are not backfilled.
+
+**Forward compatibility.** Runtimes older than 6.5.0 do not know `close.git` and report a checkpoint that contains it as an unauthorized transition (a retry on such a runtime raises `CHECKPOINT_CONFLICT`). Existing checkpoints keep validating and re-deriving on 6.5.0; the reverse does not hold. Teams sharing scopes should set `team.minPackageVersion` to `6.5.0` or newer (see [Teams](teams.md#optional-team-package-floor)); a close that records `close.git` without that floor prints an advisory. Kyro never changes `project.json` for you.
+
+The optional close commit (`git.commitOnSprintClose` in `local.json`) runs after the close and never changes checkpoint content; see [CLI — close commit](cli.md#sprint-close-git-range-and-optional-commit).
+
 ## Checkpoint v1
 
 The public TypeScript contract is `SprintCloseCheckpointV1`. Its stable envelope is:

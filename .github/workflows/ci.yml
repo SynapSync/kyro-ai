@@ -51,6 +51,9 @@ jobs:
       - name: Verify sprint git traceability
         run: npm run check:sprint-git-traceability
 
+      - name: Verify sprint close commit
+        run: npm run check:sprint-close-commit
+
   validate:
     runs-on: ubuntu-latest
     outputs:

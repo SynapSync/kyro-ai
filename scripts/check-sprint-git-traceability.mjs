@@ -285,6 +285,7 @@ try {
   const jsonRun = runCli(jsonPlan, 'plan', '--from', join(jsonPlan, '.home', 'sprint-1.json'), '--kyro-scope', 'demo', '--json');
   let jsonData = null;
   try { jsonData = JSON.parse(jsonRun.stdout).data; } catch { jsonData = null; }
+  check('plan --json: outcome is reported', jsonData?.outcome === 'applied', JSON.stringify(jsonData));
   check('plan --json: structured git outcome is exposed', jsonData?.git?.recorded === true && jsonData?.git?.startCommit === jsonHead && jsonData?.git?.branch === 'main', jsonRun.stdout.slice(0, 600));
   const jsonPlain = workspace('plan-json-plain', { git: false });
   writeFileSync(join(jsonPlain, '.home', 'init.json'), JSON.stringify(leanInit));
@@ -385,6 +386,20 @@ try {
   check('status failure: close succeeds', brokenRun.status === 0, `${brokenRun.stdout}${brokenRun.stderr}`);
   check('status failure: close reports the status failure', brokenRun.stdout.includes('Git range: not recorded (git status failed or timed out)'), brokenRun.stdout);
   check('status failure: ledger has no git key', !('git' in (readScope(brokenStatus).ledger[0] ?? { git: true })));
+
+  // debt-5: a close first attempted outside git and resumed after git init reports the original attempt.
+  const resumedPlain = workspace('close-resume-late-git', { git: false });
+  planSprint(resumedPlain, 1);
+  finishTask(resumedPlain, 'T1.1');
+  const firstAttempt = closeSprint(resumedPlain, { KYRO_TEST_CLOSE_FAIL_AFTER: 'checkpoint' });
+  check('resume reason: first attempt interrupted', firstAttempt.status === 1, `${firstAttempt.stdout}${firstAttempt.stderr}`);
+  gitIn(resumedPlain, 'init', '-q');
+  gitIn(resumedPlain, 'checkout', '-q', '-b', 'main');
+  gitIn(resumedPlain, 'add', '.gitignore');
+  commitFile(resumedPlain, 'src/app.txt', 'v1\n');
+  const resumedRun = closeSprint(resumedPlain);
+  check('resume reason: retry succeeds', resumedRun.status === 0, `${resumedRun.stdout}${resumedRun.stderr}`);
+  check('resume reason: reports the original attempt, not present git state', resumedRun.stdout.includes('Git range: not recorded (not recorded at the original close attempt)'), resumedRun.stdout);
 
   // S5: non-repository close succeeds without git data and says so.
   finishTask(plainWorkspace, 'T1.1');

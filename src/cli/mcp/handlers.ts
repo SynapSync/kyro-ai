@@ -2,7 +2,7 @@ import { applyPlan } from '../fs';
 import { runDoctorChecks } from '../commands/doctor';
 import { inspectScope } from '../commands/artifact-doctor';
 import { buildContextPack } from '../commands/context-pack';
-import { buildClosePlan, type CloseSprintArgs } from '../commands/close-sprint';
+import { buildClosePlan, finalizeClose, postCloseContext, type CloseSprintArgs, type PostCloseContext } from '../commands/close-sprint';
 import { applySprintCloseTransaction } from '../checkpoints/sprint-close';
 import { buildRepairPlan } from '../commands/repair';
 import { planRemediation } from '../remediation/plan';
@@ -40,7 +40,9 @@ export function callTool(name: string, rawArgs: unknown): ToolResult {
     const tool = getTool(name);
     if (!tool) throw new KyroCoreError('UNKNOWN_TOOL', `Unknown tool: ${name}`);
     const args = validateInput(tool.inputSchema, rawArgs ?? {});
-    const data = isConfirmedMutator(name, args) ? withStateWriterLock(() => dispatchTool(name, args)) : dispatchTool(name, args);
+    const locked = isConfirmedMutator(name, args) ? withStateWriterLock(() => dispatchTool(name, args)) : dispatchTool(name, args);
+    // Post-close git work (report, warnings, opt-in commit) runs after the lock, exactly as the CLI does.
+    const data = finalizeMcpClose(locked);
     return ok(data, summarize(name, data));
   } catch (error: unknown) {
     const envelope = toErrorEnvelope(error);
@@ -88,6 +90,16 @@ function dispatchTool(name: string, args: Record<string, unknown>): unknown {
   }
 }
 
+const POST_CLOSE = Symbol('postClose');
+
+function finalizeMcpClose(data: unknown): unknown {
+  if (typeof data !== 'object' || data === null || !(POST_CLOSE in data)) return data;
+  const { [POST_CLOSE]: context, ...rest } = data as Record<string | symbol, unknown> & { [POST_CLOSE]: PostCloseContext };
+  const finalization = finalizeClose(context);
+  return { ...rest, git: finalization.git, commit: finalization.commit, warnings: finalization.warnings };
+}
+
+
 function closeSprintTool(args: Record<string, unknown>): unknown {
   const scope = resolveScope(optionalString(args.scope) ?? null);
   const closeArgs: CloseSprintArgs = {
@@ -116,7 +128,7 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
   emitGateApproved(scope, 'close_sprint');
   emitToolCommandRun(scope, 'mcp', 'close_sprint', { outcome: transaction.checkpoint.close.outcome });
   const applied = applySprintCloseTransaction(transaction);
-  verifyWrittenSprint(scope, 'close_sprint', { remedy: `Snapshot preserves the sprint at ${snapshotPath}.` });
+  const writtenSprint = verifyWrittenSprint(scope, 'close_sprint', { remedy: `Snapshot preserves the sprint at ${snapshotPath}.` });
   emitTraceEvent({
     v: 1,
     ts: new Date().toISOString(),
@@ -126,7 +138,7 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
     snapshotId: traceSnapshotId(snapshotPath),
     outcome: normalizeTraceCloseOutcome(transaction.checkpoint.close.outcome),
   });
-  return { phase: 'applied', scope, snapshotPath, checkpointPath, checkpointId: applied.checkpointId, resumed: applied.resumed, git: transaction.checkpoint.close.git ?? null, plan };
+  return { phase: 'applied', scope, snapshotPath, checkpointPath, checkpointId: applied.checkpointId, resumed: applied.resumed, plan, [POST_CLOSE]: postCloseContext(transaction, applied.resumed, writtenSprint.handoff.nextAction) };
 }
 
 function repairScopeTool(args: Record<string, unknown>): unknown {

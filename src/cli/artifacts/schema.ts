@@ -248,6 +248,13 @@ export function validateLocalProjectStateShape(value: unknown, path: string): Va
   if ('execution' in value && value.execution !== undefined) {
     validateExecutionPreferences(value.execution, path, 'execution', issues);
   }
+  if ('git' in value && value.git !== undefined) {
+    if (!isRecord(value.git)) {
+      issues.push({ path, field: 'git', message: 'must be an object when present' });
+    } else if ('commitOnSprintClose' in value.git && value.git.commitOnSprintClose !== undefined && typeof value.git.commitOnSprintClose !== 'boolean') {
+      issues.push({ path, field: 'git.commitOnSprintClose', message: 'must be a boolean when present' });
+    }
+  }
   if ('kyroInvocation' in value) {
     issues.push({ path, field: 'kyroInvocation', message: 'must not be present on project files (global manifest only)' });
   }

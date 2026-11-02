@@ -44,6 +44,14 @@ import { assertSafeManagedPath, assertSafePathSegment, assertStateWriterLeaseHea
  * Path reported/written for the project-scope CAS during sprint close.
  * Layers prefer shared project.json; monolito dual-read keeps kyro.json until migrated.
  */
+/**
+ * The project-state file a close actually writes, or null. Layered workspaces derive the scope entry
+ * from sprint.json and only verify project.json; only a monolito-only workspace rewrites kyro.json.
+ */
+export function closeWrittenProjectStatePath(): string | null {
+  return !hasLayeredProjectStateOnDisk() && hasMonolitoProjectStateOnDisk() ? KYRO_STATE_PATH : null;
+}
+
 export function projectScopeWritePath(): string {
   if (hasLayeredProjectStateOnDisk()) return PROJECT_STATE_PATH;
   if (hasMonolitoProjectStateOnDisk()) return KYRO_STATE_PATH;

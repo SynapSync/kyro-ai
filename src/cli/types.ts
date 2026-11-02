@@ -194,6 +194,13 @@ export interface KyroLocalProjectState {
   runtimePath?: string;
   /** Optional personal execution preferences (delegation opt-in). */
   execution?: ExecutionPreferences;
+  /** Optional personal git preferences. */
+  git?: LocalGitPreferences;
+}
+
+export interface LocalGitPreferences {
+  /** When true, a confirmed sprint close commits exactly the files the close wrote. Default false. */
+  commitOnSprintClose?: boolean;
 }
 
 /**
@@ -213,6 +220,9 @@ export interface KyroProjectState {
   conventions?: Convention[];
   /** Optional team policy from shared layer (v4 layered). */
   team?: TeamPolicy;
+  /** Personal local-only preferences carried through the effective state so rewrites keep them. */
+  execution?: ExecutionPreferences;
+  git?: LocalGitPreferences;
   // kyroInvocation is intentionally NOT project state. Authoritative value lives on the
   // global runtime manifest (~/.agents/kyro/current/manifest.json). Install/sync strip any
   // legacy project-local copy so multi-workspace fleets cannot drift.
