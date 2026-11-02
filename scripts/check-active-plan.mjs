@@ -60,6 +60,25 @@ function finish(r, id) {
 let checks = 0;
 function check(label, fn) { fn(); checks++; console.log(`  ok ${label}`); }
 try {
+  for (const mixed of [false, true]) check(`${mixed ? 'mixed done/pending/ready' : 'all-pending'} update uses repair/analyze status derivation`, () => {
+    const r = sandbox();
+    if (mixed) finish(r, 'T1.3');
+    const s = read(r), phase = s.activeSprint.phases[0];
+    const dependent = phase.tasks.splice(1, 1)[0];
+    s.activeSprint.phases.push({ ...structuredClone(phase), id: 'P2', tasks: [dependent], status: 'pending' });
+    save(r, s);
+    const file = input(r, { tasks: [{ id: 'T1.1', scenario_refs: ['S4'] }],
+      requirements: [{ id: 'R3', statement: 'New behavior' }],
+      scenarios: [{ id: 'S4', requirement: 'R3', given: 'input', when: 'action', then: 'result' }] });
+    apply(r, file, preview(r, file).digest);
+    const statuses = () => ({ phases: read(r).activeSprint.phases.map((p) => p.status), sprint: read(r).activeSprint.status });
+    const after = statuses();
+    assert.deepEqual(after, { phases: [mixed ? 'active' : 'pending', 'pending'], sprint: mixed ? 'executing' : 'planned' });
+    const analyzed = ok(r, ['analyze', '--kyro-scope', scope]);
+    assert.doesNotMatch(analyzed.stdout, /\(coherence\)/);
+    ok(r, ['repair', '--kyro-scope', scope, '--yes']);
+    assert.deepEqual(statuses(), after, 'repair changed statuses written by update-active');
+  });
   check('pending/in-progress edits; zero-write preview; exact diff; no new certification', () => {
     const r = sandbox(); const s = read(r); s.activeSprint.phases[0].tasks[0].status = 'in_progress'; s.activeSprint.phases[0].status = 'active'; s.activeSprint.status = 'executing'; save(r, s);
     const file = input(r, { tasks: [{ id: 'T1.1', context: 'Changed context' }, { id: 'T1.3', acceptance_criteria: ['New criterion'] }] });

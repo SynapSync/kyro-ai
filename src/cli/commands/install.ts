@@ -8,6 +8,7 @@ import { applyPlan, printPlan } from '../fs';
 import { assertWorkspaceScope } from '../options';
 import { legacyScopeCacheWarnings, readProjectState } from '../state';
 import { formatWorkspaceInitPrompt } from '../core/scopes';
+import { ensureStateWriterLockIgnored } from '../core/git-trackability';
 import { KyroCoreError } from '../core/errors';
 import { isInteractiveTerminal } from '../core/tty';
 import { KYRO_ROOT, LOCAL_STATE_PATH, PROJECT_STATE_PATH, SCOPE } from '../constants';
@@ -66,6 +67,7 @@ function runInstallPlanUnlocked(options: CliOptions, agents: Agent[], packageVer
   }
 
   const projections = applyPlan(plan);
+  ensureStateWriterLockIgnored();
   printProjections(projections);
   printReconciliation(plan, projections);
   console.log('Kyro has been installed.');
@@ -126,6 +128,7 @@ function syncUnlocked(options: CliOptions): void {
     return;
   }
   const projections = applyPlan(plan);
+  ensureStateWriterLockIgnored();
   printProjections(projections);
   printReconciliation(plan, projections);
   console.log(`Kyro synced for: ${unique.join(', ')}`);
