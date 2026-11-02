@@ -784,6 +784,38 @@ function validateLedgerEntry(value: unknown, path: string, prefix: string, issue
   if ('checkpointSha256' in value && (typeof value.checkpointSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.checkpointSha256))) {
     issues.push({ path, field: `${prefix}.checkpointSha256`, message: 'must be a SHA-256 hex digest when present' });
   }
+  if ('git' in value) validateGitBlock(value.git, 'ledger', path, `${prefix}.git`, issues);
+}
+
+/** Git object ids: SHA-1 (40) or SHA-256 (64) lowercase hex. */
+const GIT_COMMIT_PATTERN = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+
+export type GitBlockKind = 'start' | 'end' | 'ledger';
+
+/**
+ * Validate an optional sprint git block when present: `activeSprint.git` (start),
+ * checkpoint `close.git` (end), or `ledger[].git` (ledger). Absence is always valid.
+ */
+export function validateGitBlock(value: unknown, kind: GitBlockKind, path: string, prefix: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issues.push({ path, field: prefix, message: 'must be an object when present' });
+    return;
+  }
+  if (!('branch' in value) || (value.branch !== null && (typeof value.branch !== 'string' || value.branch.length === 0))) {
+    issues.push({ path, field: `${prefix}.branch`, message: 'must be a non-empty string or null' });
+  }
+  const commit = (key: string, nullable: boolean): void => {
+    const candidate = value[key];
+    if (nullable && candidate === null) return;
+    if (typeof candidate !== 'string' || !GIT_COMMIT_PATTERN.test(candidate)) {
+      issues.push({ path, field: `${prefix}.${key}`, message: `must be a 40- or 64-character lowercase hex commit${nullable ? ' or null' : ''}` });
+    }
+  };
+  if (kind === 'start' || kind === 'ledger') commit('startCommit', kind === 'ledger');
+  if (kind === 'end' || kind === 'ledger') {
+    commit('endCommit', false);
+    if (typeof value.dirty !== 'boolean') issues.push({ path, field: `${prefix}.dirty`, message: 'must be a boolean' });
+  }
 }
 
 /** Roadmap sprint entries are consumed by close-sprint (`s.n`, `s.state`) and narrative render (`s.title`). */
@@ -821,6 +853,7 @@ function validateActiveSprint(
     issues.push({ path, field: `${prefix}.title`, message: 'must be a string when present' });
   }
   requireStringArrayField(value, 'definitionOfDone', path, issues, `${prefix}.definitionOfDone`);
+  if ('git' in value) validateGitBlock(value.git, 'start', path, `${prefix}.git`, issues);
   if (!Array.isArray(value.phases)) {
     issues.push({ path, field: `${prefix}.phases`, message: 'must be an array' });
   } else {

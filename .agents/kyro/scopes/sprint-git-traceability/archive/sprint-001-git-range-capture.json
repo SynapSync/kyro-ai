@@ -1,0 +1,441 @@
+{
+  "n": 1,
+  "slug": "git-range-capture",
+  "title": "Git range capture in plan and close",
+  "objective": "Every sprint planned and closed with this version records a deterministic, checkpoint-verifiable git range (branch, start commit, end commit, dirty flag) in the scope ledger, while every existing scope and checkpoint keeps validating and re-deriving unchanged.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Data contract and read-only git capture",
+      "objective": "Define the optional git blocks with validation and a non-throwing read-only git capture helper.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "title": "Add optional git blocks to the sprint, close-input, and ledger contracts",
+          "description": "Add optional typed blocks: ActiveSprint.git { branch: string | null, startCommit: string }, SprintCloseInputs.git { branch: string | null, endCommit: string, dirty: boolean }, LedgerEntry.git { branch: string | null, startCommit: string | null, endCommit: string, dirty: boolean }. Validate each only when present in validateActiveSprint, validateLedgerEntry, and the checkpoint frozen-close-input check (sprint-close.ts ~383): commits are 40- or 64-char lowercase hex, branch is a non-empty string or null, dirty is boolean. Create scripts/check-sprint-git-traceability.mjs (temp data under ~/.cache/kyro-tmp or os.tmpdir) with contract cases, add npm script check:sprint-git-traceability, include it in the aggregate npm run check, and add it to the checkpoints rule in .agents/kyro/validation.json.",
+          "files_to_touch": [
+            "src/cli/types.ts",
+            "src/cli/artifacts/schema.ts",
+            "src/cli/checkpoints/sprint-close.ts",
+            "scripts/check-sprint-git-traceability.mjs",
+            "package.json",
+            ".agents/kyro/validation.json"
+          ],
+          "context": "Findings 01 and 05. Validators follow the 'optional, validated when present' pattern and tolerate unknown keys today (schema.ts:769-787, :804). sprint.json schemaVersion stays 4 and checkpoint schemaVersion stays 1 — additive only. Absence of every git block must remain valid. Touching src/cli/artifacts/** and src/cli/checkpoints/** escalates sprint close to the full suite.",
+          "acceptance_criteria": [
+            "Valid git blocks on activeSprint, ledger entries, and checkpoint close inputs are accepted; malformed commits (wrong length, uppercase, non-hex), empty branch strings, and non-boolean dirty are rejected with a field-specific issue — proven by npm run check:sprint-git-traceability.",
+            "Every existing scope sprint.json and close checkpoint in this repository still validates with zero new issues — proven by npm run check:sprint-loader and npm run check:sprint-doctor-v4.",
+            "npm run build passes; the check:sprint-git-traceability script is registered in package.json and in the checkpoints rule of .agents/kyro/validation.json — verified by reading both files."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S1"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added optional git blocks: ActiveSprint.git {branch,startCommit}, SprintCloseInputs.git {branch,endCommit,dirty}, LedgerEntry.git {branch,startCommit|null,endCommit,dirty}. Shared validateGitBlock (schema.ts) validates each only when present (40/64 lowercase hex commits, non-empty branch or null, boolean dirty) from validateActiveSprint, validateLedgerEntry, and checkpointSchemaIssues for close.git. New check script registered in package.json (standalone + aggregate chain) and the close-checkpoints rule of validation.json.",
+            "validation": [
+              "npm run check:sprint-git-traceability: pass (valid start/end/ledger blocks accepted; short, uppercase, non-hex commits, empty/missing branch, non-boolean/missing dirty, non-object rejected with field-specific issues; legacy close without git adds no schema issue; 13 repo scopes and 28 checkpoints have no git issues)",
+              "npm run build: pass; npm run typecheck: pass",
+              "npm run check:sprint-loader: pass; npm run check:sprint-doctor-v4: pass",
+              "npm run check:lossless-checkpoints, check:close-handoff, check:close-policy-compatibility, check:scope-retire, check:lifecycle-replay: pass",
+              "npm run check:layered-state, check:scope-registry-from-disk, check:install-rehydrate, check:versions, check:remediation-release-docs: pass",
+              "Read package.json and .agents/kyro/validation.json: check:sprint-git-traceability present as script, in aggregate check chain, and in close-checkpoints rule"
+            ],
+            "files_changed": [
+              "src/cli/types.ts",
+              "src/cli/artifacts/schema.ts",
+              "src/cli/checkpoints/sprint-close.ts",
+              "scripts/check-sprint-git-traceability.mjs",
+              "package.json",
+              ".agents/kyro/validation.json"
+            ],
+            "notes": "close.git is validated in checkpointSchemaIssues, not checkpointIntegrityIssues, so historical-evidence commitment logic is untouched; adding close.git to an already-written checkpoint is correctly treated as tampering by the existing digest.",
+            "by": "maker",
+            "recordedAt": "2026-10-31T02:50:19.623Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Valid git blocks on activeSprint, ledger entries, and checkpoint close inputs are accepted; malformed commits (wrong length, uppercase, non-hex), empty branch strings, and non-boolean dirty are rejected with a field-specific issue — proven by npm run check:sprint-git-traceability.",
+              "Every existing scope sprint.json and close checkpoint in this repository still validates with zero new issues — proven by npm run check:sprint-loader and npm run check:sprint-doctor-v4.",
+              "npm run build passes; the check:sprint-git-traceability script is registered in package.json and in the checkpoints rule of .agents/kyro/validation.json — verified by reading both files."
+            ],
+            "findings": [
+              {
+                "severity": "suggestion",
+                "detail": "T1.4 must add a fresh-close test where close.git is produced by the writer, since T1.1 only proves validation of hand-built blocks."
+              }
+            ],
+            "by": "checker",
+            "reviewedAt": "2026-10-31T02:50:35.493Z",
+            "requestDigest": "fea694da0971d529a45d4a56f87a9807310f693c7a2ed59223b2a85fcaa616a8",
+            "reviewedMaterialDigest": "4585d306da1d719afc374a3c1c979f8b0d59961a56834dc9b0af6e328883e035"
+          }
+        },
+        {
+          "id": "T1.2",
+          "title": "Implement a non-throwing read-only git capture helper",
+          "description": "Create src/cli/core/git-capture.ts exporting functions that, for a given cwd, return the HEAD commit and branch (null when detached), or null when not a repository, git is missing, HEAD is unborn, or any git call fails; and report whether tracked or untracked non-ignored files outside .agents/kyro/ have uncommitted changes. Use execFileSync('git', [...args]) with array arguments and no shell, as in src/cli/core/git-trackability.ts. The helper performs no writes and never throws.",
+          "files_to_touch": [
+            "src/cli/core/git-capture.ts",
+            "scripts/check-sprint-git-traceability.mjs"
+          ],
+          "context": "Findings 01, 05. R4: capture never blocks planning or closing. R5: dirty excludes .agents/kyro/ because the close itself writes there, and excludes gitignored files. Must work on Windows (no shell quoting, no POSIX-only paths). Build the check cases with real temporary git repositories.",
+          "acceptance_criteria": [
+            "In temporary repositories the helper returns the correct commit and branch for a normal branch, branch null for detached HEAD, and null for a non-repository directory and for a repository with no commits — proven by npm run check:sprint-git-traceability.",
+            "Dirty is false when only .agents/kyro/ files or ignored files changed, and true for a modified tracked file and for a new untracked non-ignored file — proven by the same check.",
+            "No call path throws when git is unavailable or fails (simulated with an invalid cwd), and npm run build plus npm run check:git-trackability pass."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S5",
+            "S6"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Added src/cli/core/git-capture.ts: readGitHead (HEAD commit + branch, null branch when detached), hasUncommittedChangesOutsideKyro (porcelain -z, untracked included, ignored excluded, excludes the workspace's own .agents/kyro/ using rev-parse --show-prefix), captureSprintGitStart and captureSprintGitEnd. execFileSync with array args, no shell, 10s timeout; every function returns null instead of throwing (non-repo, missing git, unborn HEAD, any failure).",
+            "validation": [
+              "npm run check:sprint-git-traceability: pass (temp repos: normal branch returns main + rev-parse HEAD; detached returns branch null; non-repo and unborn HEAD return null; missing cwd returns null without throwing; only .agents/kyro/ or ignored changes => dirty false; modified tracked and untracked non-ignored file => dirty true; subdirectory workspace excludes only its own .agents/kyro/)",
+              "Mutation: KYRO_DIR changed in dist => check fails on the two exclusion cases; restored => pass",
+              "npm run build, typecheck, check:git-trackability: pass",
+              "npm run check:active-plan, check:status, check:analyze-metadata, check:close-handoff, check:eval (src/cli/core/** rule): pass"
+            ],
+            "files_changed": [
+              "src/cli/core/git-capture.ts",
+              "scripts/check-sprint-git-traceability.mjs"
+            ],
+            "notes": "Test repos isolate global config: -c commit.gpgsign=false, empty core.hooksPath directory, fixed user identity. Capture uses --no-renames so -z entries stay one path each.",
+            "by": "maker",
+            "recordedAt": "2026-10-31T02:52:21.154Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "In temporary repositories the helper returns the correct commit and branch for a normal branch, branch null for detached HEAD, and null for a non-repository directory and for a repository with no commits — proven by npm run check:sprint-git-traceability.",
+              "Dirty is false when only .agents/kyro/ files or ignored files changed, and true for a modified tracked file and for a new untracked non-ignored file — proven by the same check.",
+              "No call path throws when git is unavailable or fails (simulated with an invalid cwd), and npm run build plus npm run check:git-trackability pass."
+            ],
+            "findings": [
+              {
+                "severity": "suggestion",
+                "detail": "Windows CI is the first real proof of path handling (forward-slash porcelain paths vs show-prefix); watch the Windows job when this lands."
+              }
+            ],
+            "by": "checker",
+            "reviewedAt": "2026-10-31T02:52:29.279Z",
+            "requestDigest": "4476f6abec72a6c104e41acef4fa5728a4a0c5367f7e4189dbaf83f8552044eb",
+            "reviewedMaterialDigest": "b4e856e2c3b34091c579e90582f15bfb273d369928b326dd5715270aa069ddbf"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Capture at plan and close",
+      "objective": "Record the start commit when a sprint is planned and freeze the end commit in the close checkpoint inputs, deriving the ledger range deterministically.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.3",
+          "title": "Record the start commit when a sprint is planned",
+          "description": "In buildPlanSprintPlan, after building activeSprint, attach activeSprint.git = { branch, startCommit } from the capture helper when available; omit the block otherwise. Planning must never fail because of git. Init mode (activeSprint: null) is unchanged.",
+          "files_to_touch": [
+            "src/cli/commands/plan.ts",
+            "scripts/check-sprint-git-traceability.mjs"
+          ],
+          "context": "Finding 05; R1, R4. buildPlanSprintPlan is at plan.ts:449-485 and materializes every sprint, including sprint 1. Keep the dry-run preview behavior intact.",
+          "acceptance_criteria": [
+            "Planning a sprint in a temporary repository records activeSprint.git.startCommit equal to git rev-parse HEAD and the current branch — proven by npm run check:sprint-git-traceability.",
+            "Planning in a non-repository workspace succeeds with no git block — proven by the same check.",
+            "npm run build, npm run check:plan, and npm run check:active-plan pass."
+          ],
+          "depends_on": [
+            "T1.1",
+            "T1.2"
+          ],
+          "scenario_refs": [
+            "S2",
+            "S5"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "buildPlanSprintPlan attaches activeSprint.git = { branch, startCommit } from captureSprintGitStart() after deriving status; the block is omitted when capture returns null (non-repo, unborn HEAD, git failure). Init mode is unchanged (activeSprint stays null).",
+            "validation": [
+              "npm run check:sprint-git-traceability: pass (real kyro plan init + sprint mode in a temp git repo records branch main and startCommit == git rev-parse HEAD, and the planned sprint validates; the same flow in a non-repository workspace succeeds with no git block)",
+              "npm run build: pass",
+              "npm run check:plan, check:active-plan, check:emergent, check:scenario, check:clarify, check:spec-traceability: pass"
+            ],
+            "files_changed": [
+              "src/cli/commands/plan.ts",
+              "scripts/check-sprint-git-traceability.mjs"
+            ],
+            "notes": "Existing check-plan sandboxes live in tmpdir outside any repository, so their expected sprint.json shapes are unaffected.",
+            "by": "maker",
+            "recordedAt": "2026-10-31T02:54:05.706Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Planning a sprint in a temporary repository records activeSprint.git.startCommit equal to git rev-parse HEAD and the current branch — proven by npm run check:sprint-git-traceability.",
+              "Planning in a non-repository workspace succeeds with no git block — proven by the same check.",
+              "npm run build, npm run check:plan, and npm run check:active-plan pass."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-10-31T02:54:09.280Z",
+            "requestDigest": "11ddad04475caab754fd1d922d8142a6794095ec0b217a31b90ecfc96ec3630c",
+            "reviewedMaterialDigest": "d654e0a43626d010c85e50f120847860f7af098c25d62e21b2367db22fc094ed"
+          }
+        },
+        {
+          "id": "T1.4",
+          "title": "Freeze the end commit in close inputs and derive the ledger range",
+          "description": "In buildClosePlan's fresh path, capture { branch, endCommit, dirty } before any write and set it as close.git when available. retryCloseInputs must copy checkpoint.close.git verbatim so assertMatchingCloseInputs keeps matching. deriveSprintCloseTransitionWithPolicy adds ledger git = { branch: close.git.branch, startCommit: beforeClose.activeSprint.git?.startCommit ?? null, endCommit, dirty } only when close.git exists. Render a 'Git' section in the archive narrative when present. When dirty is true, the CLI close prints a warning that uncommitted changes are outside the sprint range, and the MCP close result exposes the captured git data.",
+          "files_to_touch": [
+            "src/cli/commands/close-sprint.ts",
+            "src/cli/checkpoints/sprint-close.ts",
+            "src/cli/mcp/handlers.ts",
+            "scripts/check-sprint-git-traceability.mjs"
+          ],
+          "context": "Finding 01; R2, R3, R5. Checkpoint verification re-derives intendedAfterClose from frozen inputs and compares canonically (sprint-close.ts:282-300); any ledger git data not derived from frozen inputs breaks verification. A legacy checkpoint without close.git must derive exactly as today. Never read HEAD on the retry/resume path.",
+          "acceptance_criteria": [
+            "Closing a sprint in a temporary repository records ledger git with the planned startCommit, endCommit equal to HEAD before the close, the branch, and dirty — and the new checkpoint re-derives identically — proven by npm run check:sprint-git-traceability.",
+            "After an interrupted close and a new commit, retrying the close keeps the original endCommit and raises no CHECKPOINT_CONFLICT — proven by the same check.",
+            "A close of a sprint without activeSprint.git records startCommit null; a legacy checkpoint without close.git still verifies and re-derives byte-identically — proven by npm run check:lossless-checkpoints, npm run check:close-policy-compatibility, and npm run check:sprint-git-traceability.",
+            "npm run build, npm run check:close-handoff, npm run check:lifecycle-replay, and npm run check:mcp pass."
+          ],
+          "depends_on": [
+            "T1.1",
+            "T1.2"
+          ],
+          "scenario_refs": [
+            "S3",
+            "S4",
+            "S6",
+            "S7"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "buildClosePlan fresh path freezes captureSprintGitEnd() as close.git before any write; retryCloseInputs copies checkpoint.close.git so retries never re-read HEAD; deriveSprintCloseTransitionWithPolicy adds ledger.git {branch, startCommit from beforeClose.activeSprint.git or null, endCommit, dirty} only when close.git exists. Narrative gets a 'Git range' section; CLI prints the range (or 'not recorded') and a dirty warning; MCP applied result exposes git. Fix found here: the state-writer lock directory at the workspace root is held during close and is not gitignored at root, so every close read dirty=true; hasUncommittedChangesOutsideKyro (T1.2 file) now also excludes STATE_WRITER_LOCK (exported from state-writer-lock.ts).",
+            "validation": [
+              "npm run check:sprint-git-traceability: pass (S3 real close in temp repo: ledger git = main, planned startCommit, endCommit = HEAD before close, dirty false; checkpoint re-derives with zero integrity issues; narrative has the range. S4 close interrupted via KYRO_TEST_CLOSE_FAIL_AFTER=checkpoint, new commit, retry succeeds without CHECKPOINT_CONFLICT and keeps original endCommit. S6 uncommitted tracked change => dirty true + warning. Sprint planned without git then closed in a repo => startCommit null. S5 non-repo close => no ledger git, 'Git range: not recorded'. S7 all 28 repo checkpoints still re-derive with zero integrity issues)",
+              "Mutation: retry endCommit altered in dist => check fails with CHECKPOINT_CONFLICT on the retry case; restored => pass",
+              "npm run build, typecheck: pass",
+              "npm run check:lossless-checkpoints, check:close-handoff, check:close-policy-compatibility, check:scope-retire, check:lifecycle-replay, check:replay-witness: pass",
+              "npm run check:mcp, check:operation-snapshots, check:active-plan, check:status, check:analyze-metadata, check:eval, check:git-trackability: pass"
+            ],
+            "files_changed": [
+              "src/cli/commands/close-sprint.ts",
+              "src/cli/checkpoints/sprint-close.ts",
+              "src/cli/mcp/handlers.ts",
+              "src/cli/core/git-capture.ts",
+              "src/cli/pipeline/state-writer-lock.ts",
+              "scripts/check-sprint-git-traceability.mjs"
+            ],
+            "notes": "git-capture.ts belongs to T1.2 (already passed); its dirty exclusion was corrected here with a new capture case for the lock directory. MCP git field is covered only by build/typecheck and check:mcp regression, not a dedicated MCP close assertion; Sprint 2 parity work (R12) adds it. Pre-existing: the root-level .kyro-state-writer.lock/ is not gitignored (the entry lives in .agents/kyro/.gitignore), so a git add -A during a write could stage it.",
+            "by": "maker",
+            "recordedAt": "2026-10-31T11:05:50.614Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "Closing a sprint in a temporary repository records ledger git with the planned startCommit, endCommit equal to HEAD before the close, the branch, and dirty — and the new checkpoint re-derives identically — proven by npm run check:sprint-git-traceability.",
+              "After an interrupted close and a new commit, retrying the close keeps the original endCommit and raises no CHECKPOINT_CONFLICT — proven by the same check.",
+              "A close of a sprint without activeSprint.git records startCommit null; a legacy checkpoint without close.git still verifies and re-derives byte-identically — proven by npm run check:lossless-checkpoints, npm run check:close-policy-compatibility, and npm run check:sprint-git-traceability.",
+              "npm run build, npm run check:close-handoff, npm run check:lifecycle-replay, and npm run check:mcp pass."
+            ],
+            "findings": [
+              {
+                "severity": "warning",
+                "detail": "MCP close result git field has no dedicated assertion yet; cover it in Sprint 2 parity task (R12)."
+              },
+              {
+                "severity": "suggestion",
+                "detail": "Pre-existing: root-level .kyro-state-writer.lock/ is not gitignored (entry lives in .agents/kyro/.gitignore); consider an install-managed root ignore or relocating the lock."
+              }
+            ],
+            "by": "checker",
+            "reviewedAt": "2026-10-31T11:06:01.329Z",
+            "requestDigest": "45e7d4a459c8956525655c4513919986600487397b8b9d78eaca8dbe38e1a135",
+            "reviewedMaterialDigest": "8396963c89dbb2291ed013b95006b787b5dacbfbb37b51d2fdb1b43c15670f8a"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Preservation across writers",
+      "objective": "Prove that no command that rewrites the active sprint or ledger drops the git blocks.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1.5",
+          "title": "Audit active-sprint and ledger writers and add preservation tests",
+          "description": "Audit every writer of activeSprint or ledger entries (active-plan update, record-evidence, review, add-emergent, scenario, clarify, debt, rule, repair integrity, remediation and certification plans, scope complete/reopen/retire, lifecycle state, legacy migration, Work promotion). Fix any that rebuild objects field-by-field and would drop git. Add preservation cases for the highest-traffic writers to the check script and record the audit outcome per writer in the task evidence.",
+          "files_to_touch": [
+            "src/cli/core/active-plan.ts",
+            "src/cli/commands/record-evidence.ts",
+            "src/cli/commands/review.ts",
+            "src/cli/repair/integrity-plan.ts",
+            "src/cli/remediation/plan.ts",
+            "scripts/check-sprint-git-traceability.mjs"
+          ],
+          "context": "Finding 02; R13; hypothesis H1 from the matured plan. files_to_touch lists the most likely edit points; edit only writers that actually drop the block, and name every audited writer in evidence. Validators tolerate unknown keys, so loss would be silent without tests.",
+          "acceptance_criteria": [
+            "A sprint with activeSprint.git keeps the block byte-identical after an active-plan update, record-evidence, review, and repair integrity apply — proven by npm run check:sprint-git-traceability.",
+            "A ledger entry with git keeps it unchanged after scope complete and scope reopen — proven by the same check.",
+            "Task evidence lists every audited writer with its outcome (preserves / fixed / not applicable), and npm run build, npm run check:active-plan, npm run check:record-evidence, and npm run check:repair-integrity pass."
+          ],
+          "depends_on": [
+            "T1.3",
+            "T1.4"
+          ],
+          "scenario_refs": [
+            "S8"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Audited every activeSprint/ledger writer; none drops the git blocks, so no source change was needed. Preservation is now proven by tests on the highest-traffic writers.",
+            "validation": [
+              "npm run check:sprint-git-traceability: pass (activeSprint.git byte-identical after plan --update-active, record-evidence, review, and repair --yes; ledger[0].git byte-identical after scope complete and scope reopen; ledger carries the planned startCommit)",
+              "npm run build, check:active-plan, check:record-evidence, check:repair-integrity, check:maker-checker, check:scope-remediation, check:verification-states: pass",
+              "Audit outcomes — preserves: core/active-plan.ts (deep clone + in-place status), commands/record-evidence.ts, review.ts, add-emergent.ts (JSON deep clone of activeSprint), commands/scenario.ts (spread ...active), commands/repair.ts (deep clone, sets statuses only), artifacts/schema.ts asSprintFile (validate + cast, no stripping), remediation/plan.ts ledger.checkpoint.reanchor (in-place field update), checkpoints/sprint-close.ts (ledger appended, prior entries copied by reference), scope-completion/scope-reopen (top-level spread; verified by test). Not applicable: scope-retirement (sets activeSprint null only when no active sprint), migrations/legacy-sprints (pre-v4 inputs carry no git). Captures: work/promotion.ts reuses buildPlanSprintPlan, so promoted sprints also record startCommit."
+            ],
+            "files_changed": [
+              "scripts/check-sprint-git-traceability.mjs"
+            ],
+            "notes": "files_to_touch listed likely edit points; the audit found none that needed edits.",
+            "by": "maker",
+            "recordedAt": "2026-10-31T11:09:09.034Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "A sprint with activeSprint.git keeps the block byte-identical after an active-plan update, record-evidence, review, and repair integrity apply — proven by npm run check:sprint-git-traceability.",
+              "A ledger entry with git keeps it unchanged after scope complete and scope reopen — proven by the same check.",
+              "Task evidence lists every audited writer with its outcome (preserves / fixed / not applicable), and npm run build, npm run check:active-plan, npm run check:record-evidence, and npm run check:repair-integrity pass."
+            ],
+            "findings": [],
+            "by": "checker",
+            "reviewedAt": "2026-10-31T11:09:14.123Z",
+            "requestDigest": "70ee343dbd32e25154b5f6a91073f5c9341cb4a6dde4be429d5ba0630ac385f2",
+            "reviewedMaterialDigest": "b9a2226133e31c41f14f4107a0fffc1e0ffa9c4047c3e5570ffb43b9b8850361"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [
+    {
+      "id": "E1",
+      "title": "Report the git capture outcome when a sprint is planned",
+      "description": "After planning a sprint, tell the user whether the git start was recorded (branch + start commit) or omitted, with the concrete reason (not a git repository, no commits yet, git status/rev-parse failed or timed out). Expose the same outcome as structured data in the plan --json result. Use a shared reason helper so plan and close report identical reasons.",
+      "files_to_touch": [
+        "src/cli/commands/plan.ts",
+        "src/cli/core/git-capture.ts",
+        "scripts/check-sprint-git-traceability.mjs"
+      ],
+      "context": "Required by kyro qa: M1 (R4/S5 'the user is informed' unmet on the plan side; close already informs). Re-QA is mandatory after remediation.",
+      "acceptance_criteria": [
+        "Planning in a git repository prints the recorded branch and start commit; planning in a non-repository and in a repository without commits prints 'not recorded' with the matching reason — proven by npm run check:sprint-git-traceability.",
+        "kyro plan --json exposes the git capture outcome (recorded value or reason) as structured data — proven by the same check.",
+        "npm run build, npm run check:plan, and npm run check:active-plan pass."
+      ],
+      "depends_on": [],
+      "scenario_refs": [],
+      "status": "done",
+      "evidence": {
+        "summary": "Plan sprint mode now reports the git capture outcome: prints 'Git start: <branch> @ <commit12>' or 'Git start: not recorded (<reason>).' and sets structured envelope data git {recorded, branch, startCommit} or {recorded:false, reason} for both preview and applied phases. Shared describeMissingGitCapture() (not a git repository/git unavailable, no commits yet, git status failed or timed out) is used by plan and by close's 'Git range: not recorded (...)' line.",
+        "validation": [
+          "npm run check:sprint-git-traceability: pass (repo plan prints 'Git start: main @ <HEAD12>'; non-repo prints 'not recorded (not a git repository...'; e2e repo without commits plans with no git block and prints 'not recorded (no commits yet)'; plan --json applied data.git = {recorded:true, branch main, startCommit HEAD}; non-repo --dry-run --json data.git = {recorded:false, reason})",
+          "npm run build, typecheck, check:plan, check:active-plan, check:cli-envelope, check:cli-verbs, check:emergent, check:spec-traceability: pass"
+        ],
+        "files_changed": [
+          "src/cli/commands/plan.ts",
+          "src/cli/core/git-capture.ts",
+          "src/cli/commands/close-sprint.ts",
+          "scripts/check-sprint-git-traceability.mjs"
+        ],
+        "notes": "Resolves kyro qa M1. Plan has no MCP tool, so the structured result is the CLI --json envelope. Close-side reason wording now comes from the same helper (status-failure assertion is covered in E2).",
+        "by": "maker",
+        "recordedAt": "2026-11-02T13:37:40.366Z"
+      },
+      "verdict": {
+        "result": "pass",
+        "checked_criteria": [
+          "Planning in a git repository prints the recorded branch and start commit; planning in a non-repository and in a repository without commits prints 'not recorded' with the matching reason — proven by npm run check:sprint-git-traceability.",
+          "kyro plan --json exposes the git capture outcome (recorded value or reason) as structured data — proven by the same check.",
+          "npm run build, npm run check:plan, and npm run check:active-plan pass."
+        ],
+        "findings": [],
+        "by": "checker",
+        "reviewedAt": "2026-11-02T13:37:40.497Z",
+        "requestDigest": "b831953415a8d2f349a509596a1bb5b327f07d9abc93eb19ae58eb4203f4a8b4",
+        "reviewedMaterialDigest": "fce0e44d2f06446cf5b954a68f5ffd30e96cd8d18ea918e91fdc1ae1653f0b84"
+      }
+    },
+    {
+      "id": "E2",
+      "title": "Harden git capture: lock-free status, accurate failure reasons, reclaim dirs, Windows CI",
+      "description": "Run git status with --no-optional-locks so capture never rewrites .git/index; when HEAD resolves but status fails or times out, report that specific reason instead of 'not a git repository' (close output and narrative-independent CLI message), keeping the end commit omitted per R4; exclude every root path starting with the state-writer lock name (including .kyro-state-writer.lock.reclaim-* leftovers) from the dirty check; move printGitRange above renderNarrative's JSDoc with its own doc; add npm run check:sprint-git-traceability to the Windows CI job.",
+      "files_to_touch": [
+        "src/cli/core/git-capture.ts",
+        "src/cli/commands/close-sprint.ts",
+        ".github/workflows/ci.yml",
+        "scripts/check-sprint-git-traceability.mjs"
+      ],
+      "context": "Required by kyro qa: minors 1, 2, 3, 4, 5. Evidence must also complete the T1.5 per-writer audit list (minor 6: clarify, debt, rule, repair/integrity-plan, remediation/certification-plan, checkpoints/lifecycle-state).",
+      "acceptance_criteria": [
+        "A capture run leaves .git/index mtime unchanged and leftover .kyro-state-writer.lock.reclaim-* directories do not make dirty true — proven by npm run check:sprint-git-traceability.",
+        "When git status fails with a valid HEAD, the close message states the status failure rather than 'not a git repository' — proven by the same check.",
+        "printGitRange has its own doc comment and renderNarrative keeps its original JSDoc; .github/workflows/ci.yml runs npm run check:sprint-git-traceability in the Windows job — verified by reading both files.",
+        "npm run build, npm run check:close-handoff, npm run check:lossless-checkpoints, and npm run check:git-trackability pass."
+      ],
+      "depends_on": [
+        "E1"
+      ],
+      "scenario_refs": [],
+      "status": "done",
+      "evidence": {
+        "summary": "Capture hardened: git status runs with --no-optional-locks so it never refreshes .git/index; dirty excludes every root path starting with the state-writer lock name (lock, contents, .reclaim-* leftovers); when HEAD resolves but status fails, close reports 'Git range: not recorded (git status failed or timed out)' via describeMissingGitCapture and the end commit stays omitted (R4). printGitRange moved above renderNarrative with its own doc, restoring renderNarrative's JSDoc. Windows CI job now runs npm run check:sprint-git-traceability.",
+        "validation": [
+          "npm run check:sprint-git-traceability: pass (stat-only change: capture leaves .git/index mtime unchanged; .kyro-state-writer.lock.reclaim-* leftover => dirty false; corrupted .git/index with valid HEAD => close succeeds, prints the status-failure reason, ledger has no git key)",
+          "Mutation: removing --no-optional-locks in dist => 'capture: leaves .git/index untouched' fails; restored => pass",
+          "Read src/cli/commands/close-sprint.ts: printGitRange has its own one-line doc and renderNarrative keeps its original JSDoc; read .github/workflows/ci.yml: Windows job step 'Verify sprint git traceability' runs npm run check:sprint-git-traceability (YAML parses)",
+          "npm run build, typecheck, check:close-handoff, check:lossless-checkpoints, check:git-trackability, check:close-policy-compatibility, check:lifecycle-replay, check:active-plan, check:status, check:eval: pass"
+        ],
+        "files_changed": [
+          "src/cli/core/git-capture.ts",
+          "src/cli/commands/close-sprint.ts",
+          ".github/workflows/ci.yml",
+          "scripts/check-sprint-git-traceability.mjs"
+        ],
+        "notes": "Resolves kyro qa minors 1-5. Minor 6 (T1.5 audit completeness), additional writers audited: commands/clarify.ts, commands/debt.ts, commands/rule.ts (top-level sprint edits, activeSprint and ledger untouched — preserves), repair/integrity-plan.ts (registry/lifecycle repair; no activeSprint or ledger rebuild — preserves), remediation/certification-plan.ts (reads ledger commitments only — not applicable), checkpoints/lifecycle-state.ts (derives lifecycle views, no rebuild — not applicable); consistent with the QA spot-check. Windows execution itself is only proven once CI runs.",
+        "by": "maker",
+        "recordedAt": "2026-11-02T13:41:08.409Z"
+      },
+      "verdict": {
+        "result": "pass",
+        "checked_criteria": [
+          "A capture run leaves .git/index mtime unchanged and leftover .kyro-state-writer.lock.reclaim-* directories do not make dirty true — proven by npm run check:sprint-git-traceability.",
+          "When git status fails with a valid HEAD, the close message states the status failure rather than 'not a git repository' — proven by the same check.",
+          "printGitRange has its own doc comment and renderNarrative keeps its original JSDoc; .github/workflows/ci.yml runs npm run check:sprint-git-traceability in the Windows job — verified by reading both files.",
+          "npm run build, npm run check:close-handoff, npm run check:lossless-checkpoints, and npm run check:git-trackability pass."
+        ],
+        "findings": [],
+        "by": "checker",
+        "reviewedAt": "2026-11-02T13:41:08.541Z",
+        "requestDigest": "809e6cc578204c8277c281e4bbea28e5d6d0c36f7306ef36b61ae9a97beac2fe",
+        "reviewedMaterialDigest": "00971f91792810db9653965f84b07b0709950f7d50a3b87ff17202b4d2d9c880"
+      }
+    }
+  ],
+  "definitionOfDone": [
+    "All tasks done with CLI-recorded evidence and a passing verdict.",
+    "Proportional close validation passes; this sprint touches escalate paths (src/cli/artifacts/**, src/cli/checkpoints/**), so the full integration suite runs at close.",
+    "No existing scope or checkpoint in the repository changes validation, verification, or re-derivation results."
+  ]
+}

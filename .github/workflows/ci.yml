@@ -48,6 +48,9 @@ jobs:
       - name: Verify state-writer lock
         run: npm run check:lossless-checkpoints
 
+      - name: Verify sprint git traceability
+        run: npm run check:sprint-git-traceability
+
   validate:
     runs-on: ubuntu-latest
     outputs:

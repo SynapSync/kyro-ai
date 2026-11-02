@@ -126,7 +126,7 @@ function closeSprintTool(args: Record<string, unknown>): unknown {
     snapshotId: traceSnapshotId(snapshotPath),
     outcome: normalizeTraceCloseOutcome(transaction.checkpoint.close.outcome),
   });
-  return { phase: 'applied', scope, snapshotPath, checkpointPath, checkpointId: applied.checkpointId, resumed: applied.resumed, plan };
+  return { phase: 'applied', scope, snapshotPath, checkpointPath, checkpointId: applied.checkpointId, resumed: applied.resumed, git: transaction.checkpoint.close.git ?? null, plan };
 }
 
 function repairScopeTool(args: Record<string, unknown>): unknown {

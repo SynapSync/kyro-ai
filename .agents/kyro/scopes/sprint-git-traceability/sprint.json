@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 4,
+  "scope": "sprint-git-traceability",
+  "title": "Sprint git traceability and opt-in close commit",
+  "status": "planning",
+  "objective": "Record a deterministic git commit range for every sprint and offer an opt-in commit of sprint-close artifacts, without breaking checkpoint verification or existing behavior.",
+  "successCriteria": [
+    "For a sprint planned and closed with this version, the scope ledger records the branch, the commit at planning time, the last code commit before closing, and whether uncommitted work was left out, so the sprint's code can be reproduced as an exact git range.",
+    "Closing the same sprint again after an interruption records the same end commit as the first attempt, and every existing checkpoint and scope without git data still validates and verifies unchanged.",
+    "With the personal preference enabled, a confirmed close produces exactly one commit that contains only the files the close wrote and is findable by its scope and sprint trailers; with it disabled, no commit is created.",
+    "A failed or skipped commit never undoes a close and always tells the user why and how to commit manually, identically through the CLI and MCP."
+  ],
+  "spec": {
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "When a sprint is planned inside a git repository with at least one commit, the active sprint records the current branch (or none when detached) and the HEAD commit as its start commit.",
+        "priority": "must",
+        "rationale": "First sprint of a scope has no previous close and branches can change between sprints, so the start must be captured at planning. Source: plan 2026-10-30-sprint-git-traceability, finding 05. Validation: temp-repo plan test."
+      },
+      {
+        "id": "R2",
+        "statement": "A confirmed sprint close records the branch, the HEAD commit read before any close write as the end commit, and a dirty flag; these values are frozen in the close checkpoint inputs and a retried close reuses them instead of reading HEAD again.",
+        "priority": "must",
+        "rationale": "Checkpoint verification re-derives the post-close state from frozen inputs and retries require identical inputs (sprint-close.ts:282-300, close-sprint.ts:464/547). Reading HEAD after writes or on retry would include the close commit or raise CHECKPOINT_CONFLICT. Finding 01. Validation: retry after HEAD advances keeps original end commit."
+      },
+      {
+        "id": "R3",
+        "statement": "The ledger entry's git range is derived only from the planned sprint's git block and the frozen close git inputs; when both are absent the derived ledger entry is identical to today's.",
+        "priority": "must",
+        "rationale": "Keeps sprint.json schemaVersion 4 and checkpoint schemaVersion 1 unchanged and legacy checkpoints verifiable. A sprint planned before this version yields a null start commit. Validation: lossless-checkpoints, replay-witness, close-policy-compatibility checks plus new legacy fixtures."
+      },
+      {
+        "id": "R4",
+        "statement": "Git capture never blocks planning or closing: outside a repository, with no commits, or on any git error the git data is omitted and the user is informed.",
+        "priority": "must",
+        "rationale": "Kyro must stay usable in non-git workspaces. Prevented failure: plan/close aborted by git. Validation: non-repo and unborn-HEAD temp workspaces."
+      },
+      {
+        "id": "R5",
+        "statement": "The dirty flag is true when tracked or untracked non-ignored files outside .agents/kyro/ have uncommitted changes at close, and the close warns that those changes are outside the sprint's range.",
+        "priority": "must",
+        "rationale": "Option A commits only close artifacts, so code must be committed before closing; the flag tells QA the range may be incomplete. .agents/kyro/ is excluded because the close itself modifies it."
+      },
+      {
+        "id": "R6",
+        "statement": "The automatic close commit is enabled only by the personal preference git.commitOnSprintClose = true in local.json, validated as a boolean when present, and is disabled by default.",
+        "priority": "must",
+        "rationale": "User decision: personal configuration in local.json (gitignored personal overlay, types.ts:187). Tradeoff: teammates may differ; team policy in project.json is a follow-up. Finding 04."
+      },
+      {
+        "id": "R7",
+        "statement": "The automatic commit runs only after a confirmed close has been applied and verified, never on dry runs or unconfirmed MCP calls.",
+        "priority": "must",
+        "rationale": "Prevents committing a close that was not applied. Validation: dry-run and unconfirmed MCP produce no commit."
+      },
+      {
+        "id": "R8",
+        "statement": "The automatic commit contains only the files written by the close transaction that have changes; any other staged or unstaged changes remain exactly as they were.",
+        "priority": "must",
+        "rationale": "User chose option A. git commit --only preserves other index entries but rejects unknown paths, so close paths are added explicitly first (finding 03). Prevented failure: committing unreviewed work or secrets. Validation: pre-staged unrelated file stays staged and uncommitted."
+      },
+      {
+        "id": "R9",
+        "statement": "The commit message is 'chore(kyro): close <scope> sprint <n> — <title>' with Kyro-Scope and Kyro-Sprint trailers parseable by git interpret-trailers.",
+        "priority": "must",
+        "rationale": "A commit cannot contain its own hash; trailers make the close anchor findable with git log --grep even without Kyro and survive rebases. Message follows existing manual close commits (e82dcba)."
+      },
+      {
+        "id": "R10",
+        "statement": "Kyro never pushes, amends, skips hooks, or disables signing when creating the close commit.",
+        "priority": "must",
+        "rationale": "Repository policies (hooks, signing) must be honored and nothing is published. Prevented failure: bypassing team safeguards."
+      },
+      {
+        "id": "R11",
+        "statement": "When the commit is skipped (detached HEAD, merge/rebase/cherry-pick/revert in progress, no commits, not a repository, Kyro state ignored by git, nothing to commit) or fails (hook rejection, signing or other git error), the sprint stays closed and the result reports the status, the reason, and the manual command.",
+        "priority": "must",
+        "rationale": "Close durability is independent of git; no rollback. Validation: one temp-repo case per guard and a rejecting pre-commit hook."
+      },
+      {
+        "id": "R12",
+        "statement": "Closing through the CLI and through MCP produces the same commit behavior and the same structured commit result.",
+        "priority": "must",
+        "rationale": "Both surfaces share buildClosePlan/applySprintCloseTransaction but have separate post-apply code (close-sprint.ts:103, mcp/handlers.ts:91). Validation: extended MCP check."
+      },
+      {
+        "id": "R13",
+        "statement": "Every command that rewrites the active sprint or ledger preserves their git blocks unchanged.",
+        "priority": "must",
+        "rationale": "Validators tolerate unknown keys but field-by-field rebuilds would drop them silently (finding 02, hypothesis H1). Validation: preservation tests on the audited writers."
+      },
+      {
+        "id": "R14",
+        "statement": "Documentation describes the git range fields, the preference, commit behavior and guards, and the release ships as a minor version with synchronized release metadata.",
+        "priority": "should",
+        "rationale": "Release gate requires README.md and docs/cli.md updates on bump. Validation: full npm run check and npm pack --dry-run."
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "S1",
+        "requirement": "R3",
+        "given": "sprint.json files and close checkpoints with and without git blocks",
+        "when": "they are validated",
+        "then": "well-formed git blocks and their absence are accepted and malformed git values are rejected with a field-specific issue"
+      },
+      {
+        "id": "S2",
+        "requirement": "R1",
+        "given": "a git repository with at least one commit on a branch",
+        "when": "a sprint is planned",
+        "then": "the active sprint records the branch and the HEAD commit as startCommit"
+      },
+      {
+        "id": "S3",
+        "requirement": "R2",
+        "given": "a planned sprint with startCommit and later code commits",
+        "when": "the sprint is closed with confirmation",
+        "then": "the ledger records branch, startCommit, endCommit equal to HEAD before the close, and dirty, and the checkpoint re-derives identically"
+      },
+      {
+        "id": "S4",
+        "requirement": "R2",
+        "given": "a close interrupted after its checkpoint was written and a new commit made afterwards",
+        "when": "the close is retried",
+        "then": "the original endCommit is kept and no checkpoint conflict is raised"
+      },
+      {
+        "id": "S5",
+        "requirement": "R4",
+        "given": "a workspace that is not a git repository, or a repository with no commits",
+        "when": "a sprint is planned and closed",
+        "then": "both succeed without git data and the user is informed"
+      },
+      {
+        "id": "S6",
+        "requirement": "R5",
+        "given": "uncommitted changes outside .agents/kyro/ at close time",
+        "when": "the sprint is closed",
+        "then": "dirty is true and the close warns that those changes are outside the sprint range; changes only under .agents/kyro/ or in ignored files leave dirty false"
+      },
+      {
+        "id": "S7",
+        "requirement": "R3",
+        "given": "a checkpoint and ledger written before this version without git data",
+        "when": "the checkpoint is verified and the transition re-derived",
+        "then": "results are byte-identical to the previous behavior"
+      },
+      {
+        "id": "S8",
+        "requirement": "R13",
+        "given": "a sprint whose active sprint and ledger carry git blocks",
+        "when": "commands that rewrite the active sprint or ledger run",
+        "then": "the git blocks remain unchanged"
+      }
+    ],
+    "nonGoals": [
+      "Work lifecycle closure (organic-work) git capture.",
+      "Team-wide policy in project.json forcing the close commit.",
+      "Pushing, opening pull requests, or tagging.",
+      "Backfilling git data for sprints closed before this version.",
+      "A new trace event type for the close commit.",
+      "A per-invocation CLI flag overriding the preference.",
+      "Committing on scope complete.",
+      "Updating the kyro-qa-assist registry skill (follow-up in skills-registry after this release)."
+    ],
+    "openQuestions": []
+  },
+  "clarifications": [],
+  "conventions": [],
+  "adrs": [],
+  "roadmap": {
+    "plannedSprintCount": 2,
+    "sizingRationale": "Two sprints. Split trigger: Sprint 1 changes persisted state and checkpoint derivation (escalate paths src/cli/artifacts/**, src/cli/checkpoints/**) and must prove deterministic capture and legacy compatibility on its own before any git side effect is added. Sprint 2 adds the user-visible opt-in commit with repository side effects, CLI/MCP parity, docs, and the 6.5.0 release; it depends on Sprint 1's frozen close.git inputs. Order from the matured plan: W1 contract -> W2 plan capture || W3 close capture -> W4 commit -> W5 docs/release; W6 (kyro-qa-assist v1.1) is a follow-up outside this repository. Fewer sprints would mix persistence risk with side-effect risk in one review unit; more would split cohesive capture work without a separately verifiable objective.",
+    "sprints": [
+      {
+        "n": 1,
+        "slug": "git-range-capture",
+        "title": "Git range capture in plan and close",
+        "state": "closed"
+      },
+      {
+        "n": 2,
+        "slug": "opt-in-close-commit",
+        "title": "Opt-in close commit, docs, and release",
+        "state": "planned"
+      }
+    ]
+  },
+  "ledger": [
+    {
+      "n": 1,
+      "slug": "git-range-capture",
+      "outcome": "shipped",
+      "closedAt": "2026-11-02",
+      "archive": "archive/sprint-001-git-range-capture.md",
+      "snapshot": "archive/sprint-001-git-range-capture.json",
+      "checkpoint": "archive/sprint-001-git-range-capture.checkpoint.json",
+      "recommendations": [
+        "Sprint 2: decide debt-3 (forward compatibility with older runtimes) before release; the decision shapes docs and CHANGELOG.",
+        "Sprint 2: confirm the Windows CI job passes check:sprint-git-traceability on the first push.",
+        "Sprint 2: fold debt-4, debt-5, debt-6 into the R12 parity and output work.",
+        "Sprint 2: link new tasks to scenarios at planning time so emergent work does not ship without scenario_refs."
+      ],
+      "checkpointSha256": "87d9f8b0e7bea75363d175ce0c57017f77710f739add6b3732a8a77d5e970824"
+    }
+  ],
+  "previousSprint": {
+    "n": 1,
+    "slug": "git-range-capture",
+    "outcome": "shipped",
+    "summary": "Sprint git range captured at plan (startCommit) and frozen at close (endCommit, branch, dirty) into ledger[].git, checkpoint-verifiable and backward compatible; QA approved with notes after remediation (E1, E2)."
+  },
+  "activeSprint": null,
+  "debt": [
+    {
+      "id": "debt-1",
+      "title": "plan --update-active leaves phase statuses incoherent (active/blocked with all-pending tasks)",
+      "origin": 1,
+      "priority": "medium",
+      "status": "open",
+      "targetSprint": null,
+      "note": "Observed 2026-10-30 when rewording T1.1 criteria: P1 became active and P2/P3 blocked although every task was pending; kyro analyze reported coherence findings A001-A003; kyro repair normalized only phase statuses. Pre-existing runtime bug outside this scope's objective."
+    },
+    {
+      "id": "debt-2",
+      "title": "Root-level .kyro-state-writer.lock/ is not gitignored",
+      "origin": 1,
+      "priority": "low",
+      "status": "open",
+      "targetSprint": null,
+      "note": "The lock directory lives at the workspace root while writes run, but its ignore entry is in .agents/kyro/.gitignore and only covers .agents/kyro/. A git add -A during a write could stage it. Found in T1.4; sprint dirty detection already excludes it."
+    },
+    {
+      "id": "debt-3",
+      "title": "Forward compatibility: checkpoints with close.git fail verification on runtimes older than this release",
+      "origin": 1,
+      "priority": "high",
+      "status": "open",
+      "targetSprint": 2,
+      "note": "Found by kyro qa (M2): installed 6.4.1 reports a checkpoint written by this build as 'not the authorized transition'; an older runtime retrying it would raise CHECKPOINT_CONFLICT (its retryCloseInputs does not copy close.git). Tracked scopes make this a multi-developer risk. Decide in Sprint 2 before release: (a) documented minimum runtime version for teams (docs, CHANGELOG, release notes), (b) writer-version/capability marker older runtimes can reason about, or (c) explicit acceptance. Docs must not claim 'no checkpoint schema change' without this caveat."
+    },
+    {
+      "id": "debt-4",
+      "title": "Structured git range and warnings in CLI --json close data and MCP results, with an MCP assertion",
+      "origin": 1,
+      "priority": "low",
+      "status": "open",
+      "targetSprint": 2,
+      "note": "Found by kyro qa (minor 7): MCP returns git but no warning text; CLI --json carries the range and dirty warning only as output lines. Cover under R12 in Sprint 2."
+    },
+    {
+      "id": "debt-5",
+      "title": "Resumed close without frozen close.git reports a present-time reason",
+      "origin": 1,
+      "priority": "low",
+      "status": "open",
+      "targetSprint": 2,
+      "note": "kyro re-QA minor 1: close-sprint.ts:292 / git-capture.ts:67-71 derive the 'not recorded' reason at print time; a close first attempted outside a repo and resumed after git init prints 'git status failed or timed out'. Print a neutral 'not recorded at the original close attempt' on resume (or freeze the reason) and add a check case."
+    },
+    {
+      "id": "debt-6",
+      "title": "plan sprint-mode --json envelope lacks data.outcome",
+      "origin": 1,
+      "priority": "low",
+      "status": "open",
+      "targetSprint": 2,
+      "note": "kyro re-QA minor 2: plan.ts:342 and :355 omit outcome: 'preview'/'applied' that update-active (:165) and roadmap (:234) include. Add for envelope consistency."
+    }
+  ],
+  "handoff": {
+    "nextAction": "plan_sprint",
+    "nextTaskId": null,
+    "blockers": [],
+    "note": "Close validation — reconciliation: uncommitted working tree on develop (git status --porcelain, untracked included; sprint planned and executed without intermediate commits, so status is the complete change set): src/cli/{types.ts,artifacts/schema.ts,checkpoints/sprint-close.ts,commands/close-sprint.ts,commands/plan.ts,mcp/handlers.ts,pipeline/state-writer-lock.ts,core/git-capture.ts}, scripts/check-sprint-git-traceability.mjs, package.json, .agents/kyro/validation.json, .github/workflows/ci.yml. Escalated by src/cli/artifacts/schema.ts, src/cli/checkpoints/sprint-close.ts, package.json, src/cli/pipeline/state-writer-lock.ts. Ran on the final state: npm run build and npm run check (87 scripts, exit 0, includes check:sprint-git-traceability). Reused: none. uncoveredFiles (types.ts, check script, validation.json, mcp/handlers.ts, ci.yml) covered by the aggregate; Windows CI step added but not yet executed. Integration status: ran at close. Kyro QA: CHANGES REQUIRED, remediated by E1/E2, re-QA APPROVED WITH NOTES; notes recorded as debt-5 and debt-6. Open analyze MEDIUM: R6-R12/R14 scenarios (Sprint 2), E1/E2 without scenario_refs (left unlinked to avoid invalidating passed verdicts). Closed with the installed 6.4.1 runtime (not this branch build) to avoid writing a close.git checkpoint that 6.4.x runtimes reject (debt-3); this sprint therefore records no git range.",
+    "lastUpdated": "2026-11-02"
+  },
+  "author": {
+    "name": "Roimer Peraza",
+    "email": "joisephdev@gmail.com",
+    "source": "git",
+    "capturedAt": "2026-10-31T00:56:52.640Z"
+  }
+}

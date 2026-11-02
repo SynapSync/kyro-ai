@@ -30,8 +30,9 @@ import {
   readSprintCloseCheckpoint,
   type SprintCloseTransaction,
 } from '../checkpoints/sprint-close';
-import type { ActiveSprint, OperationPlan, SprintCloseCheckpointV1, SprintCloseInputs, SprintFile, Task } from '../types';
+import type { ActiveSprint, OperationPlan, SprintCloseCheckpointV1, SprintCloseInputs, SprintFile, SprintGitEnd, Task } from '../types';
 import { SPRINT_CLOSE_OUTCOME } from '../types';
+import { captureSprintGitEnd, describeMissingGitCapture } from '../core/git-capture';
 import { assertSafeManagedPath, assertSafePathSegment, withStateWriterLock } from '../pipeline/state-writer-lock';
 
 /**
@@ -123,6 +124,7 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
     outcome: normalizeTraceCloseOutcome(fresh.transaction.checkpoint.close.outcome),
   });
   console.log(`\nSprint ${identity.sprintN} closed. activeSprint cleared; ledger entry, snapshot, and checkpoint recorded.`);
+  printGitRange(fresh.transaction.checkpoint.close.git);
   const handoff = written.handoff;
   console.log(`Next action: ${handoff.nextAction}.`);
   if (handoff.nextAction === 'plan_sprint') {
@@ -247,7 +249,9 @@ export function buildClosePlan(
     return closePlanResult(sprint, transactionFromExisting(checkpointPath, existingCheckpoint));
   }
 
-  const closeInputs = buildCloseInputs(active, args);
+  // End of the sprint's git range: read HEAD before any close write and freeze it in the
+  // checkpoint inputs. Retries reuse the frozen value (retryCloseInputs) and never re-read HEAD.
+  const closeInputs = buildCloseInputs(active, args, captureSprintGitEnd());
 
   const state = readProjectState();
   const projectScopeBefore = state?.scopes.find((entry) => entry.id === scope);
@@ -282,6 +286,18 @@ export function buildClosePlan(
   return closePlanResult(sprint, transaction);
 }
 
+/** Print the sprint's recorded git range, or why none was recorded, after a close. */
+function printGitRange(git: SprintGitEnd | undefined): void {
+  if (!git) {
+    console.log(`Git range: not recorded (${describeMissingGitCapture()}).`);
+    return;
+  }
+  console.log(`Git range: ${git.branch ?? 'detached HEAD'} → ${git.endCommit.slice(0, 12)}`);
+  if (git.dirty) {
+    console.log('⚠ Uncommitted changes outside .agents/kyro/ existed at close; they are outside this sprint\'s git range.');
+  }
+}
+
 /**
  * Render the human narrative .md deterministically. The TITLE is taken from `roadmap.sprints[]`
  * (the authoritative source, always present) with safe fallbacks — so it can never render
@@ -313,6 +329,16 @@ function renderNarrative(sprint: SprintFile, active: ActiveSprint, args: SprintC
   lines.push('');
   lines.push(active.objective);
   lines.push('');
+
+  if (args.git) {
+    lines.push('## Git range');
+    lines.push('');
+    lines.push(`- Branch: ${args.git.branch ?? '(detached HEAD)'}`);
+    lines.push(`- Start commit: ${active.git?.startCommit ?? '(not recorded at planning)'}`);
+    lines.push(`- End commit: ${args.git.endCommit}`);
+    if (args.git.dirty) lines.push('- Uncommitted changes outside .agents/kyro/ existed at close and are not part of this range.');
+    lines.push('');
+  }
 
   lines.push('## Definition of Done');
   lines.push('');
@@ -476,16 +502,19 @@ function retryCloseInputs(checkpoint: SprintCloseCheckpointV1, args: CloseSprint
     summary: args.summary,
     recommendations: [...args.recommendations],
     learnings: [...args.learnings],
+    // Frozen at the first attempt; a retry must not re-read HEAD.
+    ...(checkpoint.close.git ? { git: checkpoint.close.git } : {}),
   };
 }
 
-function buildCloseInputs(active: ActiveSprint, args: CloseSprintArgs): SprintCloseInputs {
+function buildCloseInputs(active: ActiveSprint, args: CloseSprintArgs, git: SprintGitEnd | null): SprintCloseInputs {
   return {
     outcome: resolveCloseOutcome(active, args),
     note: args.note,
     summary: args.summary,
     recommendations: [...args.recommendations],
     learnings: [...args.learnings],
+    ...(git ? { git } : {}),
   };
 }
 

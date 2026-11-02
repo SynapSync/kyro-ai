@@ -361,6 +361,31 @@ export interface LedgerEntry {
   /** External SHA-256 commitment to the checkpoint payload, anchored in live scope state. */
   checkpointSha256?: string;
   recommendations?: string[];
+  /** Git range of the sprint, derived from activeSprint.git and the frozen close.git inputs. */
+  git?: LedgerGitRange;
+}
+
+/** Git position captured when a sprint is planned. Absent outside a repository or before the first commit. */
+export interface SprintGitStart {
+  /** Current branch, or null when HEAD is detached. */
+  branch: string | null;
+  startCommit: string;
+}
+
+/** Git position captured before any close write and frozen in the close checkpoint inputs. */
+export interface SprintGitEnd {
+  branch: string | null;
+  endCommit: string;
+  /** True when uncommitted changes outside .agents/kyro/ existed at close (outside the sprint range). */
+  dirty: boolean;
+}
+
+export interface LedgerGitRange {
+  branch: string | null;
+  /** Null when the sprint was planned without git capture (older runtime, or no repository at planning). */
+  startCommit: string | null;
+  endCommit: string;
+  dirty: boolean;
 }
 
 export const SPRINT_CLOSE_CHECKPOINT_KIND = 'kyro.sprint-close-checkpoint' as const;
@@ -390,6 +415,8 @@ export interface SprintCloseInputs {
   summary: string | null;
   recommendations: string[];
   learnings: string[];
+  /** Frozen at the first close attempt; retries reuse it and never re-read HEAD. */
+  git?: SprintGitEnd;
 }
 
 export interface SprintClosePaths {
@@ -560,6 +587,8 @@ export interface ActiveSprint {
   phases: Phase[];
   emergentTasks: Task[];
   definitionOfDone: string[];
+  /** Git position recorded when the sprint was planned. */
+  git?: SprintGitStart;
 }
 
 export interface Debt {

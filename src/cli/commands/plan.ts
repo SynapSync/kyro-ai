@@ -5,6 +5,7 @@ import { sprintJsonPath } from '../artifacts/paths';
 import { asSprintFile, validateLocalProjectStateShape, validateSharedProjectStateShape, validateSprintFile } from '../artifacts/schema';
 import { verifyWrittenSprint } from '../artifacts/load-sprint';
 import { LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
+import { captureSprintGitStart, describeMissingGitCapture } from '../core/git-capture';
 import { resolveScopeAuthorFromGit } from '../core/actor';
 import { KyroCoreError } from '../core/errors';
 import { scopeEntryFromDisk } from '../core/scope-entries';
@@ -329,8 +330,16 @@ function runPlanSprintMode(raw: unknown, scope: string, currentSprint: SprintFil
   const input = parseLeanSprintInput(raw, currentSprint);
   const { sprint, plan } = buildPlanSprintPlan(scope, currentSprint, input);
   printPlan(`Plan Sprint ${input.sprint.n} for scope "${scope}" (sprint mode)`, plan);
+  const gitStart = sprint.activeSprint?.git ?? null;
+  const gitOutcome = gitStart
+    ? { recorded: true as const, branch: gitStart.branch, startCommit: gitStart.startCommit }
+    : { recorded: false as const, reason: describeMissingGitCapture() };
+  console.log(gitOutcome.recorded
+    ? `Git start: ${gitOutcome.branch ?? 'detached HEAD'} @ ${gitOutcome.startCommit.slice(0, 12)}`
+    : `Git start: not recorded (${gitOutcome.reason}).`);
 
   if (args.dryRun) {
+    setCliMachineResult('preview', { mode: 'sprint', sprint: input.sprint.n, git: gitOutcome });
     console.log('Dry run complete. No files changed.');
     return;
   }
@@ -343,6 +352,7 @@ function runPlanSprintMode(raw: unknown, scope: string, currentSprint: SprintFil
   const active = sprint.activeSprint!;
   const phaseCount = active.phases.length;
   const taskCount = active.phases.reduce((sum, phase) => sum + phase.tasks.length, 0);
+  setCliMachineResult('applied', { mode: 'sprint', sprint: active.n, phases: phaseCount, tasks: taskCount, nextAction: sprint.handoff.nextAction, git: gitOutcome });
   console.log(`Sprint ${active.n} planned for "${scope}": ${phaseCount} phase(s), ${taskCount} task(s). Next action: ${sprint.handoff.nextAction}.`);
 }
 
@@ -482,6 +492,10 @@ export function buildPlanSprintPlan(scope: string, current: SprintFile, input: L
   // Derived, never hardcoded: an all-pending sprint derives to "planned", not "executing" — hardcoding
   // "executing" here would make `kyro analyze`'s coherence check flag it immediately (known finding).
   activeSprint.status = deriveActiveSprintStatus(activeSprint);
+  // Start of the sprint's git range. Omitted outside a repository or before the first commit;
+  // planning never fails because of git.
+  const gitStart = captureSprintGitStart();
+  if (gitStart) activeSprint.git = gitStart;
   next.activeSprint = activeSprint;
 
   // Merge scenarios into spec.scenarios by id: add new, replace existing. requirements/nonGoals/
