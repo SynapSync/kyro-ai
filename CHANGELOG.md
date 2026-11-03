@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [6.5.0] - 2026-11-02
+## [6.5.0] - 2026-11-03
 
 ### Added
 
@@ -22,6 +22,10 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 
 - `local.json` personal preferences survive Kyro state rewrites. `execution.delegationEnabled` was silently dropped whenever Kyro rewrote `local.json` (for example `scope set-active`); `execution` and the new `git` block are now carried through the effective state and written back.
+- `kyro plan --update-active` derives phase statuses from task statuses, matching repair and analyze. Phases no longer remain `active` or `blocked` because of execution readiness while every task is `pending`.
+- Install and sync add `.kyro-state-writer.lock*` to the repository's local Git exclude file, prefixed for subdirectory workspaces. The writer refuses symlinked, hard-linked, or replaced targets and workspace paths with line separators. `kyro doctor` warns when the lock is not ignored or Git discovery fails; Git calls in these checks are bounded to 10 seconds.
+- `kyro doctor --artifacts` verifies remediation chains across later authorized sprint closes, and `kyro repair integrity` can extend them. Records replay at their own checkpoint boundary, then advance through valid closes in ledger order. Each boundary preserves prior ledger entries, conventions, ADRs, and debt content; only debt `status`, `targetSprint`, `note`, and priority escalation may change. Unexplained live changes remain `DIVERGED`.
+- `check:cli-bundle-assets` compares verification assertion counts from the source and projected runtimes instead of requiring a hardcoded total.
 
 ## [6.4.1] - 2026-10-28
 

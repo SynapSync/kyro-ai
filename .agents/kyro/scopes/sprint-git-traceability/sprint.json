@@ -2,7 +2,7 @@
   "schemaVersion": 4,
   "scope": "sprint-git-traceability",
   "title": "Sprint git traceability and opt-in close commit",
-  "status": "planning",
+  "status": "completed",
   "objective": "Record a deterministic git commit range for every sprint and offer an opt-in commit of sprint-close artifacts, without breaking checkpoint verification or existing behavior.",
   "successCriteria": [
     "For a sprint planned and closed with this version, the scope ledger records the branch, the commit at planning time, the last code commit before closing, and whether uncommitted work was left out, so the sprint's code can be reproduced as an exact git range.",
@@ -549,10 +549,10 @@
     }
   ],
   "handoff": {
-    "nextAction": "await_scope_completion",
+    "nextAction": "done",
     "nextTaskId": null,
     "blockers": [],
-    "note": "Close validation — reconciliation: source unchanged since commit a7f0ab3 (git status shows only .agents/kyro/scopes/sprint-git-traceability/sprint.json from evidence/review/debt writes). Close commands (validation.json): npm run build and npm run check:artifacts ran on the final state (exit 0, no [FAIL]). Integration status: satisfied by reused evidence — npm run check (88 scripts, exit 0) on the identical source tree before commit a7f0ab3, and PR #154 CI run 41579603446 at a7f0ab3 (validate incl. check:artifacts, Windows Node 18/20/22) all success. QA (Astra): T4.1 failed once (M1 debt content rewrite) and once in orchestrator close validation (hardcoded count in check-cli-bundle-assets), both remediated by Sol 6.1 and approved; T4.2 approved. debt-8 resolved. Closed with the installed 6.4.1 runtime (ADR-0001).",
+    "note": "Scope explicitly completed: Sprint git ranges at plan/close, opt-in close commit, debt remediation (active-plan statuses, root lock exclude), and remediation chain verification across later closes; 4 sprints shipped, no open debt, PR #154 CI green.",
     "lastUpdated": "2026-11-03"
   },
   "author": {
@@ -567,5 +567,14 @@
       "path": "archive/remediations/remediation-001.json",
       "commitment": "d2be92ee14adca8b8388734c013857e635e0206830e648761929cae538b34826"
     }
-  ]
+  ],
+  "completion": {
+    "completedAt": "2026-11-03T14:44:09.715Z",
+    "by": "maker",
+    "summary": "Sprint git ranges at plan/close, opt-in close commit, debt remediation (active-plan statuses, root lock exclude), and remediation chain verification across later closes; 4 sprints shipped, no open debt, PR #154 CI green.",
+    "requestDigest": "aeb9c745a81b84887a6e5f8395711ecfad193f588c2f77d8dc2253c282b19ffb",
+    "beforeEntryDigest": "43d7397793bc7f97bf4f8b6184b0c494e7151397ab2048fcec06a3ad5b176a56",
+    "beforeStateDigest": "f8a2d8207e4ff47e0de6f3b68d30bb57328095a8c9a6c07ed512e8ac25b1c45a",
+    "planDigest": "4f2216332131e6535b332f1c7f916f5ff94e9d267fd7e353406e499ae22aa304"
+  }
 }
