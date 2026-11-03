@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.5.0] - 2026-11-03
+
+### Added
+
+- Sprint git range. `kyro plan` records `activeSprint.git = { branch, startCommit }`; `kyro close-sprint` reads `{ branch, endCommit, dirty }` before any close write, freezes it as `close.git` in the checkpoint inputs, and derives `ledger[].git = { branch, startCommit, endCommit, dirty }` from frozen inputs only, so checkpoint re-derivation and retries stay deterministic (a retry reuses the frozen `endCommit`). Capture is read-only (`git --no-optional-locks status`), never blocks, and `dirty` ignores `.agents/kyro/` and the root state-writer lock. Plan and close report the recorded position or why it was not recorded, in text and `--json` data.
+- Opt-in close commit. With `git.commitOnSprintClose: true` in `local.json`, a confirmed close commits exactly the files it wrote (`git commit --only`), with `Kyro-Scope`/`Kyro-Sprint` trailers, after the state-writer lock is released. Hooks and signing are honored; nothing is pushed or amended. Guards (no repository, no commits, detached HEAD, operation in progress, ignored close files, nothing to commit) return `skipped`, failures return `failed` with a manual command; the sprint stays closed either way. CLI and MCP share one post-close step and return the same `git`, `commit`, and `warnings[]` data.
+- `check:sprint-git-traceability` and `check:sprint-close-commit`, in the aggregate suite, the close-checkpoints validation rule, and the Windows CI job.
+
+### Changed
+
+- Checkpoints that carry `close.git` are not verifiable by runtimes older than 6.5.0, which report them as unauthorized transitions. A close that records `close.git` while `team.minPackageVersion` is unset or below 6.5.0 prints an advisory; set the team floor to 6.5.0 so older runtimes WARN in `kyro doctor`. Existing checkpoints keep validating and re-deriving unchanged.
+- `kyro plan` sprint-mode `--json` data includes `outcome` (`preview`/`applied`), like the other plan modes.
+
+### Fixed
+
+- `local.json` personal preferences survive Kyro state rewrites. `execution.delegationEnabled` was silently dropped whenever Kyro rewrote `local.json` (for example `scope set-active`); `execution` and the new `git` block are now carried through the effective state and written back.
+- `kyro plan --update-active` derives phase statuses from task statuses, matching repair and analyze. Phases no longer remain `active` or `blocked` because of execution readiness while every task is `pending`.
+- Install and sync add `.kyro-state-writer.lock*` to the repository's local Git exclude file, prefixed for subdirectory workspaces. The writer refuses symlinked, hard-linked, or replaced targets and workspace paths with line separators. `kyro doctor` warns when the lock is not ignored or Git discovery fails; Git calls in these checks are bounded to 10 seconds.
+- `kyro doctor --artifacts` verifies remediation chains across later authorized sprint closes, and `kyro repair integrity` can extend them. Records replay at their own checkpoint boundary, then advance through valid closes in ledger order. Each boundary preserves prior ledger entries, conventions, ADRs, and debt content; only debt `status`, `targetSprint`, `note`, and priority escalation may change. Unexplained live changes remain `DIVERGED`.
+- `check:cli-bundle-assets` compares verification assertion counts from the source and projected runtimes instead of requiring a hardcoded total.
+
 ## [6.4.1] - 2026-10-28
 
 ### Fixed

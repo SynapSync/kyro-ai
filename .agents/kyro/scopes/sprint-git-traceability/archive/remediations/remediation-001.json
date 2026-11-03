@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 4,
+  "kind": "scope-remediation",
+  "id": "R-001",
+  "scope": "sprint-git-traceability",
+  "createdAt": "2026-11-02T14:32:46.336Z",
+  "base": {
+    "stateSha256": "cec0b96b5b31889c64727dcaf4966802d16cbe7cf70aa61723e6034090c33e6c",
+    "remediationHead": null,
+    "checkpoints": [
+      {
+        "path": "archive/sprint-001-git-range-capture.checkpoint.json",
+        "commitment": "87d9f8b0e7bea75363d175ce0c57017f77710f739add6b3732a8a77d5e970824"
+      }
+    ]
+  },
+  "issues": [
+    {
+      "id": "I-001",
+      "code": "POST_CLOSE_CONVENTION",
+      "path": "conventions",
+      "observedValueSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "id": "I-002",
+      "code": "POST_CLOSE_CONVENTION",
+      "path": "conventions",
+      "observedValueSha256": "2787106745e97968f8261d503c95ee9e88c6694f50bcde5c1acf3de257fc8c01"
+    },
+    {
+      "id": "I-003",
+      "code": "POST_CLOSE_CONVENTION",
+      "path": "conventions",
+      "observedValueSha256": "d6d867a72250b83bb0794325f76e8cb74c7c2606f1ff7e2877cab67722a853f1"
+    },
+    {
+      "id": "I-004",
+      "code": "POST_CLOSE_ADR",
+      "path": "adrs",
+      "observedValueSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  ],
+  "operations": [
+    {
+      "id": "OP-001",
+      "kind": "convention.append",
+      "resolves": [
+        "I-001"
+      ],
+      "expectedConventionCollectionSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "after": {
+        "id": "arch-frozen-close-inputs",
+        "rule": "Any data recorded at sprint close must enter the checkpoint's frozen close inputs (and be derived from them), never be added to the ledger or post-close state directly; otherwise checkpoint re-derivation and retries break.",
+        "tags": [
+          "architecture"
+        ],
+        "addedSprint": 1
+      },
+      "reason": "live convention added after close; record the observed append"
+    },
+    {
+      "id": "OP-002",
+      "kind": "convention.append",
+      "resolves": [
+        "I-002"
+      ],
+      "expectedConventionCollectionSha256": "2787106745e97968f8261d503c95ee9e88c6694f50bcde5c1acf3de257fc8c01",
+      "after": {
+        "id": "git-exclude-kyro-lock",
+        "rule": "Any git-based check of the working tree must exclude Kyro-managed paths: the workspace .agents/kyro/ and every root path starting with .kyro-state-writer.lock (including .reclaim-* leftovers).",
+        "tags": [
+          "architecture",
+          "testing"
+        ],
+        "addedSprint": 1
+      },
+      "reason": "live convention added after close; record the observed append"
+    },
+    {
+      "id": "OP-003",
+      "kind": "convention.append",
+      "resolves": [
+        "I-003"
+      ],
+      "expectedConventionCollectionSha256": "d6d867a72250b83bb0794325f76e8cb74c7c2606f1ff7e2877cab67722a853f1",
+      "after": {
+        "id": "git-readonly-status",
+        "rule": "Read-only git status calls must pass --no-optional-locks so they never rewrite .git/index.",
+        "tags": [
+          "architecture"
+        ],
+        "addedSprint": 1
+      },
+      "reason": "live convention added after close; record the observed append"
+    },
+    {
+      "id": "OP-004",
+      "kind": "adr.append",
+      "resolves": [
+        "I-004"
+      ],
+      "expectedAdrCollectionSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "after": {
+        "id": "ADR-0001",
+        "title": "Forward compatibility of close.git checkpoints via team.minPackageVersion",
+        "status": "accepted",
+        "date": "2026-11-02",
+        "context": "Checkpoints whose frozen close inputs include close.git (written from 6.5.0) are reported as unauthorized transitions by 6.4.x runtimes, and a 6.4.x retry would raise CHECKPOINT_CONFLICT. Scopes and project.json are tracked, so mixed-version teams are affected (kyro qa M2, debt-3). Shipped runtimes cannot be changed; 6.4.x already warns in kyro doctor when the runtime is older than project.json team.minPackageVersion.",
+        "decision": "Use the existing team.minPackageVersion as the compatibility signal: when a close writes close.git and the shared policy is unset or below the release that introduced close.git, print an advisory (text and structured warning) recommending team.minPackageVersion >= that release; never edit project.json automatically. Document the break in CHANGELOG, docs/teams.md, and docs/sprint-close-checkpoints.md; no doc may claim the change is fully schema-compatible without this caveat.",
+        "consequences": [
+          "Teams that follow the advisory get a doctor WARN on outdated 6.4.x runtimes before they misread history.",
+          "Teams that ignore it can still see false tamper reports on 6.4.x; documented, not prevented.",
+          "No new marker or schema version; backward compatibility is unchanged."
+        ],
+        "alternatives": [
+          "New writer-version marker: rejected, 6.4.x runtimes cannot read it.",
+          "Automatically raise team.minPackageVersion on close: rejected, silently changes shared team policy.",
+          "Accept the risk with docs only: rejected, gives mixed-version teams no machine signal."
+        ]
+      },
+      "reason": "live ADR added after close; record the observed append"
+    }
+  ],
+  "result": {
+    "stateSha256": "67b904ee429afed4c84f0ad59fff83d6d1cf22dacc9a62fffc1bf1a277de557a",
+    "witness": {
+      "schemaVersion": 1,
+      "kind": "operations-replay"
+    }
+  },
+  "provenance": {
+    "reason": "live convention added after close; record the observed append live convention added after close; record the observed append live convention added after close; record the observed append live ADR added after close; record the observed append",
+    "actor": "operator",
+    "kyroVersion": "6.4.1"
+  }
+}

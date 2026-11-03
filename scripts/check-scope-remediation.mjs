@@ -1235,15 +1235,15 @@ withFixture((fx) => {
   });
 
   // 5. The public surface must describe the route that exists, and only that route.
-  {
-    const help = run(repo, ['remediate', '--help']).output;
+  withFixture((fx) => {
+    const help = run(fx.root, ['remediate', '--help']).output;
     assert(help.includes('canonicalize-prepare') && help.includes('canonicalize-preview'), 'help must document both read-only surfaces');
     assert(help.includes('READ-ONLY'), 'help must say the canonicalization surfaces are read-only');
     assert(/remediate apply/.test(help), 'help must route a reviewed canonicalization to remediate apply');
     // Naming the absent verb to say it does not exist is honest; listing it as usable is not.
     assert(!/^\s*kyro remediate canonicalize-apply/m.test(help), 'help must not offer an apply verb that does not exist');
     assert(/no\s+canonicalize-apply command/i.test(help), 'help must say plainly that no apply verb exists');
-    const absent = run(repo, ['remediate', 'canonicalize-apply', '--kyro-scope', SCOPE]);
+    const absent = run(fx.root, ['remediate', 'canonicalize-apply', '--kyro-scope', SCOPE]);
     assert(absent.status !== 0 && absent.output.includes('UNKNOWN_SUBCOMMAND'), 'there must be no canonicalize-apply verb');
 
     const catalog = readJson(resolve(repo, 'fixtures/mcp/tool-catalog.golden.json'));
@@ -1255,7 +1255,7 @@ withFixture((fx) => {
       assert(/read-only/i.test(tool.description), `${name} description must say it is read-only`);
     }
     assert(catalog.tools.every((tool) => !tool.name.includes('canonicalize_apply')), 'the catalog must not advertise an apply tool');
-  }
+  });
 }
 
 // --- Shared canonicalization fixture (T3.1, T3.2, T3.3) -----------------------------------------

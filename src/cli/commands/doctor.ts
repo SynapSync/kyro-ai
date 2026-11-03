@@ -53,7 +53,7 @@ import { listScopes } from '../core/scopes';
 import { listForeignScopeDirectories } from '../artifacts/scopes';
 import { emitTraceEvent, readTrace } from '../core/trace';
 import { runArtifactAuditChecks } from './artifact-doctor';
-import { diagnoseKyroGitTrackability } from '../core/git-trackability';
+import { diagnoseKyroGitTrackability, diagnoseStateWriterLockIgnore } from '../core/git-trackability';
 import type { CheckResult, CliOptions, MachineAdapterRegistry } from '../types';
 
 const PROJECT_STATE_INSTALL_REMEDY = PROJECT_STATE_BOOTSTRAP_REMEDY;
@@ -95,6 +95,7 @@ export function runDoctorChecks(includeTokenAudit: boolean, includeArtifactAudit
     ...packagingChecks,
     ...checkProjectState(),
     diagnoseKyroGitTrackability(),
+    diagnoseStateWriterLockIgnore(),
     checkUnregisteredScopes(),
     ...(kyroScope ? [] : checkForeignScopeDirectories()),
     checkTeamMinPackageVersion(),

@@ -53,6 +53,26 @@ Never auto-enable on install/sync. See [Architecture — Delegated execution](ar
 
 **How to use it in forge** (prompts, L0 vs L1, role split): [Getting started — Delegated execution](getting-started.md#delegated-execution-optional).
 
+### Close commit opt-in (6.5.0)
+
+Add to `.agents/kyro/local.json` (gitignored):
+
+```json
+{
+  "git": {
+    "commitOnSprintClose": true
+  }
+}
+```
+
+| Rule | Detail |
+|------|--------|
+| Default | Absent or `false` → no commit |
+| Storage | **local.json only** — a personal choice, not team policy |
+| Effect | A confirmed close commits exactly the files it wrote; see [CLI — close commit](cli.md#sprint-close-git-range-and-optional-commit) |
+
+Kyro preserves both `execution` and `git` when it rewrites `local.json` (for example on `scope set-active`).
+
 ## Clone bootstrap
 
 ```bash
@@ -127,6 +147,8 @@ In `project.json`:
 ```
 
 Doctor emits a non-blocking **WARN** when the installed runtime package is older than `team.minPackageVersion`.
+
+**6.5.0 and sprint git ranges.** Checkpoints written by 6.5.0 or later can carry `close.git`, which runtimes older than 6.5.0 report as an unauthorized transition. Teams that share scopes should set `"minPackageVersion": "6.5.0"` (or newer) so teammates on older runtimes get the doctor WARN instead of a false tamper report. A close that records `close.git` while the floor is unset or older prints an advisory; it never edits `project.json`. See [Sprint git range](sprint-close-checkpoints.md#sprint-git-range).
 
 ## Non-goals (this contract)
 

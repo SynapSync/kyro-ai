@@ -22,7 +22,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { WORKSPACE_ROOT } from '../constants';
 import { KyroCoreError } from '../core/errors';
 
-const STATE_WRITER_LOCK = '.kyro-state-writer.lock';
+export const STATE_WRITER_LOCK = '.kyro-state-writer.lock';
 const OWNER_FILE = 'owner.json';
 const HEARTBEAT_FILE = 'heartbeat.json';
 const RECLAIM_PREFIX = `${STATE_WRITER_LOCK}.reclaim-`;

@@ -13,7 +13,7 @@ import { activeGraphIssues } from './task-graph';
 import { canonicalJson, sha256 } from './digest';
 import { KyroCoreError } from './errors';
 import { policyIssues, loadPolicy } from './policy';
-import { deriveActiveSprintStatus, deriveLiveWorkHandoff, derivePhaseStatus, taskExecutionInfo } from './status';
+import { deriveActiveSprintStatus, deriveLiveWorkHandoff, derivePhaseStatus } from './status';
 import { emitToolCommandRun } from './trace';
 import type { ActiveSprint, SpecRequirement, SpecScenario, SprintFile, Task } from '../types';
 
@@ -245,9 +245,8 @@ export function prepareActivePlan(scope: string, input: ActivePlanInput): Active
     if (task.status === 'done') { change(task.id, 'status', 'done', 'pending'); task.status = 'pending'; }
   }
   if (changes.length) {
-    const execution = new Map(taskExecutionInfo(next).map((info) => [info.taskId, info]));
     for (const phase of next.activeSprint!.phases) {
-      const status = derivePhaseStatus(phase, execution);
+      const status = derivePhaseStatus(phase);
       change(`phase:${phase.id}`, 'status', phase.status, status);
       phase.status = status;
     }

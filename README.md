@@ -10,6 +10,8 @@ Version **6.4.0** adds focused validation suggestions and proportional Forge spr
 
 Version **6.4.1** fixes native Windows brief ingestion for `work create` and `work amend-brief`, and isolates the integrity-repair tests from developer machine configuration. See the [Work guide](docs/work.md) for the portable source checks and their limits.
 
+Version **6.5.0** records each Forge sprint's git range (`startCommit` at plan, `endCommit` frozen at close) so its code can be reproduced as an exact `git diff`, and adds an opt-in commit of the close artifacts (`git.commitOnSprintClose` in `local.json`); it also fixes active-plan phase statuses, Git exclusion of the state-writer lock, and remediation replay across later sprint closes. Checkpoints that carry the range need 6.5.0 or later to verify; teams sharing scopes should set `team.minPackageVersion`. See [Sprint git range](docs/sprint-close-checkpoints.md#sprint-git-range).
+
 ## Choose a workflow
 
 | | Forge | Work |

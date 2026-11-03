@@ -49,6 +49,26 @@ export function resolveDelegationEnabled(): boolean {
   return local?.execution?.delegationEnabled === true;
 }
 
+/** True when local.json sets git.commitOnSprintClose to true; false when absent or false. */
+export function resolveCommitOnSprintClose(): boolean {
+  const local = readLocalProjectState();
+  return local?.git?.commitOnSprintClose === true;
+}
+
+/** A valid personal execution block, preserved across local.json rewrites; {} otherwise. */
+function localExecutionPreferences(value: unknown): { execution?: { delegationEnabled: boolean } } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const flag = (value as { delegationEnabled?: unknown }).delegationEnabled;
+  return typeof flag === 'boolean' ? { execution: { delegationEnabled: flag } } : {};
+}
+
+/** A valid personal git preference block, preserved across local.json rewrites; {} otherwise. */
+function localGitPreferences(value: unknown): { git?: { commitOnSprintClose: boolean } } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const flag = (value as { commitOnSprintClose?: unknown }).commitOnSprintClose;
+  return typeof flag === 'boolean' ? { git: { commitOnSprintClose: flag } } : {};
+}
+
 /** Raw legacy monolito file only — does not merge layers. */
 export function readMonolitoProjectState(): KyroProjectState | null {
   return readJsonFromWorkspace<KyroProjectState>(KYRO_STATE_PATH);
@@ -302,6 +322,8 @@ export function mergeProjectLayers(
   if (shared.principles !== undefined) effective.principles = shared.principles;
   if (shared.conventions !== undefined) effective.conventions = shared.conventions;
   if (shared.team !== undefined) effective.team = shared.team;
+  // Local-only personal preferences ride along so state rewrites (split → local.json) keep them.
+  Object.assign(effective, localExecutionPreferences(local.execution), localGitPreferences(local.git));
   return stripLegacyProjectFields(effective);
 }
 
@@ -317,6 +339,8 @@ export function effectiveFromMonolito(monolito: KyroProjectState): KyroProjectSt
     ...(base.principles !== undefined ? { principles: base.principles } : {}),
     ...(base.conventions !== undefined ? { conventions: base.conventions } : {}),
     ...(base.team !== undefined ? { team: base.team } : {}),
+    ...localExecutionPreferences(base.execution),
+    ...localGitPreferences(base.git),
   };
 }
 
@@ -353,6 +377,8 @@ export function splitMonolitoToLayers(monolito: KyroProjectState): SplitMonolito
     activeScope: effective.activeScope,
     installedAdapters: effective.installedAdapters.map(cloneInstalledAdapter),
     runtimePath: effective.runtimePath,
+    ...localExecutionPreferences(effective.execution),
+    ...localGitPreferences(effective.git),
   };
   return { shared: sanitizeSharedForWrite(shared), local: sanitizeLocalForWrite(local) };
 }
@@ -563,6 +589,9 @@ export function sanitizeLocalForWrite(local: KyroLocalProjectState): KyroLocalPr
       ? local.installedAdapters.map(cloneInstalledAdapter)
       : [],
     ...(local.runtimePath !== undefined ? { runtimePath: local.runtimePath } : {}),
+    // Personal preferences; validated below (execution) and by localGitPreferences (git).
+    ...(local.execution !== undefined ? { execution: local.execution } : {}),
+    ...(local.git !== undefined ? { git: local.git } : {}),
   }) as KyroLocalProjectState & Record<string, unknown>;
   delete cleaned.principles;
   delete cleaned.conventions;
@@ -593,6 +622,7 @@ export function sanitizeLocalForWrite(local: KyroLocalProjectState): KyroLocalPr
   ) {
     result.execution = { delegationEnabled: (cleaned.execution as { delegationEnabled: boolean }).delegationEnabled };
   }
+  Object.assign(result, localGitPreferences(cleaned.git));
   return result;
 }
 
@@ -650,6 +680,7 @@ function normalizeLocal(raw: KyroLocalProjectState | null): KyroLocalProjectStat
       && typeof (stripped.execution as { delegationEnabled?: unknown }).delegationEnabled === 'boolean'
       ? { execution: { delegationEnabled: (stripped.execution as { delegationEnabled: boolean }).delegationEnabled } }
       : {}),
+    ...localGitPreferences((stripped as { git?: unknown }).git),
   };
 }
 
