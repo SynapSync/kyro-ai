@@ -402,7 +402,7 @@
         "n": 4,
         "slug": "remediation-lifecycle",
         "title": "Remediation chain verification across later sprint closes",
-        "state": "active"
+        "state": "closed"
       }
     ]
   },
@@ -451,111 +451,29 @@
         "Decide on scope completion and the 6.5.0 release; then update kyro-qa-assist to v1.1 in skills-registry."
       ],
       "checkpointSha256": "f87aac4601bce285e44e313502efb3dd0a28604c3aeb2d77468aef69ea134b88"
+    },
+    {
+      "n": 4,
+      "slug": "remediation-lifecycle",
+      "outcome": "shipped",
+      "closedAt": "2026-11-03",
+      "archive": "archive/sprint-004-remediation-lifecycle.md",
+      "snapshot": "archive/sprint-004-remediation-lifecycle.json",
+      "checkpoint": "archive/sprint-004-remediation-lifecycle.checkpoint.json",
+      "recommendations": [
+        "Decide on scope completion; no open debt remains.",
+        "Release 6.5.0 is a user decision; afterwards update kyro-qa-assist to v1.1 in skills-registry to use ledger[].git ranges."
+      ],
+      "checkpointSha256": "e506dab8484067218ffa0ebce1285bf435fc32a0e50ba3c638da320977e1ded8"
     }
   ],
   "previousSprint": {
-    "n": 3,
-    "slug": "debt-remediation",
-    "outcome": "shipped",
-    "summary": "Debt remediation: update-active derives phase statuses like repair/analyze (debt-1); root state-writer lock ignored via a hardened local git exclude per ADR-0002 (debt-2); Windows CI evidence for Sprint 2 checks (debt-7). Implemented by Sol 6.1, certified by Astra."
-  },
-  "activeSprint": {
     "n": 4,
     "slug": "remediation-lifecycle",
-    "title": "Remediation chain verification across later sprint closes",
-    "objective": "kyro doctor --artifacts and kyro repair integrity accept authorized sprint closes recorded after a remediation chain head, while still detecting real divergence, so PR #154 CI passes and the close validation runs the artifact doctor.",
-    "status": "executing",
-    "phases": [
-      {
-        "id": "P1",
-        "title": "Lifecycle-aware remediation verification",
-        "objective": "Fix the false DIVERGED and unblock chain extension.",
-        "status": "active",
-        "tasks": [
-          {
-            "id": "T4.1",
-            "title": "Verify remediation chains against their bound checkpoint and accept later authorized closes",
-            "description": "doctor --artifacts reports the chain head R-001 of scope sprint-git-traceability as DIVERGED because the remediation lens (src/cli/remediation/plan.ts inspectRemediationTransaction ~421-428) and the verification walk (deriveScopeVerificationState ~943-957) compare the head's result.stateSha256 directly with live state; isSupersededByActiveSprint (~442-451) only excuses an active later sprint, and the digest-directed path resolveScopeEvolution (~659+) is skipped because usesBoundEvolution (~652-656) requires completion data or schemaVersion >= 5. repair integrity prepare is blocked too: resolveRemediationReplayState (~776-831) replays from the newest checkpoint instead of the record's base. Make verification and replay lifecycle-aware: verify each record against the checkpoint image it is bound to (base.checkpoints), then accept later authorized sprint closes whose checkpoints chain from that state; real divergence (any change not explained by the chain plus later authorized closes) must still fail.",
-            "files_to_touch": [
-              "src/cli/remediation/plan.ts",
-              "src/cli/repair/integrity-apply.ts",
-              "scripts/check-scope-remediation.mjs",
-              "scripts/check-verification-states.mjs"
-            ],
-            "context": "Found by a MiniMax diagnostic of PR #154 run 41545795331 (job validate): '[FAIL] sprint-git-traceability/remediation/R-001: DIVERGED: live state digest a6208212... does not match the record result digest 67b904ee...'. R-001 (schemaVersion 4) recorded 3 conventions + ADR-0001 appended after the Sprint 1 close; Sprints 2 and 3 were closed afterwards. Live state equals the Sprint 3 checkpoint after-image. Do not hand-edit .agents/kyro/**. Implementation delegated to Sol 6.1; QA by Astra.",
-            "acceptance_criteria": [
-              "A fixture scope with a post-close remediation record followed by one or more authorized sprint closes passes doctor --artifacts (remediation and verification lenses) — proven by npm run check:scope-remediation and npm run check:verification-states.",
-              "In the same fixture, a live change not explained by the chain or a later checkpoint still reports DIVERGED, and repair integrity prepare can extend the chain after later closes — proven by the same checks.",
-              "In this repository, node dist/cli.js doctor --artifacts exits 0; npm run build, npm run check:repair-integrity, npm run check:replay-witness, npm run check:lossless-checkpoints, and npm run check:compact-remediation-witness pass."
-            ],
-            "depends_on": [],
-            "scenario_refs": [
-              "S21"
-            ],
-            "status": "done",
-            "evidence": {
-              "summary": "Close-validation fix by Sol 6.1: scripts/check-cli-bundle-assets.mjs no longer asserts a hardcoded '315 assertions passed'; it runs the same check-verification-states harness against the source checkout and the projected runtime, requires successful exits and valid summaries, and compares their assertion counts. Remediation logic (checkpoint-bound replay, debt content preservation) unchanged since Astra's approval.",
-              "validation": [
-                "npm run check:cli-bundle-assets: pass, source and projected counts both 523; npm run check:verification-states: 523 assertions passed; npm run check:cli-bundle: pass; npm run build: pass (reported by Sol 6.1)",
-                "grep of scripts/ found no other hardcoded counts for check:verification-states or check:scope-remediation (unrelated check:debt-contract count unchanged) (reported by Sol 6.1)"
-              ],
-              "files_changed": [
-                "src/cli/remediation/plan.ts",
-                "src/cli/repair/integrity-plan.ts",
-                "scripts/check-verification-states.mjs",
-                "scripts/check-scope-remediation.mjs",
-                "scripts/check-cli-bundle-assets.mjs",
-                "docs/sprint-close-checkpoints.md"
-              ],
-              "by": "sol-6.1",
-              "recordedAt": "2026-11-03T04:30:13.319Z"
-            },
-            "verdict": {
-              "result": "pass",
-              "checked_criteria": [
-                "A fixture scope with a post-close remediation record followed by one or more authorized sprint closes passes doctor --artifacts (remediation and verification lenses) — proven by npm run check:scope-remediation and npm run check:verification-states.",
-                "In the same fixture, a live change not explained by the chain or a later checkpoint still reports DIVERGED, and repair integrity prepare can extend the chain after later closes — proven by the same checks.",
-                "In this repository, node dist/cli.js doctor --artifacts exits 0; npm run build, npm run check:repair-integrity, npm run check:replay-witness, npm run check:lossless-checkpoints, and npm run check:compact-remediation-witness pass."
-              ],
-              "findings": [],
-              "by": "astra",
-              "reviewedAt": "2026-11-03T04:30:48.764Z",
-              "requestDigest": "c232b3dd399a20a17d538a1aa4ae2df7e178207c19ee92cc5b9f6eb3cc516bb5",
-              "reviewedMaterialDigest": "36f1be48227bf89ac4a0c0bd9eebcbb4e7be7a2579ae540ca8e6aa18be2f2c6f"
-            }
-          },
-          {
-            "id": "T4.2",
-            "title": "Run the artifact doctor in close validation and confirm PR #154 CI",
-            "description": "Add npm run check:artifacts to the close commands of .agents/kyro/validation.json so every sprint close runs the artifact doctor that CI runs, then confirm on PR #154 that validate and the Windows jobs pass after the Sprint 4 push (resolves debt-8).",
-            "files_to_touch": [
-              ".agents/kyro/validation.json"
-            ],
-            "context": "Orchestrator task (Kyro configuration and CI evidence). Sprint 3 closed with npm run check passing while CI's extra check:artifacts failed.",
-            "acceptance_criteria": [
-              "validation.json close commands include npm run check:artifacts and the map stays valid (kyro analyze reports no validation-tier issue) — verified by reading the file and analyze.",
-              "PR #154 checks validate and Windows Node 18/20/22 pass on the Sprint 4 push — verified with gh pr checks / gh run view."
-            ],
-            "depends_on": [
-              "T4.1"
-            ],
-            "scenario_refs": [
-              "S22"
-            ],
-            "status": "pending",
-            "evidence": null,
-            "verdict": null
-          }
-        ]
-      }
-    ],
-    "emergentTasks": [],
-    "definitionOfDone": [
-      "All tasks done with CLI-recorded evidence and a passing verdict.",
-      "Proportional close validation, including npm run check:artifacts, passes; escalation applies (src/cli/repair/**, remediation).",
-      "debt-8 resolved through T4.2."
-    ]
+    "outcome": "shipped",
+    "summary": "Remediation chains now verify across later sprint closes (ADR-0003): checkpoint-bound replay through valid later closes with ledger/convention/ADR/debt-content preservation; repair integrity extends chains from the verified baseline; close validation runs check:artifacts; PR #154 CI green on Linux and Windows. Implemented by Sol 6.1, certified by Astra."
   },
+  "activeSprint": null,
   "debt": [
     {
       "id": "debt-1",
@@ -625,17 +543,17 @@
       "title": "Confirm Windows CI for the Sprint 3 changes (active-plan statuses, root lock exclude) after push",
       "origin": 3,
       "priority": "low",
-      "status": "in_progress",
+      "status": "resolved",
       "targetSprint": null,
-      "note": "Astra re-QA note: native Windows execution of the T3.2 remediation (identity fallback) is first exercised by the PR #154 Windows jobs on the Sprint 3 push."
+      "note": "PR #154 run 41579603446 at a7f0ab3 (Sprint 3 + Sprint 4 code): Windows Node 18/20/22 succeeded, including 'Verify sprint git traceability' and 'Verify sprint close commit'; validate (with check:artifacts) succeeded. Verified by Astra (T4.2)."
     }
   ],
   "handoff": {
-    "nextAction": "execute_task",
-    "nextTaskId": "T4.2",
+    "nextAction": "await_scope_completion",
+    "nextTaskId": null,
     "blockers": [],
-    "note": "Task T4.1 passed checker review.",
-    "lastUpdated": "2026-11-03T04:30:48.764Z"
+    "note": "Close validation — reconciliation: source unchanged since commit a7f0ab3 (git status shows only .agents/kyro/scopes/sprint-git-traceability/sprint.json from evidence/review/debt writes). Close commands (validation.json): npm run build and npm run check:artifacts ran on the final state (exit 0, no [FAIL]). Integration status: satisfied by reused evidence — npm run check (88 scripts, exit 0) on the identical source tree before commit a7f0ab3, and PR #154 CI run 41579603446 at a7f0ab3 (validate incl. check:artifacts, Windows Node 18/20/22) all success. QA (Astra): T4.1 failed once (M1 debt content rewrite) and once in orchestrator close validation (hardcoded count in check-cli-bundle-assets), both remediated by Sol 6.1 and approved; T4.2 approved. debt-8 resolved. Closed with the installed 6.4.1 runtime (ADR-0001).",
+    "lastUpdated": "2026-11-03"
   },
   "author": {
     "name": "Roimer Peraza",
