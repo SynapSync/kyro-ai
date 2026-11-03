@@ -224,7 +224,8 @@
     "npm run typecheck"
   ],
   "close": [
-    "npm run build"
+    "npm run build",
+    "npm run check:artifacts"
   ],
   "integration": [
     "npm run build",

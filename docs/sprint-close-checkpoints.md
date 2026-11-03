@@ -129,6 +129,16 @@ Before each renewal Kyro verifies the real lock-directory inode, exact owner rec
 
 Only the latest checkpoint is compared with current live state. Older checkpoints are historical records: doctor validates their schema, semantic transition, digests, artifacts, and ledger identity without treating later sprint evolution as divergence.
 
+Remediations are replayed from the checkpoint boundary named by their `base.checkpoints`, including
+records already sealed by a later close. Later valid closes advance that boundary in ledger order:
+their before-image must preserve prior ledger entries, conventions and ADRs unchanged and retain
+every prior debt item. Debt `id`, `title`, `origin` and any additional fields are immutable;
+only `status`, `targetSprint`, `note` and priority escalation may change through normal debt
+lifecycle work. A priority decrease requires an explicit typed remediation, not a later close.
+Normal planning and execution may evolve within that sprint. The latest after-image, plus any later replayed remediations and explicit lifecycle
+transitions, must exactly reproduce live state; an unexplained post-close edit remains `DIVERGED`.
+This proves structural consistency with committed history, not actor authenticity.
+
 ## External consumers
 
 Kyro Lens and other readers should prefer recognized checkpoint versions for historical scope views, then fall back to legacy ActiveSprint snapshots with an explicit limited-history label. This release documents the contract only; it does not modify the Kyro Lens runtime.
