@@ -2,7 +2,10 @@ import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { printPlan, resolveManagedPath } from '../fs';
-import { readProjectState } from '../state';
+import { readProjectState, resolveCommitOnSprintClose } from '../state';
+import { setCliMachineResult } from '../core/cli-envelope';
+import { buildManualCommand, commitCloseArtifacts, type CloseCommitResult } from '../core/close-commit';
+import { compareSemverLike } from './doctor';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { collectFindings } from '../core/analysis';
 import { KyroCoreError } from '../core/errors';
@@ -18,7 +21,7 @@ import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun, emitTraceEvent, normalizeTraceCloseOutcome, traceSnapshotId } from '../core/trace';
 import { readJsonSafely } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
-import { projectScopeWritePath } from '../checkpoints/sprint-close';
+import { closeWrittenProjectStatePath, projectScopeWritePath } from '../checkpoints/sprint-close';
 import { surveyScopeCheckpoints } from '../checkpoints/discovery';
 import { asSprintFile, validateSprintFile } from '../artifacts/schema';
 import { verifyWrittenSprint } from '../artifacts/load-sprint';
@@ -30,8 +33,9 @@ import {
   readSprintCloseCheckpoint,
   type SprintCloseTransaction,
 } from '../checkpoints/sprint-close';
-import type { ActiveSprint, OperationPlan, SprintCloseCheckpointV1, SprintCloseInputs, SprintFile, Task } from '../types';
+import type { ActiveSprint, OperationPlan, SprintCloseCheckpointV1, SprintCloseInputs, SprintFile, SprintGitEnd, Task } from '../types';
 import { SPRINT_CLOSE_OUTCOME } from '../types';
+import { captureSprintGitEnd, describeMissingGitCapture } from '../core/git-capture';
 import { assertSafeManagedPath, assertSafePathSegment, withStateWriterLock } from '../pipeline/state-writer-lock';
 
 /**
@@ -97,10 +101,134 @@ export async function runCloseSprintCommand(rawArgs: string[]): Promise<void> {
 
   // Rebuild under the writer lock. The displayed plan is advisory; no stale pre-prompt state is
   // ever applied after another mutator has had a chance to run.
-  withStateWriterLock(() => executeConfirmedClose(scope, args));
+  const context = withStateWriterLock(() => executeConfirmedClose(scope, args));
+  // Post-close git work runs after the lock is released: commit hooks may invoke Kyro.
+  const finalization = finalizeClose(context);
+  printCloseFinalization(finalization);
+  setCliMachineResult('applied', {
+    scope,
+    sprint: context.sprintN,
+    outcome: context.outcome,
+    nextAction: context.nextAction,
+    git: finalization.git,
+    commit: finalization.commit,
+    warnings: finalization.warnings,
+  });
 }
 
-function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
+/** What a confirmed close hands to the post-lock step (shared by CLI and MCP). */
+export interface PostCloseContext {
+  scope: string;
+  sprintN: number;
+  title: string;
+  outcome: string;
+  nextAction: string;
+  /** Exactly the paths the close transaction wrote (never a project-state file it only verified). */
+  paths: string[];
+  git: SprintGitEnd | undefined;
+  /** True when the close resumed an existing checkpoint instead of creating one. */
+  resumed: boolean;
+}
+
+export type CloseGitReport =
+  | { recorded: true; branch: string | null; endCommit: string; dirty: boolean }
+  | { recorded: false; reason: string };
+
+export interface CloseFinalization {
+  git: CloseGitReport;
+  /** Null when git.commitOnSprintClose is not enabled. */
+  commit: CloseCommitResult | null;
+  warnings: string[];
+}
+
+const DIRTY_WARNING = "Uncommitted changes outside .agents/kyro/ existed at close; they are outside this sprint's git range.";
+
+/** First release whose checkpoints carry close.git; older runtimes reject them (ADR-0001). */
+export const CLOSE_GIT_MIN_RUNTIME = '6.5.0';
+
+/**
+ * ADR-0001: older runtimes report checkpoints with close.git as unauthorized transitions. Recommend the
+ * existing team.minPackageVersion floor (understood by 6.4.x doctor). Never edits project.json.
+ */
+function compatibilityAdvisory(context: PostCloseContext): string | null {
+  if (!context.git) return null;
+  const floor = readProjectState()?.team?.minPackageVersion;
+  if (typeof floor === 'string' && (compareSemverLike(floor.trim(), CLOSE_GIT_MIN_RUNTIME) ?? -1) >= 0) return null;
+  return `This close recorded git data that Kyro runtimes older than ${CLOSE_GIT_MIN_RUNTIME} report as an unauthorized transition. `
+    + `Set team.minPackageVersion to "${CLOSE_GIT_MIN_RUNTIME}" or newer in .agents/kyro/project.json so older runtimes warn in kyro doctor.`;
+}
+
+export function postCloseContext(transaction: SprintCloseTransaction, resumed: boolean, nextAction: string): PostCloseContext {
+  const checkpoint = transaction.checkpoint;
+  const active = checkpoint.beforeClose.activeSprint;
+  const title = checkpoint.beforeClose.roadmap.sprints.find((s) => s.n === checkpoint.identity.sprintN)?.title
+    ?? active?.title
+    ?? active?.objective
+    ?? checkpoint.identity.sprintSlug;
+  return {
+    scope: checkpoint.identity.scope,
+    sprintN: checkpoint.identity.sprintN,
+    title,
+    outcome: checkpoint.close.outcome,
+    nextAction,
+    paths: [
+      transaction.checkpointPath,
+      checkpoint.paths.legacySnapshot,
+      checkpoint.paths.narrative,
+      sprintJsonPath(checkpoint.identity.scope),
+      ...(closeWrittenProjectStatePath() !== null ? [closeWrittenProjectStatePath() as string] : []),
+    ],
+    git: checkpoint.close.git,
+    resumed,
+  };
+}
+
+/** Run one post-close step; an error becomes a warning because the sprint is already closed. */
+function postCloseStep<T>(label: string, warnings: string[], fallback: T, step: () => T): T {
+  try {
+    if (process.env.KYRO_TEST_POST_CLOSE_FAIL === label) throw new KyroCoreError('INTERNAL', `Injected post-close failure in ${label}.`);
+    return step();
+  } catch (error) {
+    warnings.push(`Post-close ${label} failed after the sprint was closed: ${error instanceof Error ? error.message : String(error)}`);
+    return fallback;
+  }
+}
+
+/** Git report, warnings, and the opt-in commit. Never throws; never changes the closed state. */
+export function finalizeClose(context: PostCloseContext): CloseFinalization {
+  const warnings: string[] = [];
+  const git: CloseGitReport = context.git
+    ? { recorded: true, branch: context.git.branch, endCommit: context.git.endCommit, dirty: context.git.dirty }
+    // A resumed close reuses frozen inputs, so present-time git state says nothing about the original attempt.
+    : postCloseStep('git report', warnings, { recorded: false, reason: 'unknown' } as CloseGitReport, () => ({
+      recorded: false,
+      reason: context.resumed ? 'not recorded at the original close attempt' : describeMissingGitCapture(),
+    }));
+  if (context.git?.dirty) warnings.push(DIRTY_WARNING);
+  const advisory = postCloseStep('advisory', warnings, null, () => compatibilityAdvisory(context));
+  if (advisory) warnings.push(advisory);
+  const commit = postCloseStep<CloseCommitResult | null>('commit', warnings, {
+    status: 'failed',
+    reason: 'post-close commit step failed',
+    manualCommand: buildManualCommand(context.paths, context.scope, context.sprintN, context.title),
+  }, () => (
+    resolveCommitOnSprintClose()
+      ? commitCloseArtifacts({ paths: context.paths, scope: context.scope, sprintN: context.sprintN, title: context.title })
+      : null
+  ));
+  return { git, commit, warnings };
+}
+
+function printCloseFinalization(finalization: CloseFinalization): void {
+  const { git, commit, warnings } = finalization;
+  console.log(git.recorded ? `Git range: ${git.branch ?? 'detached HEAD'} → ${git.endCommit.slice(0, 12)}` : `Git range: not recorded (${git.reason}).`);
+  for (const warning of warnings) console.log(`⚠ ${warning}`);
+  if (!commit) return;
+  if (commit.status === 'committed') console.log(`Close commit: ${commit.sha?.slice(0, 12)} (${commit.paths?.length ?? 0} file(s); Kyro-Sprint trailer).`);
+  else console.log(`Close commit ${commit.status}: ${commit.reason}${commit.manualCommand ? `\n  Commit manually: ${commit.manualCommand}` : ''}`);
+}
+
+function executeConfirmedClose(scope: string, args: CloseSprintArgs): PostCloseContext {
   const fresh = buildClosePlan(scope, args);
   const identity = fresh.transaction.checkpoint.identity;
   emitToolCommandRun(scope, 'cli', 'close-sprint', { outcome: fresh.transaction.checkpoint.close.outcome });
@@ -110,7 +238,7 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
     throw new KyroCoreError(guard.code ?? 'POLICY_BLOCKED', guard.message, guard.remedy);
   }
   emitGateApproved(scope, 'close_sprint');
-  applySprintCloseTransaction(fresh.transaction);
+  const applied = applySprintCloseTransaction(fresh.transaction);
 
   const written = verifyWrittenSprint(scope, 'close-sprint', { remedy: `The snapshot at ${fresh.snapshotPath} preserves the sprint.` });
   emitTraceEvent({
@@ -147,6 +275,7 @@ function executeConfirmedClose(scope: string, args: CloseSprintArgs): void {
     console.log('');
     console.log('▶ Scope is terminal (historical completion or retirement). No further forge modes.');
   }
+  return postCloseContext(fresh.transaction, applied.resumed, handoff.nextAction);
 }
 
 export function buildClosePlan(
@@ -247,7 +376,9 @@ export function buildClosePlan(
     return closePlanResult(sprint, transactionFromExisting(checkpointPath, existingCheckpoint));
   }
 
-  const closeInputs = buildCloseInputs(active, args);
+  // End of the sprint's git range: read HEAD before any close write and freeze it in the
+  // checkpoint inputs. Retries reuse the frozen value (retryCloseInputs) and never re-read HEAD.
+  const closeInputs = buildCloseInputs(active, args, captureSprintGitEnd());
 
   const state = readProjectState();
   const projectScopeBefore = state?.scopes.find((entry) => entry.id === scope);
@@ -282,6 +413,7 @@ export function buildClosePlan(
   return closePlanResult(sprint, transaction);
 }
 
+
 /**
  * Render the human narrative .md deterministically. The TITLE is taken from `roadmap.sprints[]`
  * (the authoritative source, always present) with safe fallbacks — so it can never render
@@ -313,6 +445,16 @@ function renderNarrative(sprint: SprintFile, active: ActiveSprint, args: SprintC
   lines.push('');
   lines.push(active.objective);
   lines.push('');
+
+  if (args.git) {
+    lines.push('## Git range');
+    lines.push('');
+    lines.push(`- Branch: ${args.git.branch ?? '(detached HEAD)'}`);
+    lines.push(`- Start commit: ${active.git?.startCommit ?? '(not recorded at planning)'}`);
+    lines.push(`- End commit: ${args.git.endCommit}`);
+    if (args.git.dirty) lines.push('- Uncommitted changes outside .agents/kyro/ existed at close and are not part of this range.');
+    lines.push('');
+  }
 
   lines.push('## Definition of Done');
   lines.push('');
@@ -476,16 +618,19 @@ function retryCloseInputs(checkpoint: SprintCloseCheckpointV1, args: CloseSprint
     summary: args.summary,
     recommendations: [...args.recommendations],
     learnings: [...args.learnings],
+    // Frozen at the first attempt; a retry must not re-read HEAD.
+    ...(checkpoint.close.git ? { git: checkpoint.close.git } : {}),
   };
 }
 
-function buildCloseInputs(active: ActiveSprint, args: CloseSprintArgs): SprintCloseInputs {
+function buildCloseInputs(active: ActiveSprint, args: CloseSprintArgs, git: SprintGitEnd | null): SprintCloseInputs {
   return {
     outcome: resolveCloseOutcome(active, args),
     note: args.note,
     summary: args.summary,
     recommendations: [...args.recommendations],
     learnings: [...args.learnings],
+    ...(git ? { git } : {}),
   };
 }
 

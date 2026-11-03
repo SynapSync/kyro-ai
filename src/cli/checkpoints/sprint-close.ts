@@ -16,7 +16,7 @@ import { dirname } from 'node:path';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
 import { projectStatePath, sprintJsonPath } from '../artifacts/paths';
-import { asProjectState, validateProjectStateShape, validateSprintFile } from '../artifacts/schema';
+import { asProjectState, validateGitBlock, validateProjectStateShape, validateSprintFile, type ValidationIssue } from '../artifacts/schema';
 import { PROJECT_STATE_PATH, KYRO_STATE_PATH } from '../constants';
 import { KyroCoreError, describeWriteFailure } from '../core/errors';
 import { assertNotRetiredSprintOverwrite } from '../core/retirement-guard';
@@ -44,6 +44,14 @@ import { assertSafeManagedPath, assertSafePathSegment, assertStateWriterLeaseHea
  * Path reported/written for the project-scope CAS during sprint close.
  * Layers prefer shared project.json; monolito dual-read keeps kyro.json until migrated.
  */
+/**
+ * The project-state file a close actually writes, or null. Layered workspaces derive the scope entry
+ * from sprint.json and only verify project.json; only a monolito-only workspace rewrites kyro.json.
+ */
+export function closeWrittenProjectStatePath(): string | null {
+  return !hasLayeredProjectStateOnDisk() && hasMonolitoProjectStateOnDisk() ? KYRO_STATE_PATH : null;
+}
+
 export function projectScopeWritePath(): string {
   if (hasLayeredProjectStateOnDisk()) return PROJECT_STATE_PATH;
   if (hasMonolitoProjectStateOnDisk()) return KYRO_STATE_PATH;
@@ -220,6 +228,18 @@ function deriveSprintCloseTransitionWithPolicy(
     snapshot: toArchiveRelative(legacySnapshotPath),
     checkpoint: toArchiveRelative(checkpointPath),
     ...(close.recommendations.length > 0 ? { recommendations: [...close.recommendations] } : {}),
+    // Derived only from frozen inputs so checkpoint re-derivation stays byte-identical;
+    // absent close.git (legacy checkpoints, no repository) yields no git key.
+    ...(close.git
+      ? {
+          git: {
+            branch: close.git.branch,
+            startCommit: active.git?.startCommit ?? null,
+            endCommit: close.git.endCommit,
+            dirty: close.git.dirty,
+          },
+        }
+      : {}),
   };
   const roadmapSprints = beforeClose.roadmap.sprints.map((sprint) => sprint.n === active.n ? { ...sprint, state: 'closed' } : sprint);
   const remaining = roadmapSprints.filter((sprint) => sprint.state !== 'closed').length;
@@ -478,6 +498,12 @@ export function checkpointSchemaIssues(value: unknown, path: string): string[] {
   const issues: string[] = [];
   issues.push(...validateSprintFile(checkpoint.beforeClose, `${path}:beforeClose`).map(formatValidationIssue));
   issues.push(...validateSprintFile(checkpoint.intendedAfterClose, `${path}:intendedAfterClose`).map(formatValidationIssue));
+  const close = asRecord(checkpoint.close);
+  if (close && 'git' in close) {
+    const gitIssues: ValidationIssue[] = [];
+    validateGitBlock(close.git, 'end', path, 'close.git', gitIssues);
+    issues.push(...gitIssues.map(formatValidationIssue));
+  }
   return issues;
 }
 

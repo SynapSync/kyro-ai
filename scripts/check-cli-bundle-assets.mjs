@@ -97,18 +97,25 @@ withWorkspace('kyro-cli-bundle-assets-', (cwd) => {
 
   // T3.6: verify the isolated projected runtime, rather than this checkout or the user's global
   // install, drives the complete remediated/recertified/diverged/unsupported vocabulary harness.
-  const verification = spawnSync(process.execPath, [join(repo, 'scripts/check-verification-states.mjs')], {
-    cwd: repo,
-    encoding: 'utf-8',
-    env: {
-      ...process.env,
-      HOME: home,
-      KYRO_CLI_UNDER_TEST: join(runtimeDir, 'dist/cli.js'),
-    },
-  });
-  const verificationOutput = `${verification.stdout ?? ''}${verification.stderr ?? ''}`;
-  assert(verification.status === 0, `check-cli-bundle-assets: projected runtime verification failed:\n${verificationOutput}`);
-  assert(verificationOutput.includes('315 assertions passed'), `check-cli-bundle-assets: projected runtime did not report verification coverage:\n${verificationOutput}`);
+  const verificationCount = (cliPath, label) => {
+    const verification = spawnSync(process.execPath, [join(repo, 'scripts/check-verification-states.mjs')], {
+      cwd: repo,
+      encoding: 'utf-8',
+      env: { ...process.env, HOME: home, KYRO_CLI_UNDER_TEST: cliPath },
+    });
+    const output = `${verification.stdout ?? ''}${verification.stderr ?? ''}`;
+    assert(verification.status === 0, `check-cli-bundle-assets: ${label} verification failed:\n${output}`);
+    const summaries = [...output.matchAll(/^check:verification-states — ([1-9]\d*) assertions passed\r?$/gm)];
+    assert(summaries.length === 1 && Number.isSafeInteger(Number(summaries[0][1])),
+      `check-cli-bundle-assets: ${label} did not report one positive verification coverage count:\n${output}`);
+    return Number(summaries[0][1]);
+  };
+  // Compare the same complete harness on both runtimes so new regressions need no count bump.
+  const sourceCount = verificationCount(join(repo, 'dist/cli.js'), 'source checkout');
+  const projectedCount = verificationCount(join(runtimeDir, 'dist/cli.js'), 'projected runtime');
+  assert(projectedCount === sourceCount,
+    `check-cli-bundle-assets: projected runtime reported ${projectedCount} assertions; source checkout reported ${sourceCount}`);
+  console.log(`check:cli-bundle-assets — verification coverage matches source: ${projectedCount} assertions passed`);
 
   // The debt contract must hold in the *installed* runtime, not only in this checkout: the original
   // incident survived a green source build. The projected runtime classifies the same faithful corpus

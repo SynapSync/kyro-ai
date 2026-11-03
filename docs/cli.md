@@ -181,7 +181,7 @@ The project keeps only state and artifacts (layered):
 ```text
 .agents/kyro/
 ├── project.json                 # SHARED — commit: principles, team policy
-├── local.json                   # LOCAL — gitignored: activeScope, execution settings
+├── local.json                   # LOCAL — gitignored: activeScope, execution and git settings
 ├── .gitignore                   # install/sync assist (local-only files; never project.json/scopes/)
 ├── trace/{scope}/               # LOCAL — gitignored: append-only per-machine event log
 └── scopes/
@@ -520,6 +520,20 @@ Kyro evaluates dangerous operations through a shared policy core. `scope set-act
 `kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--finding severity:detail] [--by <actor>] --yes` writes task verdicts through the tool-owned checker boundary. `--dry-run` and `--yes` are mutually exclusive (preview or confirm, not both) — the same applies to `kyro close-sprint`. A resumable review is two-phase: run `kyro review <task> --dry-run --json`, retain `data.requestDigest`, then run `kyro review <task> --digest <sha256> --yes`. The digest binds the task, evidence, criteria, waivers, findings, actor, and verdict. An exact retry is `noop` without changing the verdict timestamp or trace; changed reviewed material fails with `REVIEW_REQUEST_DIVERGED` and needs a new preview. See [maker-checker.md](maker-checker.md).
 
 `kyro close-sprint` is the only verb that confirms interactively. Outside a TTY (agent harness, CI, piped shell) it fails immediately with `CONFIRMATION_REQUIRED` instead of prompting for input that can never arrive — pass `--yes` to complete the gate non-interactively, or `--dry-run` to preview it.
+
+### Sprint close git range and optional commit
+
+From 6.5.0, `kyro plan` records `activeSprint.git.startCommit` and `kyro close-sprint` freezes `{ branch, endCommit, dirty }` in the checkpoint and writes `ledger[].git` (see [Sprint git range](sprint-close-checkpoints.md#sprint-git-range)). Both commands print the recorded position or why none was recorded (`not a git repository, or git is unavailable`, `no commits yet`, `git status failed or timed out`, or, on a resumed close, `not recorded at the original close attempt`). `--json` data includes `git` (`{ recorded: true, branch, startCommit|endCommit, ... }` or `{ recorded: false, reason }`); `close-sprint --json` and the MCP `close_sprint` result also include `commit` and `warnings[]`.
+
+With `git.commitOnSprintClose: true` in `local.json` (see [Teams](teams.md#close-commit-opt-in-650)), a confirmed close then commits **exactly the files the close wrote** — checkpoint, legacy snapshot, narrative, and `sprint.json`; a project-state file only when the close wrote it (legacy monolito `kyro.json`; layered closes only verify `project.json` and never commit it) — with `git add -- <paths>` and `git commit --only -- <paths>`. Other staged or unstaged changes are left as they were, including uncommitted edits to `project.json`; the close trace is not included. Paths are resolved correctly when the Kyro workspace is a subdirectory of the repository. The message is `chore(kyro): close <scope> sprint <n> — <title>` with `Kyro-Scope: <scope>` and `Kyro-Sprint: <n>` trailers, findable with `git log --grep "Kyro-Sprint: <n>"`. Hooks and signing configuration are honored; Kyro never pushes, amends, or passes `--no-verify` / `--no-gpg-sign`. The commit runs after the state-writer lock is released and never on `--dry-run` or an unconfirmed MCP call.
+
+| Result | When |
+| --- | --- |
+| `committed` | The close files were committed; `sha` and `paths` are returned. |
+| `skipped` | Not a repository, no commits yet, detached HEAD, a merge/rebase/cherry-pick/revert in progress, a close file ignored by git, or nothing to commit. |
+| `failed` | A hook rejected the commit or git failed; `reason` summarizes stderr. |
+
+The sprint stays closed in every case. `failed` and the recoverable skips (detached HEAD, operation in progress, ignored close files) include `manualCommand`, the exact command to finish by hand: POSIX quoting with `&&`, or PowerShell quoting with `; if ($?) { … }` on Windows; trailers are passed with `git commit --trailer` (git 2.32+). After a `failed` commit the close files remain staged by the engine's `git add`; the manual command completes the commit. A commit with interactive signing can take up to 120 seconds before it reports `failed`. Any error in the post-close step is reported in `warnings[]` and never turns a completed close into a failed command. `commit` is `null` when the preference is off.
 
 Close requires every unfinished task to have a typed `task.disposition`. The persisted outcome is `shipped`/`completed` only when every task is `done` with a passing verdict; otherwise it is derived `partial` (or explicit `abandoned`). Dry-run, the narrative, the checkpoint `beforeClose` image, and the ledger entry all expose those dispositions. Closing a sprint never completes the scope. If roadmap work remains, `handoff.nextAction` is `plan_sprint`; after its final entry it is `await_scope_completion`, which requires an explicit choice to complete (`kyro scope complete`) or expand with `kyro plan --from`. Completion is the delivery terminal; retirement is a separate obsolete-scope path.
 
@@ -910,6 +924,7 @@ that leaves an immutable record of itself.
 | **6.3.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds machine-level adapter reconciliation (`kyro adapters`, `uninstall --machine`) and accepts CRLF-checked-out skill bodies on Windows. |
 | **6.4.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds focused validation suggestions, proportional Forge closure and advisory aggregate-suite findings. Work retains its existing close policy. |
 | **6.4.1** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; fixes native Windows `work create` and `work amend-brief` source ingestion and isolates integrity-repair tests from machine configuration. |
+| **6.5.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; records each sprint's git range at plan and close, adds the opt-in close commit, and keeps personal `local.json` preferences across state rewrites; fixes active-plan phase statuses, Git exclusion of the state-writer lock, and remediation replay across later sprint closes. Checkpoints with `close.git` need 6.5.0 or later to verify. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

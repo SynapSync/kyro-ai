@@ -12,6 +12,22 @@ Every new sprint close publishes an immutable, versioned checkpoint before chang
 
 `ledger[].checkpoint` and `ledger[].checkpointSha256` are additive; `ledger[].snapshot` remains unchanged. The digest in the live ledger is an external commitment to the checkpoint payload. Historical legacy archives are not backfilled because their missing scope fields cannot be reconstructed honestly.
 
+## Sprint git range
+
+From 6.5.0, each sprint records the git range that implemented it, so its code can be reproduced as `git diff <startCommit>..<endCommit>`.
+
+| Field | Written | Content |
+| --- | --- | --- |
+| `activeSprint.git` | When the sprint is planned (`kyro plan`) | `{ branch, startCommit }` — HEAD and current branch (`null` when detached). |
+| checkpoint `close.git` | At close, before any close write | `{ branch, endCommit, dirty }` — frozen input of the close transaction. |
+| `ledger[].git` | Derived at close | `{ branch, startCommit, endCommit, dirty }`; `startCommit` is `null` when the sprint was planned without git capture. |
+
+`endCommit` is a frozen close input, not post-close state: checkpoint re-derivation reproduces `ledger[].git` from `beforeClose.activeSprint.git` and `close.git`, and a retried close reuses the frozen value instead of reading HEAD again. `dirty` is `true` when tracked or untracked non-ignored files outside `.agents/kyro/` (and the root `.kyro-state-writer.lock*` paths) had uncommitted changes at close; those changes are outside the range. Capture is read-only (`git --no-optional-locks status`) and never blocks: outside a repository, before the first commit, or when git fails, the range is omitted and `plan`/`close-sprint` report why. Sprints closed before 6.5.0 are not backfilled.
+
+**Forward compatibility.** Runtimes older than 6.5.0 do not know `close.git` and report a checkpoint that contains it as an unauthorized transition (a retry on such a runtime raises `CHECKPOINT_CONFLICT`). Existing checkpoints keep validating and re-deriving on 6.5.0; the reverse does not hold. Teams sharing scopes should set `team.minPackageVersion` to `6.5.0` or newer (see [Teams](teams.md#optional-team-package-floor)); a close that records `close.git` without that floor prints an advisory. Kyro never changes `project.json` for you.
+
+The optional close commit (`git.commitOnSprintClose` in `local.json`) runs after the close and never changes checkpoint content; see [CLI — close commit](cli.md#sprint-close-git-range-and-optional-commit).
+
 ## Checkpoint v1
 
 The public TypeScript contract is `SprintCloseCheckpointV1`. Its stable envelope is:
@@ -112,6 +128,16 @@ Retries are compare-and-swap operations under the same renewable, token-owned st
 Before each renewal Kyro verifies the real lock-directory inode, exact owner record, owner token, and unexpired heartbeat with no-follow file reads; it repeats those checks immediately before publishing through an exclusive, unpredictable temporary file. JavaScript renewal errors, uncaught exceptions, and rejected promises fail-stop the owner from the heartbeat worker. Unexpected worker exit is also fenced by parent handlers when the event loop is schedulable, while every protected mutation independently rejects missing/replaced ownership. This is a user-space filesystem lease, not protection against kernel/filesystem corruption, whole-machine suspension, or an attacker with authority to replace directory entries in the final check-to-rename interval; environments requiring that boundary need OS-level locking or a transactional external store.
 
 Only the latest checkpoint is compared with current live state. Older checkpoints are historical records: doctor validates their schema, semantic transition, digests, artifacts, and ledger identity without treating later sprint evolution as divergence.
+
+Remediations are replayed from the checkpoint boundary named by their `base.checkpoints`, including
+records already sealed by a later close. Later valid closes advance that boundary in ledger order:
+their before-image must preserve prior ledger entries, conventions and ADRs unchanged and retain
+every prior debt item. Debt `id`, `title`, `origin` and any additional fields are immutable;
+only `status`, `targetSprint`, `note` and priority escalation may change through normal debt
+lifecycle work. A priority decrease requires an explicit typed remediation, not a later close.
+Normal planning and execution may evolve within that sprint. The latest after-image, plus any later replayed remediations and explicit lifecycle
+transitions, must exactly reproduce live state; an unexplained post-close edit remains `DIVERGED`.
+This proves structural consistency with committed history, not actor authenticity.
 
 ## External consumers
 

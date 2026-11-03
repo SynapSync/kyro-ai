@@ -652,10 +652,16 @@ export type ScopeEvolution =
 export function usesBoundEvolution(scope: string, live: SprintFile): boolean {
   if (!live) return false;
   return Boolean(live.completion?.beforeStateDigest || live.completionHistory?.some((record) => record.beforeStateDigest)
-    || live.remediations?.some((anchor) => (readRemediationRecord(scope, anchor.id)?.schemaVersion ?? 0) >= 5));
+    || live.remediations?.some((anchor) => (readRemediationRecord(scope, anchor.id)?.schemaVersion ?? 0) >= 5)
+    || (live.remediations?.length && latestValidCloseCheckpoint(scope)?.intendedAfterClose.remediations?.length));
 }
 
-/** One digest-directed replay for debt/remediation and lifecycle transitions, never timestamp ordering. */
+/**
+ * Replay records at their own checkpoint boundary, then advance through ledger-ordered closes.
+ * A validated close seals normal in-sprint work, not arbitrary replacement of prior history:
+ * ledger entries, conventions and ADRs must survive unchanged, and debt IDs must still exist.
+ * Only the final replayed after-image is compared with live state (except a later active sprint).
+ */
 export function resolveScopeEvolution(
   scope: string,
   image: SprintFile,
@@ -663,6 +669,85 @@ export function resolveScopeEvolution(
   live: SprintFile = readLiveState(scope) as unknown as SprintFile,
   liveEntry: KyroScopeEntry = readProjectState()!.scopes.find((item) => item.id === scope)!,
   allowPreparedDebtWrite = false,
+): ScopeEvolution {
+  return replayScopeEvolution(scope, image, imageEntry, live, liveEntry, allowPreparedDebtWrite, true);
+}
+
+function replayScopeEvolution(
+  scope: string,
+  image: SprintFile,
+  imageEntry: KyroScopeEntry,
+  live: SprintFile,
+  liveEntry: KyroScopeEntry,
+  allowPreparedDebtWrite: boolean,
+  checkUnanchored: boolean,
+): ScopeEvolution {
+  const sealed = image.remediations ?? [];
+  if (sealed.length) {
+    const broken = (detail: string): ScopeEvolution => ({ kind: 'broken', detail });
+    const first = readRemediationRecord(scope, sealed[0].id);
+    const basePath = first?.base.checkpoints.at(-1)?.path;
+    const start = image.ledger.findIndex((row) => row.checkpoint === basePath);
+    if (!basePath || start < 0) return broken('sealed remediation has no bound checkpoint in the ledger');
+    try {
+      verifyLedgerCheckpoints(scope, image as unknown as Record<string, unknown>);
+    } catch (error) {
+      return broken(error instanceof Error ? error.message : String(error));
+    }
+    let previous: SprintFile | null = null;
+    let previousEntry: KyroScopeEntry | null = null;
+    for (const row of image.ledger.slice(start)) {
+      const resolved = resolveEffectiveCheckpoint(scope, row);
+      if (!resolved.checkpoint) return broken(`cannot resolve bound checkpoint ${row.checkpoint}`);
+      const checkpoint = resolved.checkpoint;
+      const physical = asRecord(readJsonSafely(resolved.path).value)?.intendedAfterClose as SprintFile | undefined;
+      if (previous && previousEntry) {
+        const replay = resolveScopeEvolutionFromImage(scope, previous, previousEntry, checkpoint.beforeClose, checkpoint.projectScopeBefore, false, false);
+        if (replay.kind === 'broken') return replay;
+        const historyIssue = preservedSprintHistoryIssue(replay.state, checkpoint.beforeClose);
+        if (historyIssue) return broken(`${row.checkpoint}: ${historyIssue}`);
+      } else if (checkpoint.intendedAfterClose.remediations?.length) {
+        return broken('first remediation checkpoint already seals a remediation prefix');
+      }
+      previous = physical ?? checkpoint.intendedAfterClose;
+      previousEntry = checkpoint.projectScopeAfter;
+    }
+    if (!previous || stateDigest(previous as unknown as Record<string, unknown>) !== stateDigest(image as unknown as Record<string, unknown>)
+      || canonicalJson(previous.remediations ?? []) !== canonicalJson(sealed)) return broken('close boundary does not match the requested after-image');
+  }
+  return resolveScopeEvolutionFromImage(scope, image, imageEntry, live, liveEntry, allowPreparedDebtWrite, checkUnanchored);
+}
+
+function preservedSprintHistoryIssue(before: SprintFile, after: SprintFile): string | null {
+  if (!before.ledger.every((row, index) => canonicalJson(row) === canonicalJson(after.ledger[index]))) return 'sprint close rewrites or removes prior ledger entries';
+  for (const key of ['conventions', 'adrs'] as const) {
+    if (!(before[key] ?? []).every((item) => (after[key] ?? []).some((candidate) => canonicalJson(candidate) === canonicalJson(item)))) return `sprint close rewrites or removes prior ${key}`;
+  }
+  // Public debt verbs only change lifecycle fields; identity/content and any other fields are
+  // immutable. Escalation may raise priority, never lower it (reconcile requires typed replay).
+  const mutableDebtKeys = new Set(['status', 'targetSprint', 'note', 'priority']);
+  const immutableDebt = (item: object): string => canonicalJson(Object.fromEntries(Object.entries(item).filter(([key]) => !mutableDebtKeys.has(key))));
+  const priorities = ['low', 'medium', 'high', 'critical'];
+  for (const item of before.debt) {
+    const candidate = after.debt.find((debt) => debt.id === item.id);
+    if (!candidate) return 'sprint close removes prior debt';
+    if (immutableDebt(item) !== immutableDebt(candidate)) return `sprint close rewrites prior debt ${item.id} content`;
+    if (candidate.status !== item.status && !['open', 'in_progress', 'resolved', 'deferred'].includes(candidate.status)) return `sprint close rewrites prior debt ${item.id} status`;
+    if (candidate.priority !== item.priority && (priorities.indexOf(item.priority) < 0
+      || priorities.indexOf(candidate.priority) <= priorities.indexOf(item.priority))) return `sprint close rewrites prior debt ${item.id} priority (only escalation is allowed)`;
+  }
+  return null;
+}
+
+/** One digest-directed replay within a close boundary; historical prefixes use this same engine. */
+function resolveScopeEvolutionFromImage(
+  scope: string,
+  image: SprintFile,
+  imageEntry: KyroScopeEntry,
+  live: SprintFile,
+  liveEntry: KyroScopeEntry,
+  allowPreparedDebtWrite = false,
+  checkUnanchored = true,
 ): ScopeEvolution {
   const broken = (detail: string): ScopeEvolution => ({ kind: 'broken', detail });
   if (!liveEntry || image.scope !== scope || live.scope !== scope || imageEntry.id !== scope || liveEntry.id !== scope) return broken('scope evolution identity mismatch');
@@ -736,7 +821,7 @@ export function resolveScopeEvolution(
     }
     return broken(`${record?.id ?? 'evolution'}: before-state does not match the replayed state`);
   }
-  const unanchored = evaluateUnanchoredRemediationRecords(scope, anchors, head, stateDigest(state as unknown as Record<string, unknown>));
+  const unanchored = checkUnanchored ? evaluateUnanchoredRemediationRecords(scope, anchors, head, stateDigest(state as unknown as Record<string, unknown>)) : [];
   for (const finding of unanchored) {
     // Writers may re-derive exactly one interrupted next record. The transaction still verifies
     // its entire commitment against that re-derived plan before anchoring anything.
@@ -783,6 +868,16 @@ export function resolveRemediationReplayState(scope: string, closedState: unknow
   if (!closed) return { kind: 'broken', detail: 'closed state is not an object' };
   const initial = canonicalRemediationState(closed as unknown as SprintFile);
   if (anchors.length === 0) return { kind: 'none', state: initial, headCommitment: null, through: null };
+  if (usesBoundEvolution(scope, live as unknown as SprintFile)) {
+    const latest = latestValidCloseCheckpoint(scope);
+    if (!latest) return { kind: 'broken', detail: 'no valid close checkpoint for scope evolution' };
+    // Replay only anchored records here. An integrity warrant may be resuming a separately
+    // published next record; Doctor still diagnoses that unanchored transaction independently.
+    const evolution = replayScopeEvolution(scope, closed as unknown as SprintFile, latest.projectScopeAfter,
+      live as unknown as SprintFile, readProjectState()!.scopes.find((entry) => entry.id === scope)!, false, false);
+    if (evolution.kind === 'broken') return evolution;
+    return { kind: 'remediated', state: canonicalRemediationState(evolution.state), headCommitment: anchors.at(-1)!.commitment, through: anchors.at(-1)!.id };
+  }
   const ledger = ledgerCommitmentMap(closed);
 
   let replayed = initial;

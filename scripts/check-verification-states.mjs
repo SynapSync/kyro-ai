@@ -12,6 +12,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
@@ -24,6 +25,8 @@ const cli = process.env.KYRO_CLI_UNDER_TEST
 const closeFixture = resolve(repo, 'fixtures/evals/close-sprint-happy/state');
 const SCOPE = 'demo';
 const LEGACY_ORIGIN = 'food-analysis FR-FA-013 revision';
+const require = createRequire(import.meta.url);
+const { deriveSprintCloseTransition, buildSprintCloseCheckpoint, checkpointIntegrityIssues } = require(join(repo, 'dist/cli/checkpoints/sprint-close.js'));
 
 let passed = 0;
 
@@ -104,7 +107,7 @@ function narrativePath(root) {
  * The state each case starts from: a genuinely closed scope. `corrupt` decides whether the live
  * copy then acquires the prose-origin defect that motivated remediation.
  */
-function makeFixture({ corrupt = true, plannedSprints = 1 } = {}) {
+function makeFixture({ corrupt = true, plannedSprints = 1, debtPriority = 'low' } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'kyro-verification-states-'));
   cpSync(closeFixture, root, { recursive: true });
   mkdirSync(join(root, '.home'), { recursive: true });
@@ -116,14 +119,14 @@ function makeFixture({ corrupt = true, plannedSprints = 1 } = {}) {
     sprint.roadmap.plannedSprintCount = plannedSprints;
     sprint.roadmap.sprints = [
       ...sprint.roadmap.sprints,
-      { n: 2, slug: 'follow-up', title: 'Follow-up sprint', state: 'planned' },
+      ...Array.from({ length: plannedSprints - 1 }, (_, index) => ({ n: index + 2, slug: `follow-up-${index + 2}`, title: 'Follow-up sprint', state: 'planned' })),
     ];
   }
   sprint.debt = [{
     id: 'debt-1',
     title: 'Origin recorded during the food-analysis revision.',
     origin: 1,
-    priority: 'low',
+    priority: debtPriority,
     status: 'deferred',
     targetSprint: null,
     note: 'Tracked from the closing sprint.',
@@ -679,15 +682,15 @@ withFixture({ corrupt: true }, (fx) => {
 // ---------------------------------------------------------------------------------------------
 
 /** Start sprint 2 on a scope whose sprint 1 is already closed, through the real `kyro plan`. */
-function startNextSprint(root) {
+function startNextSprint(root, n = 2) {
   writeJson(join(root, 'sprint-plan.json'), {
-    sprint: { n: 2, slug: 'follow-up', title: 'Follow-up sprint', objective: 'Continue the work after close.' },
+    sprint: { n, slug: `follow-up-${n}`, title: 'Follow-up sprint', objective: 'Continue the work after close.' },
     phases: [{
       id: 'P1',
       title: 'Follow-up phase',
       objective: 'Do the next piece of work.',
       tasks: [{
-        id: 'T2.1',
+        id: `T${n}.1`,
         title: 'A task in the active sprint',
         description: 'Ordinary work that legitimately moves live state off the sprint 1 after-image.',
         files_to_touch: ['src/example.ts'],
@@ -700,6 +703,167 @@ function startNextSprint(root) {
     definitionOfDone: ['The follow-up task is done.'],
   });
   return run(root, ['plan', '--from', 'sprint-plan.json', '--kyro-scope', SCOPE]);
+}
+
+function finishNextSprint(root, n) {
+  for (const args of [
+    ['record-evidence', `T${n}.1`, '--summary', 'Done.', '--validation', 'manual: ok'],
+    ['review', `T${n}.1`, '--verdict', 'pass', '--yes'],
+    ['close-sprint', '--yes'],
+  ]) {
+    const result = run(root, [...args, '--kyro-scope', SCOPE]);
+    assert(result.status === 0, `later close: ${args[0]} failed: ${result.output}`);
+  }
+}
+
+function integrityPlan(root) {
+  const result = run(root, ['repair', 'integrity', 'prepare', '--kyro-scope', SCOPE, '--json']);
+  assert(result.status === 0, `integrity prepare failed: ${result.output}`);
+  return JSON.parse(result.output).data;
+}
+
+function applyIntegrity(root, plan) {
+  assert(plan.blockers.length === 0, `integrity plan must be extendable: ${JSON.stringify(plan.blockers)}`);
+  const result = run(root, ['repair', 'integrity', 'apply', '--digest', plan.digest, '--yes']);
+  assert(result.status === 0, `integrity apply failed: ${result.output}`);
+}
+
+/** Rebuild a later checkpoint with production builders: all internal and ledger digests agree. */
+function regenerateLaterDebtBoundary(root, mutate) {
+  const live = readJson(sprintPath(root));
+  const path = `.agents/kyro/scopes/${SCOPE}/${live.ledger.at(-1).checkpoint}`;
+  const old = readJson(join(root, path));
+  mutate(old.beforeClose.debt[0]);
+  const derived = deriveSprintCloseTransition(old.beforeClose, old.projectScopeBefore, old.close, old.createdAt, old.paths.legacySnapshot, old.paths.narrative, path);
+  const transaction = buildSprintCloseCheckpoint(path, {
+    scope: SCOPE,
+    active: old.beforeClose.activeSprint,
+    createdAt: old.createdAt,
+    close: old.close,
+    beforeClose: old.beforeClose,
+    ...derived,
+    projectScopeBefore: old.projectScopeBefore,
+    legacySnapshotPath: old.paths.legacySnapshot,
+    narrativePath: old.paths.narrative,
+    legacySnapshotContent: JSON.stringify(old.beforeClose.activeSprint, null, 2) + '\n',
+    narrativeContent: readFileSync(join(root, old.paths.narrative), 'utf8'),
+  });
+  assert(checkpointIntegrityIssues(transaction.checkpoint, path).length === 0, 'regenerated debt boundary must be an integrity-valid checkpoint');
+  writeJson(join(root, path), transaction.checkpoint);
+  writeJson(sprintPath(root), transaction.checkpoint.intendedAfterClose);
+}
+
+// S21: records belong to their own close boundary; later closes seal normal sprint work.
+for (const revision of [2, 4]) {
+  withFixture({ corrupt: revision === 2, plannedSprints: 4, debtPriority: 'medium' }, (fx) => {
+    if (revision === 2) {
+      const result = remediate(fx.root, readJson(sprintPath(fx.root)));
+      assert(result.status === 0, `historical remediation setup failed: ${result.output}`);
+    } else {
+      const live = readJson(sprintPath(fx.root));
+      live.conventions.push({ id: 'process-1', rule: 'Preserve recorded history.', tags: ['process'], addedSprint: 1 });
+      live.adrs = [{ id: 'ADR-0001', title: 'Preserve history', status: 'accepted', date: '2026-01-02', context: 'Post-close decision.', decision: 'Keep it.', consequences: ['Traceable.'], alternatives: ['Ignore it.'] }];
+      writeJson(sprintPath(fx.root), live);
+      applyIntegrity(fx.root, integrityPlan(fx.root));
+    }
+    const recordFile = join(archiveDir(fx.root), 'remediations/remediation-001.json');
+    const recordBytes = readFileSync(recordFile, 'utf8');
+    assert(readJson(recordFile).schemaVersion === revision, `fixture must exercise revision ${revision}`);
+
+    // A valid close must never launder removal or rewriting of the preceding replay's history.
+    if (revision === 4) {
+      for (const [label, mutate] of [
+        ['convention removal', (s) => { s.conventions = []; }],
+        ['convention rewrite', (s) => { s.conventions[0].rule = 'Rewritten.'; }],
+        ['ADR removal', (s) => { s.adrs = []; }],
+        ['ADR rewrite', (s) => { s.adrs[0].decision = 'Rewritten.'; }],
+        ['ledger rewrite', (s) => { s.ledger[0].note = 'Rewritten.'; }],
+        ['debt removal', (s) => { s.debt = []; }],
+      ]) {
+        const root = mkdtempSync(join(tmpdir(), 'kyro-sealed-history-'));
+        try {
+          cpSync(fx.root, root, { recursive: true });
+          const planned = startNextSprint(root);
+          assert(planned.status === 0, `${label}: plan failed: ${planned.output}`);
+          const live = readJson(sprintPath(root));
+          mutate(live);
+          writeJson(sprintPath(root), live);
+          finishNextSprint(root, 2);
+          const doctor = assertBothReport(root, 'diverged', label);
+          assert(doctor.status !== 0 && /sprint close (rewrites|removes)/.test(doctor.output), `${label}: a later close must not hide rewritten history: ${doctor.output}`);
+          assert(integrityPlan(root).blockers.some((item) => item.code === 'diverged'), `${label}: integrity prepare must refuse the broken history`);
+        } finally { rmSync(root, { recursive: true, force: true }); }
+      }
+    }
+
+    for (const n of [2, 3]) {
+      const planned = startNextSprint(fx.root, n);
+      assert(planned.status === 0, `later close: plan failed: ${planned.output}`);
+      const debtVerbs = n === 2
+        ? [['start', 'debt-1'], ['escalate', 'debt-1', '--priority', 'high'], ['defer', 'debt-1', '--target', '3', '--note', 'Scheduled during sprint 2.']]
+        : [['resolve', 'debt-1', '--note', 'Resolved during sprint 3.']];
+      for (const args of debtVerbs) {
+        const changed = run(fx.root, ['debt', ...args, '--kyro-scope', SCOPE]);
+        assert(changed.status === 0, `normal debt ${args[0]} failed: ${changed.output}`);
+      }
+      finishNextSprint(fx.root, n);
+      const doctor = assertBothReport(fx.root, 'remediated', `v${revision} after close ${n}`);
+      assert(doctor.status === 0 && !doctor.output.includes('[FAIL]'), `later close must pass all doctor lenses: ${doctor.output}`);
+      assert(readFileSync(recordFile, 'utf8') === recordBytes, 'later closes preserve published remediation bytes');
+    }
+    if (revision === 4) {
+      for (const [label, mutate, rejected] of [
+        ['title rewrite', (d) => { d.title = 'REWRITTEN historical debt'; }, true],
+        ['origin rewrite', (d) => { d.origin += 1; }, true],
+        ['priority decrease', (d) => { d.priority = 'low'; }, true],
+        ['status transition', (d) => { d.status = 'in_progress'; }, false],
+        ['targetSprint/note change', (d) => { d.status = 'deferred'; d.targetSprint = 4; d.note = 'Rescheduled during sprint 3.'; }, false],
+        ['priority escalation', (d) => { d.priority = 'critical'; }, false],
+      ]) {
+        const root = mkdtempSync(join(tmpdir(), 'kyro-regenerated-debt-'));
+        try {
+          cpSync(fx.root, root, { recursive: true });
+          regenerateLaterDebtBoundary(root, mutate);
+          const doctor = assertBothReport(root, rejected ? 'diverged' : 'remediated', `regenerated debt ${label}`);
+          assert(rejected ? doctor.status !== 0 && /sprint close rewrites prior debt/.test(doctor.output) : doctor.status === 0, `regenerated debt ${label}: wrong history verdict: ${doctor.output}`);
+          assert(integrityPlan(root).blockers.some((item) => item.code === 'diverged') === rejected, `regenerated debt ${label}: prepare must agree with Doctor`);
+          console.log(`[PASS] regenerated debt ${label}: ${rejected ? 'DIVERGED (history rewrite)' : 'remediated (allowed lifecycle change)'}`);
+        } finally { rmSync(root, { recursive: true, force: true }); }
+      }
+    }
+    const healthy = readJson(sprintPath(fx.root));
+    const history = fileTree(archiveDir(fx.root));
+    healthy.objective += ' Unexplained edit.';
+    writeJson(sprintPath(fx.root), healthy);
+    assert(assertBothReport(fx.root, 'diverged', 'unexplained post-close edit').status !== 0, 'unexplained live drift must fail');
+    assert(integrityPlan(fx.root).blockers.some((item) => item.code === 'diverged'), 'unexplained live fields cannot extend the chain');
+    healthy.objective = healthy.objective.replace(' Unexplained edit.', '');
+    healthy.conventions.push({ id: 'process-later', rule: 'A later append.', tags: ['process'], addedSprint: 3 });
+    writeJson(sprintPath(fx.root), healthy);
+    assert(assertBothReport(fx.root, 'diverged', 'unrecorded post-close append').status !== 0, 'an unrecorded append is still divergence');
+    const plan = integrityPlan(fx.root);
+    assert(plan.operations.length === 1 && plan.operations[0].kind === 'convention.append', 'prepare extends the chain with only the new delta');
+    assert(JSON.stringify(fileTree(archiveDir(fx.root))) === JSON.stringify(history), 'prepare preserves immutable archive bytes');
+    applyIntegrity(fx.root, plan);
+    const second = readJson(join(archiveDir(fx.root), 'remediations/remediation-002.json'));
+    assert(second.base.checkpoints.length === 3, 'R-002 binds the newest close boundary');
+    assert(second.base.remediationHead === digest(readJson(recordFile)), 'R-002 continues the original commitment chain');
+    assert(assertBothReport(fx.root, 'remediated', 'extended chain after later closes').status === 0, 'extended chain passes doctor');
+    const secondFile = join(archiveDir(fx.root), 'remediations/remediation-002.json');
+    const secondBytes = readFileSync(secondFile, 'utf8');
+    const interrupted = readJson(sprintPath(fx.root));
+    interrupted.remediations.pop();
+    writeJson(sprintPath(fx.root), interrupted);
+    assert(assertBothReport(fx.root, 'diverged', 'interrupted next anchor').status !== 0, 'a prepared suffix is not an applied remediation');
+    applyIntegrity(fx.root, plan);
+    assert(readFileSync(secondFile, 'utf8') === secondBytes, 'warrant resume preserves the published R-002 bytes');
+    assert(assertBothReport(fx.root, 'remediated', 'resumed next anchor').status === 0, 'warrant resumes the interrupted suffix after later closes');
+    const planned = startNextSprint(fx.root, 4);
+    assert(planned.status === 0, `second boundary: plan failed: ${planned.output}`);
+    finishNextSprint(fx.root, 4);
+    assert(assertBothReport(fx.root, 'remediated', 'records on distinct close boundaries').status === 0, 'each sealed record replays from its own boundary');
+    assert(readFileSync(recordFile, 'utf8') === recordBytes, 'extending and sealing the chain preserves R-001 bytes');
+  });
 }
 
 // 14. A closed scope that then legitimately starts sprint 2 must keep doctor green and must not be

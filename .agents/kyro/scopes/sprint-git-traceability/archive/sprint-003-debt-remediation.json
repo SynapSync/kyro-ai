@@ -1,0 +1,180 @@
+{
+  "n": 3,
+  "slug": "debt-remediation",
+  "title": "Debt remediation: active-plan statuses, root lock ignore, Windows CI evidence",
+  "objective": "Remove the open debt found in Sprints 1-2: active-plan updates leave coherent phase statuses, the root state-writer lock is ignored by git per ADR-0002, and the Windows CI evidence for the new checks is recorded.",
+  "status": "complete",
+  "phases": [
+    {
+      "id": "P1",
+      "title": "Debt fixes",
+      "objective": "Fix debt-1 and debt-2 with regression coverage.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.1",
+          "title": "Keep phase statuses coherent after plan --update-active (debt-1)",
+          "description": "kyro plan --update-active left phase statuses incoherent (P1 'active', P2/P3 'blocked' while every task was pending), producing kyro analyze coherence findings until kyro repair normalized them. Make the active-plan update derive phase and sprint statuses exactly as repair/analyze expect, for every task-state combination it can produce.",
+          "files_to_touch": [
+            "src/cli/core/active-plan.ts",
+            "scripts/check-active-plan.mjs"
+          ],
+          "context": "debt-1. Observed 2026-10-30 rewording T1.1 criteria in this scope; kyro repair (src/cli/commands/repair.ts) normalizes phase/sprint statuses from task states, and kyro analyze flags mismatches as coherence findings. Implementation is delegated to Sol 6.1; QA by Astra. Requirement and scenario links are added by the orchestrator right after planning.",
+          "acceptance_criteria": [
+            "After plan --update-active on a sprint whose tasks are all pending, every phase status is pending and kyro analyze reports no coherence finding — proven by npm run check:active-plan.",
+            "After an update on a sprint with mixed task states (done, pending with unmet dependencies, ready), phase statuses equal what kyro repair would derive — proven by the same check.",
+            "npm run build and npm run check:active-plan pass."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S18"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Implemented by Sol 6.1. Root cause: update-active passed execution states (ready/blocked) to derivePhaseStatus, so a phase with a ready pending task became 'active' and one waiting on dependencies 'blocked', while repair/analyze derive persisted statuses from task statuses only. active-plan.ts now uses the same derivation as repair/analyze.",
+            "validation": [
+              "npm run check:active-plan: pass — 'ok all-pending update uses repair/analyze status derivation', 'ok mixed done/pending/ready update uses repair/analyze status derivation' (also checks analyze coherence and that a following repair changes nothing); '18 active-edit, freshness and immutable-history groups passed' (reported by Sol 6.1, outside sandbox)",
+              "npm run build: pass (reported by Sol 6.1)",
+              "Live reproduction in this scope (orchestrator): update-active on Sprint 3 produced P1 active / P2 blocked with all tasks pending before the fix"
+            ],
+            "files_changed": [
+              "src/cli/core/active-plan.ts",
+              "scripts/check-active-plan.mjs"
+            ],
+            "by": "sol-6.1",
+            "recordedAt": "2026-11-02T23:07:30.516Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "After plan --update-active on a sprint whose tasks are all pending, every phase status is pending and kyro analyze reports no coherence finding — proven by npm run check:active-plan.",
+              "After an update on a sprint with mixed task states (done, pending with unmet dependencies, ready), phase statuses equal what kyro repair would derive — proven by the same check.",
+              "npm run build and npm run check:active-plan pass."
+            ],
+            "findings": [],
+            "by": "astra",
+            "reviewedAt": "2026-11-02T23:11:56.768Z",
+            "requestDigest": "bfd2e51d12e7a02bec5d7d8f9322acaa71e5217bf56732a008357e93962bd054",
+            "reviewedMaterialDigest": "92ea60873554387f3abb43ac40bca7d751c6f1285c6aa82285a7cbe5ee4460ad"
+          }
+        },
+        {
+          "id": "T3.2",
+          "title": "Ignore the root state-writer lock via the local git exclude file (debt-2, ADR-0002)",
+          "description": "Implement ADR-0002: install and sync idempotently add '/.kyro-state-writer.lock*' (prefixed with the workspace path when the Kyro workspace is a repository subdirectory) to the repository's local exclude file resolved with git rev-parse --git-path info/exclude; never write the root .gitignore or any tracked file; outside git write nothing. kyro doctor WARNs with the exact remedy when the root lock path is not ignored.",
+          "files_to_touch": [
+            "src/cli/install-plan.ts",
+            "src/cli/core/git-trackability.ts",
+            "src/cli/commands/doctor.ts",
+            "scripts/check-git-trackability.mjs"
+          ],
+          "context": "debt-2, ADR-0002. Lock name: STATE_WRITER_LOCK exported from src/cli/pipeline/state-writer-lock.ts (root .kyro-state-writer.lock/ plus .kyro-state-writer.lock.reclaim-* leftovers). Existing ignore helpers and doctor diagnostics live in src/cli/core/git-trackability.ts. Global rule git-exclude-kyro-lock applies. Implementation delegated to Sol 6.1; QA by Astra.",
+          "acceptance_criteria": [
+            "In a temp git repo, install and sync add exactly one exclude entry for the root lock (idempotent across repeated runs) and a held lock directory plus a reclaim leftover do not appear in git status --porcelain — proven by npm run check:git-trackability.",
+            "With the workspace in a repository subdirectory the entry is prefixed and effective; outside git nothing is written; no tracked file changes — proven by the same check.",
+            "kyro doctor WARNs with a remedy when the root lock path is not ignored and passes after install — proven by the same check; npm run build, npm run check:install-rehydrate, and npm run check:update pass."
+          ],
+          "depends_on": [],
+          "scenario_refs": [
+            "S19"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Remediation of Astra findings by Sol 6.1 (T3.1 unchanged). git-trackability.ts now validates the exclude destination against the git dir and common dir, rejects symlinks in info/ and exclude, opens without following links and verifies descriptor identity before writing (M1); rejects workspace prefixes with control characters or line separators and omits unsafe exact-line remedies (M2); distinguishes confirmed non-repository from failed git discovery and WARNs with a PATH remedy (m1); bounds git subprocesses to 10 s. Original ADR-0002 behavior retained: idempotent local exclude entry from install/sync, prefixed for subdirectory workspaces, nothing outside git, doctor WARN/PASS.",
+            "validation": [
+              "npm run check:git-trackability: pass — 'ok M1 symlinked exclude: tracked target byte-identical; install/sync nonfatal; doctor WARN'; 'ok M2 line-separator workspace paths: exclude byte-identical; unrelated secret.txt visible; unsupported workspace path WARN'; 'ok m1 unavailable Git: discovery WARN with PATH remedy; no writes'; 'ok Git calls use 10 s timeout; timed-out discovery WARNs and stays nonfatal'; original root/nested/worktree/outside-git/doctor cases pass (reported by Sol 6.1, outside sandbox)",
+              "npm run build, check:install-rehydrate, check:update: pass (reported by Sol 6.1)"
+            ],
+            "files_changed": [
+              "src/cli/core/git-trackability.ts",
+              "src/cli/commands/install.ts",
+              "src/cli/commands/doctor.ts",
+              "scripts/check-git-trackability.mjs"
+            ],
+            "notes": "Native Windows execution not verified locally; the portable identity fallback was simulated. Windows CI runs on the next push.",
+            "by": "sol-6.1",
+            "recordedAt": "2026-11-02T23:14:59.585Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "In a temp git repo, install and sync add exactly one exclude entry for the root lock (idempotent across repeated runs) and a held lock directory plus a reclaim leftover do not appear in git status --porcelain — proven by npm run check:git-trackability.",
+              "With the workspace in a repository subdirectory the entry is prefixed and effective; outside git nothing is written; no tracked file changes — proven by the same check.",
+              "kyro doctor WARNs with a remedy when the root lock path is not ignored and passes after install — proven by the same check; npm run build, npm run check:install-rehydrate, and npm run check:update pass."
+            ],
+            "findings": [
+              {
+                "severity": "suggestion",
+                "detail": "Confirm native Windows execution of the T3.2 remediation in CI before release (local coverage: Linux plus simulated portable identity fallback)."
+              }
+            ],
+            "by": "astra",
+            "reviewedAt": "2026-11-02T23:17:30.152Z",
+            "requestDigest": "533a287f10d19636740d06bddddf4819ec0666e50630b81269a38da28a0fe8e4",
+            "reviewedMaterialDigest": "456b1d9927cc287678dd74b17e7388a7151381d37c516eef3c69a6f54ae14093"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Release evidence",
+      "objective": "Record the Windows CI evidence for the Sprint 2 checks.",
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T3.3",
+          "title": "Record Windows CI evidence for the new checks (debt-7)",
+          "description": "Confirm on PR #154 that the Windows CI job ran check:sprint-git-traceability and check:sprint-close-commit successfully on every Node version in the matrix, and record the run URLs and results as evidence. If any job fails, materialize the fix as a new task delegated to Sol 6.1.",
+          "files_to_touch": [
+            ".github/workflows/ci.yml"
+          ],
+          "context": "debt-7 (Astra re-QA note). Orchestrator-only verification task: no source change expected. Evidence comes from gh pr checks / the GitHub Actions run.",
+          "acceptance_criteria": [
+            "The PR #154 Windows jobs for every Node version in the matrix show the steps 'Verify sprint git traceability' and 'Verify sprint close commit' passing — verified with gh run view and recorded run URLs."
+          ],
+          "depends_on": [
+            "T3.1",
+            "T3.2"
+          ],
+          "scenario_refs": [
+            "S20"
+          ],
+          "status": "done",
+          "evidence": {
+            "summary": "Windows CI evidence for PR #154 at commit 449d8b4: all three Windows jobs (Node 18.x, 20.x, 22.x) succeeded, and in each the steps 'Verify sprint git traceability' and 'Verify sprint close commit' succeeded. No source change.",
+            "validation": "gh run view 41541928577 --json jobs: Node 18.x success https://github.com/SynapSync/kyro-ai/actions/runs/41541928577/job/125607996468; Node 20.x success https://github.com/SynapSync/kyro-ai/actions/runs/41541928577/job/125607996598; Node 22.x success https://github.com/SynapSync/kyro-ai/actions/runs/41541928577/job/125607996509 — both sprint steps success in each",
+            "files_changed": [
+              ".github/workflows/ci.yml"
+            ],
+            "notes": "Covers Sprint 2 checks including E3's PowerShell manual-command case. Sprint 3 changes are not yet pushed; their Windows run happens on the next push.",
+            "by": "orchestrator",
+            "recordedAt": "2026-11-02T23:07:30.819Z"
+          },
+          "verdict": {
+            "result": "pass",
+            "checked_criteria": [
+              "The PR #154 Windows jobs for every Node version in the matrix show the steps 'Verify sprint git traceability' and 'Verify sprint close commit' passing — verified with gh run view and recorded run URLs."
+            ],
+            "findings": [
+              {
+                "severity": "suggestion",
+                "detail": "Evidence covers committed Sprint 2 code at 449d8b4; Sprint 3 changes get their Windows run on the next push."
+              }
+            ],
+            "by": "astra",
+            "reviewedAt": "2026-11-02T23:11:56.987Z",
+            "requestDigest": "2ebc6168c43814e4ded3716528ba315a4495242a36e41639e1ccf68190a7f183",
+            "reviewedMaterialDigest": "ca363185bdeb2155436946625059247b0e6997b52dec152e7171efdbb1b1edad"
+          }
+        }
+      ]
+    }
+  ],
+  "emergentTasks": [],
+  "definitionOfDone": [
+    "All tasks done with CLI-recorded evidence and a passing verdict.",
+    "Proportional close validation passes; escalation applies if install-plan or state paths change.",
+    "debt-1, debt-2, and debt-7 are resolved through their tasks."
+  ]
+}

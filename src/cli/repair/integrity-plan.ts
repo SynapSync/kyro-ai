@@ -366,6 +366,7 @@ export function prepareIntegrityPlan(options: {
     const physicalAfter = physicalRead.exists && !physicalRead.error
       ? (physicalRead.value as { intendedAfterClose?: SprintFile }).intendedAfterClose
       : null;
+    let replayedEvolution: SprintFile | undefined;
     if (usesBoundEvolution(scope, live)) {
       const baseEntry = resolved.checkpoint?.projectScopeAfter ?? rebuilt?.projection.projectScopeAfter;
       if (!baseEntry) continue;
@@ -374,13 +375,19 @@ export function prepareIntegrityPlan(options: {
       const changedFields = evolution.kind === 'verified' ? [...new Set([...Object.keys(evolution.state), ...Object.keys(live)])].filter((key) => !['remediations', 'checkpointSha256'].includes(key) && canonicalJson((evolution.state as unknown as Record<string, unknown>)[key]) !== canonicalJson((live as unknown as Record<string, unknown>)[key])) : [];
       const detail = evolution.kind === 'broken' ? evolution.detail : `unexplained post-close evolution in ${changedFields.join(', ') || 'scope registry'}`;
       const remedy = changedFields.length === 1 && changedFields[0] === 'debt' ? '; preview scope complete --reconcile-debt --reason "<authorized decision>" --dry-run' : '';
-      const blocker: IntegrityFinding = { class: 'blocker', code: 'diverged', summary: `${scope}: ${detail}${remedy}` };
-      blockers.push(blocker); findings.push(blocker);
-      continue;
+      const registryMatches = evolution.kind === 'verified' && canonicalJson(evolution.entry) === canonicalJson(readProjectState()?.scopes.find((entry) => entry.id === scope));
+      if (evolution.kind === 'verified' && registryMatches && changedFields.length > 0 && changedFields.every((key) => ['conventions', 'adrs', 'ledger'].includes(key))) {
+        // The existing typed append/reanchor planner below must still explain the entire delta.
+        replayedEvolution = evolution.state;
+      } else {
+        const blocker: IntegrityFinding = { class: 'blocker', code: 'diverged', summary: `${scope}: ${detail}${remedy}` };
+        blockers.push(blocker); findings.push(blocker);
+        continue;
+      }
     }
     // Lifecycle records are not authority by themselves. Completion/reopen is structurally coherent
     // only when one verifier reproduces both durable layers from the same checkpoint after-image.
-    if (hasLifecycleEvidence(live)) {
+    if (!replayedEvolution && hasLifecycleEvidence(live)) {
       const lifecycleBase = physicalAfter ?? after;
       const lifecycleEntryBase = resolved.checkpoint?.projectScopeAfter ?? rebuilt?.projection.projectScopeAfter;
       const liveEntry = readProjectState()?.scopes.find((entry) => entry.id === scope);
@@ -414,7 +421,7 @@ export function prepareIntegrityPlan(options: {
       findings.push(blocker);
       continue;
     }
-    const baseline = replay.state as unknown as SprintFile;
+    const baseline = replayedEvolution ?? (replay.state as unknown as SprintFile);
     const liveOps = planLiveEvolution(scope, live, baseline, { includeReanchor: Boolean(resolved.checkpoint) });
     const explained = structuredClone(baseline);
     for (const operation of liveOps) {
@@ -425,7 +432,7 @@ export function prepareIntegrityPlan(options: {
         if (row) row.checkpointSha256 = operation.afterSha256;
       }
     }
-    if (!hasLifecycleEvidence(live) && !live.activeSprint && remediationStateDigest(explained) !== remediationStateDigest(live)) {
+    if ((!hasLifecycleEvidence(live) || replayedEvolution) && !live.activeSprint && remediationStateDigest(explained) !== remediationStateDigest(live)) {
       const keys = [...new Set([...Object.keys(explained), ...Object.keys(live)])].filter((key) => !['remediations', 'certifications'].includes(key) && canonicalJson((explained as unknown as Record<string, unknown>)[key]) !== canonicalJson((live as unknown as Record<string, unknown>)[key]));
       const blocker: IntegrityFinding = { class: 'blocker', code: 'diverged', summary: `${scope}: unexplained post-close fields: ${keys.join(', ')}.${keys.length === 1 && keys[0] === 'debt' ? ` Preview kyro scope complete --kyro-scope ${scope} --reconcile-debt --reason "<owner decision>" --dry-run.` : ' Reconcile these fields explicitly; debt acceptance cannot authorize them.'}` };
       blockers.push(blocker); findings.push(blocker);
