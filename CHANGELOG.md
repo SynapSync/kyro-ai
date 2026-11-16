@@ -8,11 +8,17 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- The published package is about 0.66 MB packed (was 9.98 MB; 475 files, was 1 080). The tarball now ships `dist` without source maps, `commands`, `agents`, `internal`, `fixtures/evals` (read by `kyro eval`), the Markdown guides in `docs/` plus `docs/architecture.mmd` and the ADR they link, `config.json`, `WORKFLOW.yaml`, `settings.example.json`, `README.md` and `CHANGELOG.md`. `docs/diagrams`, `docs/plans` (except the linked ADR), `scripts/` and the other `fixtures/` directories stay in the repository only; no `kyro` command reads them. `check:package-contents` (in `npm run check`) enforces the size budget, the exclusions, the runtime files and the absence of absolute home paths.
+- `check:change-current-work:red` takes the baseline CLI from `KYRO_BASELINE_CLI` (or `--baseline-cli`) instead of a hardcoded personal path in `package.json`.
 - Read-only commands no longer re-read and re-hash the same checkpoint many times in one process. Managed JSON files are read, parsed and hashed once while their bytes are unchanged (validated on every use against device, inode, size and nanosecond mtime/ctime, with a racy-timestamp guard), and checkpoint integrity and commitment verdicts are memoised per file content. `kyro status` and `kyro context-pack` read each file about once; `kyro doctor --artifacts` on this repository drops from about 4.4 s to about 1 s. Output and commitments are unchanged. Guarded by `check:read-memoization`.
 
 ### Fixed
 
 - `check:cli-bundle` and `check:windows-install-smoke` no longer fail under npm 12, whose `npm pack --json` prints an object keyed by package name instead of an array; both now parse either shape through `scripts/lib/npm-pack-json.mjs`. `kyro update` no longer reads the registry as unreachable under npm 12, whose `npm view kyro-ai version --json` prints a one-element array; `queryRegistryLatest` accepts both and still validates strict semver. CI now also runs on the current Node line (26.x, npm 12): in the Windows matrix and in a new Linux `npm_current` job that gates `create_tag`.
+
+### Removed
+
+- `pnpm-lock.yaml`; CI, the release checklist and `check:versions` use `package-lock.json` only. Users who install Kyro with pnpm are unaffected.
 
 ## [6.5.0] - 2026-11-03
 

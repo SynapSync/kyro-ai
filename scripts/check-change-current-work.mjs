@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Regression fixtures for Sprint 1 live-work fixes.
-// Red baseline: npm run check:change-current-work:red (built 36c3897 worktree only).
+// Red baseline: KYRO_BASELINE_CLI=/path/to/36c3897-worktree/dist/cli.js npm run check:change-current-work:red
+// (or pass --baseline-cli <path> to this script). Requires a built 36c3897 worktree.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -11,11 +12,11 @@ import { createGuardedProbeRoot, removeGuardedProbeRoot, runGuardedCliProbe } fr
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
 const expectRed = process.argv.includes('--expect-red');
 const baselineFlag = process.argv.indexOf('--baseline-cli');
-const baselineCli = baselineFlag === -1 ? null : process.argv[baselineFlag + 1];
+const baselineCli = baselineFlag === -1 ? (process.env.KYRO_BASELINE_CLI || null) : process.argv[baselineFlag + 1];
 if (baselineFlag !== -1 && (!baselineCli || baselineCli.startsWith('-'))) throw new Error('--baseline-cli requires an absolute dist/cli.js path');
 const cli = expectRed ? resolve(baselineCli ?? '') : resolve(repo, 'dist/cli.js');
 const fixtureRepo = expectRed ? resolve(cli, '..', '..') : repo;
-if (expectRed && !baselineCli) throw new Error('--expect-red requires --baseline-cli pointing to a built 36c3897 worktree CLI');
+if (expectRed && !baselineCli) throw new Error('--expect-red requires the dist/cli.js of a built 36c3897 worktree: set KYRO_BASELINE_CLI=/absolute/path/to/dist/cli.js or pass --baseline-cli <path>');
 if (expectRed && !existsSync(cli)) throw new Error(`baseline CLI does not exist: ${cli}; build the 36c3897 worktree first`);
 if (expectRed) {
   const baselineRoot = resolve(cli, '..', '..');

@@ -84,7 +84,7 @@ This means a local `npm publish` also rebuilds, proves freshness, and validates 
 - [ ] `npm run build` produces no unexpected changes in `dist/`.
 - [ ] `npm run check:adapters` passes.
 - [ ] `npm pack --dry-run` succeeds.
-- [ ] The packed file list excludes `.claude-plugin/`, `providers/claude/`, and `hooks/`.
+- [ ] The packed file list excludes `.claude-plugin/`, `providers/claude/`, and `hooks/`, and `npm run check:package-contents` passes (size budget, no `docs/diagrams`, `scripts/`, source maps or absolute home paths).
 - [ ] In a disposable Claude profile, verify all seven `/kyro-*` skills are discoverable and route to the candidate runtime. Filesystem fixtures do not establish Claude UI discovery.
 - [ ] If an older Kyro plugin is installed, verify the new skills before asking the user to disable or uninstall it in Claude Code. Do not alter plugin settings automatically.
 - [ ] `npm run check:links` passes.
