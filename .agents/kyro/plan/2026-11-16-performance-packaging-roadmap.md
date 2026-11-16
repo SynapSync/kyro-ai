@@ -3,7 +3,7 @@
 - **Created:** 2026-11-16
 - **Baseline:** `develop` at `4c35f11`, kyro-ai 6.5.0
 - **Work branch:** `develop` (phases 1 and 2 were committed there on 2026-11-16)
-- **Status:** Phases 1 to 5 certified; Phase 6 is next
+- **Status:** Phases 1 to 6 certified; Phase 7 is next
 
 This document records a project review done on 2026-11-16 and the phased plan that came out of it.
 It is the single place to track that plan. Any agent can resume from the "Status board" and the
@@ -36,7 +36,7 @@ Project rules that apply to every phase:
 | 3 | Slim the npm package and remove leftovers | certified | 2026-11-16 | QA log, phase 3 round 1; committed on `develop` |
 | 4 | Parallel check runner and shared sandbox helper | certified | 2026-11-16 | QA log, phase 4 rounds 1 and 2; commit `bd02ed1` |
 | 5 | Lazy command loading | certified | 2026-11-16 | QA log, phase 5 rounds 1 and 2; commit `17844ba` |
-| 6 | Declarative flag parsing | pending | — | — |
+| 6 | Declarative flag parsing | certified | 2026-11-16 | QA log, phase 6 rounds 1 and 2; commit `66455ab` |
 | 7 | Structure, budgets and README cleanup | pending | — | — |
 | 8 | Measure Kyro against other workflows; short path | pending | — | — |
 
@@ -429,6 +429,42 @@ Residual notes, not blocking:
 - `--help` stays at about 54 ms because it loads the adapter registry to list agents.
 - `kyro eval` spawns the CLI per scenario and dropped from about 8.5 s to about 4.9 s in one
   observation; not measured as a median.
+
+### Phase 6, round 1 — 2026-11-16 — returned
+
+The refactor passed. The orchestrator's own old-versus-new CLI fuzz (5,940 invocations over 27 verbs,
+in empty and populated workspaces, comparing exit code, stdout, stderr and the resulting file tree)
+found no behaviour difference. The differences it reported were timestamps in trace files, four more
+runtime files copied by `adapters enable` (the new module), and one lock-heartbeat flake (below).
+
+Returned for `check:flag-parsing` only: of six injected regressions, one passed it. Changing
+`takeUnlessDashed` to reject any value starting with `-` changed `kyro rule add --rule -h`, and no
+recorded case had a value flag followed by a single-dash token.
+
+### Phase 6, round 2 — 2026-11-16 — certified
+
+Verified by the orchestrator:
+
+- The fixture grew from 1,410 to 2,226 cases (`-h`, `-y`, `-x`, `-`, `--` and `a=b` after every
+  value flag), captured from the previous build. The missed mutation now fails the check.
+- Cognitive complexity, measured with `eslint-plugin-sonarjs` (`~/.cache/kyro-tmp/phase6/cx/run.sh`):
+  `parseOptions` 66 to 2, `printCommandHelp` 28 to 2, every other migrated parser 6 or lower, the
+  shared `parseFlags` 19. No flag parser is above 50.
+- Full `npm run check`: 91 of 91, 140.8 s.
+
+Notes:
+
+- Finding F-7 quoted 929 and 352 for `parseOptions` and `printCommandHelp`. Those came from a
+  different metric (the code-graph index). Under the sonarjs rule they were 66 and 28.
+- Help text is not generated from the tables: the usage grammar cannot be derived from them, so the
+  text is kept byte for byte and pinned by hash.
+- `parseCapabilitiesArgs` (complexity 4) was left as is to keep the `capabilities` startup path at
+  its pinned module set.
+- Observed once under heavy parallel load, on unchanged code: `State-writer lease heartbeat failed
+  to start.` instead of the expected input error. 25 reruns on each build did not reproduce it.
+  Worth a look if it shows up in CI.
+- The highest complexities left in `src/cli` are outside flag parsing: `repair/integrity-plan.ts`
+  138, `core/active-plan.ts` 125, `remediation/plan.ts` 101. They belong to phase 7.
 
 QA tooling lives in `~/.cache/kyro-tmp/roadmap-qa/` (`baseline/`, `capture.sh`, `count.js`,
 `differential.sh`, `longlived.js`, and `base/`, a build of the pre-change commit).
