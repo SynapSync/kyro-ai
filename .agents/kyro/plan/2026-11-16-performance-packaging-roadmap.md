@@ -3,7 +3,7 @@
 - **Created:** 2026-11-16
 - **Baseline:** `develop` at `4c35f11`, kyro-ai 6.5.0
 - **Work branch:** `develop` (phases 1 and 2 were committed there on 2026-11-16)
-- **Status:** Phases 1, 2 and 3 certified; Phase 4 in progress
+- **Status:** Phases 1 to 4 certified; Phase 5 waits for the user's GO
 
 This document records a project review done on 2026-11-16 and the phased plan that came out of it.
 It is the single place to track that plan. Any agent can resume from the "Status board" and the
@@ -34,7 +34,7 @@ Project rules that apply to every phase:
 | 1 | Memoize checkpoint reads and commitments | certified | 2026-11-16 | QA log, rounds 1 and 2; committed on `develop` |
 | 2 | Fix checks under npm 12, widen CI Node matrix | certified | 2026-11-16 | QA log, phase 2 round 1; committed on `develop`; check the CI run |
 | 3 | Slim the npm package and remove leftovers | certified | 2026-11-16 | QA log, phase 3 round 1; committed on `develop` |
-| 4 | Parallel check runner and shared sandbox helper | in progress | — | — |
+| 4 | Parallel check runner and shared sandbox helper | certified | 2026-11-16 | QA log, phase 4 rounds 1 and 2; commit `bd02ed1` |
 | 5 | Lazy command loading | pending | — | — |
 | 6 | Declarative flag parsing | pending | — | — |
 | 7 | Structure, budgets and README cleanup | pending | — | — |
@@ -358,6 +358,47 @@ Not part of `npm run check`, and failing on this machine for environment reasons
 (the global `kyro` is not installed for the active Node) and `check:change-current-work` (the local
 Codex setup; the implementer reports the same failure on the previous code, not re-run by the
 orchestrator).
+
+### Phase 4, round 1 — 2026-11-16 — returned
+
+Implementer: Sonnet 5.5 (a new agent). `npm run check` is now `node scripts/run-checks.mjs`; the
+89 steps live in `scripts/lib/check-steps.mjs` in the original order; `check:serial` keeps the old
+behaviour. `typecheck` and `check:dist` gate the rest; the pool runs 8 steps at a time on this
+machine (`min(8, max(2, cores - 1))`); `check:canonicalization-gate` (rewrites files in `dist/`)
+and `check:eval` (creates cases in `fixtures/evals`) run alone at the end. `check:capabilities`
+and `check:operation-snapshots` were fixed to stop taking the state lock in the repo root. The
+runner refuses to start when a `check:*` script is neither a step nor declared in `NOT_IN_SUITE`.
+
+Verified by the orchestrator: the step list equals the old chain; parallel runs of 172.7 s and
+169.9 s and a `--jobs 4` run of 229.0 s, all 89 of 89, against 704 s serial; the working tree and
+every file under `dist/` byte-identical after the three runs; an injected failing step is reported
+with name, exit status and full output, exit 1.
+
+Returned for:
+
+1. An interrupted run kept going for 70 s and then reported 3 passed, exit 0.
+2. The runner injected `CI=''` into every step.
+3. An inaccurate reason for `check:change-current-work` in `NOT_IN_SUITE`.
+
+### Phase 4, round 2 — 2026-11-16 — certified
+
+Verified by the orchestrator:
+
+- SIGINT and SIGTERM after 6 s: exit 130 and 143 within about 30 ms of the signal, summary
+  "INTERRUPTED", 3 steps listed as killed, none counted as passed, no child process and no
+  `kyro-checks-*` temp directory left.
+- A step no longer sees `CI` when it is unset.
+- Full run after the fixes: 89 of 89, 177.5 s. The limiting step is `check:cli-bundle-assets`
+  (about 150 s in the pool, 101 s alone).
+
+Residual notes, not blocking:
+
+- Interrupting during `check:dist` can leave a `.kyro-dist-check-*` directory in the repo root.
+- Interrupting during `check:canonicalization-gate` could leave `dist/` modified; `npm run build`
+  restores it.
+- A 4-core CI runner was simulated only (`--jobs 4`, 229 s; pinned to 4 cores, 331 s by the
+  implementer). The real CI time will show on the next pull request.
+- The scripts were not mass-migrated to `scripts/lib/sandbox.mjs`; only the two fixed ones use it.
 
 QA tooling lives in `~/.cache/kyro-tmp/roadmap-qa/` (`baseline/`, `capture.sh`, `count.js`,
 `differential.sh`, `longlived.js`, and `base/`, a build of the pre-change commit).
