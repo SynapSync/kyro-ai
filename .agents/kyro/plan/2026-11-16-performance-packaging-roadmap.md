@@ -3,7 +3,7 @@
 - **Created:** 2026-11-16
 - **Baseline:** `develop` at `4c35f11`, kyro-ai 6.5.0
 - **Work branch:** `develop` (phases 1 and 2 were committed there on 2026-11-16)
-- **Status:** Phases 1 to 6 certified; Phase 7 structural part certified, its budget and README parts wait for a decision; Phase 8 pending
+- **Status:** Phases 1 to 7 certified; Phase 8 in progress
 
 This document records a project review done on 2026-11-16 and the phased plan that came out of it.
 It is the single place to track that plan. Any agent can resume from the "Status board" and the
@@ -37,7 +37,7 @@ Project rules that apply to every phase:
 | 4 | Parallel check runner and shared sandbox helper | certified | 2026-11-16 | QA log, phase 4 rounds 1 and 2; commit `bd02ed1` |
 | 5 | Lazy command loading | certified | 2026-11-16 | QA log, phase 5 rounds 1 and 2; commit `17844ba` |
 | 6 | Declarative flag parsing | certified | 2026-11-16 | QA log, phase 6 rounds 1 and 2; commit `66455ab` |
-| 7 | Structure, budgets and README cleanup | partly certified | 2026-11-16 | File split certified (QA log, phase 7; commit `2912f41`). Token budgets and README release notes wait for the user's decision |
+| 7 | Structure, budgets and README cleanup | certified | 2026-11-16 | QA log, phase 7 (two entries); commits `2912f41` and `eef7daa` |
 | 8 | Measure Kyro against other workflows; short path | pending | — | — |
 
 Status values: `pending`, `in progress`, `in QA`, `returned`, `certified`.
@@ -499,6 +499,24 @@ Not done, waiting for the user's decision because both change a stated policy:
 
 - Token budgets: the check says that raising a ceiling is a deliberate policy change.
 - README per-version notes: `check:remediation-release-docs` requires release text in the README.
+
+### Phase 7, budgets and README — 2026-11-16 — certified in one round
+
+The user approved both policy changes on 2026-11-16.
+
+- Token budgets: every ceiling that fails the check is now the measured size plus 5%, rounded up to
+  a multiple of 10 (plan 5,380 to 5,650; close 5,915 to 6,180; init 5,290 to 5,520; init-seedbed
+  5,620 to 5,860; review 5,005 to 5,230; execute 5,000 to 5,070; status brief 1,670 to 1,700;
+  orchestrator 875 to 890 words; sprint-forge skill 1,392 to 1,410 words). Ceilings that already
+  had 5% or more were left alone; none was lowered. The audit prints the headroom of each budget.
+  Advisory limits were not changed; three of them already warn (`commands/forge.md` 558 of 500
+  words, `commands/scope-retire.md` 681 of 500, INIT happy path 2,118 of 2,000 tokens).
+- `docs/cost-model.md` listed path ceilings (3,500, 3,000, ...) that never matched the code; it now
+  lists the real ones.
+- README: the 6.4.0, 6.4.1 and 6.5.0 paragraphs are gone; all three were already in the changelog.
+  `check:remediation-release-docs` was not changed: it needs the candidate version in the README,
+  which now sits in the legacy-remediation sentence ("the current release **6.5.0**").
+- Full `npm run check`: 91 of 91, 145.0 s.
 
 QA tooling lives in `~/.cache/kyro-tmp/roadmap-qa/` (`baseline/`, `capture.sh`, `count.js`,
 `differential.sh`, `longlived.js`, and `base/`, a build of the pre-change commit).
