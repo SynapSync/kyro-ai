@@ -3,7 +3,7 @@
 - **Created:** 2026-11-16
 - **Baseline:** `develop` at `4c35f11`, kyro-ai 6.5.0
 - **Work branch:** `develop` (phases 1 and 2 were committed there on 2026-11-16)
-- **Status:** Phases 1 and 2 certified; Phase 3 waits for the user's GO
+- **Status:** Phases 1, 2 and 3 certified; Phase 4 in progress
 
 This document records a project review done on 2026-11-16 and the phased plan that came out of it.
 It is the single place to track that plan. Any agent can resume from the "Status board" and the
@@ -33,8 +33,8 @@ Project rules that apply to every phase:
 |---|-------|--------|-----------|----------|
 | 1 | Memoize checkpoint reads and commitments | certified | 2026-11-16 | QA log, rounds 1 and 2; committed on `develop` |
 | 2 | Fix checks under npm 12, widen CI Node matrix | certified | 2026-11-16 | QA log, phase 2 round 1; committed on `develop`; check the CI run |
-| 3 | Slim the npm package and remove leftovers | pending | — | — |
-| 4 | Parallel check runner and shared sandbox helper | pending | — | — |
+| 3 | Slim the npm package and remove leftovers | certified | 2026-11-16 | QA log, phase 3 round 1; committed on `develop` |
+| 4 | Parallel check runner and shared sandbox helper | in progress | — | — |
 | 5 | Lazy command loading | pending | — | — |
 | 6 | Declarative flag parsing | pending | — | — |
 | 7 | Structure, budgets and README cleanup | pending | — | — |
@@ -325,6 +325,39 @@ Not verifiable locally:
 
 - GitHub Actions has not run the new workflow; the first push will show it.
 - `check-windows-install-smoke.mjs` runs on Windows only and was reviewed by reading.
+
+### Phase 3, round 1 — 2026-11-16 — certified
+
+Implementer: Sonnet 5.5 (a new agent). `package.json` `files` now ships `dist` without source
+maps, `commands`, `agents`, `internal`, `fixtures/evals`, `docs/*.md`, `docs/architecture.mmd` and
+the one linked ADR, plus the root files. `docs/diagrams`, `scripts/`, the other fixtures and the
+development plans stay in the repository only. `check:change-current-work:red` reads the baseline
+from `KYRO_BASELINE_CLI` or `--baseline-cli`. `pnpm-lock.yaml` and the empty `hooks/` and
+`providers/` directories are gone. New guard: `check:package-contents`.
+
+| | Before | After |
+|---|---|---|
+| Packed | 9.98 MB | 0.68 MB |
+| Unpacked | 22.2 MB | 2.67 MB |
+| Files | 1 080 | 475 |
+
+Verified by the orchestrator:
+
+- Old and new tarballs installed into isolated prefixes and homes, 13 commands each: identical
+  exit codes; outputs differ only in the runtime file count (614 against 346, the dropped maps).
+- Projected skills are byte-identical; the runtime differs only in the maps, `manifest.json` and
+  `package.json`.
+- `kyro eval` from the new package: 31 of 31.
+- The guard was mutation-tested: with the old `files` list it fails naming size, diagrams, scripts
+  and fixtures; with a `/home/...` path added to a shipped doc it fails naming file and line.
+- Typecheck and 12 targeted checks pass. Full suite: 89 steps, 704 s, 0 failures.
+- Orchestrator edit: removed a changelog bullet about the empty directories, which were never
+  tracked or published.
+
+Not part of `npm run check`, and failing on this machine for environment reasons: `check:tokens`
+(the global `kyro` is not installed for the active Node) and `check:change-current-work` (the local
+Codex setup; the implementer reports the same failure on the previous code, not re-run by the
+orchestrator).
 
 QA tooling lives in `~/.cache/kyro-tmp/roadmap-qa/` (`baseline/`, `capture.sh`, `count.js`,
 `differential.sh`, `longlived.js`, and `base/`, a build of the pre-change commit).
