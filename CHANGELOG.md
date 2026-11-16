@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- Read-only commands no longer re-read and re-hash the same checkpoint many times in one process. Managed JSON files are read, parsed and hashed once while their bytes are unchanged (validated on every use against device, inode, size and nanosecond mtime/ctime, with a racy-timestamp guard), and checkpoint integrity and commitment verdicts are memoised per file content. `kyro status` and `kyro context-pack` read each file about once; `kyro doctor --artifacts` on this repository drops from about 4.4 s to about 1 s. Output and commitments are unchanged. Guarded by `check:read-memoization`.
+
 ## [6.5.0] - 2026-11-03
 
 ### Added

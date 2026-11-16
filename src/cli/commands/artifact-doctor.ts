@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { KYRO_STATE_PATH, LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { resolveManagedPath } from '../fs';
-import { readJsonSafely } from '../artifacts/json';
+import { readJsonSafely, readJsonWithDigest } from '../artifacts/json';
 import { archiveDir, scopeRoot, sprintJsonPath } from '../artifacts/paths';
 import { listScopeFolders } from '../artifacts/scopes';
 import { assertNotForeignDirectory } from '../core/scope-resolution';
@@ -20,13 +20,13 @@ import type { CheckResult, KyroScopeEntry, SprintFile } from '../types';
 import { SPRINT_CLOSE_TRANSACTION_STATUS, type SprintCloseCheckpointV1, type SprintCloseTransactionStatus } from '../types';
 import {
   checkpointCommitment,
-  checkpointIntegrityIssues,
+  checkpointIntegrityIssuesForBytes,
   checkpointSchemaIssues,
   isLegacyIntermediateActiveScopeAfter,
   legacyNormalizedProjectScopeAfter,
   sha256,
 } from '../checkpoints/sprint-close';
-import { EFFECTIVE_CHECKPOINT_STATUS, resolveEffectiveCheckpoint, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
+import { EFFECTIVE_CHECKPOINT_STATUS, effectiveCommitment, resolveEffectiveCheckpoint, resolveEffectiveCheckpointAtPath } from '../checkpoints/effective';
 import {
   CHECKPOINT_DISCOVERY_STATUS,
   MANAGED_PATH_LEVEL,
@@ -417,7 +417,7 @@ function compareCheckpointRecency(left: SprintCloseCheckpointV1, right: SprintCl
 }
 
 function inspectCheckpoint(scope: string, path: string, compareLiveState: boolean): CheckResult {
-  const read = readJsonSafely(path);
+  const read = readJsonWithDigest(path);
   if (read.error) return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CORRUPT, read.error);
   const raw = asRecord(read.value);
   if (raw?.schemaVersion !== 1) {
@@ -436,7 +436,7 @@ function inspectCheckpoint(scope: string, path: string, compareLiveState: boolea
     return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.DIVERGED, resolved.detail);
   }
   const integrityIssues = resolved.status === EFFECTIVE_CHECKPOINT_STATUS.VALID
-    ? checkpointIntegrityIssues(read.value, path)
+    ? checkpointIntegrityIssuesForBytes(read.value, path, read.sha256)
     : [];
   if (integrityIssues.length > 0) return checkpointResult(scope, path, SPRINT_CLOSE_TRANSACTION_STATUS.CORRUPT, integrityIssues.join('; '));
   const checkpoint = resolved.checkpoint;
@@ -600,7 +600,7 @@ function validateLedgerCheckpointReferences(
       } else {
         results.push(pass(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `${entry.checkpoint} is CANONICALIZED and matches ledger identity.`));
       }
-    } else if (entry.checkpointSha256 !== checkpointCommitment(resolved.checkpoint)) {
+    } else if (entry.checkpointSha256 !== effectiveCommitment(resolved)) {
       results.push(fail(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `checkpoint commitment does not match live ledger anchor for ${entry.checkpoint}`, 'Treat the archive as tampered or corrupted. Restore the checkpoint bytes/content from trusted versioned storage.'));
     } else {
       results.push(pass(`${scope}/ledger-checkpoint/${entry.n ?? '?'}`, `${entry.checkpoint} matches ledger identity and external commitment.`));

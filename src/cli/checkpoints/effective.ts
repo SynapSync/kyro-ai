@@ -1,14 +1,14 @@
 import { lstatSync } from 'node:fs';
-import { readJsonSafely } from '../artifacts/json';
+import { readJsonWithDigest } from '../artifacts/json';
 import { scopeRoot } from '../artifacts/paths';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import {
   checkpointCommitment,
-  checkpointIntegrityIssues,
+  checkpointCommitmentForBytes,
+  checkpointIntegrityIssuesForBytes,
 } from './sprint-close';
 import {
   findCanonicalizationCandidate,
-  fileSha256,
   rebuildCanonicalCheckpointFromDisk,
   validateCanonicalizationRecord,
 } from './canonicalize';
@@ -75,7 +75,7 @@ export function resolveEffectiveCheckpointAtPath(
       detail: `unsafe-path: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
-  const read = readJsonSafely(path);
+  const read = readJsonWithDigest(path);
   if (!read.exists) {
     return { status: EFFECTIVE_CHECKPOINT_STATUS.CORRUPT, path, checkpoint: null, originalSha256: null, detail: `missing ${path}` };
   }
@@ -93,14 +93,9 @@ export function resolveEffectiveCheckpointAtPath(
     };
   }
 
-  let originalSha256: string | null = null;
-  try {
-    originalSha256 = fileSha256(path);
-  } catch {
-    originalSha256 = null;
-  }
+  const originalSha256: string | null = read.sha256;
 
-  const integrityIssues = checkpointIntegrityIssues(read.value, path);
+  const integrityIssues = checkpointIntegrityIssuesForBytes(read.value, path, read.sha256);
   if (integrityIssues.length === 0) {
     const checkpoint = read.value as SprintCloseCheckpointV1;
     if (checkpoint.identity.scope !== scope) {
@@ -160,5 +155,8 @@ export function resolveEffectiveCheckpointAtPath(
 
 export function effectiveCommitment(resolved: EffectiveCheckpoint): string | null {
   if (!resolved.checkpoint) return null;
+  // A VALID checkpoint is the unmodified parse of the bytes behind originalSha256; a canonicalized
+  // projection is not, so it is always recomputed.
+  if (resolved.status === EFFECTIVE_CHECKPOINT_STATUS.VALID) return checkpointCommitmentForBytes(resolved.checkpoint, resolved.originalSha256);
   return checkpointCommitment(resolved.checkpoint);
 }
