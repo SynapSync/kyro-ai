@@ -3,7 +3,7 @@
 - **Created:** 2026-11-16
 - **Baseline:** `develop` at `4c35f11`, kyro-ai 6.5.0
 - **Work branch:** `develop` (phases 1 and 2 were committed there on 2026-11-16)
-- **Status:** Phases 1 to 6 certified; Phase 7 is next
+- **Status:** Phases 1 to 6 certified; Phase 7 structural part certified, its budget and README parts wait for a decision; Phase 8 pending
 
 This document records a project review done on 2026-11-16 and the phased plan that came out of it.
 It is the single place to track that plan. Any agent can resume from the "Status board" and the
@@ -37,7 +37,7 @@ Project rules that apply to every phase:
 | 4 | Parallel check runner and shared sandbox helper | certified | 2026-11-16 | QA log, phase 4 rounds 1 and 2; commit `bd02ed1` |
 | 5 | Lazy command loading | certified | 2026-11-16 | QA log, phase 5 rounds 1 and 2; commit `17844ba` |
 | 6 | Declarative flag parsing | certified | 2026-11-16 | QA log, phase 6 rounds 1 and 2; commit `66455ab` |
-| 7 | Structure, budgets and README cleanup | pending | — | — |
+| 7 | Structure, budgets and README cleanup | partly certified | 2026-11-16 | File split certified (QA log, phase 7; commit `2912f41`). Token budgets and README release notes wait for the user's decision |
 | 8 | Measure Kyro against other workflows; short path | pending | — | — |
 
 Status values: `pending`, `in progress`, `in QA`, `returned`, `certified`.
@@ -465,6 +465,40 @@ Notes:
   Worth a look if it shows up in CI.
 - The highest complexities left in `src/cli` are outside flag parsing: `repair/integrity-plan.ts`
   138, `core/active-plan.ts` 125, `remediation/plan.ts` 101. They belong to phase 7.
+
+### Phase 7, structural part — 2026-11-16 — certified in one round
+
+Scope given to the implementer: the file split and the `doctor` cycle only.
+
+Verified by the orchestrator:
+
+- No file under `src/` is above 1,000 lines (largest: `remediation/protocol.ts`, 988).
+  `remediation/plan.ts` 1,743 to 322, `artifacts/schema.ts` 1,477 to 352, `types.ts` 1,307 to 26,
+  with 7, 5 and 9 new sibling modules.
+- Runtime export names of all 136 modules of the previous build are identical. The non-import lines
+  of each split file are the same multiset before and after (1,604, 1,354 and 1,170 lines).
+- `check:canonicalization-gate` had to follow the moved code (three file paths and one anchor
+  string). Old gate on the old build and new gate on the new build both report 120 assertions and
+  8 guards proven load-bearing.
+- CLI fuzz against the previous build, 2,295 invocations: no behaviour difference.
+- Full `npm run check`: 91 of 91, 150.0 s. `kyro --version` still loads 7 modules (33.7 ms).
+
+Notes:
+
+- The `doctor` call cycle in finding F-7 does not exist: `checkAdapterProjections` never calls back
+  into `doctor` or `runDoctorChecks`, and `doctor.ts` is in no module cycle. Nothing was changed.
+  Two module cycles do exist elsewhere and predate this work: one of 15 modules across adapters,
+  state, fs and checkpoints, and `remediation/plan` with `certification-plan`.
+- `kyro --help` now loads 46 `dist/` modules, up from 40, against the ceiling of 50.
+- `kyro status` measured 226 ms before and 233 ms after (medians of 25); within run-to-run noise but
+  consistent with six more small modules to load.
+- The comment above the `debt-contract` re-export in `types.ts` still says the module is free of
+  imports; it now re-exports from `types/*`.
+
+Not done, waiting for the user's decision because both change a stated policy:
+
+- Token budgets: the check says that raising a ceiling is a deliberate policy change.
+- README per-version notes: `check:remediation-release-docs` requires release text in the README.
 
 QA tooling lives in `~/.cache/kyro-tmp/roadmap-qa/` (`baseline/`, `capture.sh`, `count.js`,
 `differential.sh`, `longlived.js`, and `base/`, a build of the pre-change commit).
