@@ -4,6 +4,7 @@ import { asSharedProjectState, validateSharedProjectStateShape, validateSprintFi
 import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { PROJECT_STATE_PATH } from '../constants';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, flag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import { sha256 } from '../core/digest';
@@ -198,22 +199,29 @@ function applyLocalRuleMutation(scope: string, kind: LocalRuleMutation, args: Lo
   });
 }
 
+const ruleValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value.`, `Pass ${flagName} <value>.`));
+const ruleOption = <S>(name: string, apply: (args: S, value: string) => void): FlagSpec<S> => option([name], ruleValue, apply);
+
+const LOCAL_RULE_FLAGS: readonly FlagSpec<LocalRuleArgs>[] = [
+  dryRunFlag(),
+  flag(['--yes'], (a: LocalRuleArgs) => { a.yes = true; }),
+  flag(['--global'], () => {
+    throw new KyroCoreError('INVALID_INPUT', 'Local rule update/remove/replace never accept --global.', 'These operations write only the scope sprint.json.');
+  }),
+  ruleOption('--rule', (a: LocalRuleArgs, v) => { a.rule = v; }),
+  ruleOption('--id', (a: LocalRuleArgs, v) => { a.newId = v; }),
+  ruleOption('--tag', (a: LocalRuleArgs, v) => { a.tags.push(v); }),
+  ruleOption('--kyro-scope', (a: LocalRuleArgs, v) => { a.scope = v; }),
+  ruleOption('--digest', (a: LocalRuleArgs, v) => { a.digest = v; }),
+];
+
 function parseLocalRuleArgs(kind: LocalRuleMutation, rawArgs: string[]): LocalRuleArgs {
   const id = rawArgs[0];
   if (!id || id.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `rule ${kind} requires an existing rule id.`);
   const out: LocalRuleArgs = { id, newId: null, rule: '', tags: [], scope: null, dryRun: false, digest: null, yes: false };
-  for (let i = 1; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--dry-run') out.dryRun = true;
-    else if (arg === '--yes') out.yes = true;
-    else if (arg === '--global') throw new KyroCoreError('INVALID_INPUT', 'Local rule update/remove/replace never accept --global.', 'These operations write only the scope sprint.json.');
-    else if (arg === '--rule') out.rule = requireValue(rawArgs, i++, '--rule');
-    else if (arg === '--id') out.newId = requireValue(rawArgs, i++, '--id');
-    else if (arg === '--tag') out.tags.push(requireValue(rawArgs, i++, '--tag'));
-    else if (arg === '--kyro-scope') out.scope = requireValue(rawArgs, i++, '--kyro-scope');
-    else if (arg === '--digest') out.digest = requireValue(rawArgs, i++, '--digest');
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown flag for rule ${kind}: ${arg}`);
-  }
+  parseFlags(LOCAL_RULE_FLAGS, rawArgs.slice(1), out, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown flag for rule ${kind}: ${arg}`);
+  });
   if (out.digest && !/^[a-f0-9]{64}$/.test(out.digest)) throw new KyroCoreError('INVALID_INPUT', '--digest must be a lowercase SHA-256 digest.');
   if ((kind === 'remove' && (out.rule || out.tags.length || out.newId)) || (kind === 'update' && out.newId)) throw new KyroCoreError('INVALID_INPUT', `Unexpected replacement fields for rule ${kind}.`);
   return out;
@@ -304,6 +312,16 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const RULE_ADD_FLAGS: readonly FlagSpec<RuleAddArgs>[] = [
+  helpFlag(),
+  dryRunFlag(),
+  flag(['--global'], (a: RuleAddArgs) => { a.global = true; }),
+  ruleOption('--id', (a: RuleAddArgs, v) => { a.id = v; }),
+  ruleOption('--rule', (a: RuleAddArgs, v) => { a.rule = v; }),
+  ruleOption('--tag', (a: RuleAddArgs, v) => { a.tags.push(v); }),
+  ruleOption('--kyro-scope', (a: RuleAddArgs, v) => { a.scope = v; }),
+];
+
 function parseRuleAddArgs(args: string[]): RuleAddArgs {
   const out: RuleAddArgs = {
     id: null,
@@ -314,26 +332,9 @@ function parseRuleAddArgs(args: string[]): RuleAddArgs {
     dryRun: false,
     help: false,
   };
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === '--help' || arg === '-h') out.help = true;
-    else if (arg === '--dry-run') out.dryRun = true;
-    else if (arg === '--global') out.global = true;
-    else if (arg === '--id') out.id = requireValue(args, i++, '--id');
-    else if (arg === '--rule') out.rule = requireValue(args, i++, '--rule');
-    else if (arg === '--tag') out.tags.push(requireValue(args, i++, '--tag'));
-    else if (arg === '--kyro-scope') out.scope = requireValue(args, i++, '--kyro-scope');
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown flag for rule add: ${arg}`, 'Run kyro rule --help.');
-  }
-  return out;
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) {
-    throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value.`, `Pass ${flag} <value>.`);
-  }
-  return value;
+  return parseFlags(RULE_ADD_FLAGS, args, out, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown flag for rule add: ${arg}`, 'Run kyro rule --help.');
+  });
 }
 
 function printRuleHelp(): void {

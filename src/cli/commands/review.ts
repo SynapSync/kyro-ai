@@ -4,6 +4,7 @@ import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { collectCheckerFindings, countClarificationMarkers, normalizeCriterion } from '../core/analysis';
 import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId, taskExecutionInfo } from '../core/status';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, flag, helpFlag, option, parseFlags, takeNonEmptyUnlessDashed, type FlagSpec } from '../core/flags';
 import { setCliMachineResult } from '../core/cli-envelope';
 import { evaluateGuard } from '../core/policy';
 import { resolveScope } from '../core/scope-resolution';
@@ -325,41 +326,40 @@ function locateTask(sprint: SprintFile, taskId: string): LocatedTask | null {
   return null;
 }
 
+const reviewValue = takeNonEmptyUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
+const reviewOption = (name: string, apply: (args: ReviewArgs, value: string) => void): FlagSpec<ReviewArgs> => option([name], reviewValue, apply, true);
+
+const REVIEW_FLAGS: readonly FlagSpec<ReviewArgs>[] = [
+  helpFlag(),
+  flag(['--yes', '-y', '--confirm'], (a: ReviewArgs) => { a.yes = true; }),
+  dryRunFlag(),
+  reviewOption('--digest', (a, v) => { a.requestDigest = parseRequestDigest(v); }),
+  reviewOption('--kyro-scope', (a, v) => { a.scope = v; }),
+  reviewOption('--verdict', (a, v) => { a.verdict = parseVerdict(v); }),
+  reviewOption('--checked-criterion', (a, v) => { a.checkedCriteria.push(v); }),
+  reviewOption('--waive-criterion', (a, v) => { a.waivedCriteria.push(parseWaiver(v)); }),
+  reviewOption('--finding', (a, v) => { a.findings.push(parseFinding(v)); }),
+  reviewOption('--by', (a, v) => { a.by = v; }),
+];
+
 function parseReviewArgs(rawArgs: string[]): ReviewArgs {
-  let taskId = '';
-  let scope: string | null = null;
-  let verdict: TaskVerdictResult = 'pass';
-  const checkedCriteria: string[] = [];
-  const waivedCriteria: WaivedCriterion[] = [];
-  const findings: TaskVerdictFinding[] = [];
-  let by = process.env.KYRO_ACTOR ?? 'checker';
-  let yes = false;
-  let dryRun = false;
-  let help = false;
-  let requestDigest: string | null = null;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--digest') { requestDigest = parseRequestDigest(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--digest=')) requestDigest = parseRequestDigest(arg.slice('--digest='.length));
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--verdict') { verdict = parseVerdict(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--verdict=')) verdict = parseVerdict(arg.slice('--verdict='.length));
-    else if (arg === '--checked-criterion') { checkedCriteria.push(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--checked-criterion=')) checkedCriteria.push(arg.slice('--checked-criterion='.length));
-    else if (arg === '--waive-criterion') { waivedCriteria.push(parseWaiver(requireValue(rawArgs, i, arg))); i += 1; }
-    else if (arg.startsWith('--waive-criterion=')) waivedCriteria.push(parseWaiver(arg.slice('--waive-criterion='.length)));
-    else if (arg === '--finding') { findings.push(parseFinding(requireValue(rawArgs, i, arg))); i += 1; }
-    else if (arg.startsWith('--finding=')) findings.push(parseFinding(arg.slice('--finding='.length)));
-    else if (arg === '--by') { by = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--by=')) by = arg.slice('--by='.length);
-    else if (!arg.startsWith('--') && !taskId) taskId = arg;
+  const args: ReviewArgs = {
+    taskId: '',
+    scope: null,
+    verdict: 'pass',
+    checkedCriteria: [],
+    waivedCriteria: [],
+    findings: [],
+    by: process.env.KYRO_ACTOR ?? 'checker',
+    yes: false,
+    dryRun: false,
+    help: false,
+    requestDigest: null,
+  };
+  return parseFlags(REVIEW_FLAGS, rawArgs, args, (arg, state) => {
+    if (!arg.startsWith('--') && !state.taskId) state.taskId = arg;
     else throw new KyroCoreError('INVALID_INPUT', `Unknown review option: ${arg}`);
-  }
-  return { taskId, scope, verdict, checkedCriteria, waivedCriteria, findings, by, yes, dryRun, help, requestDigest };
+  });
 }
 
 function parseRequestDigest(value: string): string {
@@ -390,12 +390,6 @@ export function parseFinding(value: string): TaskVerdictFinding {
 
 function isFindingSeverity(value: string): value is TaskVerdictFindingSeverity {
   return value === 'critical' || value === 'warning' || value === 'suggestion';
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (!value || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value`);
-  return value;
 }
 
 /**

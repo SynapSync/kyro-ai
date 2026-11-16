@@ -5,6 +5,7 @@ import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { validateSprintFile } from '../artifacts/schema';
 import { countClarificationMarkers } from '../core/analysis';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import { SPEC_REQUIREMENT_PRIORITY, type OperationPlan, type SpecRequirement, type SpecRequirementPriority, type SprintFile } from '../types';
@@ -234,19 +235,20 @@ function parseRequirement(value: unknown, path: string): SpecRequirement {
   };
 }
 
+const clarifyValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value.`, `Pass ${flagName} <value>.`));
+
+const CLARIFY_FLAGS: readonly FlagSpec<ClarifyArgs>[] = [
+  helpFlag(),
+  dryRunFlag(),
+  option(['--from'], clarifyValue, (a, v) => { a.from = v; }, true),
+  option(['--kyro-scope'], clarifyValue, (a, v) => { a.scope = v; }, true),
+];
+
 function parseClarifyArgs(rawArgs: string[]): ClarifyArgs {
   const args: ClarifyArgs = { from: '', scope: null, dryRun: false, help: false };
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') args.help = true;
-    else if (arg === '--dry-run') args.dryRun = true;
-    else if (arg === '--from') args.from = requireValue(rawArgs, i++, '--from');
-    else if (arg.startsWith('--from=')) args.from = arg.slice('--from='.length);
-    else if (arg === '--kyro-scope') args.scope = requireValue(rawArgs, i++, '--kyro-scope');
-    else if (arg.startsWith('--kyro-scope=')) args.scope = arg.slice('--kyro-scope='.length);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown clarify option: ${arg}`, 'Run kyro clarify --help.');
-  }
-  return args;
+  return parseFlags(CLARIFY_FLAGS, rawArgs, args, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown clarify option: ${arg}`, 'Run kyro clarify --help.');
+  });
 }
 
 function revalidateWritten(scope: string): void {
@@ -263,12 +265,6 @@ function isClarificationTargetKind(value: unknown): value is ClarificationTarget
 
 function isPriority(value: unknown): value is SpecRequirementPriority {
   return typeof value === 'string' && Object.values(SPEC_REQUIREMENT_PRIORITY).includes(value as SpecRequirementPriority);
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value.`, `Pass ${flag} <value>.`);
-  return value;
 }
 
 function printClarifyHelp(): void {

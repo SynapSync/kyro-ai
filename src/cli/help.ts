@@ -103,9 +103,8 @@ Examples:
 `);
 }
 
-export function printCommandHelp(command: string): void {
-  if (command === 'work') {
-    console.log(`Usage:
+const COMMAND_HELP = new Map<string, () => string[]>([
+  ['work', () => [`Usage:
   kyro work create --id <slug> --from <brief-or-idea> [--by <actor>] [--dry-run] [--json]
   kyro work plan --work <slug> --from <proposal.json> --expect-revision <n> [--by <actor>] [--dry-run] [--json]
   kyro work start|block|unblock --work <slug> --task Wn --expect-revision <n> [--by <actor>] [--dry-run] [--json]
@@ -118,72 +117,47 @@ export function printCommandHelp(command: string): void {
   kyro work reopen --work <slug> --reason <text> --expect-revision <n> --by <actor> [--dry-run | --yes] [--json]
   kyro work promote --work <slug> --to-scope <new-forge-scope> --expect-revision <n> --by <actor> [--dry-run | --yes] [--json]
   kyro work status|context-pack --work <slug> [--task Wn] [--json]
-  Promotion carries no approval into Forge and never turns a Work pass into Forge QA. An interrupted promotion blocks other mutations; status prints the exact retry. The complete target directory is published atomically; status and doctor verify its initial origin copy, reciprocal link, and current Forge shape. Later Forge progress does not change the origin digest. Until the installed runtime gains work, use the workspace build (node dist/cli.js).`);
-    return;
-  }
-  if (command === 'install') {
-    console.log(`Usage: kyro install [--agent ${implementedAgents()}] --scope workspace [--init-workspace|--no-init-workspace] [--integrations] [--dry-run] [--yes]`);
-  } else if (command === 'adapters') {
-    console.log(`Usage: kyro adapters list | enable|disable <${implementedAgents()}> [--integrations] [--json] [--dry-run]`);
-    console.log('Disable preserves canonical ~/.agents/skills skills shared by Codex, Pi, and OpenCode.');
-  } else if (command === 'detect') {
-    console.log(`Usage: kyro detect [--agent ${implementedAgents()}] [--json]`);
-  } else if (command === 'doctor') {
-    console.log('Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--trace] [--kyro-scope <scope>]');
-  } else if (command === 'repair') {
-    console.log('Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes|--confirm]');
-  } else if (command === 'remediate') {
-    console.log('Usage: kyro remediate preview|apply --manifest <path> [--kyro-scope <scope>] [--json] (apply requires --yes)');
-  } else if (command === 'recertify') {
-    console.log('Usage: kyro recertify preview|apply --manifest <path> [--kyro-scope <scope>] [--json] (apply requires --yes)');
-  } else if (command === 'status') {
-    console.log('Usage: kyro status [brief|full|debt] [--kyro-scope <scope>] [--json]');
-  } else if (command === 'analyze') {
-    console.log('Usage: kyro analyze [--matrix] [--kyro-scope <scope>] [--json]');
-  } else if (command === 'record-evidence') {
-    console.log('Usage: kyro record-evidence <task> [--kyro-scope <scope>] --summary <text> --validation <text> [--validation <text> ...] [--file <path> ...] [--notes <text>] [--by <actor>] [--status done|blocked] [--disposition deferred|blocked|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]] [--dry-run]');
-  } else if (command === 'plan') {
-    console.log('Usage: kyro plan --from <file> [--kyro-scope <scope>] [--dry-run] | plan --update-active --from <file> --kyro-scope <scope> (--dry-run | --digest <sha256> --yes). Run kyro plan --help for input shapes.');
-  } else if (command === 'review') {
-    console.log('Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes]');
-  } else if (command === 'debt') {
-    console.log(`Usage:
+  Promotion carries no approval into Forge and never turns a Work pass into Forge QA. An interrupted promotion blocks other mutations; status prints the exact retry. The complete target directory is published atomically; status and doctor verify its initial origin copy, reciprocal link, and current Forge shape. Later Forge progress does not change the origin digest. Until the installed runtime gains work, use the workspace build (node dist/cli.js).`]],
+  ['install', () => [`Usage: kyro install [--agent ${implementedAgents()}] --scope workspace [--init-workspace|--no-init-workspace] [--integrations] [--dry-run] [--yes]`]],
+  ['adapters', () => [`Usage: kyro adapters list | enable|disable <${implementedAgents()}> [--integrations] [--json] [--dry-run]`, 'Disable preserves canonical ~/.agents/skills skills shared by Codex, Pi, and OpenCode.']],
+  ['detect', () => [`Usage: kyro detect [--agent ${implementedAgents()}] [--json]`]],
+  ['doctor', () => ['Usage: kyro doctor [--tokens] [--artifacts] [--adapters] [--trace] [--kyro-scope <scope>]']],
+  ['repair', () => ['Usage: kyro repair [--kyro-scope <scope>] [--dry-run] [--yes|--confirm]']],
+  ['remediate', () => ['Usage: kyro remediate preview|apply --manifest <path> [--kyro-scope <scope>] [--json] (apply requires --yes)']],
+  ['recertify', () => ['Usage: kyro recertify preview|apply --manifest <path> [--kyro-scope <scope>] [--json] (apply requires --yes)']],
+  ['status', () => ['Usage: kyro status [brief|full|debt] [--kyro-scope <scope>] [--json]']],
+  ['analyze', () => ['Usage: kyro analyze [--matrix] [--kyro-scope <scope>] [--json]']],
+  ['record-evidence', () => ['Usage: kyro record-evidence <task> [--kyro-scope <scope>] --summary <text> --validation <text> [--validation <text> ...] [--file <path> ...] [--notes <text>] [--by <actor>] [--status done|blocked] [--disposition deferred|blocked|superseded|cancelled --reason <text> [--target debt:<id>|task:<id>|sprint:<n>]] [--dry-run]']],
+  ['plan', () => ['Usage: kyro plan --from <file> [--kyro-scope <scope>] [--dry-run] | plan --update-active --from <file> --kyro-scope <scope> (--dry-run | --digest <sha256> --yes). Run kyro plan --help for input shapes.']],
+  ['review', () => ['Usage: kyro review <task> [--kyro-scope <scope>] [--verdict pass|fail] [--checked-criterion <text>] [--finding severity:detail] [--by <actor>] [--dry-run] [--yes]']],
+  ['debt', () => [`Usage:
   kyro debt add --title <text> --priority <critical|high|medium|low> [--target <n>] [--note <text>] [--kyro-scope <scope>] [--dry-run]
   kyro debt start <id> [--kyro-scope <scope>] [--dry-run]
   kyro debt resolve <id> [--note <text>] [--kyro-scope <scope>] [--dry-run]
   kyro debt defer <id> --target <n> --note <text> [--kyro-scope <scope>] [--dry-run]
-  kyro debt escalate <id> --priority <critical|high|medium|low> [--kyro-scope <scope>] [--dry-run]`);
-  } else if (command === 'add-emergent') {
-    console.log('Usage: kyro add-emergent --title <text> --description <text> --acceptance <text> [--acceptance <text> ...] [--file <path> ...] [--context <text>] [--depends-on <id> ...] [--kyro-scope <scope>] [--dry-run]');
-  } else if (command === 'scenario') {
-    console.log(`Usage:
+  kyro debt escalate <id> --priority <critical|high|medium|low> [--kyro-scope <scope>] [--dry-run]`]],
+  ['add-emergent', () => ['Usage: kyro add-emergent --title <text> --description <text> --acceptance <text> [--acceptance <text> ...] [--file <path> ...] [--context <text>] [--depends-on <id> ...] [--kyro-scope <scope>] [--dry-run]']],
+  ['scenario', () => [`Usage:
   kyro scenario add --id <S#> --requirement <R#> --given <text> --when <text> --then <text> [--kyro-scope <scope>] [--dry-run]
-  kyro scenario link --task <T#> --scenario <S#> [--kyro-scope <scope>] [--dry-run]`);
-  } else if (command === 'adr') {
-    console.log('Usage: kyro adr add --title <text> --context <text> --decision <text> --consequence <text> [--consequence ...] --alternative <text> [--alternative ...] [--id ADR-0001] [--status accepted|proposed|rejected|superseded] [--date YYYY-MM-DD] [--kyro-scope <scope>] [--dry-run]');
-  } else if (command === 'rule') {
-    console.log('Usage: kyro rule add --rule <text> [--tag <tag> ...] [--id <id>] [--global] [--kyro-scope <scope>] [--dry-run]');
-  } else if (command === 'close-sprint') {
-    console.log('Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome shipped|completed|partial|abandoned] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]');
-  } else if (command === 'context-pack') {
-    console.log('Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--verbosity concise|detailed] [--json]');
-  } else if (command === 'eval') {
-    console.log('Usage: kyro eval [--case <id>] [--tag <tag>] [--agent <name>] [--json] [--list] [--keep-sandbox]');
-    console.log('Exit codes: 0 all passed; 1 expectation failed; 2 harness error.');
-  } else if (command === 'mcp') {
-    console.log('Usage: kyro mcp serve | tools');
-  } else if (command === 'trace') {
-    console.log('Usage: kyro trace [scope|--kyro-scope <scope>] [--json] [--tail N] [--type <event>] [--clear <scope>]');
-  } else if (command === 'scope') {
-    console.log('Usage: kyro scope list | inspect <scope> | set-active <scope> | complete --kyro-scope <scope> [--summary <text>] [--yes] | reopen --kyro-scope <scope> --reason <reason> [--yes] | retire --kyro-scope <scope> --reason <reason> [--digest <sha256> --yes]');
-  } else if (command === 'sync') {
-    console.log(`Usage: kyro sync [--agent ${implementedAgents()}] [--integrations] [--prune] [--dry-run]`);
-  } else if (command === 'update') {
-    console.log('Usage: kyro update [--agent <agent>] [--integrations] [--check] [--dry-run] [--yes] [--verbose]');
-    console.log('Checks the registry for the latest kyro-ai release, updates the global package when behind, and refreshes the runtime + current workspace from the fresh package. Prompts before changing anything unless --yes.');
-  } else if (command === 'uninstall') {
-    console.log('Usage: kyro uninstall [--machine|--purge-adapter-assets] [--dry-run] [--json] [--yes]');
-  } else {
+  kyro scenario link --task <T#> --scenario <S#> [--kyro-scope <scope>] [--dry-run]`]],
+  ['adr', () => ['Usage: kyro adr add --title <text> --context <text> --decision <text> --consequence <text> [--consequence ...] --alternative <text> [--alternative ...] [--id ADR-0001] [--status accepted|proposed|rejected|superseded] [--date YYYY-MM-DD] [--kyro-scope <scope>] [--dry-run]']],
+  ['rule', () => ['Usage: kyro rule add --rule <text> [--tag <tag> ...] [--id <id>] [--global] [--kyro-scope <scope>] [--dry-run]']],
+  ['close-sprint', () => ['Usage: kyro close-sprint [--kyro-scope <scope>] [--outcome shipped|completed|partial|abandoned] [--note <text>] [--summary <text>] [--recommendation <text>] [--learning <text>] [--dry-run] [--yes]']],
+  ['context-pack', () => ['Usage: kyro context-pack [--kyro-scope <scope>] [--task <id>] [--verbosity concise|detailed] [--json]']],
+  ['eval', () => ['Usage: kyro eval [--case <id>] [--tag <tag>] [--agent <name>] [--json] [--list] [--keep-sandbox]', 'Exit codes: 0 all passed; 1 expectation failed; 2 harness error.']],
+  ['mcp', () => ['Usage: kyro mcp serve | tools']],
+  ['trace', () => ['Usage: kyro trace [scope|--kyro-scope <scope>] [--json] [--tail N] [--type <event>] [--clear <scope>]']],
+  ['scope', () => ['Usage: kyro scope list | inspect <scope> | set-active <scope> | complete --kyro-scope <scope> [--summary <text>] [--yes] | reopen --kyro-scope <scope> --reason <reason> [--yes] | retire --kyro-scope <scope> --reason <reason> [--digest <sha256> --yes]']],
+  ['sync', () => [`Usage: kyro sync [--agent ${implementedAgents()}] [--integrations] [--prune] [--dry-run]`]],
+  ['update', () => ['Usage: kyro update [--agent <agent>] [--integrations] [--check] [--dry-run] [--yes] [--verbose]', 'Checks the registry for the latest kyro-ai release, updates the global package when behind, and refreshes the runtime + current workspace from the fresh package. Prompts before changing anything unless --yes.']],
+  ['uninstall', () => ['Usage: kyro uninstall [--machine|--purge-adapter-assets] [--dry-run] [--json] [--yes]']],
+]);
+
+export function printCommandHelp(command: string): void {
+  const lines = COMMAND_HELP.get(command)?.();
+  if (!lines) {
     printHelp();
+    return;
   }
+  for (const line of lines) console.log(line);
 }

@@ -7,6 +7,7 @@ import { deriveActiveSprintStatus, derivePhaseStatus } from '../core/status';
 import type { ActiveSprint, CliOptions, OperationPlan, Phase } from '../types';
 import { resolveScope } from '../core/scope-resolution';
 import { KyroCoreError } from '../core/errors';
+import { flag, helpFlag, option, parseFlags, takeNonEmptyUnlessDashed, type FlagSpec } from '../core/flags';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved, emitToolCommandRun } from '../core/trace';
 import { parseOptions } from '../options';
@@ -157,7 +158,7 @@ function runIntegrityRepair(args: string[]): void {
   if (result.skipped.length > 0) console.log(`Already applied: ${result.skipped.join(', ')}`);
 }
 
-function parseIntegrityArgs(args: string[]): {
+interface IntegrityArgs {
   command: string;
   scope: string | null;
   reason: string | undefined;
@@ -165,31 +166,26 @@ function parseIntegrityArgs(args: string[]): {
   yes: boolean;
   json: boolean;
   help: boolean;
-} {
-  const command = args[0] ?? '';
-  let scope: string | null = null;
-  let reason: string | undefined;
-  let digest: string | null = null;
-  let yes = false;
-  let json = false;
-  let help = false;
-  for (let index = command === 'prepare' || command === 'apply' ? 1 : 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--json') json = true;
-    else if (arg === '--yes' || arg === '-y') yes = true;
-    else if (arg === '--kyro-scope') scope = requiredRepairValue(args, ++index, arg);
-    else if (arg === '--reason') reason = requiredRepairValue(args, ++index, arg);
-    else if (arg === '--digest') digest = requiredRepairValue(args, ++index, arg);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown repair integrity option: ${arg}`, 'Run kyro repair --help.');
-  }
-  return { command, scope, reason, digest, yes, json, help };
 }
 
-function requiredRepairValue(args: string[], index: number, flag: string): string {
-  const value = args[index];
-  if (!value || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value.`);
-  return value;
+const repairValue = takeNonEmptyUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value.`));
+
+const INTEGRITY_FLAGS: readonly FlagSpec<IntegrityArgs>[] = [
+  helpFlag(),
+  flag(['--json'], (a: IntegrityArgs) => { a.json = true; }),
+  flag(['--yes', '-y'], (a: IntegrityArgs) => { a.yes = true; }),
+  option(['--kyro-scope'], repairValue, (a, v) => { a.scope = v; }),
+  option(['--reason'], repairValue, (a, v) => { a.reason = v; }),
+  option(['--digest'], repairValue, (a, v) => { a.digest = v; }),
+];
+
+function parseIntegrityArgs(args: string[]): IntegrityArgs {
+  const command = args[0] ?? '';
+  const parsed: IntegrityArgs = { command, scope: null, reason: undefined, digest: null, yes: false, json: false, help: false };
+  const flagArgs = command === 'prepare' || command === 'apply' ? args.slice(1) : args;
+  return parseFlags(INTEGRITY_FLAGS, flagArgs, parsed, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown repair integrity option: ${arg}`, 'Run kyro repair --help.');
+  });
 }
 
 function printRepairHelp(): void {

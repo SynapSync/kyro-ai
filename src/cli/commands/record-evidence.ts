@@ -3,6 +3,7 @@ import { sprintJsonPath } from '../artifacts/paths';
 import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { deriveActiveSprintStatus, deriveLiveWorkHandoff, derivePhaseStatus, taskExecutionInfo } from '../core/status';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { countClarificationMarkers } from '../core/analysis';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
@@ -268,49 +269,45 @@ function locateTask(sprint: SprintFile, taskId: string): LocatedTask | null {
   return null;
 }
 
+const evidenceValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
+const evidenceOption = (name: string, apply: (args: RecordEvidenceArgs, value: string) => void): FlagSpec<RecordEvidenceArgs> => option([name], evidenceValue, apply, true);
+
+const RECORD_EVIDENCE_FLAGS: readonly FlagSpec<RecordEvidenceArgs>[] = [
+  helpFlag(),
+  dryRunFlag(),
+  evidenceOption('--kyro-scope', (a, v) => { a.scope = v; }),
+  evidenceOption('--summary', (a, v) => { a.summary = v; }),
+  evidenceOption('--validation', (a, v) => { a.validation.push(v); }),
+  evidenceOption('--file', (a, v) => { a.files.push(v); }),
+  evidenceOption('--notes', (a, v) => { a.notes = v; }),
+  evidenceOption('--by', (a, v) => { a.by = v; }),
+  evidenceOption('--status', (a, v) => { a.status = parseStatus(v); a.statusExplicit = true; }),
+  evidenceOption('--disposition', (a, v) => { a.dispositionKind = parseDispositionKind(v); }),
+  evidenceOption('--reason', (a, v) => { a.reason = v; }),
+  evidenceOption('--target', (a, v) => { a.targetRaw = v; }),
+];
+
 function parseRecordEvidenceArgs(rawArgs: string[]): RecordEvidenceArgs {
-  let taskId = '';
-  let scope: string | null = null;
-  let summary = '';
-  const validation: string[] = [];
-  const files: string[] = [];
-  let notes: string | null = null;
-  let by = process.env.KYRO_ACTOR ?? 'maker';
-  let status: RecordedStatus = 'done';
-  let statusExplicit = false;
-  let dispositionKind: TaskDispositionKind | null = null;
-  let reason: string | null = null;
-  let targetRaw: string | null = null;
-  let dryRun = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--summary') { summary = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--summary=')) summary = arg.slice('--summary='.length);
-    else if (arg === '--validation') { validation.push(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--validation=')) validation.push(arg.slice('--validation='.length));
-    else if (arg === '--file') { files.push(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--file=')) files.push(arg.slice('--file='.length));
-    else if (arg === '--notes') { notes = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--notes=')) notes = arg.slice('--notes='.length);
-    else if (arg === '--by') { by = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--by=')) by = arg.slice('--by='.length);
-    else if (arg === '--status') { status = parseStatus(requireValue(rawArgs, i, arg)); statusExplicit = true; i += 1; }
-    else if (arg.startsWith('--status=')) { status = parseStatus(arg.slice('--status='.length)); statusExplicit = true; }
-    else if (arg === '--disposition') { dispositionKind = parseDispositionKind(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--disposition=')) dispositionKind = parseDispositionKind(arg.slice('--disposition='.length));
-    else if (arg === '--reason') { reason = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--reason=')) reason = arg.slice('--reason='.length);
-    else if (arg === '--target') { targetRaw = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--target=')) targetRaw = arg.slice('--target='.length);
-    else if (!arg.startsWith('--') && !taskId) taskId = arg;
+  const args: RecordEvidenceArgs = {
+    taskId: '',
+    scope: null,
+    summary: '',
+    validation: [],
+    files: [],
+    notes: null,
+    by: process.env.KYRO_ACTOR ?? 'maker',
+    status: 'done',
+    statusExplicit: false,
+    dispositionKind: null,
+    reason: null,
+    targetRaw: null,
+    dryRun: false,
+    help: false,
+  };
+  return parseFlags(RECORD_EVIDENCE_FLAGS, rawArgs, args, (arg, state) => {
+    if (!arg.startsWith('--') && !state.taskId) state.taskId = arg;
     else throw new KyroCoreError('INVALID_INPUT', `Unknown record-evidence option: ${arg}`);
-  }
-  return { taskId, scope, summary, validation, files, notes, by, status, statusExplicit, dispositionKind, reason, targetRaw, dryRun, help };
+  });
 }
 
 function parseStatus(value: string): RecordedStatus {
@@ -322,12 +319,6 @@ function parseDispositionKind(value: string): TaskDispositionKind {
   const allowed = Object.values(TASK_DISPOSITION_KIND);
   if ((allowed as string[]).includes(value)) return value as TaskDispositionKind;
   throw new KyroCoreError('INVALID_INPUT', `--disposition must be one of: ${allowed.join(', ')}`);
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value`);
-  return value;
 }
 
 function printRecordEvidenceHelp(): void {

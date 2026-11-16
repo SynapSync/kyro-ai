@@ -8,6 +8,7 @@ import { LOCAL_STATE_PATH, PROJECT_STATE_PATH } from '../constants';
 import { captureSprintGitStart, describeMissingGitCapture } from '../core/git-capture';
 import { resolveScopeAuthorFromGit } from '../core/actor';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, flag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { scopeEntryFromDisk } from '../core/scope-entries';
 import { countClarificationMarkers } from '../core/analysis';
 import { deriveActiveSprintStatus, derivePhaseStatus, nextExecutableTaskId } from '../core/status';
@@ -884,38 +885,27 @@ function parseOptionalStringArray(value: unknown, field: string): string[] {
   return value as string[];
 }
 
-function parsePlanArgs(rawArgs: string[]): PlanArgs {
-  let from = '';
-  let scope: string | null = null;
-  let dryRun = false;
-  let help = false;
-  let updateActive = false;
-  let roadmap = false;
-  let yes = false;
-  let digest: string | null = null;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--from') { from = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--from=')) from = arg.slice('--from='.length);
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--update-active') updateActive = true;
-    else if (arg === '--roadmap') roadmap = true;
-    else if (arg === '--yes' || arg === '--confirm') yes = true;
-    else if (arg === '--digest') { digest = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--digest=')) digest = arg.slice('--digest='.length);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown plan option: ${arg}`);
-  }
-  if (digest !== null && !/^[a-f0-9]{64}$/.test(digest)) throw new KyroCoreError('INVALID_INPUT', '--digest must be a lowercase SHA-256 digest.');
-  return { from, scope, dryRun, help, updateActive, roadmap, yes, digest };
-}
+const planValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
+const planOption = (name: string, apply: (args: PlanArgs, value: string) => void): FlagSpec<PlanArgs> => option([name], planValue, apply, true);
 
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value`);
-  return value;
+const PLAN_FLAGS: readonly FlagSpec<PlanArgs>[] = [
+  helpFlag(),
+  dryRunFlag(),
+  planOption('--from', (a, v) => { a.from = v; }),
+  planOption('--kyro-scope', (a, v) => { a.scope = v; }),
+  flag(['--update-active'], (a: PlanArgs) => { a.updateActive = true; }),
+  flag(['--roadmap'], (a: PlanArgs) => { a.roadmap = true; }),
+  flag(['--yes', '--confirm'], (a: PlanArgs) => { a.yes = true; }),
+  planOption('--digest', (a, v) => { a.digest = v; }),
+];
+
+function parsePlanArgs(rawArgs: string[]): PlanArgs {
+  const args: PlanArgs = { from: '', scope: null, dryRun: false, help: false, updateActive: false, roadmap: false, yes: false, digest: null };
+  parseFlags(PLAN_FLAGS, rawArgs, args, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown plan option: ${arg}`);
+  });
+  if (args.digest !== null && !/^[a-f0-9]{64}$/.test(args.digest)) throw new KyroCoreError('INVALID_INPUT', '--digest must be a lowercase SHA-256 digest.');
+  return args;
 }
 
 function printPlanHelp(): void {

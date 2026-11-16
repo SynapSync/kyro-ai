@@ -1,176 +1,90 @@
 import { AGENT, SCOPE } from './constants';
 import { getAdapterDefinition, getInstallableAdapters } from './adapters/registry';
 import { KyroCoreError } from './core/errors';
+import { flag, option, parseFlags, takeIfPlain, takeNonEmpty, takeNonEmptyUnlessDashed, type FlagSpec } from './core/flags';
 import type { Agent, CliOptions, InstallScope, PackVerbosity } from './types';
 
-export function parseOptions(args: string[]): CliOptions & { machine: boolean } {
-  const agents: Agent[] = [];
-  let scope: InstallScope = SCOPE.WORKSPACE;
-  let dryRun = false;
-  let yes = false;
-  let help = false;
-  let tokens = false;
-  let artifacts = false;
-  let adapters = false;
-  let integrations = false;
-  let machine = false;
-  let trace = false;
-  let kyroScope: string | null = null;
-  let task: string | null = null;
-  const sprintFiles: string[] = [];
-  let json = false;
-  let verbosity: PackVerbosity = 'detailed';
-  let verbose = false;
-  let purgeAdapterAssets = false;
-  let prune = false;
-  let initWorkspace = false;
-  let noInitWorkspace = false;
-  const evalCases: string[] = [];
-  const evalTags: string[] = [];
-  let evalList = false;
-  let keepSandbox = false;
-  let check = false;
-  let matrix = false;
+type ParsedOptions = CliOptions & { machine: boolean };
 
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === '--dry-run') {
-      dryRun = true;
-    } else if (arg === '--yes' || arg === '-y' || arg === '--confirm') {
-      yes = true;
-    } else if (arg === '--help' || arg === '-h') {
-      help = true;
-    } else if (arg === '--tokens') {
-      tokens = true;
-    } else if (arg === '--artifacts') {
-      artifacts = true;
-    } else if (arg === '--adapters') {
-      adapters = true;
-    } else if (arg === '--integrations') {
-      integrations = true;
-    } else if (arg === '--machine') {
-      machine = true;
-    } else if (arg === '--trace') {
-      trace = true;
-    } else if (arg === '--json') {
-      json = true;
-    } else if (arg === '--verbose') {
-      verbose = true;
-    } else if (arg === '--verbosity') {
-      const value = args[i + 1];
-      if (!value) throw new KyroCoreError('INVALID_INPUT', '--verbosity requires a value', 'Use --verbosity concise|detailed.');
-      verbosity = parseVerbosity(value);
-      i += 1;
-    } else if (arg.startsWith('--verbosity=')) {
-      verbosity = parseVerbosity(arg.slice('--verbosity='.length));
-    } else if (arg === '--purge-adapter-assets') {
-      purgeAdapterAssets = true;
-    } else if (arg === '--prune') {
-      prune = true;
-    } else if (arg === '--init-workspace') {
-      initWorkspace = true;
-    } else if (arg === '--no-init-workspace') {
-      noInitWorkspace = true;
-    } else if (arg === '--list') {
-      evalList = true;
-    } else if (arg === '--keep-sandbox') {
-      keepSandbox = true;
-    } else if (arg === '--check') {
-      check = true;
-    } else if (arg === '--matrix') {
-      matrix = true;
-    } else if (arg === '--case') {
-      const value = args[i + 1];
-      if (!value) throw invalidInput('--case requires a value', 'Use --case <id> or --case=<id>.');
-      evalCases.push(value);
-      i += 1;
-    } else if (arg.startsWith('--case=')) {
-      evalCases.push(arg.slice('--case='.length));
-    } else if (arg === '--tag') {
-      const value = args[i + 1];
-      if (!value) throw invalidInput('--tag requires a value', 'Use --tag <tag> or --tag=<tag>.');
-      evalTags.push(value);
-      i += 1;
-    } else if (arg.startsWith('--tag=')) {
-      evalTags.push(arg.slice('--tag='.length));
-    } else if (arg === '--kyro-scope') {
-      const value = args[i + 1];
-      if (!value) throw invalidInput('--kyro-scope requires a value', 'Use --kyro-scope <scope> or --kyro-scope=<scope>.');
-      kyroScope = value;
-      i += 1;
-    } else if (arg.startsWith('--kyro-scope=')) {
-      kyroScope = arg.slice('--kyro-scope='.length);
-    } else if (arg === '--task') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        task = '';
-      } else {
-        task = value;
-        i += 1;
-      }
-    } else if (arg.startsWith('--task=')) {
-      task = arg.slice('--task='.length);
-    } else if (arg === '--sprint-file') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) throw invalidInput('--sprint-file requires a path', 'Use --sprint-file <path> (repeatable).');
-      sprintFiles.push(value);
-      i += 1;
-    } else if (arg.startsWith('--sprint-file=')) {
-      sprintFiles.push(arg.slice('--sprint-file='.length));
-    } else if (arg === '--agent' || arg === '--agents') {
-      const value = args[i + 1];
-      if (!value) throw invalidInput(`${arg} requires a value`, `Use ${arg} <agent>[,<agent>] or ${arg}=<agent>[,<agent>].`);
-      agents.push(...parseAgents(value));
-      i += 1;
-    } else if (arg.startsWith('--agent=')) {
-      agents.push(...parseAgents(arg.slice('--agent='.length)));
-    } else if (arg.startsWith('--agents=')) {
-      agents.push(...parseAgents(arg.slice('--agents='.length)));
-    } else if (arg === '--scope') {
-      const value = args[i + 1];
-      if (!value) throw invalidInput('--scope requires a value', 'Use --scope workspace or --scope global.');
-      scope = parseScope(value);
-      i += 1;
-    } else if (arg.startsWith('--scope=')) {
-      scope = parseScope(arg.slice('--scope='.length));
-    } else {
-      throw invalidInput(`Unknown option: ${arg}`, 'Run kyro <command> --help.');
-    }
-  }
+const needsValue = (flagName: string, remedy: string) => takeNonEmpty(() => invalidInput(`${flagName} requires a value`, remedy));
 
-  if (initWorkspace && noInitWorkspace) {
+const verbosityValue = takeNonEmpty(() => new KyroCoreError('INVALID_INPUT', '--verbosity requires a value', 'Use --verbosity concise|detailed.'));
+const agentValue = takeNonEmpty((token) => invalidInput(`${token} requires a value`, `Use ${token} <agent>[,<agent>] or ${token}=<agent>[,<agent>].`));
+
+const OPTION_FLAGS: readonly FlagSpec<ParsedOptions>[] = [
+  flag(['--dry-run'], (o) => { o.dryRun = true; }),
+  flag(['--yes', '-y', '--confirm'], (o) => { o.yes = true; }),
+  flag(['--help', '-h'], (o) => { o.help = true; }),
+  flag(['--tokens'], (o) => { o.tokens = true; }),
+  flag(['--artifacts'], (o) => { o.artifacts = true; }),
+  flag(['--adapters'], (o) => { o.adapters = true; }),
+  flag(['--integrations'], (o) => { o.integrations = true; }),
+  flag(['--machine'], (o) => { o.machine = true; }),
+  flag(['--trace'], (o) => { o.trace = true; }),
+  flag(['--json'], (o) => { o.json = true; }),
+  flag(['--verbose'], (o) => { o.verbose = true; }),
+  option(['--verbosity'], verbosityValue, (o, value) => { o.verbosity = parseVerbosity(value); }, true),
+  flag(['--purge-adapter-assets'], (o) => { o.purgeAdapterAssets = true; }),
+  flag(['--prune'], (o) => { o.prune = true; }),
+  flag(['--init-workspace'], (o) => { o.initWorkspace = true; }),
+  flag(['--no-init-workspace'], (o) => { o.noInitWorkspace = true; }),
+  flag(['--list'], (o) => { o.evalList = true; }),
+  flag(['--keep-sandbox'], (o) => { o.keepSandbox = true; }),
+  flag(['--check'], (o) => { o.check = true; }),
+  flag(['--matrix'], (o) => { o.matrix = true; }),
+  option(['--case'], needsValue('--case', 'Use --case <id> or --case=<id>.'), (o, value) => { o.evalCases.push(value); }, true),
+  option(['--tag'], needsValue('--tag', 'Use --tag <tag> or --tag=<tag>.'), (o, value) => { o.evalTags.push(value); }, true),
+  option(['--kyro-scope'], needsValue('--kyro-scope', 'Use --kyro-scope <scope> or --kyro-scope=<scope>.'), (o, value) => { o.kyroScope = value; }, true),
+  // `--task` with no usable value records an empty task instead of failing.
+  option(['--task'], takeIfPlain, (o, value) => { o.task = value; }, true),
+  option(
+    ['--sprint-file'],
+    takeNonEmptyUnlessDashed(() => invalidInput('--sprint-file requires a path', 'Use --sprint-file <path> (repeatable).')),
+    (o, value) => { o.sprintFiles.push(value); },
+    true,
+  ),
+  option(['--agent', '--agents'], agentValue, (o, value) => { o.agents.push(...parseAgents(value)); }, true),
+  option(['--scope'], needsValue('--scope', 'Use --scope workspace or --scope global.'), (o, value) => { o.scope = parseScope(value); }, true),
+];
+
+export function parseOptions(args: string[]): ParsedOptions {
+  const options: ParsedOptions = {
+    agents: [],
+    scope: SCOPE.WORKSPACE,
+    dryRun: false,
+    yes: false,
+    help: false,
+    tokens: false,
+    artifacts: false,
+    adapters: false,
+    integrations: false,
+    machine: false,
+    trace: false,
+    kyroScope: null,
+    task: null,
+    sprintFiles: [],
+    json: false,
+    verbosity: 'detailed',
+    verbose: false,
+    purgeAdapterAssets: false,
+    prune: false,
+    initWorkspace: false,
+    noInitWorkspace: false,
+    evalCases: [],
+    evalTags: [],
+    evalList: false,
+    keepSandbox: false,
+    check: false,
+    matrix: false,
+  };
+  parseFlags(OPTION_FLAGS, args, options, (arg) => {
+    throw invalidInput(`Unknown option: ${arg}`, 'Run kyro <command> --help.');
+  });
+  if (options.initWorkspace && options.noInitWorkspace) {
     throw invalidInput('Cannot combine --init-workspace and --no-init-workspace.', 'Choose one workspace initialization mode.');
   }
-
-  return {
-    agents: uniqueAgents(agents),
-    scope,
-    dryRun,
-    yes,
-    help,
-    tokens,
-    artifacts,
-    adapters,
-    integrations,
-    machine,
-    trace,
-    kyroScope,
-    task,
-    sprintFiles,
-    json,
-    verbosity,
-    verbose,
-    purgeAdapterAssets,
-    prune,
-    initWorkspace,
-    noInitWorkspace,
-    evalCases,
-    evalTags,
-    evalList,
-    keepSandbox,
-    check,
-    matrix,
-  };
+  options.agents = uniqueAgents(options.agents);
+  return options;
 }
 
 export function parseAgent(value: string): Agent {
