@@ -76,6 +76,7 @@
     "check:token-budgets": "node scripts/check-token-budgets.mjs",
     "check:managed-write-contract": "node scripts/check-managed-write-contract.mjs",
     "check:cli-envelope": "node scripts/check-cli-envelope.mjs",
+    "check:cli-lazy-load": "node scripts/check-cli-lazy-load.mjs",
     "check:git-trackability": "node scripts/check-git-trackability.mjs",
     "check:lifecycle-replay": "node scripts/check-lifecycle-replay.mjs",
     "check:cli-verbs": "node scripts/check-cli-verbs.mjs",

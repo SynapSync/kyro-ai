@@ -66,6 +66,7 @@ export const STEPS = [
   { name: 'check:startup-contract', est: 0 },
   { name: 'check:cli-verbs', est: 0 },
   { name: 'check:cli-envelope', est: 3 },
+  { name: 'check:cli-lazy-load', est: 1 },
   { name: 'check:work-contract', est: 0 },
   { name: 'check:work-plan', est: 4 },
   { name: 'check:work-execution', est: 2 },

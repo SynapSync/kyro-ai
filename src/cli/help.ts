@@ -1,4 +1,6 @@
-import { readJsonFromPackage } from './fs';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { PACKAGE_ROOT } from './constants';
 
 // Adapters use readPackageVersion while initializing. Load the registry only
 // when rendering help, after the adapter definitions have been initialized.
@@ -8,7 +10,7 @@ const implementedAgents = (): string => {
 };
 
 export function readPackageVersion(): string {
-  return readJsonFromPackage<{ version: string }>('package.json').version;
+  return (JSON.parse(readFileSync(resolve(PACKAGE_ROOT, 'package.json'), 'utf-8')) as { version: string }).version;
 }
 
 export function printHelp(): void {
