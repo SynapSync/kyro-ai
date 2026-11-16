@@ -83,6 +83,8 @@ This means a local `npm publish` also rebuilds, proves freshness, and validates 
 ## Before committing
 
 - [ ] The version was bumped and does not already exist as a GitHub Release, Git tag, or npm version.
+- [ ] On a version bump, `README.md` and `docs/cli.md` still name the new version: the README only in the legacy-remediation compatibility sentence ("the current release **X.Y.Z**"), `docs/cli.md` in its version table; per-version notes go in `CHANGELOG.md` only, never in the README. `npm run check:remediation-release-docs` enforces this.
+- [ ] Prompt growth that stays inside a token-budget ceiling needs no change; a route that outgrows its ceiling either moves detail into a lazy-loaded helper or re-baselines that ceiling by the 5% rule in `docs/cost-model.md`, with the reason in the changelog.
 - [ ] `npm run check` passes.
 - [ ] `npm run build` produces no unexpected changes in `dist/`.
 - [ ] `npm run check:adapters` passes.

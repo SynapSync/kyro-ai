@@ -5,6 +5,15 @@ import { buildCommandSkill } from '../adapters/command-skills';
 import { resolveManagedPath } from '../fs';
 import type { CheckResult } from '../types';
 
+// Headroom rule. A ceiling that fails the check when exceeded (the `fail` budgets: eager runtime
+// assets and the runtime paths) is set to the measured size at the last deliberate review plus 5%,
+// rounded up to the next multiple of 10. Growth inside that margin needs no change here. When a route
+// outgrows its ceiling, move detail into a lazy-loaded helper, or re-baseline that one ceiling with the
+// same rule and say why in the changelog. Never lower a ceiling to "tighten" it, and never raise one
+// by a few tokens to fit an edit. The audit prints the remaining headroom for each of these budgets so
+// the margin cannot erode to zero unnoticed; low headroom is reported, not a failure.
+// The `warn` budgets (command router, mode files, helpers, startup, INIT happy path) are advisory
+// limits on file shape rather than measured ceilings and keep their round numbers.
 const TOKEN_BUDGET = {
   agentsBlockWords: 150,
   projectedSkillWords: 200,
@@ -19,42 +28,35 @@ const TOKEN_BUDGET = {
   initHappyPathTokens: 2000,
   // The creation-flow existence gate (absent scope -> INIT, repair existing-only) is startup-critical
   // routing: without it every create-from-plan flow stops on a false irreconcilable blocker.
-  // 875 leaves six words above the measured 869-word asset.
-  orchestratorWords: 875,
+  orchestratorWords: 890,
   // 4.42.0 raised this from 800: SKILL.md now carries the full Step 0 startup handshake, because
   // the skill is invocable on its own and the orchestrator — which held the only copy — never
   // loads on that path. Buying it back by trimming the contract was the wrong trade; a scope
   // hand-authored without the handshake costs far more than the tokens it saves.
   // Forge carries completion-vs-retirement plus the post-roadmap decision contract.
-  // The creation-flow existence gate adds 43 words; 1392 leaves seven above the measured 1385-word asset.
-  sprintForgeSkillWords: 1392,
+  sprintForgeSkillWords: 1410,
   seedbedSkillWords: 700,
   seedbedModeWords: 900,
   seedbedHelperWords: 450,
-  // +7 tokens from the shared existence-gate wording (orchestrator loads on this path).
-  runtimeStatusBriefTokens: 1670,
+  runtimeStatusBriefTokens: 1700,
   // Path budgets preserve the production agent contracts (orchestrator + SKILL + routed
-  // mode/helpers) with roughly 10% headroom. They remain explicit ceilings so future growth is
-  // reviewed instead of silently accumulating.
+  // mode/helpers) under the headroom rule above. They remain explicit ceilings so growth that
+  // matters is reviewed instead of silently accumulating.
   //
   // Sized against a machine with the runtime INSTALLED (projected router ~180t), not against a
   // bare checkout (stub router ~46t). CI measures the stub and therefore reads ~134 tokens lower
   // per path — sizing to CI would leave `kyro doctor --tokens` failing for every real user.
-  // 4.47.0 raised this from 4180: Forge/orchestrator/SKILL now diagnose integrity *before*
-  // scope resolution. That step is load-bearing for an empty activeScope; trimming it to
-  // keep the old ceiling would leave recovery unreachable on the execute route.
-  // CI measures projected runtime paths. The creation-flow existence gate (present in forge.md,
-  // orchestrator.md and SKILL.md on every path) measures init=5283, init-seedbed=5613, plan=5373,
-  // execute=4851, review=4998, close=5906. Execute grew by 10 tokens in 4.51.0 as its
-  // live-work routing gained the blocker/remedy contract, so its ceiling is 5000.
-  runtimeForgeExecuteTokens: 5000,
-  runtimeForgeReviewTokens: 5005,
-  runtimeForgePlanTokens: 5380,
-  runtimeForgeCloseTokens: 5915,
-  runtimeForgeInitTokens: 5290,
-  // Seedbed-backed INIT adds one lazy mapping helper to the normal INIT route. The ceiling keeps
-  // roughly 10% headroom over the measured router + orchestrator + skill + mode + analysis + mapping path.
-  runtimeForgeInitSeedbedTokens: 5620,
+  // Last re-baselined at 6.5.0 with the runtime installed: execute=4824, review=4978, plan=5376,
+  // close=5881, init=5250, init-seedbed=5580, status brief=1619. The Forge/orchestrator/SKILL
+  // integrity-before-scope-resolution step and the creation-flow existence gate are load-bearing on
+  // every path; trimming them to keep an old ceiling would leave recovery unreachable.
+  runtimeForgeExecuteTokens: 5070,
+  runtimeForgeReviewTokens: 5230,
+  runtimeForgePlanTokens: 5650,
+  runtimeForgeCloseTokens: 6180,
+  runtimeForgeInitTokens: 5520,
+  // Seedbed-backed INIT adds one lazy mapping helper to the normal INIT route.
+  runtimeForgeInitSeedbedTokens: 5860,
   runtimeTaskContextTokens: 2200,
   runtimeIdeaTokens: 5200,
 } as const;
@@ -168,7 +170,7 @@ function checkRuntimeAssetBudget(file: string, budget: number, label: string): C
   if (weighted.words > budget) {
     return fail(`token budget: ${label}`, `${file} has ${weighted.words}/${budget} words`, 'Keep eager runtime assets slim; move detail into lazy-loaded protocols or docs.');
   }
-  return pass(`token budget: ${label}`, `${weighted.words}/${budget} words`);
+  return pass(`token budget: ${label}`, `${weighted.words}/${budget} words, ${formatHeadroom(weighted.words, budget)}`);
 }
 
 function checkProjectedSkills(): CheckResult {
@@ -240,7 +242,7 @@ function checkRuntimePathBudgets(): CheckResult[] {
     const weightedFiles = definition.files.map(weightPackageFile);
     if (definition.projectedSkill) weightedFiles.unshift(weightProjectedCommandSkill(definition.projectedSkill));
     const total = sumEstimatedTokens(weightedFiles);
-    const detail = `${total}/${definition.budget} estimated tokens (${formatWeightedList(weightedFiles)})`;
+    const detail = `${total}/${definition.budget} estimated tokens, ${formatHeadroom(total, definition.budget)} (${formatWeightedList(weightedFiles)})`;
     if (total > definition.budget) {
       return fail(`token budget: ${definition.name}`, detail, 'Reduce eager runtime files or route helpers later.');
     }
@@ -535,6 +537,10 @@ function sumEstimatedTokens(files: WeightedFile[]): number {
 
 function formatWeightedList(files: WeightedFile[]): string {
   return files.map((file) => `${file.path}=${file.words}w/~${file.estimatedTokens}t`).join(', ');
+}
+
+function formatHeadroom(measured: number, ceiling: number): string {
+  return `${(((ceiling - measured) / ceiling) * 100).toFixed(1)}% headroom`;
 }
 
 function pass(name: string, detail: string): CheckResult {

@@ -20,13 +20,17 @@ It should not load the full sprint history, archived sprints, or unrelated helpe
 
 | Path | Budget |
 |------|--------|
-| `kyro-forge:init` | 3,500 estimated tokens |
-| `kyro-forge:plan` | 3,000 estimated tokens |
-| `kyro-forge:execute` | 2,500 estimated tokens |
-| `kyro-forge:review` | 2,500 estimated tokens |
-| `kyro-forge:close` | 3,200 estimated tokens |
-| `kyro-status:brief` | 1,500 estimated tokens |
+| `kyro-forge:init` | 5,520 estimated tokens |
+| `kyro-forge:init` (seedbed-backed) | 5,860 estimated tokens |
+| `kyro-forge:plan` | 5,650 estimated tokens |
+| `kyro-forge:execute` | 5,070 estimated tokens |
+| `kyro-forge:review` | 5,230 estimated tokens |
+| `kyro-forge:close` | 6,180 estimated tokens |
+| `kyro-status:brief` | 1,700 estimated tokens |
+| `kyro-idea` | 5,200 estimated tokens |
 | `kyro-task-context` | 2,200 estimated tokens |
+
+Each ceiling is set 5% above the measured size at the last deliberate review, rounded up to the next multiple of 10 tokens. Growth inside that margin needs no change, and the audit prints the remaining headroom for every budget (for example `5376/5650 estimated tokens, 4.8% headroom`). Low headroom is reported, not a failure. When a route outgrows its ceiling, either move detail into a lazy-loaded helper or re-baseline that one ceiling with the same rule and say why in the changelog. Ceilings are measured with the runtime installed, so a bare checkout reads about 134 tokens lower per path.
 
 The audit includes command stubs, routers, eager agent/skill files, routed modes, and required helpers. It also fails forbidden eager helper combinations.
 

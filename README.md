@@ -6,11 +6,7 @@ Kyro gives AI coding agents a durable, CLI-governed way to plan, execute, and re
 
 Kyro works through a CLI and host adapters for Claude Code, Codex, OpenCode, and other skill-capable agents. The agent proposes and implements; the CLI validates and writes managed state. A passing task review is an attestation by a checker, not proof that tests ran or a substitute for independent QA.
 
-Version **6.4.0** adds focused validation suggestions and proportional Forge sprint closure. Projects can map changed files to checks, reserve the aggregate suite for an integration boundary, and require it at close for high-impact changes. Work retains its aggregate check before closure. See [Validation tiers](docs/validation-tiers.md).
-
-Version **6.4.1** fixes native Windows brief ingestion for `work create` and `work amend-brief`, and isolates the integrity-repair tests from developer machine configuration. See the [Work guide](docs/work.md) for the portable source checks and their limits.
-
-Version **6.5.0** records each Forge sprint's git range (`startCommit` at plan, `endCommit` frozen at close) so its code can be reproduced as an exact `git diff`, and adds an opt-in commit of the close artifacts (`git.commitOnSprintClose` in `local.json`); it also fixes active-plan phase statuses, Git exclusion of the state-writer lock, and remediation replay across later sprint closes. Checkpoints that carry the range need 6.5.0 or later to verify; teams sharing scopes should set `team.minPackageVersion`. See [Sprint git range](docs/sprint-close-checkpoints.md#sprint-git-range).
+See the [changelog](CHANGELOG.md) for what changed in each version.
 
 ## Choose a workflow
 
@@ -103,7 +99,7 @@ These entry points guide an agent; the CLI owns deterministic state changes. For
 
 Kyro's generated `.agents/kyro/.gitignore` excludes local state, locks, and pending transaction scratch; the Work brief and `work.json` remain trackable. A clone can read existing scopes from their sprint files. With multiple Forge scopes, select your own active scope using `kyro scope set-active <scope> --yes`. Work IDs are selected explicitly and do not silently change that Forge setting. See the [teams guide](docs/teams.md).
 
-The global runtime lives at `~/.agents/kyro/current/`; it is not a project file. Installing a newer version never silently migrates an existing scope, and `doctor` diagnoses rather than repairs. Scope state and closed checkpoints must be changed only by supported CLI operations.
+The global runtime lives at `~/.agents/kyro/current/`; it is not a project file. Installing a newer version never silently migrates an existing scope, and `doctor` diagnoses rather than repairs. Scope state and closed checkpoints must be changed only by supported CLI operations. Checkpoints that record a sprint's git range (`close.git`, written since 6.5.0) cannot be verified by older runtimes, so teams sharing scopes should set `team.minPackageVersion`; see [Sprint git range](docs/sprint-close-checkpoints.md#sprint-git-range).
 
 ## Safety and review boundaries
 
@@ -115,7 +111,7 @@ The global runtime lives at `~/.agents/kyro/current/`; it is not a project file.
 
 ### Legacy debt remediation
 
-Kyro **4.43.5 is origin-only**: `debt.origin.set` changes `origin` but cannot repair an entire legacy debt record. Kyro **4.44.0 and later**, including **6.2.0** and **6.3.0**, supports `debt.canonicalize` (remediation protocol v3) for a record with missing canonical fields or legacy-only keys. Protocol v5 also records post-close debt transitions so an owner can reconcile debt and complete a scope without changing historical checkpoints. The older `resolvedSprint` compatibility migration no longer runs during install, sync, or update. Nothing is migrated for you: upgrading never rewrites an existing scope, and closed-scope checkpoints remain immutable.
+Kyro **4.43.5 is origin-only**: `debt.origin.set` changes `origin` but cannot repair an entire legacy debt record. Kyro **4.44.0 and later**, including the current release **6.5.0**, supports `debt.canonicalize` (remediation protocol v3) for a record with missing canonical fields or legacy-only keys. Protocol v5 also records post-close debt transitions so an owner can reconcile debt and complete a scope without changing historical checkpoints. The older `resolvedSprint` compatibility migration no longer runs during install, sync, or update. Nothing is migrated for you: upgrading never rewrites an existing scope, and closed-scope checkpoints remain immutable.
 
 The explicit path is doctor → prepare → supply values → preview → apply with confirmation → doctor → recertify. Kyro does not guess `priority` or `targetSprint`; a suggestion is never an authorization. [Kyro Lens](https://github.com/synapsync/kyro-lens) verifies the resulting commitments read-only and does not repair them. See the [CLI remediation guide](docs/cli.md) and [release checklist](docs/release-checklist.md).
 

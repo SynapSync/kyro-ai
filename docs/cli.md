@@ -331,9 +331,9 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - projected command skill <= 200 words
 - command router <= 500 words
 - mode file <= 900 words
-- INIT mode <= 500 words
+- INIT mode <= 1,000 words
 - each analysis helper <= 450 words
-- startup, status brief, INIT happy path, and realistic forge/status runtime paths stay under estimated token budgets
+- startup, status brief, INIT happy path, and realistic forge/status runtime paths stay under estimated token budgets; the path ceilings sit 5% above the measured size (see `docs/cost-model.md`) and the audit prints each remaining headroom
 - forbidden eager helper combinations fail the audit
 - `sizingDecision` regression fixture stays internally consistent
 
