@@ -19,6 +19,9 @@ Run these commands in order. Any failure stops the release.
 # 1. Fast static checks (typecheck, version sync, link check, dist freshness)
 npm run check
 # (includes check:layered-state + check:install-rehydrate for multi-dev project state)
+# Runs the steps concurrently (scripts/run-checks.mjs): typecheck and check:dist first, then the
+# rest; every step runs even after a failure and the failed steps' output is printed at the end.
+# `npm run check:serial` runs the same steps one at a time in the original order.
 
 # 2. Regenerate the runtime from source
 npm run build

@@ -146,6 +146,6 @@ npm run check:adapters
 npm pack --dry-run
 ```
 
-The build output must match source (`npm run check:dist`). Use `node dist/cli.js` to test a checkout without changing the globally installed runtime. Release metadata in `package.json`, `package-lock.json`, and `WORKFLOW.yaml` must agree. See the [release checklist](docs/release-checklist.md).
+`npm run check` runs the 89 validation steps concurrently (`scripts/run-checks.mjs`; the step list is `scripts/lib/check-steps.mjs`) and prints only the failed steps' output. Use `npm run check:serial` for the old one-at-a-time order, or `node scripts/run-checks.mjs --jobs 4 --only <pattern> --bail --list --timings <file>` to tune it. The build output must match source (`npm run check:dist`). Use `node dist/cli.js` to test a checkout without changing the globally installed runtime. Release metadata in `package.json`, `package-lock.json`, and `WORKFLOW.yaml` must agree. See the [release checklist](docs/release-checklist.md).
 
 Licensed under [Apache-2.0](LICENSE). [Report an issue](https://github.com/SynapSync/kyro-ai/issues).

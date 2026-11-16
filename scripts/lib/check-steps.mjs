@@ -1,0 +1,135 @@
+/**
+ * The single list of steps that make up `npm run check`, in the original serial order.
+ *
+ * `package.json` `scripts.check` is `node scripts/run-checks.mjs`; this file is the only place a
+ * step is added, removed or reordered. `scripts/run-checks.mjs` refuses to run when a step has no
+ * `package.json` script, or when a `check:*` script is neither listed here nor in NOT_IN_SUITE, so
+ * the two cannot drift apart.
+ *
+ * Fields
+ *   name   the package.json script, run as `npm run <name>`
+ *   est    rough serial seconds; only used to start the slowest steps first (never an assertion)
+ *   group  gate       runs first, before everything else; a failure stops the run (everything
+ *                     else runs against dist/)
+ *          pool       (default) runs concurrently with the other pool steps
+ *          serial     runs concurrently with the pool but never next to another serial step
+ *          exclusive  runs alone, after the pool has drained
+ *   why    required for serial and exclusive: the evidence for the isolation hazard
+ */
+export const STEPS = [
+  { name: 'typecheck', est: 3, group: 'gate' },
+  { name: 'check:dist', est: 5, group: 'gate' },
+  { name: 'check:read-memoization', est: 12 },
+  { name: 'check:versions', est: 0 },
+  { name: 'check:adapters', est: 9 },
+  { name: 'check:machine-adapters', est: 79 },
+  { name: 'check:reconcile', est: 14 },
+  { name: 'check:adapter-links', est: 2 },
+  { name: 'check:links', est: 0 },
+  { name: 'check:command-modes', est: 0 },
+  { name: 'check:seedbed', est: 0 },
+  { name: 'check:managed-write-contract', est: 0 },
+  { name: 'check:runtime-artifacts', est: 0 },
+  { name: 'check:routing', est: 0 },
+  { name: 'check:qa-or-close', est: 1 },
+  { name: 'check:forge-startup-order', est: 0 },
+  { name: 'check:budget-manifest', est: 0 },
+  { name: 'check:sprint-doctor-v4', est: 4 },
+  { name: 'check:scope-remediation', est: 34 },
+  { name: 'check:repair-integrity', est: 6 },
+  { name: 'check:blast-radius-isolation', est: 10 },
+  { name: 'check:scope-retire', est: 27 },
+  { name: 'check:lifecycle-replay', est: 6 },
+  { name: 'check:compact-remediation-witness', est: 0 },
+  { name: 'check:replay-witness', est: 0 },
+  { name: 'check:lossless-checkpoints', est: 57 },
+  { name: 'check:sprint-git-traceability', est: 9 },
+  { name: 'check:sprint-close-commit', est: 13 },
+  { name: 'check:close-policy-compatibility', est: 40 },
+  { name: 'check:verification-states', est: 53 },
+  {
+    name: 'check:canonicalization-gate',
+    est: 14,
+    group: 'exclusive',
+    why: 'withMutatedRuntime() rewrites dist/cli/remediation/protocol.js and plan.js in place (the CLI classifies its package root by location, so a copy would change what is probed); any other check that loads dist/ in that window runs a runtime with a guard removed. Observed: 32 MODIFY events on those two files in one parallel run.',
+  },
+  { name: 'check:remediation-release-docs', est: 0 },
+  {
+    name: 'check:eval',
+    est: 7,
+    group: 'exclusive',
+    why: 'check-eval-harness.mjs creates harness-malformed-case and harness-failing-case inside fixtures/evals/ (the directory kyro eval discovers cases in, so it cannot move); a concurrent check that lists, copies or packs fixtures/ would see them. Observed: CREATE/DELETE events under fixtures/evals in a parallel run.',
+  },
+  { name: 'check:mcp', est: 1 },
+  { name: 'check:trace', est: 1 },
+  { name: 'check:guardrails', est: 2 },
+  { name: 'check:startup-contract', est: 0 },
+  { name: 'check:cli-verbs', est: 0 },
+  { name: 'check:cli-envelope', est: 3 },
+  { name: 'check:work-contract', est: 0 },
+  { name: 'check:work-plan', est: 4 },
+  { name: 'check:work-execution', est: 2 },
+  { name: 'check:work-evidence', est: 2 },
+  { name: 'check:work-review', est: 7 },
+  { name: 'check:work-lifecycle', est: 13 },
+  { name: 'check:work-brief-source', est: 1 },
+  { name: 'check:work-store', est: 10 },
+  { name: 'check:work-isolation', est: 1 },
+  { name: 'check:work-amend', est: 16 },
+  { name: 'check:work-disposition', est: 2 },
+  { name: 'check:work-closure', est: 12 },
+  { name: 'check:work-promotion-contract', est: 7 },
+  { name: 'check:work-promotion', est: 31 },
+  { name: 'check:work-doctor', est: 5 },
+  { name: 'check:git-trackability', est: 9 },
+  { name: 'check:token-budgets', est: 0 },
+  { name: 'check:close-handoff', est: 1 },
+  { name: 'check:record-evidence', est: 7 },
+  { name: 'check:debt', est: 6 },
+  { name: 'check:scope-debt-closure', est: 20 },
+  { name: 'check:debt-contract-fixture', est: 0 },
+  { name: 'check:debt-contract', est: 0 },
+  { name: 'check:emergent', est: 2 },
+  { name: 'check:scenario', est: 1 },
+  { name: 'check:adr', est: 1 },
+  { name: 'check:rule', est: 2 },
+  { name: 'check:clarification-gate', est: 1 },
+  { name: 'check:clarify', est: 1 },
+  { name: 'check:maker-checker', est: 3 },
+  { name: 'check:validation-tiers', est: 3 },
+  { name: 'check:capabilities', est: 4 },
+  { name: 'check:spec-traceability', est: 2 },
+  { name: 'check:analyze-metadata', est: 0 },
+  { name: 'check:status', est: 2 },
+  { name: 'check:plan', est: 7 },
+  { name: 'check:active-plan', est: 18 },
+  { name: 'check:verification-matrix', est: 11 },
+  { name: 'check:sprint-loader', est: 0 },
+  { name: 'check:verify-written-sprint', est: 0 },
+  { name: 'check:install-rehydrate', est: 4 },
+  { name: 'check:scope-registry-from-disk', est: 1 },
+  { name: 'check:layered-state', est: 1 },
+  { name: 'check:invocation', est: 0 },
+  { name: 'check:update', est: 12 },
+  { name: 'check:cli-bundle-assets', est: 101 },
+  { name: 'check:no-placeholder', est: 1 },
+  { name: 'check:cli-bundle', est: 5 },
+  { name: 'check:package-contents', est: 3 },
+  { name: 'check:operation-snapshots', est: 1 },
+];
+
+/** package.json check scripts that are deliberately not part of `npm run check`. */
+export const NOT_IN_SUITE = {
+  'check': 'the aggregate itself',
+  'check:serial': 'the aggregate, forced serial',
+  'check:change-current-work': 'not part of the aggregate suite before the runner existed (added as a standalone script in 8f82bfb, never in the old chain; no reason recorded)',
+  'check:change-current-work:red': 'expected-red variant of check:change-current-work',
+  'check:lens-remediation-fixture': 'needs the external Lens checkout',
+  'check:lens-debt-contract': 'needs the external Lens checkout',
+  'check:release-matrix': 'release boundary matrix; runs npm run check itself',
+  'check:original-incident-release': 'release-time check against the original-incident checkouts',
+  'check:windows-file-identity': 'Windows-only; run by the Windows CI job',
+  'check:windows-install-smoke': 'Windows tarball install; run by the Windows CI job',
+  'check:tokens': 'reporting command (doctor --tokens), not an assertion suite',
+  'check:artifacts': 'reporting command (doctor --artifacts), not an assertion suite',
+};

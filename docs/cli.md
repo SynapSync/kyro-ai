@@ -97,7 +97,7 @@ The full release validation sequence is:
 
 ```bash
 npm run build
-npm run check        # typecheck + versions + links + runtime-artifacts + dist + budget-manifest + sprint-doctor-v4
+npm run check        # all 89 validation steps, run concurrently (typecheck and dist first); `check:serial` runs them one at a time
 npm run check:adapters
 npm run check:tokens
 npm run check:artifacts
