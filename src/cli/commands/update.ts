@@ -268,7 +268,9 @@ export function queryRegistryLatest(): string | null {
       timeout: REGISTRY_TIMEOUT_MS,
     });
     if (result.spawnError || result.status !== 0) return null;
-    return validateTargetVersion(JSON.parse(result.stdout.trim()));
+    // npm 10 prints a bare string; npm 12 prints a one-element array for `npm view <pkg> version --json`.
+    const parsed: unknown = JSON.parse(result.stdout.trim());
+    return validateTargetVersion(Array.isArray(parsed) ? parsed[parsed.length - 1] : parsed);
   } catch {
     return null;
   }

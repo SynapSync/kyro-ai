@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync }
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseNpmPackJson } from './lib/npm-pack-json.mjs';
 
 if (process.platform !== 'win32') {
   console.log('Windows tarball smoke requires a native Windows runner');
@@ -38,7 +39,7 @@ try {
   mkdirSync(prefix, { recursive: true });
   mkdirSync(workspace, { recursive: true });
 
-  const packed = JSON.parse(run('npm', ['pack', '--ignore-scripts', '--pack-destination', root, '--json'], repo).stdout)[0];
+  const packed = parseNpmPackJson(run('npm', ['pack', '--ignore-scripts', '--pack-destination', root, '--json'], repo).stdout);
   assert(packed.version === expectedVersion, 'packed version differs from package.json');
   const tarball = join(root, packed.filename);
   assert(existsSync(tarball), 'npm pack did not produce a tarball');

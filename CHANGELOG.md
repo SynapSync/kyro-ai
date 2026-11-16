@@ -10,6 +10,10 @@ All notable changes to this project are documented here. The format is based on
 
 - Read-only commands no longer re-read and re-hash the same checkpoint many times in one process. Managed JSON files are read, parsed and hashed once while their bytes are unchanged (validated on every use against device, inode, size and nanosecond mtime/ctime, with a racy-timestamp guard), and checkpoint integrity and commitment verdicts are memoised per file content. `kyro status` and `kyro context-pack` read each file about once; `kyro doctor --artifacts` on this repository drops from about 4.4 s to about 1 s. Output and commitments are unchanged. Guarded by `check:read-memoization`.
 
+### Fixed
+
+- `check:cli-bundle` and `check:windows-install-smoke` no longer fail under npm 12, whose `npm pack --json` prints an object keyed by package name instead of an array; both now parse either shape through `scripts/lib/npm-pack-json.mjs`. `kyro update` no longer reads the registry as unreachable under npm 12, whose `npm view kyro-ai version --json` prints a one-element array; `queryRegistryLatest` accepts both and still validates strict semver. CI now also runs on the current Node line (26.x, npm 12): in the Windows matrix and in a new Linux `npm_current` job that gates `create_tag`.
+
 ## [6.5.0] - 2026-11-03
 
 ### Added
