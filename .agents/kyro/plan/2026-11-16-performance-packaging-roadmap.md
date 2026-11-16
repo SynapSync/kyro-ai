@@ -3,7 +3,7 @@
 - **Created:** 2026-11-16
 - **Baseline:** `develop` at `4c35f11`, kyro-ai 6.5.0
 - **Work branch:** `develop` (phases 1 and 2 were committed there on 2026-11-16)
-- **Status:** Phases 1 to 4 certified; Phase 5 waits for the user's GO
+- **Status:** Phases 1 to 5 certified; Phase 6 is next
 
 This document records a project review done on 2026-11-16 and the phased plan that came out of it.
 It is the single place to track that plan. Any agent can resume from the "Status board" and the
@@ -35,7 +35,7 @@ Project rules that apply to every phase:
 | 2 | Fix checks under npm 12, widen CI Node matrix | certified | 2026-11-16 | QA log, phase 2 round 1; committed on `develop`; check the CI run |
 | 3 | Slim the npm package and remove leftovers | certified | 2026-11-16 | QA log, phase 3 round 1; committed on `develop` |
 | 4 | Parallel check runner and shared sandbox helper | certified | 2026-11-16 | QA log, phase 4 rounds 1 and 2; commit `bd02ed1` |
-| 5 | Lazy command loading | pending | — | — |
+| 5 | Lazy command loading | certified | 2026-11-16 | QA log, phase 5 rounds 1 and 2; commit `17844ba` |
 | 6 | Declarative flag parsing | pending | — | — |
 | 7 | Structure, budgets and README cleanup | pending | — | — |
 | 8 | Measure Kyro against other workflows; short path | pending | — | — |
@@ -399,6 +399,36 @@ Residual notes, not blocking:
 - A 4-core CI runner was simulated only (`--jobs 4`, 229 s; pinned to 4 cores, 331 s by the
   implementer). The real CI time will show on the next pull request.
 - The scripts were not mass-migrated to `scripts/lib/sandbox.mjs`; only the two fixed ones use it.
+
+### Phase 5, round 1 — 2026-11-16 — returned
+
+The implementation passed: 180 invocations (every verb with `--help`, `--help --json`, a bad flag,
+and no-argument runs in this repository and in empty directories) gave the same stdout, stderr and
+exit code as a build of the previous commit, apart from durations and trace timestamps.
+
+Returned for the guard only. `check:cli-lazy-load` looked at `dist/cli/commands/*` alone, so two of
+three injected regressions passed it: `help.ts` importing `./fs` again (`--version` back to 71 ms)
+and a static import of the state-writer lock in `app.ts` (52 ms).
+
+### Phase 5, round 2 — 2026-11-16 — certified
+
+Verified by the orchestrator:
+
+- The guard now fails on all three mutations (static command import, `./fs` in `help.ts`, static
+  lock import). It asserts the exact `dist/` module set for `--version`, `-v`, `version` (7 modules,
+  no `node_modules`) and for `capabilities --json` (those 7 plus its command), and for `--help` no
+  command module and at most 50 `dist/` modules (40 today).
+- Medians of 31 runs, previous commit against this one: `--version` 89.6 to 33.7 ms (bare Node
+  27.7 ms); `capabilities --json` 90.7 to 33.1; `--help` 91.3 to 54.4; unknown verb 88.6 to 54.7;
+  `plan --help` 126.6 to 92.4; `status` 253.8 to 225.0; `context-pack --json` 251.0 to 222.2.
+  Modules loaded for `--version`: 130 to 7.
+- Full `npm run check`: 90 of 90, 182.3 s.
+
+Residual notes, not blocking:
+
+- `--help` stays at about 54 ms because it loads the adapter registry to list agents.
+- `kyro eval` spawns the CLI per scenario and dropped from about 8.5 s to about 4.9 s in one
+  observation; not measured as a median.
 
 QA tooling lives in `~/.cache/kyro-tmp/roadmap-qa/` (`baseline/`, `capture.sh`, `count.js`,
 `differential.sh`, `longlived.js`, and `base/`, a build of the pre-change commit).
