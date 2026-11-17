@@ -73,20 +73,9 @@ kyro work status --work search-refresh --json
 kyro work context-pack --work search-refresh --json
 ```
 
-## What it costs
+## Footprint
 
-We measured the overhead instead of guessing it. One model (Claude Haiku 5.5, headless), one small Node project, three tickets (a bug fix, a feature, a cross-cutting change with a file-format migration), three runs each, scored with tests the agent never saw.
-
-| Workflow | Runs fully passing | Median cost per ticket | Median turns | Median time |
-| --- | --- | --- | --- | --- |
-| No workflow | 9 of 9 | $0.015 | 8 | 32 s |
-| Kyro Work | 9 of 9 | $0.063 | 26 | 110 s |
-| Kyro Forge | 9 of 9 | $0.085 | 27 | 106 s |
-| OpenSpec 2.0 | 8 of 9 | $0.114 | 41 | 109 s |
-
-Read it for what it is. The tickets had complete acceptance criteria and the model solved all of them without help, so this measures overhead, not benefit: about 5 to 7 cents and a little over a minute per ticket for a plan, evidence, a review record and a verifiable close. It is a small sample, and the one OpenSpec miss was a run that stopped after its proposal because no person was there to continue it. For a one-line fix with a clear test, skip the workflow. Use Kyro when the work spans sessions or people, or when someone has to be able to check it later.
-
-The CLI itself stays out of the way: no runtime dependencies, a 0.7 MB package, and `kyro --version` returns in about 35 ms.
+The CLI stays out of the way: no runtime dependencies, a 0.7 MB package, and `kyro --version` returns in about 35 ms. A workflow adds steps, so it adds agent turns and tokens; for a one-line fix with a clear test, skip it. Use Kyro when the work spans sessions or people, or when someone has to be able to check it later.
 
 ## Supported hosts
 
