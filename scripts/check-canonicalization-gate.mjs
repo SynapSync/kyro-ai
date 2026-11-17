@@ -344,7 +344,7 @@ const GUARDS = [
   },
   {
     label: 'compact-revision replay',
-    file: 'cli/remediation/plan.js',
+    file: 'cli/remediation/plan-evolution.js',
     find: 'if (isLast || record.schemaVersion !== protocol_1.SCOPE_REMEDIATION_SCHEMA_VERSION)',
     replace: 'if (isLast || record.schemaVersion === 2)',
     guardWorking: accepts,
@@ -370,7 +370,7 @@ const GUARDS = [
   {
     // The shared semantic evaluation, which BOTH readers consume. Removing it must blind doctor.
     label: 'unanchored-record evaluation',
-    file: 'cli/remediation/plan.js',
+    file: 'cli/remediation/plan-transaction.js',
     find: 'function evaluateUnanchoredRemediationRecords(scope, anchors, headCommitment = null, headResult = null) {',
     replace: 'function evaluateUnanchoredRemediationRecords(scope, anchors, headCommitment = null, headResult = null) { return [];',
     guardWorking: refuses,
@@ -381,8 +381,8 @@ const GUARDS = [
     // what is under test is what it SAID — this is the guard whose absence let doctor report a
     // planted record as DIVERGED while status called the same scope `remediated`.
     label: 'unanchored records reach the verification state',
-    file: 'cli/remediation/plan.js',
-    find: 'const unanchored = evaluateUnanchoredRemediationRecords(scope, anchors, expectedHead, expectedBase);',
+    file: 'cli/remediation/plan-verification.js',
+    find: 'const unanchored = (0, plan_transaction_1.evaluateUnanchoredRemediationRecords)(scope, anchors, expectedHead, expectedBase);',
     replace: 'const unanchored = [];',
     guardWorking: (result) => /Verification: diverged/.test(result.output),
     probe: (dist, root) => plantUnanchoredRecord(dist, root, ['status', '--kyro-scope', SCOPE]),

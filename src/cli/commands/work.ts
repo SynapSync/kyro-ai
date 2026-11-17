@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sha256 } from '../checkpoints/sprint-close';
 import { KyroCoreError } from '../core/errors';
+import { flag, option, parseFlags, type FlagSpec } from '../core/flags';
 import { resolveScopeAuthorFromGit } from '../core/actor';
 import { validateScopeAuthor } from '../artifacts/schema';
 import type { ValidationIssue } from '../artifacts/schema';
@@ -585,7 +586,36 @@ function parsePlanProposal(value: unknown): Array<Omit<WorkTask, 'status' | 'blo
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 function isSafeRelativePath(value: unknown): value is string { return typeof value === 'string' && value !== '' && !value.startsWith('/') && !value.includes('\\') && !value.split('/').some((segment) => segment === '' || segment === '.' || segment === '..'); }
 
-function parse(args:string[], allowed:string[]):Record<string,string|boolean>{const out:Record<string,string|boolean>={};for(let i=0;i<args.length;i++){const arg=args[i];if(arg==='--json'||arg==='--dry-run'||(arg==='--yes'&&allowed.includes('yes'))){const key=arg==='--json'?'json':arg==='--dry-run'?'dryRun':'yes';if(out[key]===true)throw new KyroCoreError('INVALID_INPUT',`${arg} may only be specified once.`,'Remove the duplicate option.');out[key]=true;continue;}if(!arg.startsWith('--'))throw new KyroCoreError('INVALID_INPUT',`Unknown work argument: ${arg}.`,'Use kyro work --help.');const key=arg.slice(2);if(!allowed.includes(key))throw new KyroCoreError('INVALID_INPUT',`Unknown work option: ${arg}.`,'Use kyro work --help.');if(key in out)throw new KyroCoreError('INVALID_INPUT',`${arg} may only be specified once.`,'Remove the duplicate option.');const value=args[++i];if(!value||value.startsWith('--'))throw new KyroCoreError('INVALID_INPUT',`${arg} requires a value.`,'Provide the required value.');out[key]=value;}return out;}
+type WorkOptions = Record<string, string | boolean>;
+
+const duplicateOption = (token: string): KyroCoreError => new KyroCoreError('INVALID_INPUT', `${token} may only be specified once.`, 'Remove the duplicate option.');
+
+/** `--json`, `--dry-run` and (when the verb allows it) `--yes`: each may appear once. */
+function workSwitch(names: string, key: string): FlagSpec<WorkOptions> {
+  return flag([names], (out: WorkOptions) => {
+    if (out[key] === true) throw duplicateOption(names);
+    out[key] = true;
+  });
+}
+
+function parse(args: string[], allowed: string[]): WorkOptions {
+  const out: WorkOptions = {};
+  const specs: FlagSpec<WorkOptions>[] = [workSwitch('--json', 'json'), workSwitch('--dry-run', 'dryRun')];
+  if (allowed.includes('yes')) specs.push(workSwitch('--yes', 'yes'));
+  // Every other allowed key takes one value and may appear once. The duplicate check runs before the
+  // value check, so a repeated flag with no value reports the repeat.
+  for (const key of allowed.filter((name) => name !== 'json' && name !== 'dry-run' && name !== 'yes')) {
+    specs.push(option([`--${key}`], (next, token) => {
+      if (key in out) throw duplicateOption(token);
+      if (!next || next.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${token} requires a value.`, 'Provide the required value.');
+      return next;
+    }, (state, value) => { state[key] = value; }));
+  }
+  return parseFlags(specs, args, out, (arg) => {
+    if (!arg.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `Unknown work argument: ${arg}.`, 'Use kyro work --help.');
+    throw new KyroCoreError('INVALID_INPUT', `Unknown work option: ${arg}.`, 'Use kyro work --help.');
+  });
+}
 function required(o:Record<string,string|boolean>,key:string):string{const v=o[key];if(typeof v!=='string')throw new KyroCoreError('INVALID_INPUT',`--${key} is required.`,'Provide the required value.');return v;}
 function requiredActor(options: Record<string, string | boolean>): string {
   const actor = required(options, 'by').trim();

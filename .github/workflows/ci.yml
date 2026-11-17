@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [18.x, 20.x, 22.x]
+        node: [18.x, 20.x, 22.x, 26.x]
 
     steps:
       - uses: actions/checkout@v5
@@ -110,8 +110,35 @@ jobs:
             exit 1
           fi
 
+  npm_current:
+    name: npm on current Node (Node 26.x)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify checks that exercise npm
+        run: |
+          npm run check:cli-bundle
+          npm run check:cli-bundle-assets
+          npm run check:update
+          npm run check:invocation
+          npm run check:install-rehydrate
+
   create_tag:
-    needs: [validate, windows_state_writer_lock]
+    needs: [validate, windows_state_writer_lock, npm_current]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

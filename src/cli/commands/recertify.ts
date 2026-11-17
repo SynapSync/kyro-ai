@@ -1,4 +1,5 @@
 import { KyroCoreError } from '../core/errors';
+import { flag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import { readPackageVersion } from '../help';
@@ -124,37 +125,29 @@ function printPlan(plan: CertificationPlan): void {
   console.log(`- transaction   ${plan.transactionStatus}: ${plan.transactionDetail}`);
 }
 
+const recertifyValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
+
+const RECERTIFY_FLAGS: readonly FlagSpec<RecertifyArgs>[] = [
+  helpFlag(),
+  flag(['--yes', '--confirm'], (a: RecertifyArgs) => { a.confirm = true; }),
+  flag(['--json'], (a: RecertifyArgs) => { a.json = true; }),
+  option(['--kyro-scope'], recertifyValue, (a, v) => { a.scope = v; }, true),
+  option(['--manifest'], recertifyValue, (a, v) => { a.manifest = v; }, true),
+];
+
 function parseArgs(rawArgs: string[], subcommand: string): RecertifyArgs {
-  let manifest = '';
-  let scope: string | null = null;
-  let confirm = false;
-  let json = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--yes' || arg === '--confirm') confirm = true;
-    else if (arg === '--json') json = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--manifest') { manifest = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--manifest=')) manifest = arg.slice('--manifest='.length);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown recertify ${subcommand} option: ${arg}`);
-  }
-  if (!help && manifest.trim() === '') {
+  const args: RecertifyArgs = { manifest: '', scope: null, confirm: false, json: false, help: false };
+  parseFlags(RECERTIFY_FLAGS, rawArgs, args, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown recertify ${subcommand} option: ${arg}`);
+  });
+  if (!args.help && args.manifest.trim() === '') {
     throw new KyroCoreError(
       'INVALID_INPUT',
       `Usage: kyro recertify ${subcommand} --kyro-scope <scope> --manifest <path>`,
       '--manifest is required; a certification is always driven by explicit, re-verifiable evidence.',
     );
   }
-  return { manifest, scope, confirm, json, help };
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value`);
-  return value;
+  return args;
 }
 
 function printRecertifyHelp(): void {

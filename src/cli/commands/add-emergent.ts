@@ -3,6 +3,7 @@ import { sprintJsonPath } from '../artifacts/paths';
 import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { deriveActiveSprintStatus, nextExecutableTaskId } from '../core/status';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import type { ActiveSprint, OperationPlan, SprintFile, Task } from '../types';
@@ -116,43 +117,26 @@ function nextEmergentId(active: ActiveSprint, allIds: Set<string>): string {
   return `E${candidate}`;
 }
 
-function parseAddEmergentArgs(rawArgs: string[]): AddEmergentArgs {
-  let title = '';
-  let description = '';
-  const acceptance: string[] = [];
-  const files: string[] = [];
-  let context = '';
-  const dependsOn: string[] = [];
-  let scope: string | null = null;
-  let dryRun = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--title') { title = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--title=')) title = arg.slice('--title='.length);
-    else if (arg === '--description') { description = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--description=')) description = arg.slice('--description='.length);
-    else if (arg === '--acceptance') { acceptance.push(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--acceptance=')) acceptance.push(arg.slice('--acceptance='.length));
-    else if (arg === '--file') { files.push(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--file=')) files.push(arg.slice('--file='.length));
-    else if (arg === '--context') { context = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--context=')) context = arg.slice('--context='.length);
-    else if (arg === '--depends-on') { dependsOn.push(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--depends-on=')) dependsOn.push(arg.slice('--depends-on='.length));
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown add-emergent option: ${arg}`);
-  }
-  return { title, description, acceptance, files, context, dependsOn, scope, dryRun, help };
-}
+const emergentValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
+const emergentOption = (name: string, apply: (args: AddEmergentArgs, value: string) => void): FlagSpec<AddEmergentArgs> => option([name], emergentValue, apply, true);
 
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value`);
-  return value;
+const ADD_EMERGENT_FLAGS: readonly FlagSpec<AddEmergentArgs>[] = [
+  helpFlag(),
+  dryRunFlag(),
+  emergentOption('--kyro-scope', (a, v) => { a.scope = v; }),
+  emergentOption('--title', (a, v) => { a.title = v; }),
+  emergentOption('--description', (a, v) => { a.description = v; }),
+  emergentOption('--acceptance', (a, v) => { a.acceptance.push(v); }),
+  emergentOption('--file', (a, v) => { a.files.push(v); }),
+  emergentOption('--context', (a, v) => { a.context = v; }),
+  emergentOption('--depends-on', (a, v) => { a.dependsOn.push(v); }),
+];
+
+function parseAddEmergentArgs(rawArgs: string[]): AddEmergentArgs {
+  const args: AddEmergentArgs = { title: '', description: '', acceptance: [], files: [], context: '', dependsOn: [], scope: null, dryRun: false, help: false };
+  return parseFlags(ADD_EMERGENT_FLAGS, rawArgs, args, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown add-emergent option: ${arg}`);
+  });
 }
 
 function printAddEmergentHelp(): void {

@@ -1,36 +1,9 @@
-import { doctor } from './commands/doctor';
-import { analyze } from './commands/analyze';
-import { detect } from './commands/detect';
-import { install, sync } from './commands/install';
-import { runUpdate } from './commands/update';
-import { runTui } from './commands/tui';
-import { runRepairCommand } from './commands/repair';
-import { runRecertifyCommand } from './commands/recertify';
-import { runRemediateCommand } from './commands/remediate';
-import { contextPack } from './commands/context-pack';
-import { runStatusCommand } from './commands/status';
-import { runScopeCommand } from './commands/scope';
-import { runCloseSprintCommand } from './commands/close-sprint';
-import { uninstall } from './commands/uninstall';
-import { runAdaptersCommand } from './commands/adapters';
-import { runEval } from './commands/eval';
-import { runMcpCommand } from './commands/mcp';
-import { runTraceCommand } from './commands/trace';
-import { runReviewCommand } from './commands/review';
-import { runRecordEvidenceCommand } from './commands/record-evidence';
-import { runPlanCommand } from './commands/plan';
-import { runDebtCommand } from './commands/debt';
-import { runAddEmergentCommand } from './commands/add-emergent';
-import { runScenarioCommand } from './commands/scenario';
-import { runClarifyCommand } from './commands/clarify';
-import { runAdrCommand } from './commands/adr';
-import { runRuleCommand } from './commands/rule';
-import { runCapabilitiesCommand } from './commands/capabilities';
-import { runWorkCommand } from './commands/work';
 import { printCommandHelp, printHelp, readPackageVersion } from './help';
-import { parseOptions } from './options';
 import { KyroCoreError } from './core/errors';
-import { withStateWriterLockAsync } from './pipeline/state-writer-lock';
+
+// Command modules (and the state-writer lock) are loaded with require() only when their verb runs, so
+// `--version`, `--help` and unknown verbs never pay for the whole CLI. The build is CommonJS.
+// scripts/check-cli-lazy-load.mjs fails if `--version` loads anything under dist/cli/commands.
 
 let cliWriterLocked = false;
 
@@ -38,13 +11,13 @@ export async function runCli(): Promise<void> {
   const [command = '', ...args] = process.argv.slice(2);
   if (!cliWriterLocked && isMutatingInvocation(command, args)) {
     cliWriterLocked = true;
-    try { await withStateWriterLockAsync(runCli); }
+    try { await (require('./pipeline/state-writer-lock') as typeof import('./pipeline/state-writer-lock')).withStateWriterLockAsync(runCli); }
     finally { cliWriterLocked = false; }
     return;
   }
 
   if (command === '' || command === 'tui') {
-    await runTui();
+    await (require('./commands/tui') as typeof import('./commands/tui')).runTui();
     return;
   }
 
@@ -59,116 +32,116 @@ export async function runCli(): Promise<void> {
   }
 
   if (command === 'capabilities') {
-    runCapabilitiesCommand(args);
+    (require('./commands/capabilities') as typeof import('./commands/capabilities')).runCapabilitiesCommand(args);
     return;
   }
 
   if (command === 'work') {
-    runWorkCommand(args);
+    (require('./commands/work') as typeof import('./commands/work')).runWorkCommand(args);
     return;
   }
 
   if (command === 'adapters') {
-    runAdaptersCommand(args);
+    (require('./commands/adapters') as typeof import('./commands/adapters')).runAdaptersCommand(args);
     return;
   }
 
   if (command === 'mcp') {
-    runMcpCommand(args);
+    (require('./commands/mcp') as typeof import('./commands/mcp')).runMcpCommand(args);
     return;
   }
 
   if (command === 'trace') {
-    runTraceCommand(args);
+    (require('./commands/trace') as typeof import('./commands/trace')).runTraceCommand(args);
     return;
   }
 
   if (command === 'review') {
-    runReviewCommand(args);
+    (require('./commands/review') as typeof import('./commands/review')).runReviewCommand(args);
     return;
   }
 
   if (command === 'record-evidence') {
-    runRecordEvidenceCommand(args);
+    (require('./commands/record-evidence') as typeof import('./commands/record-evidence')).runRecordEvidenceCommand(args);
     return;
   }
 
   if (command === 'plan') {
-    runPlanCommand(args);
+    (require('./commands/plan') as typeof import('./commands/plan')).runPlanCommand(args);
     return;
   }
 
   if (command === 'remediate') {
-    runRemediateCommand(args);
+    (require('./commands/remediate') as typeof import('./commands/remediate')).runRemediateCommand(args);
     return;
   }
 
   if (command === 'recertify') {
-    runRecertifyCommand(args);
+    (require('./commands/recertify') as typeof import('./commands/recertify')).runRecertifyCommand(args);
     return;
   }
 
   if (command === 'debt') {
-    runDebtCommand(args);
+    (require('./commands/debt') as typeof import('./commands/debt')).runDebtCommand(args);
     return;
   }
 
   if (command === 'add-emergent') {
-    runAddEmergentCommand(args);
+    (require('./commands/add-emergent') as typeof import('./commands/add-emergent')).runAddEmergentCommand(args);
     return;
   }
 
   if (command === 'scenario') {
-    runScenarioCommand(args);
+    (require('./commands/scenario') as typeof import('./commands/scenario')).runScenarioCommand(args);
     return;
   }
 
   if (command === 'clarify') {
-    runClarifyCommand(args);
+    (require('./commands/clarify') as typeof import('./commands/clarify')).runClarifyCommand(args);
     return;
   }
 
   if (command === 'adr') {
-    runAdrCommand(args);
+    (require('./commands/adr') as typeof import('./commands/adr')).runAdrCommand(args);
     return;
   }
 
   if (command === 'rule') {
-    runRuleCommand(args);
+    (require('./commands/rule') as typeof import('./commands/rule')).runRuleCommand(args);
     return;
   }
 
   if (command === 'repair') {
-    await runRepairCommand(args);
+    await (require('./commands/repair') as typeof import('./commands/repair')).runRepairCommand(args);
     return;
   }
 
   if (command === 'scope') {
-    runScopeCommand(args);
+    (require('./commands/scope') as typeof import('./commands/scope')).runScopeCommand(args);
     return;
   }
 
   if (command === 'close-sprint') {
-    await runCloseSprintCommand(args);
+    await (require('./commands/close-sprint') as typeof import('./commands/close-sprint')).runCloseSprintCommand(args);
     return;
   }
 
   if (command === 'status') {
-    runStatusCommand(args);
+    (require('./commands/status') as typeof import('./commands/status')).runStatusCommand(args);
     return;
   }
 
   if (command === 'context-pack') {
-    const options = parseOptions(args);
+    const options = lazyParseOptions(args);
     if (options.help) {
       printCommandHelp(command);
       return;
     }
-    contextPack(options);
+    (require('./commands/context-pack') as typeof import('./commands/context-pack')).contextPack(options);
     return;
   }
 
-  const options = parseOptions(args);
+  const options = lazyParseOptions(args);
 
   if (options.help) {
     printCommandHelp(command);
@@ -177,28 +150,28 @@ export async function runCli(): Promise<void> {
 
   switch (command) {
     case 'install':
-      await install(options);
+      await (require('./commands/install') as typeof import('./commands/install')).install(options);
       break;
     case 'detect':
-      detect(options);
+      (require('./commands/detect') as typeof import('./commands/detect')).detect(options);
       break;
     case 'doctor':
-      doctor(options);
+      (require('./commands/doctor') as typeof import('./commands/doctor')).doctor(options);
       break;
     case 'analyze':
-      analyze(options);
+      (require('./commands/analyze') as typeof import('./commands/analyze')).analyze(options);
       break;
     case 'sync':
-      sync(options);
+      (require('./commands/install') as typeof import('./commands/install')).sync(options);
       break;
     case 'update':
-      await runUpdate(options);
+      await (require('./commands/update') as typeof import('./commands/update')).runUpdate(options);
       break;
     case 'uninstall':
-      uninstall(options);
+      (require('./commands/uninstall') as typeof import('./commands/uninstall')).uninstall(options);
       break;
     case 'eval':
-      runEval(options);
+      (require('./commands/eval') as typeof import('./commands/eval')).runEval(options);
       break;
     default:
       throw new KyroCoreError('UNKNOWN_COMMAND', `Unknown command: ${command}.`, 'Run kyro --help.');
@@ -217,4 +190,8 @@ function isMutatingInvocation(command: string, args: string[]): boolean {
   if (command === 'scope' && args[0] === 'reopen' && args.includes('--yes')) return true;
   if (command === 'work' && args[0] === 'create') return true;
   return command === 'trace' && args.includes('--clear');
+}
+
+function lazyParseOptions(args: string[]): ReturnType<typeof import('./options').parseOptions> {
+  return (require('./options') as typeof import('./options')).parseOptions(args);
 }

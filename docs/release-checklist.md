@@ -19,6 +19,9 @@ Run these commands in order. Any failure stops the release.
 # 1. Fast static checks (typecheck, version sync, link check, dist freshness)
 npm run check
 # (includes check:layered-state + check:install-rehydrate for multi-dev project state)
+# Runs the steps concurrently (scripts/run-checks.mjs): typecheck and check:dist first, then the
+# rest; every step runs even after a failure and the failed steps' output is printed at the end.
+# `npm run check:serial` runs the same steps one at a time in the original order.
 
 # 2. Regenerate the runtime from source
 npm run build
@@ -80,11 +83,13 @@ This means a local `npm publish` also rebuilds, proves freshness, and validates 
 ## Before committing
 
 - [ ] The version was bumped and does not already exist as a GitHub Release, Git tag, or npm version.
+- [ ] On a version bump, `README.md` and `docs/cli.md` still name the new version: the README only in the legacy-remediation compatibility sentence ("the current release **X.Y.Z**"), `docs/cli.md` in its version table; per-version notes go in `CHANGELOG.md` only, never in the README. `npm run check:remediation-release-docs` enforces this.
+- [ ] Prompt growth that stays inside a token-budget ceiling needs no change; a route that outgrows its ceiling either moves detail into a lazy-loaded helper or re-baselines that ceiling by the 5% rule in `docs/cost-model.md`, with the reason in the changelog.
 - [ ] `npm run check` passes.
 - [ ] `npm run build` produces no unexpected changes in `dist/`.
 - [ ] `npm run check:adapters` passes.
 - [ ] `npm pack --dry-run` succeeds.
-- [ ] The packed file list excludes `.claude-plugin/`, `providers/claude/`, and `hooks/`.
+- [ ] The packed file list excludes `.claude-plugin/`, `providers/claude/`, and `hooks/`, and `npm run check:package-contents` passes (size budget, no `docs/diagrams`, `scripts/`, source maps or absolute home paths).
 - [ ] In a disposable Claude profile, verify all seven `/kyro-*` skills are discoverable and route to the candidate runtime. Filesystem fixtures do not establish Claude UI discovery.
 - [ ] If an older Kyro plugin is installed, verify the new skills before asking the user to disable or uninstall it in Claude Code. Do not alter plugin settings automatically.
 - [ ] `npm run check:links` passes.

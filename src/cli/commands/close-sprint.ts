@@ -9,6 +9,7 @@ import { compareSemverLike } from './doctor';
 import { resolveScope as resolveKyroScope } from '../core/scope-resolution';
 import { collectFindings } from '../core/analysis';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, flag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import {
   collectSprintTasks,
   deriveSprintCloseOutcomeClass,
@@ -715,50 +716,37 @@ export function compareCheckpointRecency(left: SprintCloseCheckpointV1, right: S
 }
 
 
+const closeSprintValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
+const closeSprintOption = (name: string, apply: (args: CloseSprintArgs, value: string) => void): FlagSpec<CloseSprintArgs> => option([name], closeSprintValue, apply, true);
+
+const CLOSE_SPRINT_FLAGS: readonly FlagSpec<CloseSprintArgs>[] = [
+  dryRunFlag(),
+  flag(['--yes', '-y', '--confirm'], (a: CloseSprintArgs) => { a.yes = true; }),
+  helpFlag(),
+  closeSprintOption('--kyro-scope', (a, v) => { a.scope = v; }),
+  closeSprintOption('--outcome', (a, v) => { a.outcome = v; a.outcomeExplicit = true; }),
+  closeSprintOption('--note', (a, v) => { a.note = v; }),
+  closeSprintOption('--summary', (a, v) => { a.summary = v; }),
+  closeSprintOption('--recommendation', (a, v) => { a.recommendations.push(v); }),
+  closeSprintOption('--learning', (a, v) => { a.learnings.push(v); }),
+];
+
 function parseCloseSprintArgs(args: string[]): CloseSprintArgs {
-  let scope: string | null = null;
-  let outcome = 'shipped';
-  let outcomeExplicit = false;
-  let note: string | null = null;
-  let summary: string | null = null;
-  const recommendations: string[] = [];
-  const learnings: string[] = [];
-  let dryRun = false;
-  let yes = false;
-  let help = false;
-
-  const takeValue = (arg: string, i: number): [string, number] => {
-    const inline = arg.indexOf('=');
-    if (inline !== -1) return [arg.slice(inline + 1), i];
-    const value = args[i + 1];
-    if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${arg} requires a value`);
-    return [value, i + 1];
+  const parsed: CloseSprintArgs = {
+    scope: null,
+    outcome: 'shipped',
+    outcomeExplicit: false,
+    note: null,
+    summary: null,
+    recommendations: [],
+    learnings: [],
+    dryRun: false,
+    yes: false,
+    help: false,
   };
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
-    else if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--kyro-scope' || arg.startsWith('--kyro-scope=')) [scope, i] = takeValue(arg, i);
-    else if (arg === '--outcome' || arg.startsWith('--outcome=')) {
-      [outcome, i] = takeValue(arg, i);
-      outcomeExplicit = true;
-    }
-    else if (arg === '--note' || arg.startsWith('--note=')) [note, i] = takeValue(arg, i);
-    else if (arg === '--summary' || arg.startsWith('--summary=')) [summary, i] = takeValue(arg, i);
-    else if (arg === '--recommendation' || arg.startsWith('--recommendation=')) {
-      const [value, next] = takeValue(arg, i);
-      recommendations.push(value);
-      i = next;
-    } else if (arg === '--learning' || arg.startsWith('--learning=')) {
-      const [value, next] = takeValue(arg, i);
-      learnings.push(value);
-      i = next;
-    } else throw new KyroCoreError('INVALID_INPUT', `Unknown option: ${arg}`);
-  }
-
-  return { scope, outcome, outcomeExplicit, note, summary, recommendations, learnings, dryRun, yes, help };
+  return parseFlags(CLOSE_SPRINT_FLAGS, args, parsed, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown option: ${arg}`);
+  });
 }
 
 function printCloseSprintHelp(): void {

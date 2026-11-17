@@ -2,6 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { sprintJsonPath } from '../artifacts/paths';
 import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import type { OperationPlan, SpecScenario, SprintFile, Task } from '../types';
@@ -219,6 +220,20 @@ function replaceTask(sprint: SprintFile, taskId: string, nextTask: Task): Sprint
   };
 }
 
+const scenarioValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value.`, `Pass ${flagName} <value>.`));
+const scenarioOption = <S>(name: string, apply: (args: S, value: string) => void): FlagSpec<S> => option([name], scenarioValue, apply);
+
+const SCENARIO_ADD_FLAGS: readonly FlagSpec<ScenarioAddArgs>[] = [
+  helpFlag(),
+  dryRunFlag(),
+  scenarioOption('--id', (a, v) => { a.id = v; }),
+  scenarioOption('--requirement', (a, v) => { a.requirement = v; }),
+  scenarioOption('--given', (a, v) => { a.given = v; }),
+  scenarioOption('--when', (a, v) => { a.when = v; }),
+  scenarioOption('--then', (a, v) => { a.then = v; }),
+  scenarioOption('--kyro-scope', (a, v) => { a.scope = v; }),
+];
+
 function parseScenarioAddArgs(args: string[]): ScenarioAddArgs {
   const out: ScenarioAddArgs = {
     id: '',
@@ -230,20 +245,18 @@ function parseScenarioAddArgs(args: string[]): ScenarioAddArgs {
     dryRun: false,
     help: false,
   };
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === '--help' || arg === '-h') out.help = true;
-    else if (arg === '--dry-run') out.dryRun = true;
-    else if (arg === '--id') out.id = requireValue(args, i++, '--id');
-    else if (arg === '--requirement') out.requirement = requireValue(args, i++, '--requirement');
-    else if (arg === '--given') out.given = requireValue(args, i++, '--given');
-    else if (arg === '--when') out.when = requireValue(args, i++, '--when');
-    else if (arg === '--then') out.then = requireValue(args, i++, '--then');
-    else if (arg === '--kyro-scope') out.scope = requireValue(args, i++, '--kyro-scope');
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown flag for scenario add: ${arg}`, 'Run kyro scenario --help.');
-  }
-  return out;
+  return parseFlags(SCENARIO_ADD_FLAGS, args, out, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown flag for scenario add: ${arg}`, 'Run kyro scenario --help.');
+  });
 }
+
+const SCENARIO_LINK_FLAGS: readonly FlagSpec<ScenarioLinkArgs>[] = [
+  helpFlag(),
+  dryRunFlag(),
+  scenarioOption('--task', (a, v) => { a.taskId = v; }),
+  scenarioOption('--scenario', (a, v) => { a.scenarioId = v; }),
+  scenarioOption('--kyro-scope', (a, v) => { a.scope = v; }),
+];
 
 function parseScenarioLinkArgs(args: string[]): ScenarioLinkArgs {
   const out: ScenarioLinkArgs = {
@@ -253,24 +266,9 @@ function parseScenarioLinkArgs(args: string[]): ScenarioLinkArgs {
     dryRun: false,
     help: false,
   };
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === '--help' || arg === '-h') out.help = true;
-    else if (arg === '--dry-run') out.dryRun = true;
-    else if (arg === '--task') out.taskId = requireValue(args, i++, '--task');
-    else if (arg === '--scenario') out.scenarioId = requireValue(args, i++, '--scenario');
-    else if (arg === '--kyro-scope') out.scope = requireValue(args, i++, '--kyro-scope');
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown flag for scenario link: ${arg}`, 'Run kyro scenario --help.');
-  }
-  return out;
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) {
-    throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value.`, `Pass ${flag} <value>.`);
-  }
-  return value;
+  return parseFlags(SCENARIO_LINK_FLAGS, args, out, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown flag for scenario link: ${arg}`, 'Run kyro scenario --help.');
+  });
 }
 
 function printScenarioHelp(): void {

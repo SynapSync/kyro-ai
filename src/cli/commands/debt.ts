@@ -3,6 +3,7 @@ import { sprintJsonPath } from '../artifacts/paths';
 import { DEBT_CLASSIFICATION, assessRawDebt } from '../artifacts/debt-contract';
 import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import type { Debt, OperationPlan, SprintFile } from '../types';
@@ -87,31 +88,37 @@ function runAdd(rawArgs: string[]): void {
   applyDebtMutation(scope, sprint, nextDebt, 'add', { id: item.id, priority: item.priority }, args.dryRun, summary);
 }
 
+/** Flags every debt subcommand accepts. */
+interface DebtCommon { scope: string | null; dryRun: boolean; help: boolean }
+
+const debtValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
+const debtOption = <S extends DebtCommon>(name: string, apply: (args: S, value: string, token: string) => void): FlagSpec<S> => option([name], debtValue, apply, true);
+
+function debtCommonFlags<S extends DebtCommon>(): FlagSpec<S>[] {
+  return [helpFlag<S>(), dryRunFlag<S>(), debtOption<S>('--kyro-scope', (a, v) => { a.scope = v; })];
+}
+
+/** Reads `<id>` as the first non-flag token; anything else is an unknown option of the subcommand. */
+function debtIdFallback<S extends DebtCommon & { id: string }>(subcommand: string): (arg: string, state: S) => void {
+  return (arg, state) => {
+    if (!arg.startsWith('--') && !state.id) state.id = arg;
+    else throw new KyroCoreError('INVALID_INPUT', `Unknown debt ${subcommand} option: ${arg}`);
+  };
+}
+
+const ADD_FLAGS: readonly FlagSpec<AddArgs>[] = [
+  ...debtCommonFlags<AddArgs>(),
+  debtOption('--title', (a, v) => { a.title = v; }),
+  debtOption('--priority', (a, v) => { a.priority = parsePriority(v); }),
+  debtOption('--target', (a, v, token) => { a.target = parseNumber(v, token); }),
+  debtOption('--note', (a, v) => { a.note = v; }),
+];
+
 function parseAddArgs(rawArgs: string[]): AddArgs {
-  let title = '';
-  let priority: DebtPriority | null = null;
-  let target: number | null = null;
-  let note: string | null = null;
-  let scope: string | null = null;
-  let dryRun = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--title') { title = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--title=')) title = arg.slice('--title='.length);
-    else if (arg === '--priority') { priority = parsePriority(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--priority=')) priority = parsePriority(arg.slice('--priority='.length));
-    else if (arg === '--target') { target = requireNumber(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--target=')) target = parseNumber(arg.slice('--target='.length), arg);
-    else if (arg === '--note') { note = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--note=')) note = arg.slice('--note='.length);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown debt add option: ${arg}`);
-  }
-  return { title, priority, target, note, scope, dryRun, help };
+  const args: AddArgs = { title: '', priority: null, target: null, note: null, scope: null, dryRun: false, help: false };
+  return parseFlags(ADD_FLAGS, rawArgs, args, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown debt add option: ${arg}`);
+  });
 }
 
 // --- start ---
@@ -162,25 +169,16 @@ function runResolve(rawArgs: string[]): void {
   applyDebtMutation(scope, sprint, nextDebt, 'resolve', { id: item.id }, args.dryRun, `Debt ${item.id} → resolved.`);
 }
 
+const RESOLVE_FLAGS: readonly FlagSpec<ResolveArgs>[] = [
+  ...debtCommonFlags<ResolveArgs>(),
+  debtOption('--note', (a, v) => { a.note = v; }),
+];
+
 function parseResolveArgs(rawArgs: string[]): ResolveArgs {
-  let id = '';
-  let note: string | null = null;
-  let scope: string | null = null;
-  let dryRun = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--note') { note = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--note=')) note = arg.slice('--note='.length);
-    else if (!arg.startsWith('--') && !id) id = arg;
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown debt resolve option: ${arg}`);
-  }
-  if (!id) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro debt resolve <id> [--note <text>]', 'Pass the debt id to resolve.');
-  return { id, note, scope, dryRun, help };
+  const args: ResolveArgs = { id: '', note: null, scope: null, dryRun: false, help: false };
+  parseFlags(RESOLVE_FLAGS, rawArgs, args, debtIdFallback('resolve'));
+  if (!args.id) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro debt resolve <id> [--note <text>]', 'Pass the debt id to resolve.');
+  return args;
 }
 
 // --- defer ---
@@ -212,28 +210,17 @@ function runDefer(rawArgs: string[]): void {
   applyDebtMutation(scope, sprint, nextDebt, 'defer', { id: item.id, target }, args.dryRun, `Debt ${item.id} → deferred (target sprint ${target}).`);
 }
 
+const DEFER_FLAGS: readonly FlagSpec<DeferArgs>[] = [
+  ...debtCommonFlags<DeferArgs>(),
+  debtOption('--target', (a, v, token) => { a.target = parseNumber(v, token); }),
+  debtOption('--note', (a, v) => { a.note = v; }),
+];
+
 function parseDeferArgs(rawArgs: string[]): DeferArgs {
-  let id = '';
-  let target: number | null = null;
-  let note: string | null = null;
-  let scope: string | null = null;
-  let dryRun = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--target') { target = requireNumber(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--target=')) target = parseNumber(arg.slice('--target='.length), arg);
-    else if (arg === '--note') { note = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--note=')) note = arg.slice('--note='.length);
-    else if (!arg.startsWith('--') && !id) id = arg;
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown debt defer option: ${arg}`);
-  }
-  if (!id) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro debt defer <id> --target <n> --note <text>', 'Pass the debt id to defer.');
-  return { id, target, note, scope, dryRun, help };
+  const args: DeferArgs = { id: '', target: null, note: null, scope: null, dryRun: false, help: false };
+  parseFlags(DEFER_FLAGS, rawArgs, args, debtIdFallback('defer'));
+  if (!args.id) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro debt defer <id> --target <n> --note <text>', 'Pass the debt id to defer.');
+  return args;
 }
 
 // --- escalate ---
@@ -266,25 +253,16 @@ function runEscalate(rawArgs: string[]): void {
   applyDebtMutation(scope, sprint, nextDebt, 'escalate', { id: item.id, priority: nextPriority }, args.dryRun, `Debt ${item.id} → priority ${nextPriority}.`);
 }
 
+const ESCALATE_FLAGS: readonly FlagSpec<EscalateArgs>[] = [
+  ...debtCommonFlags<EscalateArgs>(),
+  debtOption('--priority', (a, v) => { a.priority = parsePriority(v); }),
+];
+
 function parseEscalateArgs(rawArgs: string[]): EscalateArgs {
-  let id = '';
-  let priority: DebtPriority | null = null;
-  let scope: string | null = null;
-  let dryRun = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--priority') { priority = parsePriority(requireValue(rawArgs, i, arg)); i += 1; }
-    else if (arg.startsWith('--priority=')) priority = parsePriority(arg.slice('--priority='.length));
-    else if (!arg.startsWith('--') && !id) id = arg;
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown debt escalate option: ${arg}`);
-  }
-  if (!id) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro debt escalate <id> --priority <critical|high|medium|low>', 'Pass the debt id to escalate.');
-  return { id, priority, scope, dryRun, help };
+  const args: EscalateArgs = { id: '', priority: null, scope: null, dryRun: false, help: false };
+  parseFlags(ESCALATE_FLAGS, rawArgs, args, debtIdFallback('escalate'));
+  if (!args.id) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro debt escalate <id> --priority <critical|high|medium|low>', 'Pass the debt id to escalate.');
+  return args;
 }
 
 // --- shared: read/validate/apply ---
@@ -382,21 +360,10 @@ function maxLedgerSprintNumber(sprint: SprintFile): number | null {
 }
 
 function parseTargetIdArgs(rawArgs: string[], subcommand: string): TargetIdArgs {
-  let id = '';
-  let scope: string | null = null;
-  let dryRun = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (!arg.startsWith('--') && !id) id = arg;
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown debt ${subcommand} option: ${arg}`);
-  }
-  if (!id) throw new KyroCoreError('INVALID_INPUT', `Usage: kyro debt ${subcommand} <id>`, 'Pass the debt id.');
-  return { id, scope, dryRun, help };
+  const args: TargetIdArgs = { id: '', scope: null, dryRun: false, help: false };
+  parseFlags(debtCommonFlags<TargetIdArgs>(), rawArgs, args, debtIdFallback(subcommand));
+  if (!args.id) throw new KyroCoreError('INVALID_INPUT', `Usage: kyro debt ${subcommand} <id>`, 'Pass the debt id.');
+  return args;
 }
 
 function parsePriority(value: string): DebtPriority {
@@ -408,16 +375,6 @@ function parseNumber(value: string, flag: string): number {
   const n = Number(value);
   if (!Number.isFinite(n)) throw new KyroCoreError('INVALID_INPUT', `${flag} must be a number.`);
   return n;
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value`);
-  return value;
-}
-
-function requireNumber(args: string[], index: number, flag: string): number {
-  return parseNumber(requireValue(args, index, flag), flag);
 }
 
 function printDebtHelp(): void {

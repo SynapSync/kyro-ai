@@ -2,20 +2,23 @@
 // Verifies `kyro capabilities`: the runtime handshake the orchestrator runs at forge start. It must
 // list every tool-owned verb the shipped skill assets invoke, report the package version, and stay
 // read-only. An old runtime fails the handshake by not knowing the command at all (UNKNOWN_COMMAND).
-import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createSandbox, runCli } from './lib/sandbox.mjs';
 
 const repo = resolve(fileURLToPath(import.meta.url), '../..');
-const cli = resolve(repo, 'dist/cli.js');
+// Isolation: the CLI takes `.kyro-state-writer.lock` in its working directory, even for `<verb> --help`.
+// Run it from a private sandbox with its own HOME so a concurrent check never sees a lock in the repo root.
+const sandbox = createSandbox('kyro-capabilities');
+process.on('exit', () => sandbox.cleanup());
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
 function run(args) {
-  return spawnSync(process.execPath, [cli, ...args], { cwd: repo, encoding: 'utf-8' });
+  return runCli(args, { cwd: sandbox.root, env: sandbox.env() });
 }
 
 function capabilitiesEnvelope(result) {

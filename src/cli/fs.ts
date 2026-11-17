@@ -5,6 +5,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
+import { readTextValidated } from './artifacts/read-cache';
 import { PACKAGE_ROOT, WORKSPACE_ROOT } from './constants';
 import { hasManagedBlockContent } from './injectors/managed-block';
 import { applyMachineAdapterPlan } from './adapters/machine-registry';
@@ -85,7 +86,7 @@ export function readJsonFromWorkspace<T>(file: string): T | null {
 export function readJsonFromManagedPath<T>(file: string): T | null {
   const path = resolveManagedPath(file);
   if (!existsSync(path)) return null;
-  return JSON.parse(readFileSync(path, 'utf-8')) as T;
+  return JSON.parse(readTextValidated(path)) as T;
 }
 
 export function readPackageText(file: string): string {

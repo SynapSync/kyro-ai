@@ -23,6 +23,7 @@ const {
   assessUpdateConsistency,
   buildUpdatePlan,
   quoteWinArg,
+  queryRegistryLatest,
   refreshFromCli,
   validateTargetVersion,
 } = require(resolve(repo, 'dist/cli/commands/update.js'));
@@ -601,6 +602,33 @@ if (process.platform !== 'win32') {
       && !existing.stdout.includes('Delete .agents/kyro/legacy-migrations'),
     `update leaves an old backup directory alone: ${existing.stderr}\n${existing.stdout}`);
   } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// `npm view <pkg> version --json` prints a bare string on npm 10 and a one-element array on npm 12.
+if (process.platform !== 'win32') {
+  const root = mkdtempSync(join(tmpdir(), 'kyro-update-registry-'));
+  const savedPath = process.env.PATH;
+  try {
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    const npmStub = join(bin, 'npm');
+    process.env.PATH = `${bin}${delimiter}${savedPath}`;
+    for (const [shape, printed, expected] of [
+      ['npm 10 string', '"9.8.7"', '9.8.7'],
+      ['npm 12 array', '["9.8.7"]', '9.8.7'],
+      ['malformed', '{"version":"9.8.7"}', null],
+      ['non-semver', '["latest"]', null],
+      ['empty array', '[]', null],
+    ]) {
+      writeFileSync(npmStub, `#!/bin/sh\nprintf '%s\\n' '${printed}'\n`);
+      chmodSync(npmStub, 0o755);
+      assert(queryRegistryLatest() === expected, `queryRegistryLatest ${shape}: expected ${expected}, got ${queryRegistryLatest()}`);
+    }
+    console.log('PASS registry latest accepts npm 10 string and npm 12 array output, rejects other shapes');
+  } finally {
+    process.env.PATH = savedPath;
     rmSync(root, { recursive: true, force: true });
   }
 }

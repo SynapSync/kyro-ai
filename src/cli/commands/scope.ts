@@ -13,6 +13,7 @@ import { buildClosePlan } from './close-sprint';
 import { applySprintCloseTransaction, readSprintCloseCheckpoint } from '../checkpoints/sprint-close';
 import { undisposedCloseTasks } from '../core/status';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, flag, helpFlag, option, parseFlags, takeNonEmptyUnlessDashed, type FlagSpec } from '../core/flags';
 import { evaluateGuard } from '../core/policy';
 import { emitBlockedReason, emitGateApproved } from '../core/trace';
 import { emitToolCommandRun } from '../core/trace';
@@ -184,17 +185,16 @@ function setActiveScope(scope: string, yes: boolean, dryRun: boolean): void {
   console.log(`Active Kyro scope set to: ${scope}`);
 }
 
+const scopeValue = takeNonEmptyUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value.`));
+const scopeOption = <S>(name: string, apply: (args: S, value: string) => void): FlagSpec<S> => option([name], scopeValue, apply);
+const yesFlag = <S extends { yes: boolean }>(names: readonly string[]): FlagSpec<S> => flag<S>(names, (a) => { a.yes = true; });
+
 function parseSetActiveArgs(args: string[]): { scope: string; yes: boolean; dryRun: boolean } {
-  let scope = '';
-  let yes = false;
-  let dryRun = false;
-  for (const arg of args) {
-    if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (!arg.startsWith('--') && !scope) scope = arg;
+  const parsed = { scope: '', yes: false, dryRun: false };
+  return parseFlags([yesFlag<typeof parsed>(['--yes', '-y', '--confirm']), dryRunFlag<typeof parsed>()], args, parsed, (arg, state) => {
+    if (!arg.startsWith('--') && !state.scope) state.scope = arg;
     else throw new KyroCoreError('INVALID_INPUT', `Unknown scope set-active option: ${arg}`);
-  }
-  return { scope, yes, dryRun };
+  });
 }
 
 interface ScopeDiscardArgs {
@@ -291,20 +291,22 @@ function prepareScopeDiscard(scope: string, reason: string): { sprint: SprintFil
   return { sprint, digest, resumed, affectedFiles };
 }
 
+const DISCARD_FLAGS: readonly FlagSpec<ScopeDiscardArgs>[] = [
+  helpFlag(),
+  yesFlag(['--yes', '-y']),
+  dryRunFlag(),
+  scopeOption('--kyro-scope', (a: ScopeDiscardArgs, v) => { a.scope = v; }),
+  scopeOption('--reason', (a: ScopeDiscardArgs, v) => { a.reason = v; }),
+  scopeOption('--digest', (a: ScopeDiscardArgs, v) => { a.digest = v; }),
+];
+
 function parseDiscardArgs(args: string[]): ScopeDiscardArgs {
-  let scope = ''; let reason = ''; let digest: string | null = null; let yes = false; let dryRun = false; let help = false;
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--yes' || arg === '-y') yes = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') scope = requiredValue(args, ++index, arg);
-    else if (arg === '--reason') reason = requiredValue(args, ++index, arg);
-    else if (arg === '--digest') digest = requiredValue(args, ++index, arg);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown scope discard option: ${arg}`, 'Run kyro scope discard --help.');
-  }
-  if (!help && (!scope || !reason)) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope discard --kyro-scope <scope> --reason <reason> [--dry-run | --digest <sha256> --yes].');
-  return { scope, reason, digest, yes, dryRun, help };
+  const parsed: ScopeDiscardArgs = { scope: '', reason: '', digest: null, yes: false, dryRun: false, help: false };
+  parseFlags(DISCARD_FLAGS, args, parsed, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown scope discard option: ${arg}`, 'Run kyro scope discard --help.');
+  });
+  if (!parsed.help && (!parsed.scope || !parsed.reason)) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope discard --kyro-scope <scope> --reason <reason> [--dry-run | --digest <sha256> --yes].');
+  return parsed;
 }
 
 function printScopeDiscardPlan(prepared: ReturnType<typeof prepareScopeDiscard>): void {
@@ -383,33 +385,23 @@ function printRetirementPlan(preparation: ReturnType<typeof buildScopeRetirement
   if (preparation.alreadyApplied) console.log('State: already applied; an identical apply is a safe no-op.');
 }
 
-function parseRetireArgs(args: string[]): ScopeRetireArgs {
-  let scope = '';
-  let reason = '';
-  let supersededBy: string | null = null;
-  let digest: string | null = null;
-  let yes = false;
-  let dryRun = false;
-  let help = false;
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--yes' || arg === '-y') yes = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') scope = requiredValue(args, ++index, arg);
-    else if (arg === '--reason') reason = requiredValue(args, ++index, arg);
-    else if (arg === '--superseded-by') supersededBy = requiredValue(args, ++index, arg);
-    else if (arg === '--digest') digest = requiredValue(args, ++index, arg);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown scope retire option: ${arg}`, 'Run kyro scope retire --help.');
-  }
-  if (!help && (!scope || !reason)) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope retire --kyro-scope <scope> --reason <reason> [--superseded-by <scope>] [--digest <sha256> --yes].');
-  return { scope, reason, supersededBy, digest, yes, dryRun, help };
-}
+const RETIRE_FLAGS: readonly FlagSpec<ScopeRetireArgs>[] = [
+  helpFlag(),
+  yesFlag(['--yes', '-y']),
+  dryRunFlag(),
+  scopeOption('--kyro-scope', (a: ScopeRetireArgs, v) => { a.scope = v; }),
+  scopeOption('--reason', (a: ScopeRetireArgs, v) => { a.reason = v; }),
+  scopeOption('--superseded-by', (a: ScopeRetireArgs, v) => { a.supersededBy = v; }),
+  scopeOption('--digest', (a: ScopeRetireArgs, v) => { a.digest = v; }),
+];
 
-function requiredValue(args: string[], index: number, flag: string): string {
-  const value = args[index];
-  if (!value || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value.`);
-  return value;
+function parseRetireArgs(args: string[]): ScopeRetireArgs {
+  const parsed: ScopeRetireArgs = { scope: '', reason: '', supersededBy: null, digest: null, yes: false, dryRun: false, help: false };
+  parseFlags(RETIRE_FLAGS, args, parsed, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown scope retire option: ${arg}`, 'Run kyro scope retire --help.');
+  });
+  if (!parsed.help && (!parsed.scope || !parsed.reason)) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope retire --kyro-scope <scope> --reason <reason> [--superseded-by <scope>] [--digest <sha256> --yes].');
+  return parsed;
 }
 
 function printScopeRetireHelp(): void {
@@ -518,32 +510,26 @@ function activeTasks(sprint: SprintFile): Task[] {
   return active.phases.flatMap((phase) => phase.tasks).concat(active.emergentTasks);
 }
 
+const COMPLETE_FLAGS: readonly FlagSpec<ScopeCompleteArgs>[] = [
+  helpFlag(),
+  yesFlag(['--yes', '-y', '--confirm']),
+  dryRunFlag(),
+  scopeOption('--kyro-scope', (a: ScopeCompleteArgs, v) => { a.scope = v; }),
+  scopeOption('--summary', (a: ScopeCompleteArgs, v) => { a.summary = v; }),
+  flag(['--accept-open-debt'], (a: ScopeCompleteArgs) => { a.acceptOpenDebt = true; }),
+  flag(['--reconcile-debt'], (a: ScopeCompleteArgs) => { a.reconcileDebt = true; }),
+  scopeOption('--reason', (a: ScopeCompleteArgs, v) => { a.reason = v; }),
+  scopeOption('--expect-digest', (a: ScopeCompleteArgs, v) => { a.expectDigest = v; }),
+];
+
 function parseCompleteArgs(args: string[]): ScopeCompleteArgs {
-  let scope = '';
-  let summary: string | null = null;
-  let yes = false;
-  let dryRun = false;
-  let help = false;
-  let acceptOpenDebt = false;
-  let reconcileDebt = false;
-  let reason: string | null = null;
-  let expectDigest: string | null = null;
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') scope = requiredValue(args, ++index, arg);
-    else if (arg === '--summary') summary = requiredValue(args, ++index, arg);
-    else if (arg === '--accept-open-debt') acceptOpenDebt = true;
-    else if (arg === '--reconcile-debt') reconcileDebt = true;
-    else if (arg === '--reason') reason = requiredValue(args, ++index, arg);
-    else if (arg === '--expect-digest') expectDigest = requiredValue(args, ++index, arg);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown scope complete option: ${arg}`, 'Run kyro scope complete --help.');
-  }
-  if (!help && !scope) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes].');
-  if (expectDigest && !/^[a-f0-9]{64}$/.test(expectDigest)) throw new KyroCoreError('INVALID_INPUT', '--expect-digest must be a SHA-256 digest.');
-  return { scope, summary, yes, dryRun, help, acceptOpenDebt, reconcileDebt, reason, expectDigest };
+  const parsed: ScopeCompleteArgs = { scope: '', summary: null, yes: false, dryRun: false, help: false, acceptOpenDebt: false, reconcileDebt: false, reason: null, expectDigest: null };
+  parseFlags(COMPLETE_FLAGS, args, parsed, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown scope complete option: ${arg}`, 'Run kyro scope complete --help.');
+  });
+  if (!parsed.help && !parsed.scope) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope complete --kyro-scope <scope> [--summary <text>] [--yes].');
+  if (parsed.expectDigest && !/^[a-f0-9]{64}$/.test(parsed.expectDigest)) throw new KyroCoreError('INVALID_INPUT', '--expect-digest must be a SHA-256 digest.');
+  return parsed;
 }
 
 function printScopeCompleteHelp(): void {
@@ -620,23 +606,21 @@ function printLifecycleHistory(sprint: SprintFile): void {
   }
 }
 
+const REOPEN_FLAGS: readonly FlagSpec<ScopeReopenArgs>[] = [
+  helpFlag(),
+  yesFlag(['--yes', '-y', '--confirm']),
+  dryRunFlag(),
+  scopeOption('--kyro-scope', (a: ScopeReopenArgs, v) => { a.scope = v; }),
+  scopeOption('--reason', (a: ScopeReopenArgs, v) => { a.reason = v; }),
+];
+
 function parseReopenArgs(args: string[]): ScopeReopenArgs {
-  let scope = '';
-  let reason = '';
-  let yes = false;
-  let dryRun = false;
-  let help = false;
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--yes' || arg === '-y' || arg === '--confirm') yes = true;
-    else if (arg === '--dry-run') dryRun = true;
-    else if (arg === '--kyro-scope') scope = requiredValue(args, ++index, arg);
-    else if (arg === '--reason') reason = requiredValue(args, ++index, arg);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown scope reopen option: ${arg}`, 'Run kyro scope reopen --help.');
-  }
-  if (!help && (!scope || !reason)) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope reopen --kyro-scope <scope> --reason <reason> [--yes].');
-  return { scope, reason, yes, dryRun, help };
+  const parsed: ScopeReopenArgs = { scope: '', reason: '', yes: false, dryRun: false, help: false };
+  parseFlags(REOPEN_FLAGS, args, parsed, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown scope reopen option: ${arg}`, 'Run kyro scope reopen --help.');
+  });
+  if (!parsed.help && (!parsed.scope || !parsed.reason)) throw new KyroCoreError('INVALID_INPUT', 'Usage: kyro scope reopen --kyro-scope <scope> --reason <reason> [--yes].');
+  return parsed;
 }
 
 function printScopeReopenHelp(): void {

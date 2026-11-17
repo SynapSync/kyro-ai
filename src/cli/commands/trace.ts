@@ -3,6 +3,7 @@ import { assertStateWriterLeaseHealthy } from '../pipeline/state-writer-lock';
 import { legacyTraceEventsPath, traceEventsPath } from '../artifacts/paths';
 import { resolveManagedPath } from '../fs';
 import { KyroCoreError } from '../core/errors';
+import { flag, helpFlag, option, parseFlags, takeNonEmpty, takeNonEmptyUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { isTraceEventType, readTrace } from '../core/trace';
 import type { TraceEventType } from '../types';
@@ -36,39 +37,23 @@ export function runTraceCommand(rawArgs: string[]): void {
   printTrace(scope, result.events, result.skipped);
 }
 
+const traceValue = (flagName: string) => takeNonEmpty(() => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
+
+const TRACE_FLAGS: readonly FlagSpec<TraceCommandArgs>[] = [
+  helpFlag(),
+  flag(['--json'], (a: TraceCommandArgs) => { a.json = true; }),
+  option(['--kyro-scope'], traceValue('--kyro-scope'), (a, v) => { a.scope = v; }, true),
+  option(['--tail'], traceValue('--tail'), (a, v) => { a.tail = parseTail(v); }, true),
+  option(['--type'], traceValue('--type'), (a, v) => { a.type = parseType(v); }, true),
+  option(['--clear'], takeNonEmptyUnlessDashed(() => new KyroCoreError('INVALID_INPUT', '--clear requires an explicit scope')), (a, v) => { a.clearScope = v; }),
+];
+
 function parseTraceArgs(rawArgs: string[]): TraceCommandArgs {
   const args: TraceCommandArgs = { scope: null, json: false, clearScope: null, help: false };
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') args.help = true;
-    else if (arg === '--json') args.json = true;
-    else if (arg === '--kyro-scope') {
-      const value = rawArgs[i + 1];
-      if (!value) throw new KyroCoreError('INVALID_INPUT','--kyro-scope requires a value');
-      args.scope = value;
-      i += 1;
-    } else if (arg.startsWith('--kyro-scope=')) args.scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--tail') {
-      const value = rawArgs[i + 1];
-      if (!value) throw new KyroCoreError('INVALID_INPUT','--tail requires a value');
-      args.tail = parseTail(value);
-      i += 1;
-    } else if (arg.startsWith('--tail=')) args.tail = parseTail(arg.slice('--tail='.length));
-    else if (arg === '--type') {
-      const value = rawArgs[i + 1];
-      if (!value) throw new KyroCoreError('INVALID_INPUT','--type requires a value');
-      args.type = parseType(value);
-      i += 1;
-    } else if (arg.startsWith('--type=')) args.type = parseType(arg.slice('--type='.length));
-    else if (arg === '--clear') {
-      const value = rawArgs[i + 1];
-      if (!value || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT','--clear requires an explicit scope');
-      args.clearScope = value;
-      i += 1;
-    } else if (!arg.startsWith('--') && args.scope === null) args.scope = arg;
-    else throw new KyroCoreError('INVALID_INPUT',`Unknown trace option: ${arg}`);
-  }
-  return args;
+  return parseFlags(TRACE_FLAGS, rawArgs, args, (arg, state) => {
+    if (!arg.startsWith('--') && state.scope === null) state.scope = arg;
+    else throw new KyroCoreError('INVALID_INPUT', `Unknown trace option: ${arg}`);
+  });
 }
 
 function parseTail(value: string): number {

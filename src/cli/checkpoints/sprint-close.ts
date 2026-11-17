@@ -381,6 +381,42 @@ export function readSprintCloseCheckpoint(path: string): SprintCloseCheckpointV1
 }
 
 /**
+ * Per-process memo for the two pure, expensive checkpoint verifications. The key is the SHA-256 of the
+ * exact file bytes the value was parsed from (plus the path, which the verdict depends on), so a
+ * changed file can never hit an old verdict. Callers must pass the unmodified parse of those bytes;
+ * results are returned as fresh copies.
+ */
+const integrityMemo = new Map<string, readonly string[]>();
+const commitmentMemo = new Map<string, string>();
+const MEMO_LIMIT = 1024;
+
+function memoSet<T>(map: Map<string, T>, key: string, value: T): void {
+  if (map.size >= MEMO_LIMIT) map.delete(map.keys().next().value as string);
+  map.set(key, value);
+}
+
+/** checkpointIntegrityIssues for a value parsed, unmodified, from bytes whose SHA-256 is `fileSha256`. */
+export function checkpointIntegrityIssuesForBytes(value: unknown, path: string, fileSha256: string | null): string[] {
+  if (!fileSha256) return checkpointIntegrityIssues(value, path);
+  const key = `${fileSha256}\0${path}`;
+  const hit = integrityMemo.get(key);
+  if (hit) return hit.slice();
+  const issues = checkpointIntegrityIssues(value, path);
+  memoSet(integrityMemo, key, issues.slice());
+  return issues;
+}
+
+/** checkpointCommitment for a value parsed, unmodified, from bytes whose SHA-256 is `fileSha256`. */
+export function checkpointCommitmentForBytes(value: SprintCloseCheckpointV1, fileSha256: string | null): string {
+  if (!fileSha256) return checkpointCommitment(value);
+  const hit = commitmentMemo.get(fileSha256);
+  if (hit !== undefined) return hit;
+  const commitment = checkpointCommitment(value);
+  memoSet(commitmentMemo, fileSha256, commitment);
+  return commitment;
+}
+
+/**
  * Integrity issues only (structural, commitment, digests, paths, transitions).
  * A checkpoint with a valid commitment and no integrity issues is historical evidence,
  * even if its schema is stale.

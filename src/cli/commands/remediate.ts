@@ -1,4 +1,5 @@
 import { KyroCoreError } from '../core/errors';
+import { flag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import { readPackageVersion } from '../help';
@@ -188,48 +189,39 @@ interface CanonicalizeArgs {
   help: boolean;
 }
 
-function parseCanonicalizeArgs(rawArgs: string[]): CanonicalizeArgs {
-  let debtId = '';
-  let scope: string | null = null;
-  let reason: string | null = null;
-  let actor: string | null = null;
-  let json = false;
-  let help = false;
-  const decisions: Record<string, unknown> = {};
+const remediateValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value`));
 
-  const takeValue = (index: number, flag: string): string => requireValue(rawArgs, index, flag);
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    const inline = (flag: string): string | null => (arg.startsWith(`${flag}=`) ? arg.slice(flag.length + 1) : null);
-    if (arg === '--help' || arg === '-h') help = true;
-    else if (arg === '--json') json = true;
-    else if (arg === '--kyro-scope') { scope = takeValue(i, arg); i += 1; }
-    else if (inline('--kyro-scope') !== null) scope = inline('--kyro-scope') as string;
-    else if (arg === '--debt') { debtId = takeValue(i, arg); i += 1; }
-    else if (inline('--debt') !== null) debtId = inline('--debt') as string;
-    else if (arg === '--reason') { reason = takeValue(i, arg); i += 1; }
-    else if (inline('--reason') !== null) reason = inline('--reason') as string;
-    else if (arg === '--actor') { actor = takeValue(i, arg); i += 1; }
-    else if (inline('--actor') !== null) actor = inline('--actor') as string;
-    // Decisions are opt-in per field: an absent flag means "undecided", never "use the suggestion".
-    else if (arg === '--origin') { decisions.origin = parseIntegerDecision(takeValue(i, arg), '--origin'); i += 1; }
-    else if (inline('--origin') !== null) decisions.origin = parseIntegerDecision(inline('--origin') as string, '--origin');
-    else if (arg === '--priority') { decisions.priority = takeValue(i, arg); i += 1; }
-    else if (inline('--priority') !== null) decisions.priority = inline('--priority') as string;
-    else if (arg === '--target-sprint') { decisions.targetSprint = parseTargetSprint(takeValue(i, arg)); i += 1; }
-    else if (inline('--target-sprint') !== null) decisions.targetSprint = parseTargetSprint(inline('--target-sprint') as string);
-    else if (arg === '--note') { decisions.note = takeValue(i, arg); i += 1; }
-    else if (inline('--note') !== null) decisions.note = inline('--note') as string;
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown remediate canonicalize-prepare option: ${arg}`);
-  }
-  if (!help && debtId.trim() === '') {
+interface CanonicalizeState extends CanonicalizeArgs { decisions: Record<string, unknown> }
+
+const canonicalizeOption = (name: string, apply: (state: CanonicalizeState, value: string) => void): FlagSpec<CanonicalizeState> => option([name], remediateValue, apply, true);
+
+// Decisions are opt-in per field: an absent flag means "undecided", never "use the suggestion".
+const CANONICALIZE_FLAGS: readonly FlagSpec<CanonicalizeState>[] = [
+  helpFlag(),
+  flag(['--json'], (s: CanonicalizeState) => { s.json = true; }),
+  canonicalizeOption('--kyro-scope', (s, v) => { s.scope = v; }),
+  canonicalizeOption('--debt', (s, v) => { s.debtId = v; }),
+  canonicalizeOption('--reason', (s, v) => { s.reason = v; }),
+  canonicalizeOption('--actor', (s, v) => { s.actor = v; }),
+  canonicalizeOption('--origin', (s, v) => { s.decisions.origin = parseIntegerDecision(v, '--origin'); }),
+  canonicalizeOption('--priority', (s, v) => { s.decisions.priority = v; }),
+  canonicalizeOption('--target-sprint', (s, v) => { s.decisions.targetSprint = parseTargetSprint(v); }),
+  canonicalizeOption('--note', (s, v) => { s.decisions.note = v; }),
+];
+
+function parseCanonicalizeArgs(rawArgs: string[]): CanonicalizeArgs {
+  const state: CanonicalizeState = { debtId: '', scope: null, decisions: {}, reason: null, actor: null, json: false, help: false };
+  parseFlags(CANONICALIZE_FLAGS, rawArgs, state, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown remediate canonicalize-prepare option: ${arg}`);
+  });
+  if (!state.help && state.debtId.trim() === '') {
     throw new KyroCoreError(
       'INVALID_INPUT',
       'Usage: kyro remediate canonicalize-prepare --kyro-scope <scope> --debt <id> [--origin n] [--priority p] [--target-sprint n|null] [--note text]',
       '--debt is required: canonicalization is record-level and always names the debt it describes.',
     );
   }
-  return { debtId, scope, decisions, reason, actor, json, help };
+  return state;
 }
 
 /** A malformed decision is surfaced as such rather than quietly dropped into "undecided". */
@@ -283,35 +275,25 @@ function printPlan(plan: RemediationPlan): void {
   console.log(`- transaction   ${plan.transactionStatus}: ${plan.transactionDetail}`);
 }
 
+const REMEDIATE_FLAGS: readonly FlagSpec<RemediateArgs>[] = [
+  helpFlag(),
+  // --confirm is the spelling used by the remediation design doc; --yes is the CLI-wide
+  // convention. Both mean the same explicit approval.
+  flag(['--yes', '--confirm'], (a: RemediateArgs) => { a.confirm = true; }),
+  flag(['--json'], (a: RemediateArgs) => { a.json = true; }),
+  option(['--kyro-scope'], remediateValue, (a, v) => { a.scope = v; }, true),
+  option(['--manifest'], remediateValue, (a, v) => { a.manifest = v; }, true),
+];
+
 function parseArgs(rawArgs: string[], subcommand: string): RemediateArgs {
-  let manifest = '';
-  let scope: string | null = null;
-  let confirm = false;
-  let json = false;
-  let help = false;
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (arg === '--help' || arg === '-h') help = true;
-    // --confirm is the spelling used by the remediation design doc; --yes is the CLI-wide
-    // convention. Both mean the same explicit approval.
-    else if (arg === '--yes' || arg === '--confirm') confirm = true;
-    else if (arg === '--json') json = true;
-    else if (arg === '--kyro-scope') { scope = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--kyro-scope=')) scope = arg.slice('--kyro-scope='.length);
-    else if (arg === '--manifest') { manifest = requireValue(rawArgs, i, arg); i += 1; }
-    else if (arg.startsWith('--manifest=')) manifest = arg.slice('--manifest='.length);
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown remediate ${subcommand} option: ${arg}`);
-  }
-  if (!help && manifest.trim() === '') {
+  const args: RemediateArgs = { manifest: '', scope: null, confirm: false, json: false, help: false };
+  parseFlags(REMEDIATE_FLAGS, rawArgs, args, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown remediate ${subcommand} option: ${arg}`);
+  });
+  if (!args.help && args.manifest.trim() === '') {
     throw new KyroCoreError('INVALID_INPUT', `Usage: kyro remediate ${subcommand} --kyro-scope <scope> --manifest <path>`, '--manifest is required; a remediation is always driven by an explicit typed manifest.');
   }
-  return { manifest, scope, confirm, json, help };
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value`);
-  return value;
+  return args;
 }
 
 function printRemediateHelp(): void {

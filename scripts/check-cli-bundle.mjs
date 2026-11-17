@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symli
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseNpmPackJson } from './lib/npm-pack-json.mjs';
 
 // End-to-end proof (design.md §10.2 / tasks.md 7.1): the bundled runtime CLI must run a
 // CLI-owned, irreversible workflow step (close-sprint) with NO `kyro` binary on PATH — using
@@ -162,7 +163,7 @@ function main() {
         cwd: repo, env: { ...process.env, HOME: home }, encoding: 'utf8',
       });
       assert(pack.status === 0, `check-cli-bundle: npm pack migration fixture failed: ${pack.stderr || pack.stdout}`);
-      const packed = JSON.parse(pack.stdout)[0];
+      const packed = parseNpmPackJson(pack.stdout);
       assert(packed.version === version, `check-cli-bundle: tarball version differs from package ${version}`);
       const packedPaths = new Set(packed.files.map((file) => file.path));
       for (const path of [

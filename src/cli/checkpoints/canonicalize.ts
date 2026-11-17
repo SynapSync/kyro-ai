@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { resolveManagedPath } from '../fs';
 import { readJsonSafely } from '../artifacts/json';
+import { readFileValidated, readTextValidated } from '../artifacts/read-cache';
 import { archiveDir } from '../artifacts/paths';
 import { assertSafeManagedPath } from '../pipeline/state-writer-lock';
 import {
@@ -55,7 +55,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 export function fileSha256(absoluteOrManagedPath: string): string {
   const absolute = resolveManagedPath(absoluteOrManagedPath);
-  return createHash('sha256').update(readFileSync(absolute)).digest('hex');
+  return readFileValidated(absolute).sha256;
 }
 
 export function checkpointRemediationsDir(scope: string): string {
@@ -114,8 +114,8 @@ export function rebuildCanonicalCheckpointFromDisk(checkpointPath: string): Cano
   const snapshotAbs = resolveManagedPath(paths.legacySnapshot);
   const narrativeAbs = resolveManagedPath(paths.narrative);
   if (!existsSync(snapshotAbs) || !existsSync(narrativeAbs)) return null;
-  const snapshotContent = readFileSync(snapshotAbs, 'utf8');
-  const narrativeContent = readFileSync(narrativeAbs, 'utf8');
+  const snapshotContent = readTextValidated(snapshotAbs);
+  const narrativeContent = readTextValidated(narrativeAbs);
   const rebuilt = rebuildCanonicalCheckpoint(read.value, checkpointPath, snapshotContent, narrativeContent);
   if (!rebuilt) return null;
   rebuilt.originalSha256 = fileSha256(checkpointPath);

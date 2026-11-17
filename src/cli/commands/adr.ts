@@ -2,6 +2,7 @@ import { applyPlan, printPlan } from '../fs';
 import { sprintJsonPath } from '../artifacts/paths';
 import { loadScopeSprint, verifyWrittenSprint } from '../artifacts/load-sprint';
 import { KyroCoreError } from '../core/errors';
+import { dryRunFlag, helpFlag, option, parseFlags, takeUnlessDashed, type FlagSpec } from '../core/flags';
 import { resolveScope } from '../core/scope-resolution';
 import { emitToolCommandRun } from '../core/trace';
 import type { AdrRecord, AdrStatus, OperationPlan, SprintFile } from '../types';
@@ -131,6 +132,28 @@ function revalidateWritten(scope: string): void {
   verifyWrittenSprint(scope, 'adr add');
 }
 
+const adrValue = takeUnlessDashed((flagName) => new KyroCoreError('INVALID_INPUT', `${flagName} requires a value.`, `Pass ${flagName} <value>.`));
+const adrOption = (name: string, apply: (args: AdrAddArgs, value: string) => void): FlagSpec<AdrAddArgs> => option([name], adrValue, apply);
+
+const ADR_ADD_FLAGS: readonly FlagSpec<AdrAddArgs>[] = [
+  helpFlag(),
+  dryRunFlag(),
+  adrOption('--id', (a, v) => { a.id = v; }),
+  adrOption('--title', (a, v) => { a.title = v; }),
+  adrOption('--status', (a, v) => {
+    if (!Object.values(ADR_STATUS).includes(v as AdrStatus)) {
+      throw new KyroCoreError('INVALID_INPUT', `Invalid --status "${v}".`, `Use one of: ${Object.values(ADR_STATUS).join(', ')}.`);
+    }
+    a.status = v as AdrStatus;
+  }),
+  adrOption('--date', (a, v) => { a.date = v; }),
+  adrOption('--context', (a, v) => { a.context = v; }),
+  adrOption('--decision', (a, v) => { a.decision = v; }),
+  adrOption('--consequence', (a, v) => { a.consequences.push(v); }),
+  adrOption('--alternative', (a, v) => { a.alternatives.push(v); }),
+  adrOption('--kyro-scope', (a, v) => { a.scope = v; }),
+];
+
 function parseAdrAddArgs(args: string[]): AdrAddArgs {
   const out: AdrAddArgs = {
     id: null,
@@ -145,35 +168,9 @@ function parseAdrAddArgs(args: string[]): AdrAddArgs {
     dryRun: false,
     help: false,
   };
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === '--help' || arg === '-h') out.help = true;
-    else if (arg === '--dry-run') out.dryRun = true;
-    else if (arg === '--id') out.id = requireValue(args, i++, '--id');
-    else if (arg === '--title') out.title = requireValue(args, i++, '--title');
-    else if (arg === '--status') {
-      const raw = requireValue(args, i++, '--status');
-      if (!Object.values(ADR_STATUS).includes(raw as AdrStatus)) {
-        throw new KyroCoreError('INVALID_INPUT', `Invalid --status "${raw}".`, `Use one of: ${Object.values(ADR_STATUS).join(', ')}.`);
-      }
-      out.status = raw as AdrStatus;
-    } else if (arg === '--date') out.date = requireValue(args, i++, '--date');
-    else if (arg === '--context') out.context = requireValue(args, i++, '--context');
-    else if (arg === '--decision') out.decision = requireValue(args, i++, '--decision');
-    else if (arg === '--consequence') out.consequences.push(requireValue(args, i++, '--consequence'));
-    else if (arg === '--alternative') out.alternatives.push(requireValue(args, i++, '--alternative'));
-    else if (arg === '--kyro-scope') out.scope = requireValue(args, i++, '--kyro-scope');
-    else throw new KyroCoreError('INVALID_INPUT', `Unknown flag for adr add: ${arg}`, 'Run kyro adr --help.');
-  }
-  return out;
-}
-
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith('--')) {
-    throw new KyroCoreError('INVALID_INPUT', `${flag} requires a value.`, `Pass ${flag} <value>.`);
-  }
-  return value;
+  return parseFlags(ADR_ADD_FLAGS, args, out, (arg) => {
+    throw new KyroCoreError('INVALID_INPUT', `Unknown flag for adr add: ${arg}`, 'Run kyro adr --help.');
+  });
 }
 
 function printAdrHelp(): void {

@@ -193,6 +193,13 @@ function buildFixture(sandbox) {
 }
 
 // --- Main ---
+// Isolation: this check counts and tidies `kyro-pipeline-*` backup directories under tmpdir(). Point
+// tmpdir() at a private directory so another process (a concurrent check) cannot add or remove any.
+const privateTmp = fsMkdtempSync(join(tmpdir(), 'kyro-op-snap-tmp-'));
+process.env.TMPDIR = privateTmp;
+// applyOperationPlan() takes `.kyro-state-writer.lock` relative to the working directory; keep it out of the repo.
+// The dist modules resolve the lock path from the working directory, so change it before loading them.
+process.chdir(privateTmp);
 const distStep = join(repo, 'dist/cli/pipeline/operation-steps.js');
 assert(existsSync(distStep), `Missing built pipeline (run npm run build first): ${distStep}`);
 const { applyOperationPlan } = require(distStep);
@@ -572,6 +579,8 @@ try {
 }
 
 const tempsAfterAll = listPipelineTemps();
+process.chdir(repo);
+rmSync(privateTmp, { recursive: true, force: true });
 const baseline = {
   scenario: 'S1 mkdir-noop + S1b rmdir-noops + S2 rollback-matrix',
   repeats: REPEATS,

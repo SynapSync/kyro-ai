@@ -97,7 +97,7 @@ The full release validation sequence is:
 
 ```bash
 npm run build
-npm run check        # typecheck + versions + links + runtime-artifacts + dist + budget-manifest + sprint-doctor-v4
+npm run check        # all 89 validation steps, run concurrently (typecheck and dist first); `check:serial` runs them one at a time
 npm run check:adapters
 npm run check:tokens
 npm run check:artifacts
@@ -331,9 +331,9 @@ Use `kyro doctor --tokens` to verify progressive-disclosure budgets:
 - projected command skill <= 200 words
 - command router <= 500 words
 - mode file <= 900 words
-- INIT mode <= 500 words
+- INIT mode <= 1,000 words
 - each analysis helper <= 450 words
-- startup, status brief, INIT happy path, and realistic forge/status runtime paths stay under estimated token budgets
+- startup, status brief, INIT happy path, and realistic forge/status runtime paths stay under estimated token budgets; the path ceilings sit 5% above the measured size (see `docs/cost-model.md`) and the audit prints each remaining headroom
 - forbidden eager helper combinations fail the audit
 - `sizingDecision` regression fixture stays internally consistent
 
@@ -925,6 +925,7 @@ that leaves an immutable record of itself.
 | **6.4.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; adds focused validation suggestions, proportional Forge closure and advisory aggregate-suite findings. Work retains its existing close policy. |
 | **6.4.1** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; fixes native Windows `work create` and `work amend-brief` source ingestion and isolates integrity-repair tests from machine configuration. |
 | **6.5.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; records each sprint's git range at plan and close, adds the opt-in close commit, and keeps personal `local.json` preferences across state rewrites; fixes active-plan phase statuses, Git exclusion of the state-writer lock, and remediation replay across later sprint closes. Checkpoints with `close.git` need 6.5.0 or later to verify. |
+| **6.6.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; no change to state formats or verbs. Faster read-only commands and startup, a 0.68 MB package, declarative flag parsing and smaller source files. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

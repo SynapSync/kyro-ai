@@ -6,6 +6,7 @@ import { unregisteredScopeFolders } from '../core/scopes';
 import { deriveActiveSprintStatus, deriveLiveWorkHandoff, derivePhaseStatus, deriveScopeStatus, isTaskVerifiedComplete, taskExecutionInfo } from '../core/status';
 import { hasStaleReview } from '../core/review-material';
 import { KyroCoreError } from '../core/errors';
+import { flag, option, parseFlags, takeNonEmptyUnlessDashed, type FlagSpec } from '../core/flags';
 import { deriveScopeVerificationState } from '../remediation/plan';
 import { detectProjectStateBootstrapNeed, readProjectState } from '../state';
 import { ADR_STATUS } from '../types';
@@ -178,31 +179,27 @@ export function runStatusCommand(args: string[]): void {
   else printBriefStatus(report);
 }
 
-function parseStatusArgs(args: string[]): StatusCommandOptions {
-  let mode: StatusMode = STATUS_MODE.BRIEF;
-  let explicitMode = false;
-  let kyroScope: string | null = null;
-  let json = false;
-  let help = false;
+interface StatusParseState extends StatusCommandOptions { explicitMode: boolean }
 
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === '--help' || arg === '-h' || arg === 'help') {
-      help = true;
-    } else if (arg === '--json') {
-      json = true;
-    } else if (arg === '--kyro-scope') {
-      const value = args[index + 1];
-      if (!value || value.startsWith('--')) throw invalidInput('--kyro-scope requires a value.', 'Use --kyro-scope <scope> or --kyro-scope=<scope>.');
-      kyroScope = value;
-      index += 1;
-    } else if (arg.startsWith('--kyro-scope=')) {
-      kyroScope = arg.slice('--kyro-scope='.length);
-      if (!kyroScope) throw invalidInput('--kyro-scope requires a value.', 'Use --kyro-scope <scope> or --kyro-scope=<scope>.');
-    } else if (arg === STATUS_MODE.BRIEF || arg === STATUS_MODE.FULL || arg === STATUS_MODE.DEBT) {
-      if (explicitMode) throw invalidInput(`Multiple status modes provided: ${mode}, ${arg}.`, 'Use one of: kyro status brief, kyro status full, or kyro status debt.');
-      mode = arg;
-      explicitMode = true;
+const statusScopeValue = takeNonEmptyUnlessDashed(() => invalidInput('--kyro-scope requires a value.', 'Use --kyro-scope <scope> or --kyro-scope=<scope>.'));
+
+const STATUS_FLAGS: readonly FlagSpec<StatusParseState>[] = [
+  flag(['--help', '-h', 'help'], (s: StatusParseState) => { s.help = true; }),
+  flag(['--json'], (s: StatusParseState) => { s.json = true; }),
+  option(['--kyro-scope'], statusScopeValue, (s, value) => {
+    // The inline form can carry an empty value; the separate form cannot reach here with one.
+    if (!value) throw invalidInput('--kyro-scope requires a value.', 'Use --kyro-scope <scope> or --kyro-scope=<scope>.');
+    s.kyroScope = value;
+  }, true),
+];
+
+function parseStatusArgs(args: string[]): StatusCommandOptions {
+  const state: StatusParseState = { mode: STATUS_MODE.BRIEF, explicitMode: false, kyroScope: null, json: false, help: false };
+  parseFlags(STATUS_FLAGS, args, state, (arg) => {
+    if (arg === STATUS_MODE.BRIEF || arg === STATUS_MODE.FULL || arg === STATUS_MODE.DEBT) {
+      if (state.explicitMode) throw invalidInput(`Multiple status modes provided: ${state.mode}, ${arg}.`, 'Use one of: kyro status brief, kyro status full, or kyro status debt.');
+      state.mode = arg;
+      state.explicitMode = true;
     } else if (READ_ONLY_DEBT_COMMANDS.has(arg)) {
       throw readOnlyDebtError(arg);
     } else if (arg.startsWith('--')) {
@@ -210,9 +207,8 @@ function parseStatusArgs(args: string[]): StatusCommandOptions {
     } else {
       throw invalidInput(`Unknown status mode: ${arg}.`, 'Use one of: brief, full, or debt. Kyro CLI status is read-only; use Kyro workflow review/repair commands for state changes.');
     }
-  }
-
-  return { mode, kyroScope, json, help };
+  });
+  return { mode: state.mode, kyroScope: state.kyroScope, json: state.json, help: state.help };
 }
 
 function readOnlyDebtError(command: string): KyroCoreError {
