@@ -2,65 +2,69 @@
 
 [![npm](https://img.shields.io/npm/v/kyro-ai)](https://www.npmjs.com/package/kyro-ai) [![CI](https://github.com/SynapSync/kyro-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/SynapSync/kyro-ai/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 
-Kyro gives AI coding agents a durable, CLI-governed way to plan, execute, and review software work. Plans and evidence live in the project instead of disappearing with a chat session. Choose the workflow explicitly: **Forge** for scope-and-sprint delivery, or **Work** for a task-based plan with its own lifecycle. Neither path is selected by the size or difficulty of the job.
+**A workflow for AI coding agents where the agent proposes and a CLI decides what gets written.**
 
-Kyro works through a CLI and host adapters for Claude Code, Codex, OpenCode, and other skill-capable agents. The agent proposes and implements; the CLI validates and writes managed state. A passing task review is an attestation by a checker, not proof that tests ran or a substitute for independent QA.
+An agent that plans in a chat window forgets the plan when the session ends, marks its own work as done, and leaves nothing a second person can check. Kyro moves the plan, the evidence and the review out of the conversation and into the repository, behind a command-line tool that validates every change to that state.
 
-See the [changelog](CHANGELOG.md) for what changed in each version.
+- **State lives in the project.** Plans, tasks, evidence, reviews and debt are JSON and Markdown under `.agents/kyro/`, committed with the code.
+- **The CLI owns the writes.** Agents call `kyro` verbs; the CLI checks the schema and the transition, takes a lock, and writes. Hand edits are detected.
+- **Makers do not approve themselves.** Recorded evidence is a claim. A separate review, and optionally an independent QA pass, decides whether it holds.
+- **Closed work stays closed.** Closing a sprint writes a checkpoint with SHA-256 digests of the scope before and after, plus the git range of the code.
+- **One install, several hosts.** Claude Code, Codex, OpenCode and Pi use the same skills and the same state.
 
-## Choose a workflow
+## Quick start
 
-| | Forge | Work |
-| --- | --- | --- |
-| Start with | A scope and sprint plan | A Markdown brief and explicit task plan |
-| State | `.agents/kyro/scopes/<scope>/sprint.json` | `.agents/kyro/work/<id>/brief.md` and `work.json` |
-| Flow | Scope → sprint → tasks → reviews → QA-or-close → checkpoint | Brief → tasks → evidence → reviews → close or promote |
-| Use when | You want sprint checkpoints, scope-level planning, debt, and independent certification | You want a separate, task-driven path with dependencies, amendments, and explicit closure |
-| Entry point | `/kyro:forge` or `kyro-forge` | `/kyro:work` or `kyro-work`, selected explicitly |
-
-Work is **not** restricted to small or quick jobs. A Work can later be promoted into a **new** Forge scope through an explicit, recoverable CLI transaction. Promotion transfers selected unfinished tasks, not approvals: Forge tasks start pending and follow Forge's own review and QA process. It does not change the active Forge scope. See the [Work guide](docs/work.md).
-
-Before either path, `/kyro:idea` can mature an idea into a plan. Idea does not automatically choose or create a Forge scope or Work.
-
-## Install and verify
-
-Requires Node.js 18 or newer and Git. From the root of the project where you will use Kyro:
+Requires Node.js 18 or newer and Git. Run this from the root of the project where you want Kyro:
 
 ```bash
 npm install -g kyro-ai
 kyro install --init-workspace --yes
-kyro --version
 kyro doctor --artifacts
 ```
 
-Installation projects the runtime and command skills under `~/.agents/`, and initializes project-local `.agents/kyro/` state. Check `kyro capabilities --json` before relying on a command such as `work`: a locally installed older runtime does not gain new verbs merely because this repository was built. `kyro update` refreshes an installed runtime from a published package; it is not part of developing or testing a release candidate.
-
-One install publishes canonical `~/.agents/skills/kyro-*` skills and projects to every detected, enabled harness. Claude and OpenCode use native skill links with a copy fallback; Codex and Pi discover the canonical skills directly. Detection uses the harness binary on PATH or an existing config directory. Use `kyro install --no-init-workspace` for machine assets alone. `--agent` is an explicit selection that can re-enable a detected harness, not a required per-harness install step.
-
-```bash
-kyro adapters list
-kyro adapters disable claude       # Persistent machine opt-out; keeps canonical skills
-kyro adapters enable claude
-kyro adapters enable codex --integrations
-kyro doctor --adapters
-```
-
-Config integrations are opt-in: the Codex MCP/root `AGENTS.md` blocks and OpenCode agent overlay are unchanged on fresh installs without `--integrations`. Machine choices live in `~/.agents/kyro/adapters.json`; install/sync migrates legacy workspace `installedAdapters` with existing integrations preserved. Sync/update discovers newly added harnesses and respects disabled choices across workspaces. Doctor shows one row per implemented adapter.
-
-Invoke Work as Claude `/kyro-work`, Codex `kyro-work`, OpenCode `/kyro/work`, or Pi `/skill:kyro-work`. Pi has no files of its own. If you previously installed the Claude Kyro plugin, verify the new skills and then disable or uninstall the plugin in Claude Code; Kyro never changes plugin settings automatically. See [agent adapters](docs/agent-adapters.md) for discovery, link/copy behavior, invocation names, and migration.
-
-Workspace `kyro uninstall` preserves machine projections and integrations. `kyro uninstall --machine` removes Kyro-owned canonical skills, projections, integration blocks, and the registry. Each team member initializes their own clone; `local.json` remains personal and harness choices are per machine.
-
-## First steps
-
-For a Forge scope, ask your agent to run `/kyro:forge` (or its installed `kyro-forge` skill) with the outcome you want. Forge asks for approval at planning gates, writes sprint state through the CLI, and routes the next task from a fresh context pack. The typical progression is:
+Then ask your agent for an outcome through one of the two workflows:
 
 ```text
-scope initialization → sprint plan → task execution → evidence → review
-                     → independent QA or close decision → sprint checkpoint
+/kyro-forge Add OAuth login with Google and GitHub
+/kyro-work  Fix the price rounding bug in the checkout total
 ```
 
-For Work, write a Markdown brief that states a verifiable outcome, then create the Work explicitly:
+That is the Claude Code spelling; see [Supported hosts](#supported-hosts) for the others. The agent plans, stops at the approval gates, implements, records evidence and asks for review. You can stop at any point and continue in a fresh session with `/kyro-task-context`: the state is on disk, not in the chat.
+
+## How it works
+
+```text
+you ──► agent command (/kyro-forge, /kyro-work)
+              │  reads a context pack built from project state
+              ▼
+        agent proposes: plan, evidence, verdict
+              │  kyro plan · record-evidence · review · close-sprint
+              ▼
+        kyro CLI validates schema and transition, locks, writes
+              │
+              ▼
+        .agents/kyro/   plans, tasks, evidence, reviews, debt, checkpoints
+```
+
+The agent never edits `sprint.json` or `work.json` directly. Each verb is revision-bound, so a stale or conflicting write is refused instead of merged, and an interrupted transaction is either finished by an exact retry or fails closed.
+
+## Two workflows
+
+You choose the workflow explicitly. Neither is selected by the size or difficulty of the job.
+
+| | Forge | Work |
+| --- | --- | --- |
+| Start with | A scope and a sprint plan | A Markdown brief and an explicit task plan |
+| Flow | Scope → sprint → tasks → reviews → QA or close → checkpoint | Brief → tasks → evidence → reviews → close or promote |
+| State | `.agents/kyro/scopes/<scope>/sprint.json` | `.agents/kyro/work/<id>/brief.md` and `work.json` |
+| Choose it when | You want sprint checkpoints, a roadmap, tracked debt and independent certification | You want one task-driven piece of work with dependencies, amendments and its own closure |
+| Entry point | `/kyro-forge` | `/kyro-work` |
+
+Work is not limited to small jobs. A Work can later be promoted into a **new** Forge scope through an explicit, recoverable CLI transaction. Promotion transfers the selected unfinished tasks, not their approvals: the Forge tasks start pending and go through Forge's own review and QA. It does not change the active Forge scope. See the [Work guide](docs/work.md).
+
+Before either path, `/kyro-idea` can mature a rough idea into a plan. It does not choose or create a scope or a Work for you.
+
+Work can also be driven from the shell:
 
 ```bash
 kyro work create --id search-refresh --from brief.md --dry-run --json
@@ -69,65 +73,117 @@ kyro work status --work search-refresh --json
 kyro work context-pack --work search-refresh --json
 ```
 
-Create is only the beginning: use `kyro work plan` to submit the task proposal, then follow the CLI's revision-bound start, evidence, review, amendment, disposition, and closure commands. The CLI writes `work.json`; agents must not edit it directly. Preview mutating operations with `--dry-run` where supported. The [Work guide](docs/work.md) has the exact JSON inputs, flags, retry behavior, and promotion contract.
+## What it costs
 
-For either workflow, refresh status or context before writing. If a revision is stale, a brief changed outside the CLI, or a transaction is pending, resolve the reported blocker rather than editing managed files by hand. Work task review and Forge independent QA are deliberately different gates.
+We measured the overhead instead of guessing it. One model (Claude Haiku 5.5, headless), one small Node project, three tickets (a bug fix, a feature, a cross-cutting change with a file-format migration), three runs each, scored with tests the agent never saw.
 
-## Commands at a glance
+| Workflow | Runs fully passing | Median cost per ticket | Median turns | Median time |
+| --- | --- | --- | --- | --- |
+| No workflow | 9 of 9 | $0.015 | 8 | 32 s |
+| Kyro Work | 9 of 9 | $0.063 | 26 | 110 s |
+| Kyro Forge | 9 of 9 | $0.085 | 27 | 106 s |
+| OpenSpec 2.0 | 8 of 9 | $0.114 | 41 | 109 s |
 
-| Agent command / skill | Purpose |
+Read it for what it is. The tickets had complete acceptance criteria and the model solved all of them without help, so this measures overhead, not benefit: about 5 to 7 cents and a little over a minute per ticket for a plan, evidence, a review record and a verifiable close. It is a small sample, and the one OpenSpec miss was a run that stopped after its proposal because no person was there to continue it. For a one-line fix with a clear test, skip the workflow. Use Kyro when the work spans sessions or people, or when someone has to be able to check it later.
+
+The CLI itself stays out of the way: no runtime dependencies, a 0.7 MB package, and `kyro --version` returns in about 35 ms.
+
+## Supported hosts
+
+One `kyro install` publishes canonical skills under `~/.agents/skills/` and projects them to every detected host.
+
+| Host | Invoke Work as | How it gets the skills |
+| --- | --- | --- |
+| Claude Code | `/kyro-work` | Native skills linked under `~/.claude/skills/` |
+| Codex | `kyro-work` | Reads the canonical skills directly |
+| OpenCode | `/kyro/work` | Native skills and slash commands |
+| Pi | `/skill:kyro-work` | Reads the canonical skills directly |
+
+The other commands follow the same pattern. Manage hosts per machine:
+
+```bash
+kyro adapters list
+kyro adapters disable claude              # persistent opt-out; keeps the canonical skills
+kyro adapters enable codex --integrations # also write the Codex MCP and AGENTS.md blocks
+kyro doctor --adapters
+```
+
+Config integrations are opt-in: without `--integrations`, a fresh install does not touch a host's own configuration. If you used the old Claude Kyro plugin, check the new skills and then disable the plugin yourself; Kyro never changes plugin settings. Details are in [Agent adapters](docs/agent-adapters.md).
+
+## Commands
+
+Agent commands guide the agent. The CLI makes the deterministic state changes.
+
+| Agent command | Purpose |
 | --- | --- |
-| `/kyro:forge` · `kyro-forge` | Plan, execute, review, and close a Forge sprint or complete a finished scope |
-| `/kyro:work` · `kyro-work` | Enter the explicitly selected Work lifecycle |
-| `/kyro:idea` · `kyro-idea` | Mature an idea before choosing a workflow |
-| `/kyro:status` · `kyro-status` | Read Forge progress, roadmap, and debt |
-| `/kyro:task-context` · `kyro-task-context` | Prepare a concise handoff to a fresh session |
-| `/kyro:qa` · `kyro-qa` | Independently audit a Forge scope and implementation |
-| `/kyro:scope-retire` · `kyro-scope-retire` | Retire an obsolete scope through a separate human-gated operation |
+| `/kyro-forge` | Plan, execute, review and close a Forge sprint, or complete a finished scope |
+| `/kyro-work` | Run the Work lifecycle you selected |
+| `/kyro-idea` | Mature an idea before choosing a workflow |
+| `/kyro-status` | Read progress, roadmap and debt |
+| `/kyro-task-context` | Write a handoff prompt for a fresh session |
+| `/kyro-qa` | Audit a scope and its implementation independently of the executor |
+| `/kyro-scope-retire` | Retire an obsolete scope through a separate human-gated operation |
 
-These entry points guide an agent; the CLI owns deterministic state changes. For flags and machine-readable output, see the [CLI reference](docs/cli.md) and [commands reference](docs/commands-reference.md).
+| CLI | Purpose |
+| --- | --- |
+| `kyro status` · `kyro context-pack` | Read-only view of a scope, and the context package an agent starts from |
+| `kyro plan` · `record-evidence` · `review` · `close-sprint` | The Forge write path |
+| `kyro work <subcommand>` | The Work write path |
+| `kyro debt` · `adr` · `rule` · `scenario` · `clarify` | Tracked debt, decisions, conventions and requirements |
+| `kyro doctor [--artifacts] [--adapters] [--tokens]` | Diagnose the install, the artifacts and the prompt budgets |
+| `kyro capabilities --json` | The verbs this installed runtime supports |
+| `kyro update` · `sync` · `uninstall` | Maintain the install |
+
+The state verbs accept `--json` for a machine-readable envelope, and mutating verbs accept `--dry-run` where a preview makes sense. Check `kyro capabilities --json` before relying on a verb: an older installed runtime does not gain new ones because a repository was built. See the [CLI reference](docs/cli.md) and the [commands reference](docs/commands-reference.md).
 
 ## Project state and teams
 
 ```text
 .agents/kyro/
-├── project.json             # shared project policy; commit
-├── local.json               # personal active scope; ignore
-├── scopes/<scope>/           # shared Forge sprint state and close archives; commit
-└── work/<id>/               # shared Work brief, state, and durable history; commit
+├── project.json        # shared project policy; commit
+├── local.json          # your active scope and local settings; ignored
+├── scopes/<scope>/     # Forge sprint state and close archives; commit
+└── work/<id>/          # Work brief, state and history; commit
 ```
 
-Kyro's generated `.agents/kyro/.gitignore` excludes local state, locks, and pending transaction scratch; the Work brief and `work.json` remain trackable. A clone can read existing scopes from their sprint files. With multiple Forge scopes, select your own active scope using `kyro scope set-active <scope> --yes`. Work IDs are selected explicitly and do not silently change that Forge setting. See the [teams guide](docs/teams.md).
+Kyro writes its own `.agents/kyro/.gitignore`, which excludes local state, locks and pending-transaction scratch. Each team member runs `kyro install` in their own clone and picks their own active scope with `kyro scope set-active <scope> --yes`. Host choices are per machine, in `~/.agents/kyro/adapters.json`. See the [teams guide](docs/teams.md).
 
-The global runtime lives at `~/.agents/kyro/current/`; it is not a project file. Installing a newer version never silently migrates an existing scope, and `doctor` diagnoses rather than repairs. Scope state and closed checkpoints must be changed only by supported CLI operations. Checkpoints that record a sprint's git range (`close.git`, written since 6.5.0) cannot be verified by older runtimes, so teams sharing scopes should set `team.minPackageVersion`; see [Sprint git range](docs/sprint-close-checkpoints.md#sprint-git-range).
+The runtime lives at `~/.agents/kyro/current/` and is not a project file. `kyro uninstall` removes workspace assets and keeps the machine install; `kyro uninstall --machine` removes Kyro's skills, projections, integration blocks and registry.
 
-## Safety and review boundaries
+Checkpoints that record a sprint's git range (`close.git`, written since 6.5.0) cannot be verified by older runtimes, so teams that share scopes should set `team.minPackageVersion`; see [Sprint git range](docs/sprint-close-checkpoints.md#sprint-git-range).
 
-- **CLI-owned writes:** `sprint.json` and `work.json` have validated schemas and transitions. Use the relevant CLI verb instead of hand-editing them.
-- **Honest evidence:** recording a command and a `passed` result is a maker claim. A checker must inspect the actual work and results; Work reviews are task-level attestations.
-- **Recovery:** interrupted Work brief amendments and promotions use local pending records. Exact retries can finish valid interruptions; conflicting or corrupted state fails closed.
-- **Forge isolation:** ordinary Work operations do not alter Forge state. Only an explicitly confirmed promotion creates a new Forge scope, with its own provenance link and fresh pending tasks.
-- **Independent certification:** `/kyro:qa` is separate from executor review. Closing a sprint or completing a scope is a distinct, approval-gated action.
+## What Kyro guarantees, and what it does not
+
+- **It guarantees the record.** `sprint.json` and `work.json` have validated schemas and transitions, and only CLI verbs write them. A checkpoint commits to its content with SHA-256, so a later edit to a closed sprint is detectable.
+- **It does not prove the work is correct.** A recorded command with a `passed` result is the maker's claim. A passing review is a checker's attestation, not proof that tests ran. `/kyro-qa` is a separate, independent audit, and closing a sprint or completing a scope is its own approval-gated action.
+- **It recovers without guessing.** An interrupted amendment or promotion leaves a pending record. An exact retry finishes a valid interruption; conflicting or corrupted state fails closed.
+- **It keeps the workflows apart.** Work operations do not alter Forge state. Only a confirmed promotion creates a new Forge scope, with a provenance link and fresh pending tasks.
+- **Its tamper evidence has a boundary.** Someone who can rewrite both a checkpoint and its entry in the live ledger can replace both. If you need adversarial authenticity, protect history with signed commits as well; see [Sprint checkpoints](docs/sprint-close-checkpoints.md).
+
+## Upgrading
+
+`kyro update` installs the latest release and refreshes the runtime and the workspace. Upgrading never rewrites an existing scope, `kyro doctor` diagnoses rather than repairs, and closed-scope checkpoints remain immutable. The [changelog](CHANGELOG.md) lists what changed in each version.
 
 ### Legacy debt remediation
 
-Kyro **4.43.5 is origin-only**: `debt.origin.set` changes `origin` but cannot repair an entire legacy debt record. Kyro **4.44.0 and later**, including the current release **6.5.0**, supports `debt.canonicalize` (remediation protocol v3) for a record with missing canonical fields or legacy-only keys. Protocol v5 also records post-close debt transitions so an owner can reconcile debt and complete a scope without changing historical checkpoints. The older `resolvedSprint` compatibility migration no longer runs during install, sync, or update. Nothing is migrated for you: upgrading never rewrites an existing scope, and closed-scope checkpoints remain immutable.
+Kyro **4.43.5 is origin-only**: `debt.origin.set` changes `origin` but cannot repair an entire legacy debt record. Kyro **4.44.0 and later**, including the current release **6.5.0**, supports `debt.canonicalize` (remediation protocol v3) for a record with missing canonical fields or legacy-only keys. Protocol v5 also records post-close debt transitions, so an owner can reconcile debt and complete a scope without changing historical checkpoints. Nothing is migrated for you.
 
-The explicit path is doctor → prepare → supply values → preview → apply with confirmation → doctor → recertify. Kyro does not guess `priority` or `targetSprint`; a suggestion is never an authorization. [Kyro Lens](https://github.com/synapsync/kyro-lens) verifies the resulting commitments read-only and does not repair them. See the [CLI remediation guide](docs/cli.md) and [release checklist](docs/release-checklist.md).
+The explicit path is doctor → prepare → supply values → preview → apply with confirmation → doctor → recertify. Kyro does not guess `priority` or `targetSprint`; a suggestion is never an authorization. [Kyro Lens](https://github.com/synapsync/kyro-lens) verifies the resulting commitments read-only and does not repair them. See the [CLI remediation guide](docs/cli.md) and the [release checklist](docs/release-checklist.md).
 
 ## Documentation
 
 | Guide | What it covers |
 | --- | --- |
-| [Getting started](docs/getting-started.md) | Initial installation and Forge scope |
-| [Work](docs/work.md) | Complete Work CLI lifecycle and promotion |
-| [CLI](docs/cli.md) | Tool-owned verbs, invocation, upgrades, and remediation |
-| [Agent adapters](docs/agent-adapters.md) | Claude, Codex, OpenCode, and other hosts |
-| [Teams](docs/teams.md) | Shared versus personal state and clone bootstrap |
-| [Architecture](docs/architecture.md) | Components, storage, and data flow |
-| [Maker/checker](docs/maker-checker.md) | Evidence and review responsibilities |
-| [Validation tiers](docs/validation-tiers.md) | Focused task checks, proportional sprint close, aggregate at integration |
-| [Sprint checkpoints](docs/sprint-close-checkpoints.md) | Lossless Forge closure and recovery |
+| [Getting started](docs/getting-started.md) | First install and first Forge scope |
+| [Work](docs/work.md) | The full Work lifecycle and promotion |
+| [CLI](docs/cli.md) | Verbs, invocation, upgrades and remediation |
+| [Agent adapters](docs/agent-adapters.md) | Claude Code, Codex, OpenCode, Pi and other hosts |
+| [Teams](docs/teams.md) | Shared and personal state, clone bootstrap |
+| [Architecture](docs/architecture.md) | Components, storage and data flow |
+| [Maker/checker](docs/maker-checker.md) | Who records evidence and who reviews it |
+| [Validation tiers](docs/validation-tiers.md) | Focused checks per task, the full suite at integration |
+| [Sprint checkpoints](docs/sprint-close-checkpoints.md) | Lossless closure, the git range and recovery |
+| [Cost model](docs/cost-model.md) | Prompt budgets per route and how they are kept |
 | [MCP](docs/mcp.md) · [Trace](docs/trace.md) · [Evals](docs/evals.md) | Structured tools and diagnostics |
 
 ## Develop Kyro
@@ -138,10 +194,16 @@ cd kyro-ai
 npm ci
 npm run build
 npm run check
-npm run check:adapters
-npm pack --dry-run
 ```
 
-`npm run check` runs the 89 validation steps concurrently (`scripts/run-checks.mjs`; the step list is `scripts/lib/check-steps.mjs`) and prints only the failed steps' output. Use `npm run check:serial` for the old one-at-a-time order, or `node scripts/run-checks.mjs --jobs 4 --only <pattern> --bail --list --timings <file>` to tune it. The build output must match source (`npm run check:dist`). Use `node dist/cli.js` to test a checkout without changing the globally installed runtime. Release metadata in `package.json`, `package-lock.json`, and `WORKFLOW.yaml` must agree. See the [release checklist](docs/release-checklist.md).
+`npm run check` runs every validation step in parallel and prints only the output of the steps that failed; it takes about two and a half minutes on eight cores. Narrow it while you work:
+
+```bash
+node scripts/run-checks.mjs --list
+node scripts/run-checks.mjs --only flag --bail
+npm run check:serial
+```
+
+Use `node dist/cli.js` to try a checkout without touching your installed runtime. Versions in `package.json`, `package-lock.json` and `WORKFLOW.yaml` must agree; the [release checklist](docs/release-checklist.md) has the rest.
 
 Licensed under [Apache-2.0](LICENSE). [Report an issue](https://github.com/SynapSync/kyro-ai/issues).
