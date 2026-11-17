@@ -3,7 +3,7 @@
 - **Created:** 2026-11-16
 - **Baseline:** `develop` at `4c35f11`, kyro-ai 6.5.0
 - **Work branch:** `develop` (phases 1 and 2 were committed there on 2026-11-16)
-- **Status:** Phases 1 to 7 certified; Phase 8 in progress
+- **Status:** All 8 phases done; the phase 8 decision is the owner's
 
 This document records a project review done on 2026-11-16 and the phased plan that came out of it.
 It is the single place to track that plan. Any agent can resume from the "Status board" and the
@@ -38,7 +38,7 @@ Project rules that apply to every phase:
 | 5 | Lazy command loading | certified | 2026-11-16 | QA log, phase 5 rounds 1 and 2; commit `17844ba` |
 | 6 | Declarative flag parsing | certified | 2026-11-16 | QA log, phase 6 rounds 1 and 2; commit `66455ab` |
 | 7 | Structure, budgets and README cleanup | certified | 2026-11-16 | QA log, phase 7 (two entries); commits `2912f41` and `eef7daa` |
-| 8 | Measure Kyro against other workflows; short path | pending | — | — |
+| 8 | Measure Kyro against other workflows; short path | measured | 2026-11-16 | `.agents/kyro/plan/2026-11-16-workflow-overhead-bench.md`; recommendation: no new short path |
 
 Status values: `pending`, `in progress`, `in QA`, `returned`, `certified`.
 
@@ -517,6 +517,16 @@ The user approved both policy changes on 2026-11-16.
   `check:remediation-release-docs` was not changed: it needs the candidate version in the README,
   which now sits in the legacy-remediation sentence ("the current release **6.5.0**").
 - Full `npm run check`: 91 of 91, 145.0 s.
+
+### Phase 8 — 2026-11-16 — measured
+
+At the user's request the bench ran with Haiku 5.5 (Claude Code headless) instead of Codex: 4 arms,
+3 tickets, 3 repetitions, 36 runs, $2.45. Results and limits are in
+`.agents/kyro/plan/2026-11-16-workflow-overhead-bench.md`. In short: every arm solved every
+ticket except one OpenSpec run that stopped after its proposal; median cost was $0.015 with no
+workflow, $0.063 with Kyro Work, $0.085 with Kyro Forge and $0.114 with OpenSpec. The tickets were
+too easy to show a quality difference, so the bench measures overhead only. Recommendation: no new
+short path; Work already is one.
 
 QA tooling lives in `~/.cache/kyro-tmp/roadmap-qa/` (`baseline/`, `capture.sh`, `count.js`,
 `differential.sh`, `longlived.js`, and `base/`, a build of the pre-change commit).
