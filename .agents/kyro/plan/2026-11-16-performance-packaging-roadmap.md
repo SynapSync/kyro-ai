@@ -530,3 +530,7 @@ short path; Work already is one.
 
 QA tooling lives in `~/.cache/kyro-tmp/roadmap-qa/` (`baseline/`, `capture.sh`, `count.js`,
 `differential.sh`, `longlived.js`, and `base/`, a build of the pre-change commit).
+
+## Follow-up: multi-session bench (2026-11-17)
+
+The harder four-session bench found no benefit from any workflow on Haiku and 40-55% extra cost; see `2026-11-17-multi-session-bench.md`. No README claim.

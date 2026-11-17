@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.6.0] - 2026-11-17
+
+Performance, packaging and maintainability release. No change to state formats, verbs, prompts or output; agent token cost per task is unchanged.
+
 ### Changed
 
 - `npm run check` runs its 89 steps concurrently through `scripts/run-checks.mjs` (about 3 minutes on 16 cores, was 12; about 4 minutes with `--jobs 4`) instead of one `&&` chain. The single step list is `scripts/lib/check-steps.mjs`; the `check` script in `package.json` is just the runner, and the runner refuses to start if a `check:*` script is neither a step nor listed as deliberately excluded. `typecheck` and `check:dist` run first and gate the rest; every other step runs even after a failure and only failed steps print their output (`--bail`, `--only`, `--skip`, `--list`, `--jobs <n>` or `KYRO_CHECK_JOBS`, `--timings <file>`, `--serial`). `npm run check:serial` keeps the old one-at-a-time order. Each step gets a private `TMPDIR`; `check:canonicalization-gate` (rewrites `dist/` in place) and `check:eval` (writes fixtures inside `fixtures/evals/`) run alone. `check:capabilities` and `check:operation-snapshots` no longer write `.kyro-state-writer.lock` into the repository root or scan the shared temp directory. New helper `scripts/lib/sandbox.mjs`.
