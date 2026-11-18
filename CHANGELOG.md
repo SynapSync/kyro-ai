@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.6.1] - 2026-11-17
+
+### Fixed
+
+- `kyro update` and `kyro update --check` no longer refuse an npm-installed `kyro` with "The active kyro command belongs to another manager or npm prefix" when the shell reaches it through a version manager's symlinked bin directory (mise keeps `installs/node/latest -> 26.x` on PATH while `npm prefix -g` reports the resolved directory). Ownership is still `foreign` unless the command and npm's own `<prefix>/bin/kyro` resolve to the same file; Windows is unchanged. Guarded by three new cases in `check:invocation` (symlinked bin owned; no resolvable shim foreign; another install foreign). Reported on Omarchy with mise.
+
+### Docs
+
+- `docs/cli.md` explains the version-manager case and that global npm packages belong to one Node version, so `npm install -g kyro-ai` is needed once after the manager moves to a new Node.
+
 ## [6.6.0] - 2026-11-17
 
 Performance, packaging and maintainability release. No change to state formats, verbs, prompts or output; agent token cost per task is unchanged.
