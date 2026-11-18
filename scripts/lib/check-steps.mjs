@@ -29,6 +29,7 @@ export const STEPS = [
   { name: 'check:command-modes', est: 0 },
   { name: 'check:seedbed', est: 0 },
   { name: 'check:managed-write-contract', est: 0 },
+  { name: 'check:toml-managed-block', est: 0 },
   { name: 'check:runtime-artifacts', est: 0 },
   { name: 'check:routing', est: 0 },
   { name: 'check:qa-or-close', est: 1 },
