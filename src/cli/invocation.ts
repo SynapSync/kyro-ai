@@ -118,6 +118,14 @@ export interface GlobalKyroProbe {
   npmRoot: string | null;
   /** Real path of commandPath; null if the shim cannot be inspected. */
   realPath: string | null;
+  /**
+   * Real path of the shim npm itself would write (`<npmPrefix>/bin/kyro`); null when it cannot be
+   * inspected or the platform does not use a POSIX shim. Version managers (mise, asdf, nvm) keep
+   * a stable symlinked bin directory on PATH (…/node/latest/bin) while `npm prefix -g` reports the
+   * resolved version directory (…/node/26.13.1), so the literal paths differ for a legitimate
+   * npm-owned install.
+   */
+  expectedShimRealPath?: string | null;
   /** Windows npm .cmd text; null if unreadable. */
   shimContents?: string | null;
   platform?: NodeJS.Platform;
@@ -144,7 +152,14 @@ export function classifyGlobalKyroOwnership(probe: GlobalKyroProbe): GlobalKyroO
     : path.join(npmPrefix, 'lib', 'node_modules');
   if (normalize(npmRoot) !== normalize(expectedRoot)) return 'ambiguous';
   const expectedShim = platform === 'win32' ? path.join(npmPrefix, 'kyro.cmd') : path.join(npmPrefix, 'bin', 'kyro');
-  if (normalize(commandPath) !== normalize(expectedShim)) return 'foreign';
+  if (normalize(commandPath) !== normalize(expectedShim)) {
+    // Version managers expose the npm bin through a symlinked version directory on PATH, so the
+    // literal shim path differs from npm's resolved prefix even though both name the same file.
+    // Accept that only when the canonical targets match; a real second install stays foreign.
+    if (platform === 'win32') return 'foreign';
+    const shimRealPath = probe.expectedShimRealPath;
+    if (!shimRealPath || normalize(realPath) !== normalize(shimRealPath)) return 'foreign';
+  }
   const expectedCli = path.join(npmRoot, 'kyro-ai', 'dist', 'cli.js');
   if (platform === 'win32') {
     const contents = probe.shimContents;

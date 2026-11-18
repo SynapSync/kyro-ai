@@ -46,6 +46,24 @@ assert(classifyGlobalKyroOwnership({ ...owner, commandPath: null, realPath: null
 assert(classifyGlobalKyroOwnership({ ...owner, realPath: null }) === 'ambiguous', 'unreadable path is ambiguous');
 assert(classifyGlobalKyroOwnership({ ...owner, npmRoot: '/other/lib/node_modules' }) === 'ambiguous', 'inconsistent npm root is ambiguous');
 assert(classifyGlobalKyroOwnership({ ...owner, commandPath: '/home/u/.npm/_npx/a/node_modules/.bin/kyro' }) === 'foreign', 'npx command is foreign');
+// Version managers (mise, asdf, nvm) keep a stable symlinked bin directory on PATH while
+// `npm prefix -g` reports the resolved version directory; both must name the same cli.js.
+const symlinkedOwner = {
+  commandPath: '/home/u/.local/share/mise/installs/node/latest/bin/kyro',
+  npmPrefix: '/home/u/.local/share/mise/installs/node/26.13.1',
+  npmRoot: '/home/u/.local/share/mise/installs/node/26.13.1/lib/node_modules',
+  realPath: '/home/u/.local/share/mise/installs/node/26.13.1/lib/node_modules/kyro-ai/dist/cli.js',
+  expectedShimRealPath: '/home/u/.local/share/mise/installs/node/26.13.1/lib/node_modules/kyro-ai/dist/cli.js',
+  platform: 'linux',
+};
+assert(classifyGlobalKyroOwnership(symlinkedOwner) === 'npm-owned',
+  'symlinked version-manager bin is owned when it resolves to the npm prefix cli.js');
+assert(classifyGlobalKyroOwnership({ ...symlinkedOwner, expectedShimRealPath: null }) === 'foreign',
+  'symlinked bin is foreign when the npm shim cannot be resolved');
+assert(classifyGlobalKyroOwnership({
+  ...symlinkedOwner,
+  expectedShimRealPath: '/other/lib/node_modules/kyro-ai/dist/cli.js',
+}) === 'foreign', 'symlinked bin from another install stays foreign');
 const winOwner = {
   commandPath: 'C:\\npm\\kyro.cmd', npmPrefix: 'C:\\npm', npmRoot: 'C:\\npm\\node_modules',
   realPath: 'C:\\npm\\kyro.cmd', shimContents: '@ECHO off\r\nnode "%~dp0\\node_modules\\kyro-ai\\dist\\cli.js" %*', platform: 'win32',

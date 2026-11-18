@@ -283,6 +283,7 @@ export function probeGlobalKyroOwnership(): GlobalKyroOwnership {
   const prefix = runPackageManager('npm', ['prefix', '-g'], { timeout: REGISTRY_TIMEOUT_MS });
   const root = runPackageManager('npm', ['root', '-g'], { timeout: REGISTRY_TIMEOUT_MS });
   let realPath: string | null = null;
+  let expectedShimRealPath: string | null = null;
   let shimContents: string | null = null;
   try {
     realPath = realpathSync(commandPath);
@@ -290,11 +291,20 @@ export function probeGlobalKyroOwnership(): GlobalKyroOwnership {
   } catch {
     // An unreadable command cannot establish npm ownership.
   }
+  const prefixPath = prefix.status === 0 && !prefix.spawnError ? prefix.stdout.trim() : null;
+  if (prefixPath && process.platform !== 'win32') {
+    try {
+      expectedShimRealPath = realpathSync(join(prefixPath, 'bin', 'kyro'));
+    } catch {
+      // No npm shim at that prefix; the literal-path comparison decides below.
+    }
+  }
   return classifyGlobalKyroOwnership({
     commandPath,
-    npmPrefix: prefix.status === 0 && !prefix.spawnError ? prefix.stdout.trim() : null,
+    npmPrefix: prefixPath,
     npmRoot: root.status === 0 && !root.spawnError ? root.stdout.trim() : null,
     realPath,
+    expectedShimRealPath,
     shimContents,
   });
 }

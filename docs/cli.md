@@ -476,7 +476,7 @@ Behavior notes:
   `kyro update --check` only reports the status.
 - `--check` and `--dry-run` are read-only. If the registry cannot be reached, they report that the target version is unknown; a real update stops without choosing an unverified version.
 - If only the projected runtime exists, `kyro update` reports migration steps and does not install another package implicitly: `npm install -g kyro-ai`, open a new terminal, verify `kyro --version`, then run `kyro install --scope workspace --init-workspace --yes` from the project root. Existing scope state is preserved.
-- A command owned by pnpm, another npm prefix, or an ambiguous PATH is blocked with a diagnostic rather than updating a different installation. A partial failure reports which package and runtime steps completed and an explicit repair command.
+- A command owned by pnpm, another npm prefix, or an ambiguous PATH is blocked with a diagnostic rather than updating a different installation. A version manager (mise, nvm, asdf with an npm-shaped prefix) that puts a symlinked bin directory such as `…/node/latest/bin` on PATH is recognised as npm-owned when that command and npm's own `<prefix>/bin/kyro` resolve to the same file. Global npm packages belong to one Node version: after the manager moves to a new Node, run `npm install -g kyro-ai` once under it, because `kyro` is not a manager-provided tool. A partial failure reports which package and runtime steps completed and an explicit repair command.
 - `update` is operator surface like `install` and `sync`: it is not a tool-owned verb, so the
   capability handshake is untouched and agents never self-update mid-sprint.
 
@@ -926,6 +926,7 @@ that leaves an immutable record of itself.
 | **6.4.1** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; fixes native Windows `work create` and `work amend-brief` source ingestion and isolates integrity-repair tests from machine configuration. |
 | **6.5.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; records each sprint's git range at plan and close, adds the opt-in close commit, and keeps personal `local.json` preferences across state rewrites; fixes active-plan phase statuses, Git exclusion of the state-writer lock, and remediation replay across later sprint closes. Checkpoints with `close.git` need 6.5.0 or later to verify. |
 | **6.6.0** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; no change to state formats or verbs. Faster read-only commands and startup, a 0.68 MB package, declarative flag parsing and smaller source files. |
+| **6.6.1** | retains protocol v3/v5 remediation | Preserves `debt.canonicalize` and post-close debt transitions; `kyro update` no longer reports an npm-owned install behind a version manager's symlinked bin directory as foreign. |
 
 **Kyro 4.43.5 is origin-only and cannot repair a record-level legacy shape.** If a debt carries a
 string `origin` *and* legacy-only keys *and* missing canonical fields — the shape real pre-contract

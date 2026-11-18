@@ -155,7 +155,7 @@ Checkpoints that record a sprint's git range (`close.git`, written since 6.5.0) 
 
 ### Legacy debt remediation
 
-Kyro **4.43.5 is origin-only**: `debt.origin.set` changes `origin` but cannot repair an entire legacy debt record. Kyro **4.44.0 and later**, including the current release **6.6.0**, supports `debt.canonicalize` (remediation protocol v3) for a record with missing canonical fields or legacy-only keys. Protocol v5 also records post-close debt transitions, so an owner can reconcile debt and complete a scope without changing historical checkpoints. Nothing is migrated for you.
+Kyro **4.43.5 is origin-only**: `debt.origin.set` changes `origin` but cannot repair an entire legacy debt record. Kyro **4.44.0 and later**, including the current release **6.6.1**, supports `debt.canonicalize` (remediation protocol v3) for a record with missing canonical fields or legacy-only keys. Protocol v5 also records post-close debt transitions, so an owner can reconcile debt and complete a scope without changing historical checkpoints. Nothing is migrated for you.
 
 The explicit path is doctor → prepare → supply values → preview → apply with confirmation → doctor → recertify. Kyro does not guess `priority` or `targetSprint`; a suggestion is never an authorization. [Kyro Lens](https://github.com/synapsync/kyro-lens) verifies the resulting commitments read-only and does not repair them. See the [CLI remediation guide](docs/cli.md) and the [release checklist](docs/release-checklist.md).
 

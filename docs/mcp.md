@@ -88,3 +88,7 @@ Cursor (`mcp.json`):
 See [Agent-Computer Interface](aci.md) for the error-code table, `verbosity` contract, result-summary
 format, and the CLI↔MCP parameter naming map. The MCP surface exposes nine tools including
 `review_task` (maker/checker) and `trace_tail` (observability).
+
+## Codex configuration
+
+With `--integrations`, Kyro keeps one managed `[mcp_servers.kyro]` table in `~/.codex/config.toml`, between `# kyro-ai:mcp-server-kyro:start` and `:end` markers. If an unmarked `[mcp_servers.kyro]` table already exists, Kyro adopts it when it holds only `command` and `args`, and otherwise leaves your table untouched and adds nothing: TOML does not allow two tables with the same name, and Codex refuses to start with a duplicate. A `config.toml` that an older Kyro left with two tables is repaired by the next `kyro sync`; to repair it by hand, delete the unmarked table.

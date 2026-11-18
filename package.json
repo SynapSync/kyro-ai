@@ -1,6 +1,6 @@
 {
   "name": "kyro-ai",
-  "version": "6.6.0",
+  "version": "6.6.1",
   "description": "Portable sprint workflow kit for AI coding agents, with markdown artifacts, adapter guides, formal debt tracking, and evidence-grounded idea maturation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -75,6 +75,7 @@
     "check:guardrails": "node scripts/check-guardrails.mjs",
     "check:token-budgets": "node scripts/check-token-budgets.mjs",
     "check:managed-write-contract": "node scripts/check-managed-write-contract.mjs",
+    "check:toml-managed-block": "node scripts/check-toml-managed-block.mjs",
     "check:cli-envelope": "node scripts/check-cli-envelope.mjs",
     "check:cli-lazy-load": "node scripts/check-cli-lazy-load.mjs",
     "check:flag-parsing": "node scripts/check-flag-parsing.mjs",

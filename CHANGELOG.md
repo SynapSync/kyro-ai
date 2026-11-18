@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [6.6.1] - 2026-11-17
+
+### Fixed
+
+- `kyro update` and `kyro update --check` no longer refuse an npm-installed `kyro` with "The active kyro command belongs to another manager or npm prefix" when the shell reaches it through a version manager's symlinked bin directory (mise keeps `installs/node/latest -> 26.x` on PATH while `npm prefix -g` reports the resolved directory). Ownership is still `foreign` unless the command and npm's own `<prefix>/bin/kyro` resolve to the same file; Windows is unchanged. Guarded by three new cases in `check:invocation` (symlinked bin owned; no resolvable shim foreign; another install foreign). Reported on Omarchy with mise.
+
+- `kyro install`, `sync` and `update` no longer write a second `[mcp_servers.kyro]` table into `~/.codex/config.toml` when an unmarked one already exists. TOML forbids duplicate tables and Codex 0.169 refuses to load such a file (`duplicate key`), which also broke hosts that start `codex app-server`, such as T3 Code. An unmarked table that holds only Kyro's own `command` and `args` is adopted into the managed block (a config already damaged this way is healed on the next sync); a table with other keys or sub-tables, which is the user's own configuration, is left exactly as it is. Other managed blocks, and `AGENTS.md`, are unchanged. New `check:toml-managed-block`.
+
+### Docs
+
+- `docs/cli.md` explains the version-manager case and that global npm packages belong to one Node version, so `npm install -g kyro-ai` is needed once after the manager moves to a new Node.
+
 ## [6.6.0] - 2026-11-17
 
 Performance, packaging and maintainability release. No change to state formats, verbs, prompts or output; agent token cost per task is unchanged.
